@@ -22,6 +22,20 @@ Feature: Connection profiles
     And its stream port is 5551
     And its management port is 15671
 
+  Scenario: A new connection defaults to read-only topology control
+    When I add a connection with these settings
+      | name          | uat-eu                 |
+      | host          | rabbit-uat.example.com |
+      | virtual host  | /                      |
+      | username      | svc-explorer           |
+      | password      | s3cret                 |
+    Then its topology control level is "Read-only"
+
+  Scenario: Raise a connection's topology control level
+    Given a saved connection "uat-eu"
+    When I set the topology control level of "uat-eu" to "Full control"
+    Then its topology control level is "Full control"
+
   Scenario: Connection names must be unique
     Given a saved connection "uat-eu"
     When I try to save another connection named "uat-eu"
@@ -82,7 +96,7 @@ Feature: Connection profiles
     When I choose a CA certificate file that is not a valid certificate
     Then the file is rejected with a message saying it is not a valid certificate
 
-  @security @needs-spike
+  @security
   Scenario: Passwords are not stored in the profile file
     Given a saved connection "uat-eu" with password "s3cret"
     Then the profile file on disk does not contain "s3cret"

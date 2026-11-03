@@ -118,7 +118,7 @@ Four screens cover v1's core flow, laid out like Kafka UI: a left sidebar for co
 
 ## Topology migrations and permission guardrails
 
-Topology changes are versioned JSON files applied in order, like a database migration tool, and each connection is its own environment: before the first connection the app checks what the connection's user may do, and limits itself to that.
+Topology changes are versioned JSON files applied in order, like a database migration tool, and each connection is its own environment: before the first connection the app checks what the connection's user may do, and limits itself to that. On top of that broker-read check, the user also sets their own ceiling for the connection — a self-constraint level — and the app enforces whichever of the two is stricter.
 
 A migration lists the changes to make: streams, super streams, quorum queues, exchanges, bindings and policies. The app applies pending files in version order, tracking applied versions per machine and per connection profile, and can export a broker's current topology as a new file, so one format covers both apply and export/import. The format below is a proposal to refine.
 
@@ -133,11 +133,38 @@ A migration lists the changes to make: streams, super streams, quorum queues, ex
 }
 ```
 
-| Permission found for the connection's user | What the app allows |
+### Self-constraint level
+
+Each connection profile carries its own `topologyControlLevel`, a ceiling the user sets explicitly for that connection, independent of what the broker would otherwise allow. It defaults to Read-only for every new profile, so a freshly added connection never unlocks topology changes by surprise. Three levels, each strictly containing the one before it:
+
+| Level | What the app allows on this connection, regardless of broker permission |
+| --- | --- |
+| Read-only (default) | No topology changes at all: no declare, no edit, no delete, no migration applied. Topology and statistics stay readable. |
+| Declare and edit | Declare new topology (streams, super streams, queues, exchanges, bindings, policies) and edit existing items (policies, bindings); deleting is still blocked. |
+| Full control | Everything Declare and edit allows, plus delete; migrations may include destructive actions. |
+
+This is the app's own rule, layered on top of the broker's. It resolves what was previously an open question: RabbitMQ's configure permission covers both creating and deleting, so a broker-only check cannot allow one without the other — the self-constraint level is where the app draws that line instead, by reserving delete for Full control specifically.
+
+### Broker-read permission
+
+Unchanged from before: before the first connection, and again whenever the profile is edited, the app reads the connection user's permissions on the virtual host from the management API.
+
+| Permission found for the connection's user | What the broker-read half allows |
 | --- | --- |
 | Configure permission on the virtual host | Declare, edit and delete topology, apply migrations |
 | No configure permission | Read topology and statistics; edit, validate and export migration files; no topology changes |
 | No write permission | Test publishing is disabled |
+
+If permissions cannot be read at all, the app falls back to the safest mode: topology locked, test publishing disabled, streams still listable and browsable (see `tests/bdd/features/02_permission_check.feature`, "Permissions cannot be read for this user").
+
+### Effective permission
+
+An action is allowed only when both halves allow it — the stricter of the self-constraint level and the broker-read permission wins:
+
+- **Declare or edit:** needs self-constraint at Declare and edit or above, and the broker's configure permission.
+- **Delete:** needs self-constraint at Full control, and the broker's configure permission.
+- **Apply a migration:** each action inside it is checked individually against the same two rules; a migration that only reads (dry run, export) never needs either.
+- **Test publishing:** governed solely by the broker's write permission. The self-constraint level is topology-only and has no effect on it.
 
 ## Testing: TDD and BDD
 
@@ -196,5 +223,6 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 **Open questions**
 
 - [ ] How does the app read the user's own permissions? The management API lists permissions for administrators; confirm whether a non-administrator user can see their own, and what the fallback is.
-- [ ] RabbitMQ's configure permission covers both creating and deleting, so the check cannot allow additive changes while blocking deletes. Is that acceptable, or should the app add its own rule on top?
 - [ ] Confirm the exact fields returned by the stream publisher and consumer endpoints (offset, messages behind, counters) on a real broker; the API reference does not list them.
+
+Resolved: RabbitMQ's configure permission covers both creating and deleting, so a broker-only check could not allow one without the other. Resolved by the self-constraint level (see "Topology migrations and permission guardrails" / Self-constraint level): the app adds its own rule on top, reserving delete for the Full control level.

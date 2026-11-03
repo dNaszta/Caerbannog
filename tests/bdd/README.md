@@ -54,7 +54,7 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 
 | Feature file | Spec section | Milestone |
 | --- | --- | --- |
-| 01 connections | Screens (Connections), Architecture (TLS only) | M1 |
+| 01 connections | Screens (Connections), Architecture (TLS only), Topology migrations and permission guardrails (self-constraint level) | M1 |
 | 02 permission check | Topology migrations and permission guardrails | M1 |
 | 03 stream list | Goals (stream list), Screens (Stream list) | M2 |
 | 04 publishers and consumers | Goals (publishers and consumers) | M2 |
@@ -72,5 +72,9 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 - How a non-administrator user's own permissions are read (`02`, `@needs-spike`).
 - Exact fields of the stream publisher and consumer endpoints (`04`, `@needs-spike`).
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
-- Whether the configure permission is enough, or the app adds its own rule on top (spec open question).
 - Whether streams are found by name through the same API call as queues (`11`, `@needs-spike`).
+
+Resolved: whether the broker's configure permission alone is a sufficient guardrail. Resolved by the
+self-constraint level (`docs/spec.md`, "Topology migrations and permission guardrails"): the app adds its own
+rule on top, reserving delete for the Full control level. `01` now covers storing/editing the level; `02` and
+`10` will need scenarios for the combined effective-permission check once M1-03 and M5 scope that enforcement.
