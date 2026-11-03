@@ -1,0 +1,32 @@
+# Local developer commands for Caerbannog.
+#
+# Requires go-task (https://taskfile.dev) installed separately, e.g. `brew install go-task` on macOS.
+# Each task below is a thin wrapper around an existing `./gradlew` command - no logic lives here, it
+# only shortens what a developer has to type. See docs/tasks/M1-TASKFILE-01-local-dev-commands.md.
+version: '3'
+
+tasks:
+  test:
+    desc: Run the fast test suite across all modules (no Docker required).
+    cmds:
+      - ./gradlew test
+
+  test:broker:
+    desc: Run the Docker-dependent @broker test suite (needs Docker Desktop running).
+    cmds:
+      - ./gradlew :data-rabbit:brokerTest
+
+  run:
+    desc: Launch the desktop app.
+    cmds:
+      - ./gradlew :desktopApp:run
+
+  package:dmg:
+    desc: Build the macOS .dmg installer.
+    cmds:
+      - ./gradlew :desktopApp:packageDmg
+
+  package:msi:
+    desc: Build the Windows .msi installer (cannot be cross-built from macOS).
+    cmds:
+      - ./gradlew :desktopApp:packageMsi
