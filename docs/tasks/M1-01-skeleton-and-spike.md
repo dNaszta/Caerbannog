@@ -154,7 +154,7 @@ trusted for CI use.
 
 ## Status
 
-- Step: 3 (build) — in progress
+- Step: 4 (verify) — in progress
 - Round: 1
 - Last verdict: none yet
 - Open findings: none yet
@@ -163,12 +163,72 @@ trusted for CI use.
     scenarios, for both local dev and CI (overrides the architect's Colima/Podman recommendation above).
     License eligibility for this org was not separately confirmed as part of this decision; if that becomes
     a concern later it is a separate follow-up, not a blocker for this task.
-  - Kotlin Toolchain vs Gradle: test developer found the installed `kotlin` CLI (v2.4.21, Homebrew) has no
-    `new`, `run`, or `package` subcommands at all — not the project-oriented Toolchain the spec describes.
-    Senior developer should still run and record the formal `kotlin package --help` check per Acceptance
-    item 1, but should expect to land on the Gradle fallback.
-  - Keychain library and test-stack choices: engineering calls, confirmed candidates now exercised in the
-    red tests (`com.github.javakeyring:java-keyring`; JUnit 5 + `cucumber-junit-platform-engine` for BDD).
-    Senior developer may still switch the plain unit-test framework to Kotest if preferred — only
-    `core/src/jvmTest/kotlin/dev/caerbannog/core/SpikeSanityTest.kt` depends on that choice.
-- Branch: `m1-01-skeleton-and-spike` (scaffold + red tests at commit `0b6d5a1`)
+  - Resolved by the senior developer: build tool is **Gradle fallback** (Kotlin CLI has no `new`/`run`/
+    `package` subcommands at all here — not ambiguous). Test stack is **JUnit 5 everywhere** (incl. driving
+    Cucumber via JUnit Platform Suite) and `com.github.javakeyring:java-keyring` for the keychain. All
+    recorded in `docs/spec.md`.
+  - New, for the architect's review: Testcontainers can't talk to this machine's Docker Desktop (29.8.2,
+    API 1.56) without a workaround (`systemProperty("api.version", "1.43")` pinned on `data-rabbit`'s
+    `brokerTest` task) — see the senior developer's root-cause note below. Open question: does this travel
+    safely to CI's Docker Desktop version, or should CI `@broker` wiring be its own follow-up task? Not yet
+    escalated to the product owner — architect to judge in review whether this is purely technical or needs
+    to go up.
+  - Windows keychain round-trip is unverified (no Windows hardware/CI yet) — carried as a known gap, not a
+    blocker for this task per the brief.
+- Branch: `m1-01-skeleton-and-spike` (green at the senior developer's handover)
+
+### Open points resolution (senior developer, round 1)
+
+**Acceptance item 1 — build tool.** Ran the formal check on this machine:
+
+```
+$ which kotlin
+/opt/homebrew/bin/kotlin
+$ kotlin -version
+Kotlin version 2.4.21 (JRE 27.0.1.0.3)
+$ kotlin package --help
+error: could not find or load main class package
+$ kotlin new --help
+error: could not find or load main class new
+$ kotlin run --help
+error: could not find or load main class run
+```
+
+Not ambiguous: the installed CLI is the classic Homebrew `kotlin` compiler/script runner (`brew info
+kotlin` confirms it depends only on `openjdk`, no Toolchain-specific packaging), with no `new`, `run` or
+`package` subcommand at all — nothing to apply the spec's dmg/msi decision rule to. **Decision: Gradle
+fallback**, per the spec's own rule (docs/spec.md Packaging row and Open questions, now updated). Did not
+escalate — this isn't the "partial jpackage support" ambiguity the brief flagged as escalation-worthy, it's
+a CLI that doesn't have the subcommands being asked about at all.
+
+**Acceptance item 2 — desktopApp launches a window.** `./gradlew :desktopApp:run` starts the Compose
+window; verified the forked JVM process (`dev.caerbannog.desktopapp.MainKt`) stayed alive and responsive
+for 20+ seconds with no exception before being killed manually (this sandbox has no screenshot/display
+capture tool available, so this is the terminal-transcript proof the brief allows as an alternative).
+Also ran `./gradlew :desktopApp:packageDmg` end to end: produced a working
+`desktopApp/build/compose/binaries/main/dmg/Caerbannog-1.0.0.dmg` (71 MB), proving the Gradle fallback's
+packaging path (not just build/run) works for an empty app.
+
+**Items 3–7 (test-tooling proofs).** All five wired for real (no fakes) and green:
+`./gradlew :core:jvmTest`, `./gradlew :acceptance-tests:test`, `./gradlew :data-rabbit:test
+:data-rabbit:brokerTest`, `./gradlew :ui:jvmTest`. See the handover note on the PR/task thread for full
+command output; summary: JUnit 5 unit test in `core`; Cucumber-JVM scenario (`cucumber-junit-platform-engine`
++ JUnit Platform Suite) in `acceptance-tests`; Testcontainers RabbitMQ 4.x container actually started and its
+management port answered 401 (tagged `broker`, excluded from the default `test` task, included only in the
+new `brokerTest` task); Compose Multiplatform UI test rendered `App()` and found "Caerbannog" by text;
+`java-keyring` round trip passed on macOS with the keychain entry confirmed deleted afterwards (`security
+find-generic-password` fails to find it post-test).
+
+**New finding, not anticipated by the brief:** Testcontainers 1.20.4 (the version the test developer
+scaffolded with) and 1.21.3 (current latest) both fail every provider strategy against this machine's Docker
+Desktop (29.8.2, API 1.56, `MinAPIVersion` 1.40) with HTTP 400, even though `docker ps`/`docker info` work
+fine and the daemon is healthy. Root cause (confirmed by decompiling `testcontainers-1.21.3.jar`):
+`DockerClientProviderStrategy.getTransportConfig()` hardcodes a fallback Docker API version of 1.32 when
+none is otherwise resolved, and this engine's `MinAPIVersion` (1.40) rejects that with a 400 before
+Testcontainers gets to do its own `/version` negotiation. Confirmed independently with `curl --unix-socket
+/var/run/docker.sock http://localhost/v1.32/info` → 400 vs `.../v1.40/info` → 200. Worked around by pinning
+`systemProperty("api.version", "1.43")` directly on the `data-rabbit:brokerTest` Gradle task (must be set on
+the forked test JVM, not as a `-D` flag on the `gradlew` command line, which only reaches the long-lived
+Gradle daemon). Recorded in `docs/spec.md`'s Risks section since it bears directly on the just-made Docker
+Desktop decision for CI — worth the architect/CI task confirming the CI runners' Docker Desktop version
+doesn't hit the same wall, and worth re-testing this workaround whenever Testcontainers ships a fix.

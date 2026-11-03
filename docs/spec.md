@@ -53,7 +53,7 @@ The stream protocol over TLS (default port 5551) carries message reads, publishe
 
 ## Module layout and tech stack
 
-One Kotlin Toolchain project (a root project.yaml plus a module.yaml per module, still alpha) with a shared core and a thin desktop app, so Android or iOS can be added later without rewriting logic.
+One Gradle project (Kotlin Multiplatform and Compose Multiplatform Gradle plugins, one `build.gradle.kts` per module — see Packaging below for why Gradle over Kotlin Toolchain) with a shared core and a thin desktop app, so Android or iOS can be added later without rewriting logic.
 
 | Module | Source set | Holds |
 | --- | --- | --- |
@@ -69,9 +69,9 @@ One Kotlin Toolchain project (a root project.yaml plus a module.yaml per module,
 | Stream access | `com.rabbitmq:stream-client` (official Java client) |
 | Management API | Ktor client with kotlinx-serialization |
 | Navigation | A simple sealed-class screen stack to start; Decompose only if it grows |
-| Settings and secrets | Connection profiles in a JSON file; passwords in the OS keychain via a JVM keyring library (to confirm) |
-| Packaging | Kotlin Toolchain (`kotlin new`, `kotlin run -m desktopApp` with Hot Reload); installers for dmg (macOS) and msi (Windows) to be proven in an M1 spike, with Gradle as fallback |
-| Testing | Kotest or JUnit 5 for TDD, Cucumber-JVM for Gherkin scenarios, Testcontainers for a real broker, Compose UI tests (all to confirm in the M1 spike) |
+| Settings and secrets | Connection profiles in a JSON file; passwords in the OS keychain via `com.github.javakeyring:java-keyring` — a write/read/delete round trip passed on macOS in the M1 spike; Windows is unverified until run on Windows hardware or CI |
+| Packaging | Gradle with the Compose Multiplatform Gradle plugin (`org.jetbrains.compose`); `./gradlew :desktopApp:run` opens the window and `:desktopApp:packageDmg` / `:desktopApp:packageMsi` (jpackage under the hood) build installers — chosen over Kotlin Toolchain because the M1 spike found the installed CLI has no `new`, `run` or `package` subcommands at all (see `docs/tasks/M1-01-skeleton-and-spike.md`'s Status section for the captured command output) |
+| Testing | JUnit 5 (+ `kotlinx-coroutines-test` once there is async code to test) for TDD, Cucumber-JVM (`cucumber-junit-platform-engine`) with Kotlin step definitions for Gherkin scenarios, Testcontainers for a real broker, Compose Multiplatform UI test API — all four wired and proven together in the M1 spike |
 
 The `data-rabbit` module sits behind repository interfaces in `core`, so a future gateway-backed implementation can replace it without touching the UI.
 
@@ -142,9 +142,9 @@ A migration lists the changes to make: streams, super streams, quorum queues, ex
 
 Every feature is built test-first, and its behavior is written as BDD scenarios that run automatically; both are requirements, not extras. The `core` module has no RabbitMQ imports and talks to the stream and management clients through interfaces, so most tests run against fakes without a broker.
 
-| Layer | What it covers | Tooling (to confirm in M1) |
+| Layer | What it covers | Tooling (confirmed in the M1 spike) |
 | --- | --- | --- |
-| Unit (TDD) | Paging math, offset resolution, migration ordering and idempotency, permission guardrails, payload detection | Kotest or JUnit 5, coroutines test, fakes behind the `core` interfaces |
+| Unit (TDD) | Paging math, offset resolution, migration ordering and idempotency, permission guardrails, payload detection | JUnit 5, coroutines test, fakes behind the `core` interfaces |
 | BDD scenarios | User-visible behavior as Given/When/Then, such as paging at stream edges and blocked topology edits without configure permission | Gherkin features with Cucumber-JVM and Kotlin step definitions |
 | Integration | Real stream and management calls against a RabbitMQ 4.x broker over TLS | Testcontainers RabbitMQ module (needs Docker) |
 | UI | Screens render and respond: stream list, message browser, publish dialog | Compose Multiplatform UI test API on desktop |
@@ -186,13 +186,13 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 - Opening a consumer per page adds latency; measure it on a real broker, then consider keeping one consumer open and prefetching the next page.
 - The stream client is JVM-only, which caps v1 at desktop (and later Android) until a gateway exists.
 - Very large or compressed messages can make pages slow; the body viewer caps display size.
-- Secret storage differs per OS; the keychain library choice needs a quick spike.
-- Kotlin Toolchain is alpha, so its behavior may change, and its docs list no dmg or msi installers (only a regular and an executable JAR) and say JVM publishing is not fully supported yet; the installer spike in M1 decides whether we stay on it or fall back to Gradle.
+- Secret storage differs per OS; `java-keyring`'s write/read/delete round trip passed on macOS in the M1 spike. Windows (Credential Manager) and Linux (libsecret, not a v1 packaging target) are still unverified until run on that hardware or in CI.
+- Kotlin Toolchain was evaluated in the M1 spike and ruled out: the installed CLI (Homebrew, v2.4.21) has no `new`, `run` or `package` subcommands at all, so there is nothing resembling the project/run/installer workflow the spec originally described (see `docs/tasks/M1-01-skeleton-and-spike.md`'s Status section for the captured command output). The project uses Gradle with the Compose Multiplatform Gradle plugin instead; `:desktopApp:packageDmg` already produces a working dmg on macOS.
+- Testcontainers' own Docker connectivity probe (`org.testcontainers.dockerclient.DockerClientProviderStrategy`) falls back to a hardcoded Docker API version (1.32) when none is otherwise configured; very new Docker Desktop engines (confirmed here: 29.8.2, API 1.56, `MinAPIVersion` 1.40) reject that version with HTTP 400, so every provider strategy fails even though Docker is installed and working. Worked around locally by pinning a supported API version on the test JVM (`data-rabbit/build.gradle.kts`, `brokerTest` task); worth re-checking whenever Testcontainers or Docker Desktop is upgraded, and worth confirming the CI runners' Docker Desktop version doesn't hit the same wall before relying on `@broker` scenarios there.
 - Migration history is kept per machine, so two people can apply the same migration to one broker; every action must be idempotent (declaring something that already exists with the same settings is a no-op).
 
 **Open questions**
 
-- [ ] Can Kotlin Toolchain build dmg and msi installers for our desktop app? Checked in its docs: dependencies from Maven Central work (group:artifact:version), but for desktop apps they describe only a regular JAR (build) and an executable JAR (package), with no dmg, msi or jpackage. The M1 spike runs `kotlin package --help` on the installed CLI; if there is no dmg or msi, we switch the project to Gradle with the Compose plugin.
 - [ ] How does the app read the user's own permissions? The management API lists permissions for administrators; confirm whether a non-administrator user can see their own, and what the fallback is.
 - [ ] RabbitMQ's configure permission covers both creating and deleting, so the check cannot allow additive changes while blocking deletes. Is that acceptable, or should the app add its own rule on top?
 - [ ] Confirm the exact fields returned by the stream publisher and consumer endpoints (offset, messages behind, counters) on a real broker; the API reference does not list them.

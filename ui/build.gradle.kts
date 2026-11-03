@@ -1,16 +1,38 @@
 plugins {
-    kotlin("multiplatform") version "2.4.21"
+    kotlin("multiplatform")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
 }
 
-// M1-01 spike scaffold: `ui` per docs/spec.md Module layout table - commonMain, no broker/network
-// imports.
+// M1-01 spike: `ui` per docs/spec.md Module layout table - commonMain, no broker/network imports.
 //
-// Deliberately bare: no Compose Multiplatform plugin/compiler, no Compose UI test dependency yet.
-// src/jvmTest/kotlin/.../AppUiTest.kt exercises the (not yet written) `@Composable fun App()` and
-// the Compose Multiplatform UI test API - both are missing right now, so it must fail to compile
-// for two independent reasons until the senior developer wires the Compose plugin AND writes the
-// placeholder App() composable (see the task brief's Design notes).
+// Compose Multiplatform (Desktop) with Material 3, per docs/spec.md's tech-stack table. The Compose
+// compiler is a separate Gradle plugin since Kotlin 2.0 (org.jetbrains.kotlin.plugin.compose),
+// pinned to the exact Kotlin version in use to avoid compiler/IR mismatches.
+//
+// `App()` below is the one piece of real production code this spike needs (see the task brief's
+// Design notes: "a single `@Composable fun App()` with no view model") - a placeholder screen only,
+// proven by AppUiTest.kt via the Compose Multiplatform UI test API.
 kotlin {
     jvmToolchain(21)
     jvm()
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.runtime)
+        }
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("org.junit.jupiter:junit-jupiter:5.11.4")
+            implementation(compose.desktop.uiTestJUnit4)
+            implementation(compose.desktop.currentOs)
+            runtimeOnly("org.junit.platform:junit-platform-launcher")
+        }
+    }
+}
+
+tasks.named<Test>("jvmTest") {
+    useJUnitPlatform()
 }

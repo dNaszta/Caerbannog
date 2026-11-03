@@ -1,14 +1,26 @@
 plugins {
-    kotlin("multiplatform") version "2.4.21"
+    kotlin("multiplatform")
 }
 
-// M1-01 spike scaffold: `core` per docs/spec.md Module layout table - commonMain, no RabbitMQ imports.
+// M1-01 spike: `core` per docs/spec.md Module layout table - commonMain, no RabbitMQ imports.
 //
-// Deliberately bare: no test framework dependency is declared yet (Kotest vs JUnit 5 is still an
-// open engineering call per the task brief's Open points). The trivial unit test in
-// src/jvmTest/kotlin uses JUnit 5 directly; until the senior developer adds the junit-jupiter
-// dependency (and wires `useJUnitPlatform()` on the jvm test task) it must fail to compile.
+// Test framework: JUnit 5 (+ kotlinx-coroutines-test later, once there is async code to test), per
+// docs/spec.md's Testing table - chosen over Kotest to keep one test runner across every module
+// (acceptance-tests and data-rabbit already need JUnit 5/JUnit Platform for Cucumber and
+// Testcontainers, so using it here too avoids running two different test engines).
 kotlin {
     jvmToolchain(21)
     jvm()
+
+    sourceSets {
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("org.junit.jupiter:junit-jupiter:5.11.4")
+            runtimeOnly("org.junit.platform:junit-platform-launcher")
+        }
+    }
+}
+
+tasks.named<Test>("jvmTest") {
+    useJUnitPlatform()
 }
