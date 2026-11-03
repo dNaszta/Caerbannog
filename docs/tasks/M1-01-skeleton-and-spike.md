@@ -154,9 +154,18 @@ trusted for CI use.
 
 ## Status
 
-- Step: 5 (review) — in progress
+- Step: 6 (done)
 - Round: 1
-- Last verdict: none yet
+- Last verdict: **Accepted with follow-ups** (architect review, 2026-11-03). Module boundaries are correct
+  (`core` and `ui` have zero broker/network deps; only `data-rabbit` carries Testcontainers/java-keyring);
+  all seven acceptance proofs independently re-verified; scope matched the brief with no unrelated
+  production code. Follow-ups:
+  - `docs/spec.md` Packaging row and Risks section corrected directly by the architect (msi wording; added
+    a Risks line for the Testcontainers `withPluginsEnabled` deprecation so it is not inherited silently).
+  - New task `docs/tasks/M1-CI-01-broker-tests-wiring.md` filed to confirm the `api.version=1.43` pin
+    travels to CI's Docker Desktop (engineering follow-up, not escalated to the product owner — see that
+    task's Why section for the reasoning).
+  - The Skiko JDK27 warning (idea-level) needs no follow-up: cosmetic, not actionable.
 - Open findings (from test-developer verification, round 1 — none blocking):
   - idea — `desktopApp:run` prints a benign JDK 27 Skiko "restricted method" warning.
   - minor — `docs/spec.md` Packaging row reads as if both dmg and msi were exercised; only `packageDmg` was
