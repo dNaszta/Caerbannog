@@ -154,7 +154,7 @@ trusted for CI use.
 
 ## Status
 
-- Step: 2 (tests first) — in progress
+- Step: 3 (build) — in progress
 - Round: 1
 - Last verdict: none yet
 - Open findings: none yet
@@ -163,6 +163,12 @@ trusted for CI use.
     scenarios, for both local dev and CI (overrides the architect's Colima/Podman recommendation above).
     License eligibility for this org was not separately confirmed as part of this decision; if that becomes
     a concern later it is a separate follow-up, not a blocker for this task.
-  - Kotlin Toolchain vs Gradle: to be resolved by running `kotlin package --help` during the build step.
-  - Keychain library and test-stack choices: engineering calls, to be made during the build step.
-- Branch: `m1-01-skeleton-and-spike`
+  - Kotlin Toolchain vs Gradle: test developer found the installed `kotlin` CLI (v2.4.21, Homebrew) has no
+    `new`, `run`, or `package` subcommands at all — not the project-oriented Toolchain the spec describes.
+    Senior developer should still run and record the formal `kotlin package --help` check per Acceptance
+    item 1, but should expect to land on the Gradle fallback.
+  - Keychain library and test-stack choices: engineering calls, confirmed candidates now exercised in the
+    red tests (`com.github.javakeyring:java-keyring`; JUnit 5 + `cucumber-junit-platform-engine` for BDD).
+    Senior developer may still switch the plain unit-test framework to Kotest if preferred — only
+    `core/src/jvmTest/kotlin/dev/caerbannog/core/SpikeSanityTest.kt` depends on that choice.
+- Branch: `m1-01-skeleton-and-spike` (scaffold + red tests at commit `0b6d5a1`)
