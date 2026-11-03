@@ -15,9 +15,19 @@ kotlin {
 //   - RabbitMqContainerSpikeTest (Testcontainers proof, tagged "broker")
 //   - KeyringRoundTripSpikeTest (keychain library proof, com.github.javakeyring:java-keyring)
 dependencies {
+    // M1-02: data-rabbit's real implementations (BrokerReachabilityChecker, ConnectionProfileRepository,
+    // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
+    // docs/tasks/M1-02-connection-profiles.md's Design notes ("core holds ... repository interfaces").
+    // No src/main exists yet, so this dependency only matters for the test source set until the
+    // senior developer adds one.
+    implementation(project(":core"))
+
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
+    // plain JUnit test via runBlocking.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:testcontainers")

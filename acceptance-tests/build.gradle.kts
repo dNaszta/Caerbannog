@@ -16,12 +16,34 @@ kotlin {
 // way it discovers plain JUnit 5 tests, with no separate Cucumber CLI/runner to configure.
 val cucumberVersion = "7.20.1"
 
+// M1-02: step definitions and fakes for tests/bdd/features/01_connections.feature now live here too
+// (RunConnectionsAcceptanceTest.kt), alongside the M1-01 scratch scenario (untouched, see its own
+// file header). Depends on `core` (main, not test) for the real domain types/interfaces/view model
+// this task adds (ConnectionProfile, ConnectionProfileRepository, SecretStore,
+// BrokerReachabilityChecker, ConnectionCheckResult, CaCertificateValidator, ConnectionsViewModel) -
+// per the task brief's Design notes, the fakes for ConnectionProfileRepository/SecretStore/
+// BrokerReachabilityChecker live in THIS module, not in core or data-rabbit, so acceptance-tests
+// does not need a dependency on data-rabbit for this feature file.
 dependencies {
     testImplementation(kotlin("test"))
+    testImplementation(project(":core"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
     testImplementation("io.cucumber:cucumber-junit-platform-engine:$cucumberVersion")
     testImplementation("org.junit.platform:junit-platform-suite:1.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// tests/bdd/features/ is the canonical Gherkin source (per tests/bdd/README.md); it is NOT copied
+// into this module's own src/test/resources. Instead it is added as an extra resources root so the
+// Cucumber JUnit Platform Engine can discover individual feature files from the classpath by name
+// (see RunConnectionsAcceptanceTest.kt's @SelectClasspathResource). This intentionally exposes every
+// file under tests/bdd/features/ (01 through 12) on the test classpath, but each Suite class only
+// selects the one feature file it has glue for, so unimplemented features (02-12) are never run.
+sourceSets {
+    test {
+        resources.srcDir(rootProject.projectDir.resolve("tests/bdd/features"))
+    }
 }
 
 tasks.test {

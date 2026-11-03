@@ -1,0 +1,382 @@
+package dev.caerbannog.acceptance.connections
+
+import dev.caerbannog.core.connections.CaCertificateValidationResult
+import dev.caerbannog.core.connections.ConnectionCheckResult
+import dev.caerbannog.core.connections.ConnectionProfileInput
+import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.ConnectionProfile
+import dev.caerbannog.core.connections.Endpoint
+import dev.caerbannog.core.connections.SaveConnectionResult
+import dev.caerbannog.core.connections.TopologyControlLevel
+import io.cucumber.datatable.DataTable
+import io.cucumber.java.Before
+import io.cucumber.java.en.Given
+import io.cucumber.java.en.Then
+import io.cucumber.java.en.When
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.fail
+
+/**
+ * Step definitions for tests/bdd/features/01_connections.feature, covering every scenario named "in"
+ * by docs/tasks/M1-02-connection-profiles.md's Acceptance list EXCEPT "Switch between connections"
+ * (deliberately deferred, see SwitchBetweenConnectionsSteps.kt) and everything in
+ * 02_permission_check.feature (a different task, M1-03, not touched here).
+ *
+ * Expected to fail to compile right now: none of the `dev.caerbannog.core.connections.*` types this
+ * file imports exist yet in `core`, and `ConnectionsViewModel` does not exist either. This is the
+ * intended "red" state - see Fakes.kt's header for the full list of missing production types.
+ *
+ * Package-private state is reset per scenario via @Before, since cucumber-java creates a fresh
+ * instance of this class for every scenario (no shared state leaks between scenarios).
+ */
+class ConnectionsSteps {
+
+    private lateinit var repository: InMemoryConnectionProfileRepository
+    private lateinit var secretStore: FakeSecretStore
+    private lateinit var checker: FakeBrokerReachabilityChecker
+    private lateinit var caValidator: FakeCaCertificateValidator
+    private lateinit var viewModel: ConnectionsViewModel
+
+    private var lastProfileName: String? = null
+    private var lastPassword: String? = null
+    private var lastSaveResult: SaveConnectionResult? = null
+    private var lastCheckResult: ConnectionCheckResult? = null
+    private var lastCaCertificateResult: CaCertificateValidationResult? = null
+
+    @Before
+    fun resetFakes() {
+        repository = InMemoryConnectionProfileRepository()
+        secretStore = FakeSecretStore()
+        checker = FakeBrokerReachabilityChecker()
+        caValidator = FakeCaCertificateValidator()
+        viewModel = ConnectionsViewModel(repository, secretStore, checker, caValidator)
+    }
+
+    // --- Background -----------------------------------------------------
+
+    @Given("the app is started with no saved connections")
+    fun theAppIsStartedWithNoSavedConnections() {
+        assertTrue(viewModel.state.value.profiles.isEmpty()) {
+            "Expected a freshly started app to have no saved connections, found ${viewModel.state.value.profiles}"
+        }
+    }
+
+    // --- Adding / saving --------------------------------------------------
+
+    @When("I add a connection with these settings")
+    fun iAddAConnectionWithTheseSettings(table: DataTable) {
+        val fields = table.asMap(String::class.java, String::class.java)
+        val input = ConnectionProfileInput(
+            name = fields.getValue("name"),
+            host = fields.getValue("host"),
+            virtualHost = fields.getValue("virtual host"),
+            username = fields.getValue("username"),
+            password = fields["password"],
+        )
+        lastProfileName = input.name
+        lastPassword = input.password
+        lastSaveResult = viewModel.addConnection(input)
+    }
+
+    @Given("a saved connection {string}")
+    fun aSavedConnection(name: String) {
+        addDefaultConnection(name, password = "s3cret")
+    }
+
+    @Given("a saved connection {string} with password {string}")
+    fun aSavedConnectionWithPassword(name: String, password: String) {
+        addDefaultConnection(name, password = password)
+    }
+
+    @Given("saved connections {string} and {string}")
+    fun savedConnectionsAAndB(first: String, second: String) {
+        addDefaultConnection(first, password = "s3cret")
+        addDefaultConnection(second, password = "s3cret")
+    }
+
+    private fun addDefaultConnection(name: String, password: String) {
+        val input = ConnectionProfileInput(
+            name = name,
+            host = "rabbit-${name}.example.com",
+            virtualHost = "/",
+            username = "svc-explorer",
+            password = password,
+        )
+        lastProfileName = name
+        lastPassword = password
+        val result = viewModel.addConnection(input)
+        check(result is SaveConnectionResult.Saved) {
+            "Test setup failed: could not save fixture connection '$name': $result"
+        }
+    }
+
+    @When("I try to save another connection named {string}")
+    fun iTryToSaveAnotherConnectionNamed(name: String) {
+        // A genuinely different profile (different host) that happens to reuse an existing name -
+        // the point of this scenario is the name collision, not an identical duplicate.
+        val input = ConnectionProfileInput(
+            name = name,
+            host = "a-different-host.example.com",
+            virtualHost = "/",
+            username = "someone-else",
+            password = "different-password",
+        )
+        lastSaveResult = viewModel.addConnection(input)
+    }
+
+    @Then("the connection {string} appears in the saved profiles")
+    fun theConnectionAppearsInTheSavedProfiles(name: String) {
+        assertTrue(viewModel.state.value.profiles.any { it.name == name }) {
+            "Expected '$name' among saved profiles, found ${viewModel.state.value.profiles.map { it.name }}"
+        }
+    }
+
+    @Then("the connection {string} is no longer in the saved profiles")
+    fun theConnectionIsNoLongerInTheSavedProfiles(name: String) {
+        assertFalse(viewModel.state.value.profiles.any { it.name == name }) {
+            "Expected '$name' to have been deleted, but it is still in ${viewModel.state.value.profiles.map { it.name }}"
+        }
+    }
+
+    @Then("the connection {string} is still in the saved profiles")
+    fun theConnectionIsStillInTheSavedProfiles(name: String) = theConnectionAppearsInTheSavedProfiles(name)
+
+    @Then("its stream port is {int}")
+    fun itsStreamPortIs(port: Int) {
+        assertEquals(port, currentProfile().streamPort)
+    }
+
+    @Then("its management port is {int}")
+    fun itsManagementPortIs(port: Int) {
+        assertEquals(port, currentProfile().managementPort)
+    }
+
+    @Then("the app refuses to save it")
+    fun theAppRefusesToSaveIt() {
+        assertTrue(lastSaveResult is SaveConnectionResult.NameAlreadyExists) {
+            "Expected the save to be refused with NameAlreadyExists, got $lastSaveResult"
+        }
+    }
+
+    @Then("the message says a connection with that name already exists")
+    fun theMessageSaysAConnectionWithThatNameAlreadyExists() {
+        val result = lastSaveResult as? SaveConnectionResult.NameAlreadyExists
+            ?: fail("Expected a NameAlreadyExists result, got $lastSaveResult")
+        assertEquals(lastProfileName, result.name)
+    }
+
+    // --- Topology control level -------------------------------------------
+
+    @When("I set the topology control level of {string} to {string}")
+    fun iSetTheTopologyControlLevelOfTo(name: String, levelLabel: String) {
+        lastProfileName = name
+        lastSaveResult = viewModel.setTopologyControlLevel(name, topologyControlLevelFromLabel(levelLabel))
+    }
+
+    @Then("its topology control level is {string}")
+    fun itsTopologyControlLevelIs(levelLabel: String) {
+        assertEquals(topologyControlLevelFromLabel(levelLabel), currentProfile().topologyControlLevel)
+    }
+
+    private fun topologyControlLevelFromLabel(label: String): TopologyControlLevel = when (label) {
+        "Read-only" -> TopologyControlLevel.READ_ONLY
+        "Declare and edit" -> TopologyControlLevel.DECLARE_AND_EDIT
+        "Full control" -> TopologyControlLevel.FULL_CONTROL
+        else -> error("Unknown topology control level label in a scenario: '$label'")
+    }
+
+    // --- Reachability checks -----------------------------------------------
+
+    @Given("the broker's stream endpoint and management API are both reachable over TLS")
+    fun theBrokerSStreamEndpointAndManagementApiAreBothReachableOverTls() {
+        checker.streamReachable = true
+        checker.managementReachable = true
+        checker.tlsOffered = true
+        checker.managementPluginEnabled = true
+    }
+
+    @Given("the {endpoint} is not reachable")
+    fun theEndpointIsNotReachable(endpoint: Endpoint) {
+        when (endpoint) {
+            Endpoint.STREAM -> checker.streamReachable = false
+            Endpoint.MANAGEMENT -> checker.managementReachable = false
+        }
+    }
+
+    @Given("the broker does not have the {string} plugin enabled")
+    fun theBrokerDoesNotHaveThePluginEnabled(pluginName: String) {
+        // The fake only models the one plugin this feature cares about; the name is still taken from
+        // the Gherkin text (rather than hard-coded here) so the step definition does not silently pass
+        // for a typo'd or different plugin name in the scenario.
+        check(pluginName == "rabbitmq_stream_management") {
+            "This fake only simulates 'rabbitmq_stream_management' missing, got '$pluginName'"
+        }
+        checker.managementPluginEnabled = false
+    }
+
+    @Given("the broker only accepts connections without TLS")
+    fun theBrokerOnlyAcceptsConnectionsWithoutTls() {
+        checker.tlsOffered = false
+    }
+
+    @Given("the broker presents a certificate signed by a private CA")
+    fun theBrokerPresentsACertificateSignedByAPrivateCa() {
+        checker.requiredCaCertificatePath = PRIVATE_CA_FIXTURE_PATH
+    }
+
+    @When("I check the connection {string}")
+    fun iCheckTheConnection(name: String) {
+        lastProfileName = name
+        lastCheckResult = runBlocking { viewModel.checkConnection(name) }
+    }
+
+    @Then("the check reports that both endpoints are reachable")
+    fun theCheckReportsThatBothEndpointsAreReachable() {
+        assertEquals(ConnectionCheckResult.BothReachable, lastCheckResult)
+    }
+
+    @Then("the check reports that the {endpoint} cannot be reached")
+    fun theCheckReportsThatTheEndpointCannotBeReached(endpoint: Endpoint) {
+        val result = lastCheckResult as? ConnectionCheckResult.EndpointUnreachable
+            ?: fail("Expected EndpointUnreachable, got $lastCheckResult")
+        assertEquals(endpoint, result.endpoint)
+    }
+
+    @Then("the other endpoint is still reported as reachable")
+    fun theOtherEndpointIsStillReportedAsReachable() {
+        // Proves the app actually probed BOTH endpoints rather than stopping at the first failure:
+        // the failing one is named by the EndpointUnreachable result, and the checker's own call log
+        // shows the other one was checked too (and, by construction of the fake, did not fail it -
+        // otherwise a different result type would have been returned).
+        assertEquals(setOf(Endpoint.STREAM, Endpoint.MANAGEMENT), checker.checkedEndpoints.toSet()) {
+            "Expected both endpoints to have been probed, only probed ${checker.checkedEndpoints}"
+        }
+    }
+
+    @Then("the check tells me to enable {string}")
+    fun theCheckTellsMeToEnable(pluginName: String) {
+        val result = lastCheckResult as? ConnectionCheckResult.ManagementPluginMissing
+            ?: fail("Expected ManagementPluginMissing, got $lastCheckResult")
+        assertEquals(pluginName, result.pluginName)
+    }
+
+    @Then("the connection is refused")
+    fun theConnectionIsRefused() {
+        assertEquals(ConnectionCheckResult.TlsRefused, lastCheckResult)
+    }
+
+    @Then("the message says the app does not connect without TLS")
+    fun theMessageSaysTheAppDoesNotConnectWithoutTls() {
+        // The fixed wording ("the app does not connect without TLS", docs/spec.md "Broker
+        // requirements") is a UI-layer banner string, verified by the Compose screen's own UI test
+        // once it exists. At this layer we verify the semantic result the UI renders that banner
+        // from is unambiguously the TLS-refusal case, not a generic failure.
+        assertEquals(ConnectionCheckResult.TlsRefused, lastCheckResult)
+    }
+
+    // --- CA certificate -----------------------------------------------------
+
+    @Given("I am editing a connection profile")
+    fun iAmEditingAConnectionProfile() {
+        // No fixture state needed: "TLS is always on" is asserted against the ConnectionProfile type
+        // itself (no instance required), and "An unreadable CA certificate file is rejected" exercises
+        // viewModel.validateCaCertificateFile(...) standalone, before any profile is saved - exactly
+        // like a user filling in the "New connection" panel. This step only documents that context.
+    }
+
+    @Then("there is no option to turn TLS off")
+    fun thereIsNoOptionToTurnTlsOff() {
+        val tlsRelatedFields = ConnectionProfile::class.java.declaredFields
+            .map { it.name.lowercase() }
+            .filter { it.contains("tls") }
+        assertTrue(tlsRelatedFields.isEmpty()) {
+            "ConnectionProfile must have no TLS-related field at all (TLS is the only mode this app " +
+                "can express, not a toggle) - found: $tlsRelatedFields"
+        }
+    }
+
+    @When("I set the CA certificate of {string} to the private CA file")
+    fun iSetTheCaCertificateOfToThePrivateCaFile(name: String) {
+        lastCaCertificateResult = viewModel.setCaCertificate(name, PRIVATE_CA_FIXTURE_PATH)
+    }
+
+    @When("I choose a CA certificate file that is not a valid certificate")
+    fun iChooseACaCertificateFileThatIsNotAValidCertificate() {
+        lastCaCertificateResult = viewModel.validateCaCertificateFile(INVALID_CERTIFICATE_FIXTURE_PATH)
+    }
+
+    @Then("the file is rejected with a message saying it is not a valid certificate")
+    fun theFileIsRejectedWithAMessageSayingItIsNotAValidCertificate() {
+        val result = lastCaCertificateResult as? CaCertificateValidationResult.Invalid
+            ?: fail("Expected the CA certificate file to be rejected, got $lastCaCertificateResult")
+        assertTrue(result.reason.contains("valid certificate", ignoreCase = true)) {
+            "Expected a message about an invalid certificate, got '${result.reason}'"
+        }
+    }
+
+    // --- Passwords and secrets -----------------------------------------------
+
+    @Then("the profile file on disk does not contain {string}")
+    fun theProfileFileOnDiskDoesNotContain(secret: String) {
+        // ConnectionProfile structurally has no password field at all, so nothing that serializes a
+        // ConnectionProfile (the real JSON file included - see data-rabbit's own
+        // JsonConnectionProfileRepositoryTest, which asserts this against a real file on disk) can
+        // ever contain the password. This checks that structural guarantee at the type level, plus
+        // the concrete value for this scenario's saved profile, since this feature's own fakes do not
+        // touch a real file (see Design notes: the fakes here are in-memory by design).
+        assertTrue(ConnectionProfile::class.java.declaredFields.none { it.name.contains("password", ignoreCase = true) }) {
+            "ConnectionProfile must not declare a password field at all"
+        }
+        assertFalse(currentProfile().toString().contains(secret)) {
+            "ConnectionProfile's own string representation must never contain the password"
+        }
+    }
+
+    @Then("the password is kept in the operating system's secret store")
+    fun thePasswordIsKeptInTheOperatingSystemSSecretStore() {
+        val name = requireNotNull(lastProfileName)
+        assertTrue(secretStore.storeCalls.any { it.first == name }) {
+            "Expected the app to store the password for '$name' via SecretStore, but it never called store()"
+        }
+        assertEquals(lastPassword, secretStore.retrieve(name))
+    }
+
+    // --- Delete -----------------------------------------------------------
+
+    @When("I delete the connection {string} and confirm")
+    fun iDeleteTheConnectionAndConfirm(name: String) {
+        viewModel.requestDelete(name)
+        viewModel.confirmDelete()
+    }
+
+    @When("I start deleting the connection {string} and then cancel")
+    fun iStartDeletingTheConnectionAndThenCancel(name: String) {
+        viewModel.requestDelete(name)
+        viewModel.cancelDelete()
+    }
+
+    // --- Helpers -----------------------------------------------------------
+
+    private fun currentProfile(): ConnectionProfile {
+        val name = requireNotNull(lastProfileName) { "No connection name recorded yet in this scenario" }
+        return viewModel.state.value.profiles.firstOrNull { it.name == name }
+            ?: fail("Expected a saved connection named '$name', found ${viewModel.state.value.profiles.map { it.name }}")
+    }
+
+    companion object {
+        // Fixture certificate files for "Use a custom CA certificate" and "An unreadable CA
+        // certificate file is rejected". Resolved from the test classpath (src/test/resources) so
+        // they work regardless of the working directory the test runner uses.
+        val PRIVATE_CA_FIXTURE_PATH: String = requireFixture("fixtures/private-ca.pem")
+        val INVALID_CERTIFICATE_FIXTURE_PATH: String = requireFixture("fixtures/not-a-certificate.txt")
+
+        private fun requireFixture(resourcePath: String): String {
+            val url = ConnectionsSteps::class.java.classLoader.getResource(resourcePath)
+                ?: error("Missing test fixture on the classpath: $resourcePath")
+            return java.io.File(url.toURI()).absolutePath
+        }
+    }
+}

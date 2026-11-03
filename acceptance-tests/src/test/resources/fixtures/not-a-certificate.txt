@@ -1,0 +1,1 @@
+This is definitely not a certificate file. Just plain garbage text for a negative test.

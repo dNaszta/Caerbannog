@@ -112,6 +112,11 @@ Feature: Connection profiles
     When I start deleting the connection "uat-eu" and then cancel
     Then the connection "uat-eu" is still in the saved profiles
 
+  @needs-M2
+  # Deferred to M2: needs a real stream list to assert "the stream list shows the streams of
+  # 'prod-eu'" against. See docs/tasks/M1-02-connection-profiles.md's Acceptance section and
+  # acceptance-tests/.../connections/SwitchBetweenConnectionsSteps.kt. Excluded from the default
+  # Cucumber run via "not @needs-M2" rather than deleted or silently skipped.
   Scenario: Switch between connections
     Given saved connections "uat-eu" and "prod-eu"
     And I am connected to "uat-eu"

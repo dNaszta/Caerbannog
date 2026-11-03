@@ -40,6 +40,7 @@ tests/bdd/
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS only, never reading queue messages, browsing never changes offsets) |
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
 | `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
+| `@needs-M2` | Step definitions exist and compile but are deliberately left pending (`PendingException`) because the scenario needs a later milestone's feature (currently only "Switch between connections" in `01`, needs M2's stream list); excluded from the default Cucumber run |
 
 Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@broker` in a separate CI job.
 
