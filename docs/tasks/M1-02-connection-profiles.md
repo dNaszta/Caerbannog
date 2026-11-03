@@ -215,3 +215,23 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 - No profile password ever appears in the JSON file or in logs.
 - `docs/tasks/README.md` status updated for this task.
 - No unrelated changes (no permission-check logic, no stream-list/topology code).
+
+## Status
+
+- Step: 2 (tests first) — in progress
+- Round: 1
+- Last verdict: none yet
+- Open findings: none yet
+- Open questions:
+  - Product decision made (2026-11-03): added a per-connection "self-constraint" topology control level
+    (Read-only default / Declare and edit / Full control), sitting alongside the automatic broker-permission
+    read as an additional ceiling (effective permission = the stricter of the two). Confirmed as proposed,
+    topology-only (not publishing). `docs/spec.md`'s "Topology migrations and permission guardrails" section
+    rewritten accordingly; `topologyControlLevel` added to this task's `ConnectionProfile` scope
+    (storage/editor only, no enforcement — enforcement is M1-03/M5 work).
+  - Permission check itself (`02_permission_check.feature`) stays deferred to `M1-03`, confirmed by this
+    brief's own Scope/Out section.
+  - "Switch between connections" scenario deliberately deferred to M2 (stream list doesn't exist yet).
+  - Carried forward, not this task's concern: non-admin permission read (blocks M1-03), Windows keychain
+    round-trip unverified.
+- Branch: `m1-02-connection-profiles`
