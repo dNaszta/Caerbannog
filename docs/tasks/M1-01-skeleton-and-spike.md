@@ -154,28 +154,31 @@ trusted for CI use.
 
 ## Status
 
-- Step: 4 (verify) — in progress
+- Step: 5 (review) — in progress
 - Round: 1
 - Last verdict: none yet
-- Open findings: none yet
+- Open findings (from test-developer verification, round 1 — none blocking):
+  - idea — `desktopApp:run` prints a benign JDK 27 Skiko "restricted method" warning.
+  - minor — `docs/spec.md` Packaging row reads as if both dmg and msi were exercised; only `packageDmg` was
+    (correctly — can't cross-build msi from macOS). Wording should say msi stays unverified until Windows.
+  - idea — `withPluginsEnabled` deprecation warning from Testcontainers' RabbitMQ module at
+    `data-rabbit/build.gradle.kts:38`; worth a one-line note so `M1-02` doesn't inherit it silently.
 - Open questions:
   - Product decision made (2026-11-03): use **Docker Desktop** as the Testcontainers runtime for `@broker`
     scenarios, for both local dev and CI (overrides the architect's Colima/Podman recommendation above).
     License eligibility for this org was not separately confirmed as part of this decision; if that becomes
     a concern later it is a separate follow-up, not a blocker for this task.
-  - Resolved by the senior developer: build tool is **Gradle fallback** (Kotlin CLI has no `new`/`run`/
-    `package` subcommands at all here — not ambiguous). Test stack is **JUnit 5 everywhere** (incl. driving
-    Cucumber via JUnit Platform Suite) and `com.github.javakeyring:java-keyring` for the keychain. All
-    recorded in `docs/spec.md`.
-  - New, for the architect's review: Testcontainers can't talk to this machine's Docker Desktop (29.8.2,
-    API 1.56) without a workaround (`systemProperty("api.version", "1.43")` pinned on `data-rabbit`'s
-    `brokerTest` task) — see the senior developer's root-cause note below. Open question: does this travel
+  - Resolved and independently verified: build tool is **Gradle fallback**; test stack is **JUnit 5
+    everywhere** (incl. driving Cucumber via JUnit Platform Suite); **`com.github.javakeyring:java-keyring`**
+    for the keychain. All recorded in `docs/spec.md`.
+  - For the architect's review: Testcontainers can't talk to this machine's Docker Desktop (29.8.2, API
+    1.56) without a workaround (`systemProperty("api.version", "1.43")` pinned on `data-rabbit`'s
+    `brokerTest` task), reproduced independently by the test developer. Open question: does this travel
     safely to CI's Docker Desktop version, or should CI `@broker` wiring be its own follow-up task? Not yet
-    escalated to the product owner — architect to judge in review whether this is purely technical or needs
-    to go up.
+    escalated to the product owner — architect to judge whether this is purely technical or needs to go up.
   - Windows keychain round-trip is unverified (no Windows hardware/CI yet) — carried as a known gap, not a
     blocker for this task per the brief.
-- Branch: `m1-01-skeleton-and-spike` (green at the senior developer's handover)
+- Branch: `m1-01-skeleton-and-spike` (green and independently verified at commit `09adf9e`)
 
 ### Open points resolution (senior developer, round 1)
 
