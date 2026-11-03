@@ -151,3 +151,18 @@ trusted for CI use.
 - `docs/tasks/README.md` status for this task updated from "in progress" to "done".
 - No unrelated changes (no real connection-profile, permission-check, or screen code beyond the placeholder
   described above).
+
+## Status
+
+- Step: 2 (tests first) — in progress
+- Round: 1
+- Last verdict: none yet
+- Open findings: none yet
+- Open questions:
+  - Product decision made (2026-11-03): use **Docker Desktop** as the Testcontainers runtime for `@broker`
+    scenarios, for both local dev and CI (overrides the architect's Colima/Podman recommendation above).
+    License eligibility for this org was not separately confirmed as part of this decision; if that becomes
+    a concern later it is a separate follow-up, not a blocker for this task.
+  - Kotlin Toolchain vs Gradle: to be resolved by running `kotlin package --help` during the build step.
+  - Keychain library and test-stack choices: engineering calls, to be made during the build step.
+- Branch: `m1-01-skeleton-and-spike`

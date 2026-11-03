@@ -4,4 +4,4 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
-| M1-01-skeleton-and-spike | Skeleton and M1 tooling spike | M1 | in progress |
+| M1-01-skeleton-and-spike | Skeleton and M1 tooling spike | M1 | in progress (step 2: tests first) |
