@@ -111,7 +111,7 @@ No `tests/bdd/features/` scenario is targeted (this is local tooling, like M1-01
 
 ## Status
 
-- Step: 3 (build) — in progress
+- Step: 4 (verify) — in progress
 - Round: 1
 - Last verdict: none yet
 - Open findings: none yet
