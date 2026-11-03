@@ -111,20 +111,18 @@ No `tests/bdd/features/` scenario is targeted (this is local tooling, like M1-01
 
 ## Status
 
-- Step: 4 (verify) — in progress
+- Step: 5 (review) — in progress
 - Round: 1
 - Last verdict: none yet
-- Open findings: none yet
+- Open findings: none — verification pass (round 1) found zero blockers, majors, or minors.
 - Open questions:
   - Renamed/rescoped from `M1-CI-01-broker-tests-wiring` (2026-11-03) per product decision: no CI pipeline
     for now, local-development-only; use a Taskfile instead. See this file's Why section.
   - go-task as a new local dependency: an engineering call, not escalated (see Open points above). Confirmed
     installed on this machine (Homebrew, v3.54.0) — not a blocker.
-  - Test developer deliberately wrote no test code for this task (see Design notes/Scope: wrapper-only, no
-    new coverage); "red" was confirmed directly (`task` commands fail cleanly with no `Taskfile.yml` present).
-    Baselines captured: `./gradlew test` green and Docker-free; `./gradlew :data-rabbit:brokerTest` green,
-    `api.version=1.43` pin still resolves against this machine's Docker Desktop (29.8.2) — matches M1-01.
-  - Minor wording nuance flagged for the architect (not blocking): the brief says "every module's default
-    test task excludes the broker tag" — in fact only `data-rabbit`'s does; the others simply have no test
-    sources yet. Outcome is correct, reasoning imprecise; worth a one-line brief fix at review time.
-- Branch: `m1-taskfile-01-local-dev-commands`
+  - For the architect to fix at review (not blocking): the brief's Scope says "every module's default test
+    task excludes the broker tag" — in fact only `data-rabbit`'s does; `ui`/`acceptance-tests` just have no
+    test sources yet, `desktopApp` has no test task at all. Outcome stated is correct, reasoning imprecise.
+  - Testcontainers `api.version=1.43` pin independently re-confirmed twice now (senior developer, then test
+    developer) against this machine's Docker Desktop 29.8.2 — no drift, `docs/spec.md` Risks section accurate.
+- Branch: `m1-taskfile-01-local-dev-commands` (green and independently verified at commit `78de7de`)
