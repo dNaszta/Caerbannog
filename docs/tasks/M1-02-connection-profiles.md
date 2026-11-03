@@ -152,6 +152,115 @@ storage, Settings and secrets row: JSON file + `java-keyring`).
   the reachability check to "did the TLS handshake and the HTTP call succeed at all," nothing more, so there
   is no temptation to half-build M1-03's logic here.
 
+### Decisions pinned at handover from step 2 (architect, 2026-11-03)
+
+The test developer flagged five design questions while writing the fakes/step-defs/red tests (round 1,
+commit `242eb6b`). All five are resolved below; build against this shape, not against a verbal summary.
+
+1. **`ConnectionProfileRepository` write API — the `add()`/`update()` split is correct, keep it.**
+   Everything in this task is keyed by `name` (no separate `id` concept anywhere in the brief or in
+   `01_connections.feature`), so a single `save()` comparing by reference/identity would force the
+   `ConnectionsViewModel` to track "the exact object instance I started editing" across a session of
+   immutable-data-class copies — fragile, and not what any scenario needs. Final shape:
+   ```kotlin
+   interface ConnectionProfileRepository {
+       fun list(): List<ConnectionProfile>
+       fun add(profile: ConnectionProfile): SaveConnectionResult     // fails if the name exists
+       fun update(profile: ConnectionProfile): SaveConnectionResult  // profile.name must already exist
+       fun delete(name: String)
+   }
+   sealed interface SaveConnectionResult {
+       data class Saved(val profile: ConnectionProfile) : SaveConnectionResult
+       data class NameAlreadyExists(val name: String) : SaveConnectionResult
+   }
+   ```
+   `update()` on a name that does not exist is a programmer error (the fake throws via `check()`; the real
+   `data-rabbit` implementation may do the same) — it is never reachable from the UI, since the UI only
+   calls `update()` for a profile it already loaded from `list()`.
+   **New edge case this split surfaces, not covered by any Gherkin scenario but real once the "Editing"
+   panel's Save button is wired (see UX section) — renaming an existing profile.** Resolve it in
+   `ConnectionsViewModel`, not in the repository: keep track of the name the edit session started from
+   (`originalName`); on Save, if the (possibly edited) name is unchanged, call `repository.update(...)`; if
+   it changed, call `repository.add(newProfile)` first and only on `Saved` follow with
+   `repository.delete(originalName)` and move the secret (`secretStore.store(newName, password)` then
+   `secretStore.delete(originalName)`) — on `NameAlreadyExists`, return that result unchanged and leave the
+   original profile under `originalName` untouched. This keeps a failed rename non-destructive. No new
+   Gherkin scenario is required for this task (open point, not blocking — see Open points), but the senior
+   developer must not skip it: it is reachable the first time anyone edits a saved profile's name field.
+
+2. **`CaCertificateValidator` — confirmed, added to the component list (it was missing from the original
+   Design notes, that was this brief's gap, not the test developer's).** This is the correct way to let
+   `core` express "a certificate file can be validated" without `core`'s commonMain ever importing
+   `java.security.cert` (a JVM-only type `core` must stay free of per Module boundaries, since `core` is a
+   Kotlin Multiplatform module declared for more than the `jvm()` target even though only `jvm()` exists
+   today). Final component list addition:
+   - `core`: `CaCertificateValidator` (`fun validate(filePath: String): CaCertificateValidationResult`) and
+     `CaCertificateValidationResult` sealed type (`Valid`, `Invalid(reason: String)`) — both pure data/
+     contract, no cert-library import.
+   - `data-rabbit`: `X509CaCertificateValidator`, the real implementation using
+     `java.security.cert.CertificateFactory`.
+   - `acceptance-tests`: `FakeCaCertificateValidator` performs the same real X.509 parsing independently
+     (acceptable: `acceptance-tests` is a plain `kotlin("jvm")` module per its own `build.gradle.kts`, not
+     KMP, so it may import `java.security.cert` without creating a `core`/`ui` boundary problem; it exists
+     so `01_connections.feature`'s step definitions don't need a dependency on `data-rabbit`'s concrete
+     class — see Fakes vs. real JSON file below for the same reasoning applied elsewhere).
+
+3. **Fakes vs. the real JSON file scenario — confirmed, split stands as implemented, no change.**
+   `01_connections.feature`'s Cucumber layer (in-memory fakes, per Design notes above) proves the
+   structural guarantee — `ConnectionProfile` has no password field, `SecretStore.store()` was actually
+   called — and `data-rabbit`'s `JsonConnectionProfileRepositoryTest` (`the password never appears in the
+   JSON file on disk`) proves the real file written by `JsonFileConnectionProfileRepository` never contains
+   it, by reading the real bytes back. Both together satisfy "Passwords are not stored in the profile file"
+   (Acceptance); do not change the Cucumber step to spin up a real temp-file repository — that would
+   contradict this same Design notes section's instruction to keep `01_connections.feature`'s fakes
+   filesystem-free, and would duplicate, not replace, what `JsonConnectionProfileRepositoryTest` already
+   proves honestly.
+
+4. **`ConnectionsViewModel` method surface — confirmed, with one required addition and two notes.**
+   The five pinned methods (`addConnection`, `setTopologyControlLevel`, `setCaCertificate`,
+   `validateCaCertificateFile`, `checkConnection` (suspend), `requestDelete`/`confirmDelete`/`cancelDelete`)
+   in `dev.caerbannog.core.connections` are sound — build against them as-is. One gap: no pinned method
+   lets the UI persist edits to a saved profile's host/virtual-host/username/password (only the narrower
+   `setTopologyControlLevel`/`setCaCertificate` setters are pinned), yet the UX section's "Editing" state
+   needs exactly that for its Save button. Add:
+   ```kotlin
+   fun updateConnection(originalName: String, input: ConnectionProfileInput): SaveConnectionResult
+   ```
+   implementing the rename handling from decision 1 above. Two more notes, not changes:
+   - Model pending-delete as a nullable name (e.g. `pendingDeleteName: String?` on `ConnectionsState`), not
+     a `Boolean` plus a separately-tracked name — `requestDelete(name)` already carries the name, so there
+     is no reason to introduce a boolean flag that switches behavior (review checklist).
+   - The pinned methods are necessarily incomplete for full UI wiring: pure UI-selection state (which
+     profile is selected, "New connection" vs "Editing" panel mode, cancel-edit) is not exercised by any
+     Gherkin scenario (Cucumber drives domain behavior, not Compose selection state) and is not pinned by
+     the test developer's red tests. The senior developer adds it following the same shape (state in
+     `ConnectionsState`, events as `ConnectionsViewModel` methods) — this is normal build-time detail, not
+     an open architecture question requiring another round here.
+
+5. **Extra tests (`KeyringSecretStoreTest`, `CaCertificateValidatorTest`) — confirmed in scope, not scope
+   creep.** The brief's own Scope lines name a real `java-keyring`-backed `SecretStore` and real CA
+   certificate validation as production code this task builds; the Definition of done's "No profile
+   password ever appears in the JSON file or in logs" and the CA-certificate scope bullet are not honestly
+   provable by the `@fake-broker`/fake-repository Cucumber layer alone (a fake cannot prove anything about
+   a real OS keychain or real X.509 parsing — "a fake that is too forgiving hides bugs", the test
+   developer's own house rule, applies here). These two tests are ordinary TDD coverage for in-scope
+   production classes, distinct from the one brief-named `@Tag("broker")` test (which proves
+   `BrokerReachabilityChecker` end-to-end against Testcontainers, not keyring or cert parsing). Keep both;
+   do not cut.
+
+### Caveat carried forward to the senior developer (not a question, do not re-litigate)
+
+`RealBrokerReachabilityTest`'s TLS config (`data-rabbit/src/test/resources/tls/rabbitmq.conf`, plus the
+`RabbitMQContainer` wiring in that test) is the test developer's own words "a solid first attempt, not a
+proven one" — it has not been run against a live Docker daemon (no production
+`StreamAndManagementReachabilityChecker` exists yet to make it pass), and the `testcontainers-rabbitmq`
+API calls were verified by `javap`/bytecode inspection against the cached jar, not by a sources jar or a
+real run. Treat this the same way M1-01 treated its own Docker-API-version finding: expect a possible
+RabbitMQ-4.x config-key surprise (e.g. a renamed `stream.listeners.ssl.*`/`management.ssl.*` key) the
+first time this test actually runs against a container, budget time for it, and if it turns out to be a
+genuinely hard TLS/Testcontainers problem, stop and flag it back here rather than quietly reshaping the
+gate — this is explicitly called out, not a silent risk.
+
 ## UX
 
 Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Build these states:
@@ -197,6 +306,9 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 - The self-constraint level's product design (overall approach, the 3-level staircase, topology-only scope)
   was confirmed as-is by the product owner; `docs/spec.md`'s "Topology migrations and permission guardrails"
   section reflects the confirmed design. Nothing about it is still open for this task.
+- Renaming an existing profile's name during an edit has no Gherkin scenario (see Design notes, decision 1)
+  — behavior is pinned there (non-destructive add-then-delete) so the senior developer has a concrete rule
+  to build against; filing a scenario for it is optional follow-up, not a blocker for this task.
 
 **Unrelated to this task, carried forward unresolved (do not attempt to resolve here):**
 
@@ -218,9 +330,10 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 
 ## Status
 
-- Step: 2 (tests first) — in progress
+- Step: 2 (tests first) — done; design questions resolved by architect, handed off to step 3 (build)
 - Round: 1
-- Last verdict: none yet
+- Last verdict: none yet (design Q&A only — the five questions the test developer flagged at handover,
+  see Design notes "Decisions pinned at handover from step 2"; not a code review, no verdict applies)
 - Open findings: none yet
 - Open questions:
   - Product decision made (2026-11-03): added a per-connection "self-constraint" topology control level
@@ -232,6 +345,19 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
   - Permission check itself (`02_permission_check.feature`) stays deferred to `M1-03`, confirmed by this
     brief's own Scope/Out section.
   - "Switch between connections" scenario deliberately deferred to M2 (stream list doesn't exist yet).
+  - Architect decisions made (2026-11-03), see Design notes "Decisions pinned at handover from step 2":
+    `ConnectionProfileRepository.add()`/`update()` split confirmed; `CaCertificateValidator` added to the
+    component list (`core` interface + `data-rabbit` `X509CaCertificateValidator` impl); fakes-vs-real-file
+    split for the password-storage scenario confirmed as implemented; `ConnectionsViewModel` surface
+    confirmed with one addition (`updateConnection`, covering profile renames); `KeyringSecretStoreTest` and
+    `CaCertificateValidatorTest` confirmed in scope.
+  - New, pinned but not yet a Gherkin scenario: renaming an existing profile's name on Save (non-destructive
+    add-then-delete rule, see Design notes decision 1 and Open points) — optional follow-up to add a
+    scenario, not a blocker.
   - Carried forward, not this task's concern: non-admin permission read (blocks M1-03), Windows keychain
     round-trip unverified.
+  - Carried forward caveat for the senior developer (not a question): `RealBrokerReachabilityTest`'s TLS
+    `rabbitmq.conf` is an unproven first attempt (never run against a live container) — see Design notes
+    "Caveat carried forward to the senior developer". Expect a possible config-key surprise, budget time,
+    flag back here if it's genuinely hard rather than reshaping the gate.
 - Branch: `m1-02-connection-profiles`
