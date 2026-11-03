@@ -330,11 +330,26 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 
 ## Status
 
-- Step: 2 (tests first) — done; design questions resolved by architect, handed off to step 3 (build)
+- Step: 4 (verify) — build done, handed off for verification
 - Round: 1
-- Last verdict: none yet (design Q&A only — the five questions the test developer flagged at handover,
-  see Design notes "Decisions pinned at handover from step 2"; not a code review, no verdict applies)
-- Open findings: none yet
+- Last verdict: none yet (build complete, not yet reviewed)
+- Open findings (senior developer, build handover, 2026-11-03):
+  - **For the test developer:** `acceptance-tests`' `FakeBrokerReachabilityChecker.check()` (`Fakes.kt`)
+    short-circuits on a stream-endpoint failure before adding `Endpoint.MANAGEMENT` to `checkedEndpoints`,
+    so `ConnectionsSteps.theOtherEndpointIsStillReportedAsReachable()`'s assertion
+    (`checkedEndpoints.toSet() == setOf(STREAM, MANAGEMENT)`) fails for the "stream endpoint" row of "Check
+    connection names the endpoint that failed" (the "management API" row passes, since that code path adds
+    both `Endpoint` entries to `checkedEndpoints` before returning). This is a bug in the fake, not in
+    `ConnectionsViewModel` or any other production code: the fake's own step-definition comment states the
+    intent ("proves the app actually probed BOTH endpoints rather than stopping at the first failure"), but
+    the fake's `check()` body does stop at the first failure for this one row. Not fixed here — `Fakes.kt`
+    is test-developer-owned, outside this handover's "write only app code" remit — flagging rather than
+    silently patching. Suggested fix (test developer's call): record both endpoints as checked
+    unconditionally before branching on which one (if any) failed, e.g. add both `Endpoint.STREAM` and
+    `Endpoint.MANAGEMENT` to `checkedEndpoints` up front, then evaluate `streamReachable` /
+    `managementReachable` to decide the result. All 13 other in-scope scenarios pass; only this one
+    Scenario Outline example is affected.
+  - Everything else: all other scenarios/tests green, see handover report for full command/result list.
 - Open questions:
   - Product decision made (2026-11-03): added a per-connection "self-constraint" topology control level
     (Read-only default / Declare and edit / Full control), sitting alongside the automatic broker-permission
@@ -360,4 +375,35 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
     `rabbitmq.conf` is an unproven first attempt (never run against a live container) — see Design notes
     "Caveat carried forward to the senior developer". Expect a possible config-key surprise, budget time,
     flag back here if it's genuinely hard rather than reshaping the gate.
+    **Resolved, no surprise found:** ran clean on the first attempt against a live Docker daemon (Docker
+    Desktop 29.8.2) once the real `StreamAndManagementReachabilityChecker` existed to make it pass — no
+    RabbitMQ 4.x config-key rename needed. See handover report for the exact command and timing.
+  - Build-time engineering calls made by the senior developer (none escalated — all within "the developer's
+    call" per Design notes, or ordinary build-time detail per decision 4's UI-selection-state note):
+    - Stream-port reachability: a raw `SSLSocket` handshake (Design notes explicitly leaves this choice
+      open), not `com.rabbitmq:stream-client` — the real stream protocol is not exercised until M2, so no
+      new dependency was added for a bare TLS-handshake probe.
+    - Management-API reachability: Ktor client with the Java engine (`io.ktor:ktor-client-java`, wrapping
+      `java.net.http.HttpClient`), chosen because it is the simplest way to plug in a custom `SSLContext`
+      built from an optional per-profile CA certificate; version `3.0.3` (no Ktor version was pinned
+      anywhere before this task).
+    - `ManagementPluginMissing` detection against a real broker probes `GET /api/stream/connections`
+      unauthenticated and treats HTTP 404 as "plugin not registered" — this specific endpoint path is this
+      developer's best-effort guess from RabbitMQ's naming convention, **not verified** against a real
+      broker with `rabbitmq_stream_management` disabled (`RealBrokerReachabilityTest` only proves the
+      plugin-enabled path); flagged with a `TODO(spike)` comment in
+      `StreamAndManagementReachabilityChecker.kt`. Same category of risk as the already-tracked "management
+      API field names for publishers/consumers" spike item — worth a follow-up to confirm for real, not a
+      blocker for this task (no scenario requires a real-broker proof of this specific branch, only the
+      `@fake-broker` scenario does, and that already passes).
+    - Connection-profile JSON file storage uses kotlinx-serialization (already the project's chosen JSON
+      library for the management API per `docs/spec.md`'s tech-stack table) via a private DTO in
+      `data-rabbit`, not `core`'s `ConnectionProfile` directly, so `core` never imports the serialization
+      library.
+    - `desktopApp`'s placeholder `App()`/`main()` was deliberately left untouched: wiring the real
+      Connections screen into the actual running desktop app would need `desktopApp` to depend on
+      `data-rabbit` for the real `JsonFileConnectionProfileRepository`/`JavaKeyringSecretStore`/
+      `StreamAndManagementReachabilityChecker`/`X509CaCertificateValidator` wiring, which is not named in
+      this task's Scope or Definition of done (only "the Compose Connections screen in `ui`" is) — flagged
+      as a natural follow-up, not done here to avoid unrequested, unrelated changes.
 - Branch: `m1-02-connection-profiles`

@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization")
 }
 
 kotlin {
@@ -10,17 +11,37 @@ kotlin {
 // (not Kotlin Multiplatform): per spec.md "Why JVM-only", a future Android/iOS client is served by a
 // separate gateway module, not by this one, so data-rabbit never needs other KMP targets.
 //
-// This task's Scope keeps data-rabbit an "empty jvmMain module with just the build wiring" - no
-// RabbitMQ client, no management HTTP client yet. Only test-tooling spikes live here for now:
+// M1-02: this is where data-rabbit stops being an empty shell - real implementations of core's
+// ConnectionProfileRepository (JSON file), SecretStore (OS keychain), CaCertificateValidator (X.509)
+// and BrokerReachabilityChecker (TLS reachability) now live in src/main. Test-tooling spikes from
+// M1-01 stay as-is:
 //   - RabbitMqContainerSpikeTest (Testcontainers proof, tagged "broker")
 //   - KeyringRoundTripSpikeTest (keychain library proof, com.github.javakeyring:java-keyring)
 dependencies {
     // M1-02: data-rabbit's real implementations (BrokerReachabilityChecker, ConnectionProfileRepository,
     // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
     // docs/tasks/M1-02-connection-profiles.md's Design notes ("core holds ... repository interfaces").
-    // No src/main exists yet, so this dependency only matters for the test source set until the
-    // senior developer adds one.
     implementation(project(":core"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+
+    // Connection-profile JSON file storage (JsonFileConnectionProfileRepository): kotlinx-serialization
+    // is already the project's chosen JSON library (docs/spec.md tech-stack table, "Management API:
+    // Ktor client with kotlinx-serialization") - reused here for file I/O instead of introducing a
+    // second JSON library. A private DTO in this module carries the @Serializable annotation, not
+    // core's ConnectionProfile itself, so core's domain model stays free of any serialization-library
+    // import (see JsonFileConnectionProfileRepository's own header comment).
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Management API reachability probe (StreamAndManagementReachabilityChecker): Ktor client per
+    // docs/spec.md's tech-stack table ("Management API: Ktor client ..."), using the Java engine
+    // (wraps java.net.http.HttpClient) because it is the simplest way to plug in a custom SSLContext
+    // built from an optional per-profile CA certificate.
+    implementation("io.ktor:ktor-client-core:3.0.3")
+    implementation("io.ktor:ktor-client-java:3.0.3")
+
+    // Password storage (JavaKeyringSecretStore): was test-only in the M1-01 spike, now a real
+    // production dependency.
+    implementation("com.github.javakeyring:java-keyring:1.0.4")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
@@ -33,8 +54,6 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
-
-    testImplementation("com.github.javakeyring:java-keyring:1.0.4")
 }
 
 tasks.test {

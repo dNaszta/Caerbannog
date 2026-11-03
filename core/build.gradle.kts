@@ -13,6 +13,12 @@ kotlin {
     jvm()
 
     sourceSets {
+        // M1-02: ConnectionsViewModel exposes state as a StateFlow (Async and state row,
+        // docs/spec.md tech-stack table) - this is a pure-Kotlin multiplatform artifact, no JVM-only
+        // or network code, so it stays within core's "zero RabbitMQ/network imports" rule.
+        commonMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+        }
         jvmTest.dependencies {
             implementation(kotlin("test"))
             implementation("org.junit.jupiter:junit-jupiter:5.11.4")
