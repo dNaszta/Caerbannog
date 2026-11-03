@@ -29,8 +29,12 @@ spec correction is needed beyond what this brief already describes doing.
 
 In:
 - `Taskfile.yml` at the repo root (go-task convention; `version: '3'`).
-- `task test` — wraps `./gradlew test` (fast, no Docker required; every module's default `test` task already
-  excludes the `broker` tag, per `data-rabbit/build.gradle.kts`'s `excludeTags("broker")`).
+- `task test` — wraps `./gradlew test` (fast, no Docker required; only `data-rabbit` has any
+  `@Tag("broker")`-tagged test today, excluded via `data-rabbit/build.gradle.kts`'s `excludeTags("broker")`
+  on its `test` task. `ui` and `acceptance-tests` already have test sources — `AppUiTest.kt` and
+  `RunCucumberSpikeTest.kt`/`SpikeSanitySteps.kt` respectively — but none of them are tagged `"broker"`, so
+  there is nothing for their `test` tasks to exclude; `desktopApp` has no test task at all. Either way,
+  `./gradlew test` stays Docker-free today).
 - `task test:broker` — wraps `./gradlew :data-rabbit:brokerTest`. Confirm this still passes locally (Docker
   Desktop running) before marking this task done; this is a re-confirmation of M1-01's finding, not new
   investigation. If the `api.version=1.43` pin (`data-rabbit/build.gradle.kts`, `brokerTest` task) still
@@ -111,18 +115,27 @@ No `tests/bdd/features/` scenario is targeted (this is local tooling, like M1-01
 
 ## Status
 
-- Step: 5 (review) — in progress
+- Step: 5 (review) — done
 - Round: 1
-- Last verdict: none yet
-- Open findings: none — verification pass (round 1) found zero blockers, majors, or minors.
+- Last verdict: Accepted
+- Open findings: none — verification pass (round 1) found zero blockers, majors, or minors; architect review
+  found zero blockers, majors, or minors.
 - Open questions:
   - Renamed/rescoped from `M1-CI-01-broker-tests-wiring` (2026-11-03) per product decision: no CI pipeline
     for now, local-development-only; use a Taskfile instead. See this file's Why section.
   - go-task as a new local dependency: an engineering call, not escalated (see Open points above). Confirmed
-    installed on this machine (Homebrew, v3.54.0) — not a blocker.
-  - For the architect to fix at review (not blocking): the brief's Scope says "every module's default test
-    task excludes the broker tag" — in fact only `data-rabbit`'s does; `ui`/`acceptance-tests` just have no
-    test sources yet, `desktopApp` has no test task at all. Outcome stated is correct, reasoning imprecise.
+    installed on this machine (Homebrew, v3.54.0) — not a blocker. Now also listed in `docs/spec.md`'s
+    tech-stack table (new "Local dev commands" row) so it is not undocumented anymore.
+  - Fixed at review (architect, 2026-11-03): the brief's Scope wrongly said "every module's default test
+    task excludes the broker tag". Corrected — only `data-rabbit`'s `test` task declares
+    `excludeTags("broker")`; `ui` and `acceptance-tests` have test sources (`AppUiTest.kt`,
+    `RunCucumberSpikeTest.kt`/`SpikeSanitySteps.kt`) but none tagged `"broker"`, so there is nothing for
+    their `test` tasks to exclude; `desktopApp` has no test task at all. The outcome (`./gradlew test` stays
+    Docker-free) was always correct; only the stated reason was imprecise.
   - Testcontainers `api.version=1.43` pin independently re-confirmed twice now (senior developer, then test
     developer) against this machine's Docker Desktop 29.8.2 — no drift, `docs/spec.md` Risks section accurate.
-- Branch: `m1-taskfile-01-local-dev-commands` (green and independently verified at commit `78de7de`)
+  - M1's own gate ("Connects to a local broker", per `docs/spec.md`'s Milestones table) is not reached by
+    this task — it was tooling-only, same as M1-01. The connection-profile work (next candidate: `M1-02`) is
+    still needed before that gate is met; not created yet, left for a deliberate next-task decision.
+- Branch: `m1-taskfile-01-local-dev-commands` (green and independently verified at commit `78de7de`),
+  reviewed and accepted at commit `ae3cc83`
