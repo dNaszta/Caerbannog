@@ -108,3 +108,15 @@ No `tests/bdd/features/` scenario is targeted (this is local tooling, like M1-01
 - `docs/spec.md` Risks section reflects this task's local Docker Desktop/API version re-confirmation.
 - No unrelated changes (no new test coverage, no CI config, no `data-rabbit`/`desktopApp` production code
   changes).
+
+## Status
+
+- Step: 2 (tests first) — in progress
+- Round: 1
+- Last verdict: none yet
+- Open findings: none yet
+- Open questions:
+  - Renamed/rescoped from `M1-CI-01-broker-tests-wiring` (2026-11-03) per product decision: no CI pipeline
+    for now, local-development-only; use a Taskfile instead. See this file's Why section.
+  - go-task as a new local dependency: an engineering call, not escalated (see Open points above).
+- Branch: `m1-taskfile-01-local-dev-commands`
