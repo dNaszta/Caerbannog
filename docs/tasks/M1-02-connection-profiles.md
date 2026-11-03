@@ -330,8 +330,43 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 
 ## Status
 
-- Step: 5 (review) — changes required, round 2 needed
-- Round: 1
+- Step: 5 (review) — **accepted**
+- Round: 2
+- Round 2 verdict (architect, 2026-11-04): **Accepted.** Round 1's single blocker (`ConnectionsViewModel.
+  updateConnection`/`renameTo` had zero automated test coverage) is closed. The test developer added
+  `core/src/jvmTest/kotlin/dev/caerbannog/core/connections/ConnectionsViewModelTest.kt` (commit `0f3ec08`,
+  the only file touched since round 1's handover — no production code changed), 5 tests covering: plain
+  field edit via `update()` (no rename dance); plain edit with a password change; rename with secret
+  migration (old name gone from both repository and secret store, new name present in both); rename with
+  a new password overriding the carried-over secret; and a rename collision (`NameAlreadyExists`) leaving
+  the original profile *and* its secret completely untouched, including proving a half-applied field edit
+  (a changed host alongside the colliding name) does not leak through. Read the test file myself: the
+  fakes are minimal and local to `core`'s own test source set (no `acceptance-tests`/`ui` dependency,
+  matching `ConnectionsScreenUiTest`'s own pattern), the reachability checker and CA validator fakes
+  `error()` if ever called (correctly proving `updateConnection` never reaches them), and every assertion
+  checks a real outcome (repository contents, secret-store contents, exact field values) — none is a bare
+  "doesn't throw." Independently re-read `ConnectionsViewModel.updateConnection`/`renameTo` myself (not
+  just trusting the test developer's confirmation): it branches on `input.name == originalName` for a
+  plain `repository.update(...)` vs. `renameTo`'s add-then-delete, `renameTo` calls `repository.add(updated)`
+  first and only on `Saved` migrates the secret and deletes the original name (profile and secret) — on
+  `NameAlreadyExists` it returns immediately, touching neither the repository nor the secret store. This
+  matches decision 1 exactly; no bug found, confirming this was purely a coverage gap, not a logic defect.
+  Independently re-ran (not just re-reading the test developer's report): `ConnectionsViewModelTest` (5/5
+  green), `core:jvmTest` and `ui:jvmTest` in full (`SpikeSanityTest`, `AppUiTest`,
+  `ConnectionsScreenUiTest` all still green), `acceptance-tests`' `01_connections.feature` run (14
+  scenarios: 13 passed, 1 skipped — "Switch between connections", correctly still deferred — 0 failures),
+  and `data-rabbit`'s full suite including `RealBrokerReachabilityTest` against live Docker (all green).
+  No regressions anywhere. Nothing else outstanding from round 1: the two minor UI findings and the
+  desktopApp-wiring question were already spun out as `M1-04-connections-screen-feedback-gaps.md` and
+  `M1-05-wire-desktopapp-connections.md` last round, confirmed still present as separate task briefs, not
+  reopened here.
+  **M1-gate statement:** M1-02 is accepted, and with it `RealBrokerReachabilityTest`'s real, non-fake,
+  TLS-verified reachability proof against a live Testcontainers RabbitMQ 4.x broker stands as the concrete
+  artifact that satisfies M1's own gate in `docs/spec.md`'s Milestones table, "Connects to a local broker."
+  That specific gate is met. M1 as a whole is not yet closed: `M1-03` (the permission-check feature,
+  `02_permission_check.feature`, still blocked on the non-admin-permission-read spike question) has not
+  been started, and `M1-04`/`M1-05` remain open follow-ups. Same position as stated at round 1.
+- Round 1 (superseded by the above, kept for history):
 - Last verdict (architect, 2026-11-04): **Changes required.** One blocker: `ConnectionsViewModel.
   updateConnection` (the rename/edit orchestration pinned at step 2's decision 1 and decision 4) has zero
   automated test coverage anywhere in the codebase — no Gherkin scenario exercises it, and no unit test
