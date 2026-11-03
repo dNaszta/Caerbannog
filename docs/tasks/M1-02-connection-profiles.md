@@ -330,9 +330,26 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 
 ## Status
 
-- Step: 5 (review) — in progress
+- Step: 5 (review) — changes required, round 2 needed
 - Round: 1
-- Last verdict: none yet
+- Last verdict (architect, 2026-11-04): **Changes required.** One blocker: `ConnectionsViewModel.
+  updateConnection` (the rename/edit orchestration pinned at step 2's decision 1 and decision 4) has zero
+  automated test coverage anywhere in the codebase — no Gherkin scenario exercises it, and no unit test
+  exists in `core` (`JsonConnectionProfileRepositoryTest` covers the repository's own `update()`, but not
+  the view-model-level decision between a plain update and an add-then-delete rename, the secret
+  migration, or the non-destructive rollback on a colliding new name). This is in-scope, Goal-relevant,
+  non-trivial logic (decision 1: "the senior developer must not skip it") built without a driving test,
+  which is a TDD-requirement violation (`docs/spec.md`'s Quality requirement), not a style nit. Everything
+  else reviewed (domain model, repository, keychain store, CA validator, reachability checker, the real
+  `@Tag("broker")` proof, the Compose screen, and all named Gherkin scenarios) is accepted as-is; see the
+  architect's findings table for the two non-blocking notes and the desktopApp-wiring answer, both
+  resolved via follow-up briefs (`M1-04-connections-screen-feedback-gaps.md`,
+  `M1-05-wire-desktopapp-connections.md`) rather than reopening this task's scope.
+  **To close round 2:** add a `ConnectionsViewModelTest` (or equivalent) in `core`'s test source set,
+  using small local fakes (same pattern as `ui`'s `ConnectionsScreenUiTest`, since `core` cannot and
+  should not depend on `acceptance-tests`), covering at minimum: editing a saved profile's fields without
+  renaming; renaming a saved profile (old entry gone, new entry present, secret moved); and the
+  non-destructive rollback when the new name collides with another saved profile.
 - Verification (test developer, 2026-11-03): pass with findings, no blockers. All 13 in-scope scenarios
   green (including both Scenario Outline rows after the fake fix below), "Switch between connections"
   correctly deferred/pending. `data-rabbit` unit tests, `@Tag("broker")` `RealBrokerReachabilityTest`
