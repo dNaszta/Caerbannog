@@ -330,9 +330,19 @@ Screen: `docs/ux/Main.dc.html` ("1 Connections" per `docs/ux/canvas.json`). Buil
 
 ## Status
 
-- Step: 4 (verify) — build done, handed off for verification
+- Step: 5 (review) — in progress
 - Round: 1
-- Last verdict: none yet (build complete, not yet reviewed)
+- Last verdict: none yet
+- Verification (test developer, 2026-11-03): pass with findings, no blockers. All 13 in-scope scenarios
+  green (including both Scenario Outline rows after the fake fix below), "Switch between connections"
+  correctly deferred/pending. `data-rabbit` unit tests, `@Tag("broker")` `RealBrokerReachabilityTest`
+  (independently re-run against live Docker, confirmed genuine via throwaway-CA trust restriction, not
+  vacuous), and `ui`/`core` `jvmTest` suites all pass. Fixed `FakeBrokerReachabilityChecker`'s
+  short-circuit bug (own file) so both Outline rows pass. Two minor exploratory findings for the
+  architect to judge (not scenario/spec violations, no action required to accept): (1) `ConnectionsScreen`
+  never surfaces `state.lastSaveResult`, so saving over a duplicate name is a silent no-op in the UI; (2)
+  `state.lastCheckResult` isn't cleared on `selectConnection`, so switching profiles can show a stale
+  check-connection banner from the previously selected profile.
 - Open findings (senior developer, build handover, 2026-11-03):
   - **For the test developer:** `acceptance-tests`' `FakeBrokerReachabilityChecker.check()` (`Fakes.kt`)
     short-circuits on a stream-endpoint failure before adding `Endpoint.MANAGEMENT` to `checkedEndpoints`,
