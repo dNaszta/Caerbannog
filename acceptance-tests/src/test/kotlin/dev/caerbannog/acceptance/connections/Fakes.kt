@@ -120,12 +120,18 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
             )
         }
 
+        // Both endpoints are always probed, unconditionally, before branching on which one (if any)
+        // failed - a real checker cannot know the stream endpoint failed without having attempted the
+        // management endpoint too (they are independent connections), so this fake must not
+        // short-circuit after the first failure either. See "Check connection names the endpoint that
+        // failed"'s "the other endpoint is still reported as reachable" assertion, which this exists
+        // to make honest.
         checkedEndpoints += Endpoint.STREAM
+        checkedEndpoints += Endpoint.MANAGEMENT
+
         if (!streamReachable) {
             return ConnectionCheckResult.EndpointUnreachable(Endpoint.STREAM, "connection refused")
         }
-
-        checkedEndpoints += Endpoint.MANAGEMENT
         if (!managementReachable) {
             return ConnectionCheckResult.EndpointUnreachable(Endpoint.MANAGEMENT, "connection refused")
         }
