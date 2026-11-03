@@ -6,4 +6,4 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | --- | --- | --- | --- |
 | M1-01-skeleton-and-spike | Skeleton and M1 tooling spike | M1 | done |
 | M1-TASKFILE-01-local-dev-commands | Taskfile for local developer commands (fast tests, @broker tests) | M1 | done |
-| M1-02-connection-profiles | Connection profiles | M1 | in progress (step 2: tests first) |
+| M1-02-connection-profiles | Connection profiles | M1 | in progress (step 3: build) |
