@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Global search</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px;border:2px solid var(--primary)"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">orders</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>Streams</h1>
+</header>
+<div class="content">
+<div class="tscroll" style="height:520px"></div>
+</div>
+</main>
+<div class="scrim" style="align-items:flex-start;padding-top:72px">
+<section class="dialog" role="dialog" aria-label="Search" style="width:720px;padding:16px 16px 20px;gap:12px;border-radius:28px">
+<div class="search" style="flex:none;background:var(--sc-highest)"><span class="ms" aria-hidden="true">search</span><span style="flex-grow:1;color:var(--on-surface)">orders</span><span class="ms" aria-hidden="true">close</span></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 4px">
+<span class="chip on"><span class="ms sm" aria-hidden="true">check</span>All 5</span>
+<span class="chip">Streams 2</span>
+<span class="chip">Queues 2</span>
+<span class="chip">Exchanges 1</span>
+<span style="flex-grow:1"></span>
+<span class="chip">Regex</span>
+</div>
+<div style="display:flex;flex-direction:column;padding:0 4px">
+<div class="t-lm dim" style="padding:8px 8px 4px">Streams</div>
+<div style="display:flex;align-items:center;gap:16px;min-height:56px;padding:0 8px;border-radius:12px;background:var(--secondary-container);color:var(--on-secondary-container)"><span class="ms" aria-hidden="true">stream</span><span style="flex:1 1 auto;min-width:0"><span class="t-ts mono">orders-events</span><br><span class="t-bs">About 48,300 messages</span></span><span class="pill">Stream</span><span class="ms sm" aria-hidden="true">keyboard_return</span></div>
+<div style="display:flex;align-items:center;gap:16px;min-height:56px;padding:0 8px"><span class="ms dim" aria-hidden="true">stream</span><span style="flex:1 1 auto;min-width:0"><span class="t-ts mono">orders</span><br><span class="t-bs dim">3 partitions</span></span><span class="pill">Super stream</span></div>
+<div class="t-lm dim" style="padding:12px 8px 4px">Queues</div>
+<div style="display:flex;align-items:center;gap:16px;min-height:56px;padding:0 8px"><span class="ms dim" aria-hidden="true">inbox</span><span style="flex:1 1 auto;min-width:0"><span class="t-ts mono">orders</span><br><span class="t-bs dim">1,240 ready · virtual host /</span></span><span class="pill">Quorum queue</span></div>
+<div style="display:flex;align-items:center;gap:16px;min-height:56px;padding:0 8px"><span class="ms dim" aria-hidden="true">inbox</span><span style="flex:1 1 auto;min-width:0"><span class="t-ts mono">legacy-orders</span><br><span class="t-bs dim">0 ready · virtual host /</span></span><span class="pill">Quorum queue</span></div>
+<div class="t-lm dim" style="padding:12px 8px 4px">Exchanges</div>
+<div style="display:flex;align-items:center;gap:16px;min-height:56px;padding:0 8px"><span class="ms dim" aria-hidden="true">swap_horiz</span><span style="flex:1 1 auto;min-width:0"><span class="t-ts mono">orders.events</span><br><span class="t-bs dim">virtual host /</span></span><span class="pill">Exchange</span></div>
+</div>
+<div class="t-bs dim" style="padding:0 8px">Searches names only, never messages. Results come from the management API's name filter, paged for large brokers.</div>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

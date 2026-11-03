@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Connections</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>Connections</h1>
+<button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>New connection</button>
+</header>
+<div class="content" style="flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
+<section style="flex:0 1 340px;min-width:0;display:flex;flex-direction:column;gap:8px">
+<div class="t-lm dim" style="padding:0 4px">Saved profiles</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+<div class="t-bs dim">Connected</div>
+</div>
+<div class="pcard on">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">uat-eu</span><span class="pill ok">Can change topology</span></div>
+<div class="t-bs">rabbit-uat.example.com</div>
+<div class="t-bs">Editing</div>
+</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">staging-eu</span><span class="pill ok">Can change topology</span></div>
+<div class="t-bs dim">rabbit-staging.example.com</div>
+<div class="t-bs dim">Not connected</div>
+</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">local-test</span><span class="pill ok">Can change topology</span></div>
+<div class="t-bs dim">localhost</div>
+<div class="t-bs dim">Not connected</div>
+</div>
+</section>
+<section class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:20px">
+<div class="t-tl">Edit connection</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px 16px">
+<div class="tf focus"><span class="l">Name</span><div class="v"><span>uat-eu</span></div></div>
+<div class="tf"><span class="l">Virtual host</span><div class="v"><span>/</span></div></div>
+<div class="tf"><span class="l">Host</span><div class="v"><span>rabbit-uat.example.com</span></div></div>
+<div class="tf"><span class="l">Username</span><div class="v"><span>svc-explorer</span></div></div>
+<div class="tf"><span class="l">Stream port (TLS)</span><div class="v"><span>5551</span></div></div>
+<div class="tf"><span class="l">Management port (HTTPS)</span><div class="v"><span>15671</span></div></div>
+<div class="tf"><span class="l">Password</span><div class="v"><span>••••••••••</span><span class="ms" aria-hidden="true">visibility</span></div></div>
+<div class="tf"><span class="l">CA certificate (optional)</span><div class="v"><span>Use system trust store</span><span class="ms" aria-hidden="true">upload_file</span></div></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">Permission check</div>
+<div class="banner ok"><span class="ms" aria-hidden="true">verified_user</span><div><b>svc-explorer can change topology on virtual host /.</b> It has configure, write and read permissions there, so topology screens and migrations are unlocked for this connection.</div></div>
+<div class="t-bs dim">The check runs before the first connection and again whenever you edit this profile. If the user cannot change topology, the topology screens open read-only.</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;color:var(--on-surface-variant)"><span class="ms" aria-hidden="true">lock</span><div class="t-bs">TLS is always on. The app does not connect without it.</div></div>
+<div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div>Connection test passed. The stream endpoint and the management API are both reachable.</div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">delete</span>Delete profile</button>
+<span style="flex-grow:1"></span>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">wifi_tethering</span>Check connection and permissions</button>
+<button class="btn filled" type="button">Save</button>
+</div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

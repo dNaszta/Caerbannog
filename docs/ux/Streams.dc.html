@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stream list</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>Streams</h1>
+<span class="t-bs dim">Updated 12 s ago</span>
+<button class="iconbtn" type="button" aria-label="Refresh"><span class="ms" aria-hidden="true">refresh</span></button>
+<button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Create stream</button>
+</header>
+<div class="content">
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<div class="search"><span class="ms" aria-hidden="true">search</span><span>Search streams</span></div>
+<span class="chip on"><span class="ms sm" aria-hidden="true">check</span>All</span>
+<span class="chip">Streams</span>
+<span class="chip">Super streams</span>
+</div>
+<div class="tscroll">
+<table class="tbl" style="min-width:900px">
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th class="r">Messages (approx.)</th>
+<th class="r">First offset</th>
+<th class="r">Last offset</th>
+<th class="r">Size</th>
+<th class="r">Publishers</th>
+<th class="r">Consumers</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="t-ts">orders-events</td>
+<td>Stream</td>
+<td class="r">48,300</td>
+<td class="r">0</td>
+<td class="r">48,299</td>
+<td class="r">212 MB</td>
+<td class="r">2</td>
+<td class="r">3</td>
+<td class="r"><button class="btn text" type="button">Browse</button><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
+</tr>
+<tr>
+<td class="t-ts"><span style="display:inline-flex;align-items:center;gap:8px"><span class="ms" aria-hidden="true">expand_more</span>orders</span></td>
+<td>Super stream · 3 partitions</td>
+<td class="r">96,100</td>
+<td class="r dim">–</td>
+<td class="r dim">–</td>
+<td class="r">410 MB</td>
+<td class="r">4</td>
+<td class="r">6</td>
+<td class="r"><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
+</tr>
+<tr style="background: var(--sc-low)">
+<td style="padding-left:56px">orders-0</td>
+<td class="dim">Partition</td>
+<td class="r">31,200</td>
+<td class="r">0</td>
+<td class="r">31,199</td>
+<td class="r">130 MB</td>
+<td class="r">1</td>
+<td class="r">2</td>
+<td class="r"><button class="btn text" type="button">Browse</button></td>
+</tr>
+<tr style="background: var(--sc-low)">
+<td style="padding-left:56px">orders-1</td>
+<td class="dim">Partition</td>
+<td class="r">32,900</td>
+<td class="r">0</td>
+<td class="r">32,899</td>
+<td class="r">140 MB</td>
+<td class="r">2</td>
+<td class="r">2</td>
+<td class="r"><button class="btn text" type="button">Browse</button></td>
+</tr>
+<tr style="background: var(--sc-low)">
+<td style="padding-left:56px">orders-2</td>
+<td class="dim">Partition</td>
+<td class="r">32,000</td>
+<td class="r">0</td>
+<td class="r">31,999</td>
+<td class="r">140 MB</td>
+<td class="r">1</td>
+<td class="r">2</td>
+<td class="r"><button class="btn text" type="button">Browse</button></td>
+</tr>
+<tr>
+<td class="t-ts">audit-log</td>
+<td>Stream</td>
+<td class="r">1,204,000</td>
+<td class="r">880,000</td>
+<td class="r">2,083,999</td>
+<td class="r">3.4 GB</td>
+<td class="r">1</td>
+<td class="r">1</td>
+<td class="r"><button class="btn text" type="button">Browse</button><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
+</tr>
+<tr>
+<td class="t-ts">payments-stream</td>
+<td>Stream</td>
+<td class="r">7,850</td>
+<td class="r">0</td>
+<td class="r">7,849</td>
+<td class="r">31 MB</td>
+<td class="r">1</td>
+<td class="r">0</td>
+<td class="r"><button class="btn text" type="button">Browse</button><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:16px" class="t-bs dim">
+<span>Message counts are approximate: committed offset minus first offset, plus one.</span>
+<span style="flex-grow:1"></span>
+<span>1–5 of 12 streams</span>
+<button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button>
+<button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

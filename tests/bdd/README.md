@@ -1,0 +1,76 @@
+# Caerbannog BDD tests
+
+Plain-language scenarios that describe what Caerbannog must do, written as a product owner and test engineer.
+They follow `docs/spec.md` and the screens in `docs/ux/`. Each `.feature` file covers one area of the spec.
+
+Status: the scenarios are written first (TDD/BDD). Step definitions do not exist yet.
+The runner (Cucumber-JVM with Kotlin steps) is a proposal to confirm in the M1 spike; the files are plain
+Gherkin and will work with any Gherkin runner.
+
+## Layout
+
+```
+tests/bdd/
+  README.md
+  features/
+    01_connections.feature
+    02_permission_check.feature
+    03_stream_list.feature
+    04_publishers_consumers.feature
+    05_message_browser_paging.feature
+    06_super_streams.feature
+    07_payload_viewer_filter.feature
+    08_publish_test_message.feature
+    09_topology_queues.feature
+    10_topology_migrations.feature
+    11_global_search.feature
+    12_stream_management.feature
+```
+
+## Tags
+
+| Tag | Meaning |
+| --- | --- |
+| `@M1` to `@M5` | Milestone that must make the scenario pass (see the milestones table in `docs/spec.md`) |
+| `@gate-M2`, `@gate-M4`, `@gate-M5` | Scenario that is the gate check for that milestone |
+| `@smoke` | Smallest set that proves the feature works; run on every commit |
+| `@fake-broker` | Runs against in-memory fakes of the stream and management clients; no broker needed |
+| `@broker` | Needs a real RabbitMQ 4.x broker with TLS (Testcontainers, needs Docker) |
+| `@negative` | Checks a refusal, an error or a safety rule |
+| `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS only, never reading queue messages, browsing never changes offsets) |
+| `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
+| `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
+
+Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@broker` in a separate CI job.
+
+## Vocabulary used in steps
+
+- "the connection" is a saved profile; each profile is its own environment.
+- "locked" and "unlocked" describe topology changes, decided by the configure permission.
+- "offset" numbers start at 0; "page size" is the number of messages per page.
+- "the broker" is the fake in `@fake-broker` scenarios and a real RabbitMQ in `@broker` scenarios.
+
+## Traceability
+
+| Feature file | Spec section | Milestone |
+| --- | --- | --- |
+| 01 connections | Screens (Connections), Architecture (TLS only) | M1 |
+| 02 permission check | Topology migrations and permission guardrails | M1 |
+| 03 stream list | Goals (stream list), Screens (Stream list) | M2 |
+| 04 publishers and consumers | Goals (publishers and consumers) | M2 |
+| 05 message browser paging | Paging model | M3 |
+| 06 super streams | Paging model (super streams), Screens | M2, M3 |
+| 07 payload viewer and filter | Goals (viewer, filter), UX rules | M4 |
+| 08 publish test message | Goals (publish), Screens | M5 |
+| 09 topology and queues | Goals (quorum queues), Screens (Topology) | M2, M5 |
+| 10 topology migrations | Topology migrations and permission guardrails | M5 |
+| 11 global search | Goals (global search), Screens | M2, M3 |
+| 12 stream management | Goals (publish and manage), UX rules | M5 |
+
+## Open points that affect these tests
+
+- How a non-administrator user's own permissions are read (`02`, `@needs-spike`).
+- Exact fields of the stream publisher and consumer endpoints (`04`, `@needs-spike`).
+- What happens when a migration fails half-way (`10`, `@needs-decision`).
+- Whether the configure permission is enough, or the app adds its own rule on top (spec open question).
+- Whether streams are found by name through the same API call as queues (`11`, `@needs-spike`).

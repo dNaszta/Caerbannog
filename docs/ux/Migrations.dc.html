@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topology migrations</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>Migrations</h1>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export current topology</button>
+<button class="btn filled lead" type="button" disabled><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button>
+</header>
+<div class="content">
+<div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.</span></div>
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
+<section style="flex:0 1 340px;min-width:0;display:flex;flex-direction:column;gap:8px">
+<div class="t-lm dim" style="padding:0 4px">Migration files</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">0001</span><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Applied</span></div>
+<div class="t-bs dim">Create orders super stream</div>
+</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">0002</span><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Applied</span></div>
+<div class="t-bs dim">Add invoices queue</div>
+</div>
+<div class="pcard on">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">0003</span><span class="pill warn">Pending</span></div>
+<div class="t-bs">Add orders queue and binding</div>
+</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">0004</span><span class="pill warn">Pending</span></div>
+<div class="t-bs dim">Add notifications policy</div>
+</div>
+</section>
+<section class="card" style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:16px">
+<div class="t-tl">0003 · Add orders queue and binding</div>
+<div class="code">{
+  "version": "0003",
+  "description": "Add orders queue and binding",
+  "up": [
+    { "action": "declareQueue", "name": "orders", "type": "quorum" },
+    { "action": "declareBinding", "exchange": "events", "queue": "orders", "routingKey": "order.created" },
+    { "action": "deleteQueue", "name": "legacy-orders" }
+  ]
+}</div>
+<div class="t-ts">Dry run on prod-eu</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true" style="color:var(--error)">block</span><span style="flex-grow:1">Declare quorum queue <span class="mono">orders</span></span><span class="pill bad">Blocked</span></div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true" style="color:var(--error)">block</span><span style="flex-grow:1">Bind <span class="mono">events</span> to <span class="mono">orders</span> with <span class="mono">order.created</span></span><span class="pill bad">Blocked</span></div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true" style="color:var(--error)">block</span><span style="flex-grow:1">Delete queue <span class="mono">legacy-orders</span></span><span class="pill bad">Blocked</span></div>
+</div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div>Apply is disabled: the permission check found that svc-explorer cannot change topology on prod-eu. You can still edit, validate and export this file, then apply it on a connection that allows it.</div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">edit</span>Edit file</button>
+<span style="flex-grow:1"></span>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">rule</span>Validate again</button>
+<button class="btn filled" type="button" disabled>Apply 0003</button>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

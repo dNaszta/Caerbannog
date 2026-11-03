@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Publishers and consumers</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<button class="iconbtn" type="button" aria-label="Back to streams"><span class="ms" aria-hidden="true">arrow_back</span></button>
+<h1>orders-events</h1>
+<span class="t-bs dim">Updated 5 s ago</span>
+<button class="iconbtn" type="button" aria-label="Refresh"><span class="ms" aria-hidden="true">refresh</span></button>
+</header>
+<div class="tabs" style="padding:0 24px"><span class="tab">Messages</span><span class="tab on">Publishers and consumers</span></div>
+<div class="content" style="padding-top:16px">
+<section style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:12px"><span class="t-tm">Publishers</span><span class="pill">2</span></div>
+<div class="tscroll">
+<table class="tbl" style="min-width:760px">
+<thead>
+<tr>
+<th>Reference</th>
+<th>Connection</th>
+<th class="r">Published</th>
+<th class="r">Confirmed</th>
+<th class="r">Errors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="t-ts">checkout-1</td>
+<td class="mono">10.0.4.21:51234 · checkout-service</td>
+<td class="r">48,100</td>
+<td class="r">48,100</td>
+<td class="r"><span class="pill ok">0</span></td>
+</tr>
+<tr>
+<td class="t-ts">backfill-job</td>
+<td class="mono">10.0.7.8:40022 · backfill</td>
+<td class="r">200</td>
+<td class="r">200</td>
+<td class="r"><span class="pill ok">0</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:12px"><span class="t-tm">Consumers</span><span class="pill">3</span><span class="t-bs dim">Last offset on the stream: 48,299</span></div>
+<div class="tscroll">
+<table class="tbl" style="min-width:760px">
+<thead>
+<tr>
+<th>Consumer</th>
+<th>Connection</th>
+<th class="r">Offset</th>
+<th class="r">Messages behind</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="t-ts">billing</td>
+<td class="mono">10.0.5.14:38812 · billing-service</td>
+<td class="r">48,299</td>
+<td class="r">0</td>
+<td><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Caught up</span></td>
+</tr>
+<tr>
+<td class="t-ts">analytics</td>
+<td class="mono">10.0.9.3:52901 · analytics-etl</td>
+<td class="r">47,950</td>
+<td class="r">349</td>
+<td><span class="pill warn">Behind</span></td>
+</tr>
+<tr>
+<td class="t-ts">audit</td>
+<td class="mono">10.0.6.30:44417 · audit-writer</td>
+<td class="r">48,100</td>
+<td class="r">199</td>
+<td><span class="pill warn">Behind</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<div class="t-bs dim">Read from the management API (rabbitmq_stream_management). Opening a row can jump the message browser to that consumer's offset.</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

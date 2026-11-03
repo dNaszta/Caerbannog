@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Publish test message</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
+<div class="t-lm dim">Connection</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
+<div class="t-bs dim">rabbit-prod.example.com</div>
+</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>orders-events</h1>
+<button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Publish test message</button>
+</header>
+<div class="content">
+<div class="card" style="height:56px"></div>
+<div class="tscroll" style="height:420px"></div>
+</div>
+</main>
+<div class="scrim">
+<section class="dialog" role="dialog" aria-label="Publish test message">
+<div class="t-tl">Publish test message</div>
+<div class="t-bs dim">Send one message to any stream, exchange or queue on this connection.</div>
+<div class="seg" style="align-self:flex-start"><span>Stream</span><span class="on"><span class="ms sm" aria-hidden="true">check</span>Exchange</span><span>Queue</span></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px 16px;padding-top:8px">
+<div class="tf" style="--tf-bg: var(--sc-high)"><span class="l">Exchange</span><div class="v"><span>orders.events</span><span class="ms" aria-hidden="true">arrow_drop_down</span></div></div>
+<div class="tf focus" style="--tf-bg: var(--sc-high)"><span class="l">Routing key</span><div class="v"><span>order.created</span></div></div>
+<div class="tf" style="--tf-bg: var(--sc-high)"><span class="l">message-id</span><div class="v"><span>test-0001</span></div></div>
+<div class="tf" style="--tf-bg: var(--sc-high)"><span class="l">content-type</span><div class="v"><span>application/json</span><span class="ms" aria-hidden="true">arrow_drop_down</span></div></div>
+</div>
+<div class="tf" style="--tf-bg: var(--sc-high)"><span class="l">Body</span><div class="v mono" style="height:112px;align-items:flex-start;padding-top:12px"><div style="white-space:pre">{
+  "orderId": "TEST-1",
+  "status": "created"
+}</div></div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<span class="pill">tenant: eu</span>
+<button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add application property</button>
+</div>
+<div class="banner err"><span class="ms" aria-hidden="true">warning</span><div>This message goes to the real broker on <b>prod-eu</b>. Publishing test messages is allowed for this user, but its consumers will receive it.</div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<span class="pill">Connection: prod-eu</span>
+<span style="flex-grow:1"></span>
+<button class="btn text" type="button">Cancel</button>
+<button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Publish</button>
+</div>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
