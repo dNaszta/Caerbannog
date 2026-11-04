@@ -20,6 +20,30 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   desktopApp tests do not compile (missing contract types); `:ui:jvmTest` compiles and fails (32 of 54).
 - Branch: `m1-07-permission-state-ui` from `main`.
 
+## Architect rulings (2026-11-04, after step 2)
+1. **Composition root seam: yes.** `createConnectionsViewModel` gets `permissionChecker: PermissionChecker =
+   ManagementApiPermissionChecker()` and `reachabilityChecker: BrokerReachabilityChecker =
+   StreamAndManagementReachabilityChecker()`, real defaults, next to the existing `profilesFile` and `secretStore`. The
+   session is built from `permissionChecker` and the same `secretStore`. Test change: `CompositionRootTest` should pass fake
+   checkers instead of using a closed loopback port (deterministic, no socket); a fake that returns a known result is
+   enough to prove the session is wired (pill/state shows it).
+2. **New connection panel (no saved profile): the Permission check section is absent** (no banner, no pill). There is
+   nothing to check before a profile is saved. A saved profile that was never checked shows the neutral banner
+   "Permission check has not run yet." and the pill "Not checked". The removed assertion in the empty-state test is
+   therefore correct for New connection; keep a test for the saved-but-unchecked case.
+3. **Detail texts.** Confirmed: unlocked without write: headline "<user> can change topology on virtual host <vhost>."
+   detail "The broker confirmed it, so topology screens and migrations are unlocked for this connection. Test publishing
+   is disabled: no write permission." Declared detail is two lines joined by a single "\n": "The broker could not confirm
+   it and still enforces its own permissions." then `Unreadable.reason`. Unreadable banner: headline
+   `Unreadable.userMessage`, `detail` = null, `dimNote` = null.
+4. **Pill inside the clickable card: yes.** The whole profile card is the click target and the pill (tag
+   `permissionPill:<name>`) is a child of it.
+5. **Password masking:** `PasswordVisualTransformation` on `OutlinedTextField` makes Compose emit
+   `SemanticsProperties.Password`, so the test assumption stands. If it does not on this Compose version, add
+   `Modifier.semantics { password() }` on the field; the test stays unchanged.
+6. **`kotlinx-coroutines-core` as `testImplementation` in `desktopApp`: accepted** (already used in core, not a new
+   library, test scope only). Record it in the Status.
+
 ## Goal
 The user can always see what the permission check found for each connection (broker-read, declared by the user, could
 not be read, not checked yet, checking), what that locks, and can see that the edit panel scrolls.
