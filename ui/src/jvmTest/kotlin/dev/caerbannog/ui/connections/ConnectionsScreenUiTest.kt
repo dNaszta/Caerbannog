@@ -1396,7 +1396,7 @@ class ConnectionsScreenUiTest {
 
     // --- M1-12a round 2: short labels, long text as single-line supporting text ----------------------
 
-    private val passwordHint = "Leave blank to keep the saved password"
+    private val passwordHint = "Blank keeps the saved password"
     private val caHint = "Blank uses the system trust store"
 
     @OptIn(ExperimentalTestApi::class)
@@ -1439,6 +1439,8 @@ class ConnectionsScreenUiTest {
             val layouts = mutableListOf<TextLayoutResult>()
             hint.single().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
             assertEquals(1, layouts.single().lineCount, "the hint is a single line")
+            // lineCount == 1 also holds for an ellipsized line; the hint must fit the grid cell at 1280 wide.
+            assertFalse(layouts.single().hasVisualOverflow, "the hint '$passwordHint' must not be ellipsized at 1280 wide")
         }
         runDesktopComposeUiTest(1280, 880) {
             setContent { ConnectionsScreen(permissionViewModel()) }
