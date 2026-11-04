@@ -1157,7 +1157,9 @@ class ConnectionsScreenUiTest {
         assertTagged("connectionsAppBar", "Connections")
         val bar = nodeBounds(hasTestTag("connectionsAppBar"))
         val title = nodeBounds(hasText("Connections").and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
-        val button = nodeBounds(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        // merged tree: the Button node carries the click action, its child Text carries the label
+        val button = onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+            .fetchSemanticsNode().boundsInRoot
         assertTrue(title.left < button.left, "title must be left of the button: title $title, button $button")
         assertTrue(button.center.x > bar.center.x, "the button must sit in the right half of the app bar: bar $bar, button $button")
         assertTrue(bar.right - button.right <= 48f * 2, "the button must be at the right edge of the app bar: bar $bar, button $button")
