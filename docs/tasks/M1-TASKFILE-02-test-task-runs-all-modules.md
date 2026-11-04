@@ -3,7 +3,7 @@
 Milestone: M1    Depends on: none (any branch; touches build files and Taskfile only)    Size: S
 
 ## Status
-- State: step 2 done (tests first, red established on unfixed `main` base); ready for the senior developer.
+- State: step 3 done (build fix in place, evidence below); ready for test developer verification and architect review.
 - Round: 0
 - Branch: `m1-taskfile-02-test-task-runs-all-modules`, created from `main` (not from the M1-10 branch; see Base branch).
 - Step 2, red evidence (no production code, no Gherkin; acceptance is by command output; no extra script or Taskfile
@@ -27,6 +27,17 @@ Milestone: M1    Depends on: none (any branch; touches build files and Taskfile 
   - The fix is correct when: dry run lists both jvmTest tasks, and a plain `./gradlew test --rerun-tasks` yields the
     same per-module numbers as the table, with results under `core/build/test-results/jvmTest` and
     `ui/build/test-results/jvmTest`.
+- Step 3, build (senior developer): registered `test` (group verification, `dependsOn("jvmTest")`) in
+  `core/build.gradle.kts` and `ui/build.gradle.kts`, with a comment that later KMP modules need the same. Taskfile
+  untouched (`git diff main -- Taskfile.yml` empty). spec.md line 75 reworded: `test` in core and ui delegates to `jvmTest`.
+  - `./gradlew test --dry-run` now lists `:core:jvmTest`, `:core:test`, `:ui:jvmTest`, `:ui:test` besides the old ones.
+  - `./gradlew test --rerun-tasks --continue`: BUILD SUCCESSFUL; tests/skipped per module: acceptance-tests 17/1,
+    core 6/0, data-rabbit 8/0, ui 3/0, desktopApp no results. Identical to the baseline table.
+  - `task test` (go-task at /opt/homebrew/bin/task) runs `./gradlew test` and executes core and ui jvmTest: BUILD SUCCESSFUL.
+  - Mutation: failing call added to `SpikeSanityTest` -> `./gradlew test` BUILD FAILED, `:core:jvmTest FAILED`;
+    same for `AppUiTest` -> `:ui:jvmTest FAILED`. Both restored with `git checkout`.
+  - Not pulled in: `--dry-run` has 0 `brokerTest` tasks; core/ui tests contain no keyring or `@broker` references
+    (only a main-source interface mentions them). Only core and ui `test` were added.
 
 ## Goal
 `./gradlew test` and `task test` run the tests of `core` and `ui` (30 tests on the M1-10 branch) as well as

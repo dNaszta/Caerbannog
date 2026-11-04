@@ -30,3 +30,13 @@ kotlin {
 tasks.named<Test>("jvmTest") {
     useJUnitPlatform()
 }
+
+// Root `./gradlew test` (and `task test`) runs the same-named task in every project, but a Kotlin
+// Multiplatform module only has `jvmTest`. This lifecycle `test` delegates to `jvmTest` (not `allTests`,
+// so a future non-JVM target does not slow the fast local run). Any later KMP module with tests needs the
+// same wiring. See docs/tasks/M1-TASKFILE-02-test-task-runs-all-modules.md.
+tasks.register("test") {
+    group = "verification"
+    description = "Runs the fast JVM tests (delegates to jvmTest) so the root `test` task reaches this module."
+    dependsOn("jvmTest")
+}
