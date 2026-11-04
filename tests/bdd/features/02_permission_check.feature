@@ -38,14 +38,14 @@ Feature: Permission check before the first connection
     Then the permission check runs again
     And topology changes are locked
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: A locked connection says so in the sidebar and on topology screens
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
     Then the sidebar shows "Topology locked" next to "prod-eu"
     And the topology screen explains that the user has no configure permission on virtual host "/"
 
-  @fake-broker
+  @fake-broker @needs-M2
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"

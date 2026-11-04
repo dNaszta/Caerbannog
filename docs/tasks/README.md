@@ -9,3 +9,4 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M1-02-connection-profiles | Connection profiles | M1 | done |
 | M1-04-connections-screen-feedback-gaps | Connections screen: surface save errors, clear stale banners | M1 | not started |
 | M1-05-wire-desktopapp-connections | Wire desktopApp to the real Connections screen | M1 | not started |
+| M1-03-permission-check | Permission check: read the user's vhost permissions, lock topology and test publishing, safe fallback | M1 | in progress (step 2: tests first) |
