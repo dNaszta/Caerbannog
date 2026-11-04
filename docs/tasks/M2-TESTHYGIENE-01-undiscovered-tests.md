@@ -4,7 +4,54 @@ Milestone: M2    Depends on: none (runs beside M2-03 part 2)    Size: S to M
 
 Owner: test developer. Branch: `m2-testhygiene-01-undiscovered-tests` from `main` (410a9b1 or later; part 1 is merged). Confirmed by the architect 2026-11-04: start now.
 
-Status: confirmed, not started.
+Status: step A (audit) done on `main` 410a9b1 plus docs commit 6d102c3: no hidden test found.
+
+### Audit result (A1 + A2, 2026-11-04)
+Method: `./gradlew clean test --continue` (XML kept), `:data-rabbit:brokerTest --rerun-tasks` (Docker available, run), `:ui:screenshotTest` (opt-in, writes PNGs to `ui/build` only); source scan of `@Test`, `@ParameterizedTest`, `@RepeatedTest`, `@TestFactory` (JUnit 5 and `kotlin.test`) in `core` jvmTest/commonTest, `ui` jvmTest, `data-rabbit` test, `desktopApp` test and `acceptance-tests` test, compared per class with the `testcase` count of the XML. `keychainTest` was NOT run (real keychain): the two keychain classes are marked unchecked (source 1 + 1, equal to the earlier known 1 + 1).
+
+Findings: non-Unit `@Test` functions (declared type): 0. Classes where source count differs from XML count: 0. Classes with `@ParameterizedTest`/`@RepeatedTest`/`@TestFactory`: none. Test functions with an expression body: 225 (all `= runBlocking { ... }`, `= runBlocking<Unit> { ... }` or `= runDesktopComposeUiTest { ... }`); every one of them is discovered (counts equal), so none returns a non-Unit value. The six tests of part 1 were already fixed there. Step B therefore has nothing to fix; step C: 0 newly running tests, 0 newly failing tests.
+
+| Module | Class | Source | XML | Diff | Task of the XML |
+| --- | --- | --- | --- | --- | --- |
+| core | SpikeSanityTest | 1 | 1 | 0 | jvmTest |
+| core | ActiveConnectionSafetyTest | 3 | 3 | 0 | jvmTest |
+| core | ActiveConnectionTest | 28 | 28 | 0 | jvmTest |
+| core | ConnectionSessionStateTest | 6 | 6 | 0 | jvmTest |
+| core | ConnectionSessionTest | 33 | 33 | 0 | jvmTest |
+| core | ConnectionsViewModelActiveConnectionTest | 15 | 15 | 0 | jvmTest |
+| core | ConnectionsViewModelLateResultTest | 5 | 5 | 0 | jvmTest |
+| core | ConnectionsViewModelPermissionChecksTest | 21 | 21 | 0 | jvmTest |
+| core | ConnectionsViewModelPermissionTest | 11 | 11 | 0 | jvmTest |
+| core | ConnectionsViewModelSessionTest | 12 | 12 | 0 | jvmTest |
+| core | ConnectionsViewModelSingleStateTest | 7 | 7 | 0 | jvmTest |
+| core | ConnectionsViewModelTest | 22 | 22 | 0 | jvmTest |
+| core | PermissionDecisionTest | 13 | 13 | 0 | jvmTest |
+| core | PermissionSummaryTest | 19 | 19 | 0 | jvmTest |
+| data-rabbit | CaCertificateValidatorTest | 3 | 3 | 0 | test |
+| data-rabbit | JsonConnectionProfileRepositoryTest | 9 | 9 | 0 | test |
+| data-rabbit | PermissionCheckerFailureTest | 5 | 5 | 0 | test |
+| data-rabbit | PermissionsEndpointSpikeTest (broker) | 1 | 1 | 0 | brokerTest |
+| data-rabbit | RabbitMqContainerSpikeTest (broker) | 1 | 1 | 0 | brokerTest |
+| data-rabbit | RealBrokerPermissionCheckTest (broker) | 8 | 8 | 0 | brokerTest |
+| data-rabbit | RealBrokerReachabilityTest (broker) | 1 | 1 | 0 | brokerTest |
+| data-rabbit | StreamClientSpikeTest (broker) | 14 | 14 | 0 | brokerTest |
+| data-rabbit | StreamManagementApiSpikeTest (broker) | 15 | 15 | 0 | brokerTest |
+| data-rabbit | KeyringRoundTripSpikeTest (keychain) | 1 | unchecked | - | keychainTest, not run |
+| data-rabbit | KeyringSecretStoreTest (keychain) | 1 | unchecked | - | keychainTest, not run |
+| desktopApp | CompositionRootTest | 5 | 5 | 0 | test |
+| ui | AppUiTest | 1 | 1 | 0 | jvmTest |
+| ui | ConnectionsScreenUiTest | 102 | 102 | 0 | jvmTest |
+| ui | ConnectionsScreenshotTest (screenshot) | 5 | 5 | 0 | screenshotTest |
+
+Per module (source = XML): core 196 = 196; data-rabbit default `test` 17 = 17 (3 classes), `brokerTest` 40 = 40, keychain 2 unchecked; desktopApp 5 = 5; ui `jvmTest` 103 = 103, `screenshotTest` 5 = 5.
+
+Cucumber (acceptance-tests): runner classes have no `@Test`; compared with scenarios plus Examples rows of the feature files. XML testcases: `01_connections` 18 (16 scenarios + 2 example rows) = 18 in the file; `02_permission_check` 26 (18 + 8 rows) = 26; `13_connection_lifecycle` 21 (17 + 4 rows) = 21; spike 1 = 1; 66 in all. Note: scenarios with an excluded tag (`@needs-M2`, `@needs-M2-03b`, `@needs-decision`, `@broker`) are not removed by the runners' tag filter but are reported as skipped (1 + 4 + 5 = 10 skipped), so they are counted. The earlier "17/22/16" figures (after exclusion) are therefore not the XML counts.
+
+### Guard (step D)
+Built: `verifyTestDiscovery` (root task, in `check` and in the root `test` lifecycle, so `./gradlew test` and `task test` run it after every module's fast tests). Logic and task classes in `buildSrc/src/main/kotlin/TestDiscoveryGuard.kt`, wiring in `gradle/test-discovery-guard.gradle.kts`. No new dependency (buildSrc uses Gradle's own `kotlin-dsl`). Configuration cache works.
+1. Counts (primary): per class, source `@Test`-family count equals XML testcase count (for `@ParameterizedTest`, `@RepeatedTest`, `@TestFactory` classes: XML count at least the method count). A class with tests but no XML at all fails. A class tagged `broker`, `keychain` or `screenshot` is compared with the XML of `<tag>Test` only when that XML exists and is newer than the source; otherwise "unchecked". The table is printed on every run and written to `build/reports/test-discovery/report.txt`.
+2. Style (clear message with file:line and test name): declared return type other than Unit, and `= runBlocking { ... }` without `<Unit>` whose last statement starts with `assertIs`, `assertFailsWith`, `assertThrows`, `assertNotNull`, `assertInstanceOf`, `assertDoesNotThrow` or `assertTimeout`. It is a text rule (no type resolution); it cannot prove a test fine, the counts do that. A JUnit source-scan test in `core` was not built: it would duplicate the scanner, and the Gradle task runs in the same `test` run.
+Proof: `verifyTestDiscoveryFixtures` (also wired into `verifyTestDiscovery`) runs the same checker over `tests/guard-fixtures/` (`.kt.txt` sources and result XML, outside any test source set) and fails unless exactly the 5 bad cases are rejected (declared String, runBlocking ending in assertIs, in assertFailsWith, a class with 0 of 3 testcases reported, a class with 2 of 3) and the 3 good ones are accepted. Also checked by hand with a real mutation of `SpikeSanityTest` (expression body ending in `assertIs`): build failed with both the style message and "no XML result", then reverted.
 
 ## Goal
 Every test method in every module actually runs, and a permanent check fails the build when a `@Test` function can be silently skipped again.
