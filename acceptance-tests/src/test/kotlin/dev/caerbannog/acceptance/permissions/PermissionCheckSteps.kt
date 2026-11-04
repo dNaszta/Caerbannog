@@ -20,12 +20,18 @@ import dev.caerbannog.core.connections.UnreadableCause
 import dev.caerbannog.core.connections.permissionBanner
 import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
+import dev.caerbannog.core.connections.CurrentConnection
 import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -70,6 +76,9 @@ class PermissionCheckSteps {
     private var loadedProfiles: List<ConnectionProfile> = emptyList()
     private var tempDir: File? = null
 
+    // M2-01: a check left running (held by the fake) and the scope it runs in
+    private var heldCheck: Job? = null
+
     @Before
     fun reset() {
         repository = InMemoryConnectionProfileRepository()
@@ -85,6 +94,7 @@ class PermissionCheckSteps {
         pendingDeclaration = DeclaredPermissionsEdit.Keep
         reopenedProfile = null
         loadedProfiles = emptyList()
+        heldCheck = null
     }
 
     @After
@@ -232,12 +242,84 @@ class PermissionCheckSteps {
         result = runBlocking { session.open(profile) }
     }
 
-    private fun statusOf(name: String): PermissionCheckStatus.Done {
+    // M2-01: once a connection is current (connect / switch steps), the sidebar shows the current connection and
+    // its status; before that (M1-07 scenarios) it is read per profile name from the session.
+    private fun statusOf(name: String): PermissionCheckStatus {
+        val current = viewModel.state.value.currentConnection
+        if (current != null) {
+            assertEquals(name, current.name, "the sidebar shows '${current.name}', not '$name'")
+            return checkNotNull(current.status) { "the current connection '$name' has not been checked" }
+        }
         assertEquals(profile.name, name, "the profile shown must be the saved one")
         return PermissionCheckStatus.Done(checkNotNull(session.permissions(name)) { "no permission check result for '$name'" })
     }
 
     private fun bannerOf(): PermissionBanner = permissionBanner(profile, statusOf(profile.name))
+
+    // --- M2-01: overlapping checks, current connection ------------------------------------------
+
+    private fun ensureSaved(name: String) {
+        if (viewModel.state.value.profiles.none { it.name == name }) {
+            val saved = ConnectionProfile(name = name, host = "rabbit.example", virtualHost = "/", username = "svc-explorer")
+            check(repository.add(saved) is SaveConnectionResult.Saved)
+            secretStore.store(name, "s3cret-for-$name")
+        }
+    }
+
+    @Given("the first check of {string} is still running and would say the user can change topology")
+    fun firstCheckStillRunning(name: String) {
+        assertEquals(profile.name, name, "the connection must be the saved one")
+        broker.permissions = BrokerPermissions(configure = ".*", write = ".*", read = ".*")
+        broker.holdNextCheck()
+        // Unconfined: the check runs up to the broker call and stays there until releaseHeld.
+        heldCheck = CoroutineScope(Dispatchers.Unconfined).launch { session.open(profile) }
+        assertEquals(1, broker.calls.size, "precondition: the first check has asked the broker")
+        assertFalse(session.isUsable(name), "precondition: the connection is not usable while its first check runs")
+    }
+
+    @Given("the connection {string} is checked again and that check says the user has no configure permission")
+    fun checkedAgainNoConfigure(name: String) {
+        assertEquals(profile.name, name, "the connection must be the saved one")
+        broker.permissions = BrokerPermissions(configure = "", write = ".*", read = ".*")
+        result = runBlocking { session.open(profile) }
+        assertEquals(2, broker.calls.size, "precondition: the second check ran")
+        assertFalse(result!!.topologyUnlocked, "precondition: the second check says locked, got $result")
+    }
+
+    @When("the first check finishes")
+    fun theFirstCheckFinishes() {
+        broker.releaseHeld()
+        runBlocking { withTimeout(5_000) { checkNotNull(heldCheck) { "no check was started" }.join() } }
+    }
+
+    @Given("saved connections {string} and {string}")
+    fun savedConnections(first: String, second: String) {
+        ensureSaved(first)
+        ensureSaved(second)
+    }
+
+    @Given("the user has configure permission on {string} and no configure permission on {string}")
+    fun configurePerConnection(withConfigure: String, withoutConfigure: String) {
+        broker.permissionsByName[withConfigure] = BrokerPermissions(configure = ".*", write = ".*", read = ".*")
+        broker.permissionsByName[withoutConfigure] = BrokerPermissions(configure = "", write = ".*", read = ".*")
+    }
+
+    @Given("I am connected to {string}")
+    fun iAmConnectedTo(name: String) {
+        runBlocking { viewModel.connect(name) }
+        assertEquals(name, viewModel.state.value.currentConnection?.name, "precondition: '$name' is the current connection")
+    }
+
+    @When("I switch to {string}")
+    fun iSwitchTo(name: String) {
+        runBlocking { viewModel.connect(name) }
+    }
+
+    @Then("the sidebar shows {string} as the current connection")
+    fun sidebarShowsCurrent(name: String) {
+        val current: CurrentConnection? = viewModel.state.value.currentConnection
+        assertEquals(name, current?.name, "current connection shown in the sidebar, got $current")
+    }
 
     @Then("the sidebar shows {string} next to {string}")
     fun theSidebarShows(text: String, name: String) {

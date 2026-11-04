@@ -80,3 +80,22 @@ added, spec Risks entry for last-write-wins closed (architect moves it) once mer
 
 ## Status
 - State: briefed 2026-11-04 by the architect, awaiting product owner confirmation and the team loop (step 1 onward).
+- Step 2 (tests first, test developer, 2026-11-04): red. Written: `ConnectionSessionTest` (latest-started-wins in both release
+  orders, names independent, forget/rename during a check, `current` follows select/forget/check; replaces the M1-09 test
+  that pinned last-finished-wins), `ConnectionsViewModelSessionTest` (new), `GatedPermissionChecker` (core test fake),
+  acceptance steps for the two new `02` scenarios (`PermissionCheckSteps`, `PermissionFakes`), UI tests in
+  `ConnectionsScreenUiTest` (drawer card follows the session; four M1-12a stand-in drawer tests rewritten, two icon tests
+  adjusted to click Connect first), README unit row. Core and acceptance do not compile (missing members); 9 UI tests fail.
+  Contract the developer must follow: see the test developer's step-2 report (names below).
+  - `data class CurrentConnection(val name: String, val status: PermissionCheckStatus?)` in core (null status = not checked;
+    reuses `PermissionCheckStatus` Checking/Done).
+  - `ConnectionSession`: `val current: StateFlow<CurrentConnection?>`, `val statuses: StateFlow<Map<String, PermissionCheckStatus>>`
+    (Checking from the start of `open`, Done at the end), `fun select(name: String)` (no check, no lookup), `open` keeps its
+    signature and returns its own result; `forget(name)` also invalidates a running check for that name and clears `current`
+    when it is that name. Token logic lives in the session.
+  - `ConnectionsViewModel`: `suspend fun connect(name: String)` (unknown name: no-op; else `session.select` then the check);
+    `ConnectionsState.currentConnection: CurrentConnection?` and `permissionChecks` both mirrored from the session (must be
+    readable synchronously from `state.value`).
+  - UI: button tagged `connectButton`, text "Connect", in the edit panel of a saved profile only; calls `viewModel.connect`.
+  - Brief gaps: names above; rename of the current profile clears `current` (user reconnects), to be confirmed; the existing
+    M1-12a drawer tests asserted the stand-in, so "unchanged" cannot hold for them.

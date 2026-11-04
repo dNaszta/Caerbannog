@@ -77,6 +77,7 @@ Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`)
 | Task | Tests | Covers |
 | --- | --- | --- |
 | M1-09 permission check hardening | `ConnectionSessionTest`, `PermissionDecisionTest`, `ConnectionsViewModelPermissionTest` (core); `PermissionCheckerFailureTest` (data-rabbit, no Docker) | A failed check never throws: `Unreadable(UNEXPECTED)`, declaration applied except without a password, no secret in the result, overlapping opens, invalid URL and silent server |
+| M2-01 connection session | `ConnectionSessionTest`, `ConnectionsViewModelSessionTest` (core); `ConnectionsScreenUiTest` drawer card tests (ui) | The latest started check per profile name wins whichever finishes last, and a stale or forgotten check never makes a connection usable; each name keeps its own result; `current` follows select, delete, forget and re-check; the edit-panel selection and the current connection are independent; the drawer Connection card shows the current connection only. Two `02` scenarios cover the user-visible part (`@fake-broker`). |
 
 ## Open points that affect these tests
 

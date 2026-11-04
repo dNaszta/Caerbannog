@@ -1271,24 +1271,76 @@ class ConnectionsScreenUiTest {
         assertFalse(gridField("Management port (HTTPS)").config.contains(SemanticsActions.SetText))
     }
 
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `the drawer shows the selected profile's name, host and pill`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel(prod)) }
-        selectProfile(0)
+    // --- M2-01: the drawer Connection card follows the session's current connection ------------------
+    // Replaces the four M1-12a stand-in tests that asserted "the card shows the profile open in the edit panel"
+    // (the brief says that stand-in goes away). Contract for the screen (test developer's proposal, brief gap):
+    //   a button tagged "connectButton" (text "Connect") in the edit panel of a SAVED profile; clicking it calls
+    //   viewModel.connect(name). It is not shown for the "New connection" panel.
+    // The card reads ConnectionsState.currentConnection (name, status) and the host from the saved profile.
 
-        assertTagged("drawerConnectionCard", "Connection")
-        assertTagged("drawerConnectionCard", "prod-eu")
-        assertTagged("drawerConnectionCard", "rabbit.example")
-        assertTagged("drawerPermissionPill", "Not checked")
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.connectButton() {
+        onNodeWithTag("connectButton").performScrollTo().performClick()
+        waitForIdle()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer pill follows the permission check of the selected profile`() = runDesktopComposeUiTest(1280, 880) {
-        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+    fun `the drawer shows the current connection's name, host and pill after Connect`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
+        connectButton()
+
+        assertTagged("drawerConnectionCard", "Connection")
+        assertTagged("drawerConnectionCard", "prod-eu")
+        assertTagged("drawerConnectionCard", "rabbit.example")
+        assertTagged("drawerPermissionPill", "Can change topology")
+        assertEquals(1, fakeChecker.calls.size, "Connect runs one permission check")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `selecting a profile in the panel without connecting does not change the drawer card`() = runDesktopComposeUiTest(1280, 880) {
+        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
+        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
+
+        selectProfile(0)
+        assertTagged("drawerConnectionCard", "No connection selected")
+        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
+
+        connectButton() // prod-eu is current (it is still open in the panel)
+        selectProfile(1) // dev-eu is open in the panel only
+        assertTagged("drawerConnectionCard", "prod-eu")
+        assertTagged("drawerConnectionCard", "rabbit.example")
+        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("dev-eu"))), useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(1, fakeChecker.calls.size, "selecting in the panel must not run a check")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `connecting to the other profile switches the drawer card and its pill`() = runDesktopComposeUiTest(1280, 880) {
+        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
+        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
+        selectProfile(0)
+        connectButton()
+        fakeChecker.result = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = true)
+        selectProfile(1)
+        connectButton()
+
+        assertTagged("drawerConnectionCard", "dev-eu")
+        assertTagged("drawerConnectionCard", "rabbit-dev.example")
+        assertTagged("drawerPermissionPill", "Topology locked")
+        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("prod-eu"))), useUnmergedTree = true).assertDoesNotExist()
+        assertTagged("permissionPill:prod-eu", "Can change topology") // the first connection keeps its own result
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer pill follows a re-check of the current connection from the panel button`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        connectButton()
+        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
         checkButton()
 
         assertTagged("drawerPermissionPill", "Topology locked")
@@ -1297,32 +1349,48 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer shows the other profile after the selection changes`() = runDesktopComposeUiTest(1280, 880) {
-        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
-        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
-        selectProfile(0)
-        selectProfile(1)
+    fun `the drawer says No connection selected until Connect and keeps the current one for New connection`() =
+        runDesktopComposeUiTest(1280, 880) {
+            setContent { ConnectionsScreen(permissionViewModel(prod)) }
 
-        assertTagged("drawerConnectionCard", "dev-eu")
-        assertTagged("drawerConnectionCard", "rabbit-dev.example")
-        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("prod-eu"))), useUnmergedTree = true).assertDoesNotExist()
+            assertTagged("drawerConnectionCard", "No connection selected")
+            onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
+
+            selectProfile(0)
+            assertTagged("drawerConnectionCard", "No connection selected")
+
+            connectButton()
+            onNode(hasText("No connection selected"), useUnmergedTree = true).assertDoesNotExist()
+
+            newConnectionButton().performClick()
+            waitForIdle()
+            assertTagged("drawerConnectionCard", "prod-eu") // the panel moved on; the current connection did not
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `deleting the current connection puts the drawer back to No connection selected`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        connectButton()
+        assertTagged("drawerConnectionCard", "prod-eu")
+
+        onNodeWithText("Delete profile").performScrollTo().performClick()
+        waitForIdle()
+        onNodeWithText("Yes").performClick()
+        waitForIdle()
+
+        assertTagged("drawerConnectionCard", "No connection selected")
+        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer says No connection selected when nothing is selected`() = runDesktopComposeUiTest(1280, 880) {
+    fun `there is no Connect button in the New connection panel`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
-
-        assertTagged("drawerConnectionCard", "No connection selected")
-        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
-
+        onNodeWithTag("connectButton").assertDoesNotExist()
         selectProfile(0)
-        onNode(hasText("No connection selected"), useUnmergedTree = true).assertDoesNotExist()
-
-        newConnectionButton().performClick()
-        waitForIdle()
-        assertTagged("drawerConnectionCard", "No connection selected")
-        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag("connectButton").assertExists()
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -1708,10 +1776,12 @@ class ConnectionsScreenUiTest {
                 val profile = prod.copy(declaredPermissions = case.declared)
                 setContent { ConnectionsScreen(permissionViewModel(profile)) }
                 selectProfile(0)
-                if (case.result != null) checkButton()
+                if (case.result != null) connectButton() // M2-01: the drawer pill shows the current connection only
 
                 assertEquals(case.expectedIcons, iconTagsUnder("permissionPill:prod-eu"), "${case.label}: list pill icons")
-                assertEquals(case.expectedIcons, iconTagsUnder("drawerPermissionPill"), "${case.label}: drawer pill icons")
+                if (case.result != null) {
+                    assertEquals(case.expectedIcons, iconTagsUnder("drawerPermissionPill"), "${case.label}: drawer pill icons")
+                }
                 assertEquals(case.expectedIcons, iconTagsUnder("permissionBanner"), "${case.label}: banner icons")
             }
         }
@@ -1723,9 +1793,10 @@ class ConnectionsScreenUiTest {
         val gated = GatedChecker()
         setContent { ConnectionsScreen(viewModelWith(AlwaysReachableChecker(), gated, prod)) }
         selectProfile(0)
-        checkButton()
+        connectButton()
 
         assertTagged("permissionPill:prod-eu", "Checking...")
+        assertTagged("drawerPermissionPill", "Checking...")
         assertTagged("permissionBanner", "Checking permissions...")
         assertEquals(emptyList(), iconTagsUnder("permissionPill:prod-eu"), "Checking: pill has no icon")
         assertEquals(emptyList(), iconTagsUnder("drawerPermissionPill"), "Checking: drawer pill has no icon")
