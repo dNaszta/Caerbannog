@@ -1,0 +1,18 @@
+package fixture
+
+// Tagged class whose result XML is older than this source (the self-test ages a copy of the XML). It must be reported
+// as unchecked, not as a violation, although the XML holds fewer testcases than there are test methods here.
+@Tag("broker")
+class StaleTaggedFixtureTest {
+    @Test
+    fun `stale a`() {
+    }
+
+    @Test
+    fun `stale b`() {
+    }
+
+    @Test
+    fun `stale c`() {
+    }
+}

@@ -142,6 +142,8 @@ fun scanFunctions(file: String, text: String): List<TestFunction> {
     return result
 }
 
+// Scans only the first class declared in a file; any @Tag("...") in the file marks that class as tagged.
+// The guard task is skipped when its dependency tasks (the test runs) fail; `--continue` still reports all failures.
 fun scanClass(file: File, text: String, relative: String): TestClass? {
     val annotations = testAnnotation.findAll(text).toList()
     if (annotations.isEmpty()) return null
@@ -169,7 +171,7 @@ fun readResults(resultDirs: List<File>): Map<String, Map<String, Int>> {
     return out
 }
 
-class GuardResult(val violations: List<String>, val report: List<String>)
+class GuardResult(val violations: List<String>, val report: List<String>, val unchecked: Int)
 
 // sources: .kt (or .kt.txt) files; resultDirs: directories holding TEST-*.xml, named after the Gradle test task.
 fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardResult {
@@ -177,6 +179,7 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
     val report = ArrayList<String>()
     val results = readResults(resultDirs)
     val classes = ArrayList<TestClass>()
+    var unchecked = 0
     for (f in sources.sortedBy { it.path }) {
         val text = f.readText()
         val rel = f.relativeTo(rootDir).path
@@ -195,6 +198,7 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
         }
         val verdict: String
         if (taskDir != null && (xml == null || (resultFile != null && resultFile.lastModified() < c.lastModified))) {
+            unchecked++
             verdict = "unchecked (tag ${c.tag}: run $taskDir to check)"
         } else if (xml == null) {
             verdict = "FAIL no result: class ${c.fqn} has ${c.methods} test methods but no test run reported any"
@@ -210,7 +214,8 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
         }
         report.add("%-70s %6d %6s  %s".format(c.fqn, c.methods, xml?.toString() ?: "-", verdict))
     }
-    return GuardResult(violations, report)
+    if (unchecked > 0) report.add("$unchecked classes unchecked (run brokerTest, keychainTest, screenshotTest)")
+    return GuardResult(violations, report, unchecked)
 }
 
 abstract class VerifyTestDiscovery : DefaultTask() {
@@ -244,7 +249,10 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
     fun verify() {
         val base = fixtureRoot.get().asFile
         val sources = base.resolve("sources").listFiles { f -> f.name.endsWith(".kt.txt") }!!.toList()
-        val r = runGuard(sources, listOf(base.resolve("results/test")), rootDirectory.get().asFile)
+        // Age a copy of the stale-case XML: file times from a git checkout are arbitrary, so the fixture sets its own.
+        val staleDir = temporaryDir.resolve("brokerTest").apply { deleteRecursively(); mkdirs() }
+        base.resolve("results/brokerTest").listFiles()!!.forEach { it.copyTo(staleDir.resolve(it.name)).setLastModified(1000L) }
+        val r = runGuard(sources, listOf(base.resolve("results/test"), staleDir), rootDirectory.get().asFile)
         // Every bad test below must be named by the guard; the good one must not be.
         val mustFlag = listOf(
             "declared return type is rejected",
@@ -257,13 +265,15 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
         val text = r.violations.joinToString("\n")
         val missed = mustFlag.filterNot { text.contains(it) }
         val falseAlarm = mustNotFlag.filter { text.contains(it) }
-        if (missed.isNotEmpty() || falseAlarm.isNotEmpty() || r.violations.size != mustFlag.size) {
+        if (missed.isNotEmpty() || falseAlarm.isNotEmpty() || r.violations.size != mustFlag.size ||
+            r.unchecked != 1 || !r.report.contains("1 classes unchecked (run brokerTest, keychainTest, screenshotTest)")) {
             throw GradleException(
                 "Guard self-test failed. Not rejected: $missed. Wrongly rejected: $falseAlarm. " +
-                    "Violations found (${r.violations.size}, expected ${mustFlag.size}):\n$text",
+                    "Violations found (${r.violations.size}, expected ${mustFlag.size}); " +
+                    "unchecked ${r.unchecked} (expected 1: the stale tagged class):\n$text",
             )
         }
-        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones.")
+        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones, left the stale tagged class unchecked.")
         marker.get().asFile.apply { parentFile.mkdirs() }.writeText("ok\n")
     }
 }
