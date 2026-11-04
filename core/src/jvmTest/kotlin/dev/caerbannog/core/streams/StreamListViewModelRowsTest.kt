@@ -194,6 +194,7 @@ class StreamListViewModelRowsTest {
         assertEquals("unavailable", row.publishers)
         assertEquals("1", row.consumers)
         assertIs<StreamListScreen.Rows>(s.state.screen)
+        assertEquals(0, s.count("publisherCounts"), "ruling 8: with no plugin the call is not made at all")
     }
 
     @Test
