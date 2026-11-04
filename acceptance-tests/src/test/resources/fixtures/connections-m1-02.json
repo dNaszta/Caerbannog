@@ -1,0 +1,20 @@
+[
+    {
+        "name": "prod-eu",
+        "host": "rabbit.example",
+        "virtualHost": "/",
+        "username": "svc-explorer",
+        "streamPort": 5551,
+        "managementPort": 15671
+    },
+    {
+        "name": "uat-eu",
+        "host": "rabbit-uat.example.com",
+        "virtualHost": "uat",
+        "username": "svc-uat",
+        "streamPort": 5552,
+        "managementPort": 15672,
+        "caCertificatePath": "/etc/ssl/uat-ca.pem",
+        "topologyControlLevel": "DECLARE_AND_EDIT"
+    }
+]

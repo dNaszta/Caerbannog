@@ -125,4 +125,81 @@ class ConnectionsViewModelPermissionTest {
             realSession.permissions("prod-eu"),
         )
     }
+
+    // --- M1-06: the declaration travels with the save and the session decides with it.
+    // Red state: DeclaredPermissionsEdit does not exist yet.
+
+    private fun declaring(edit: DeclaredPermissionsEdit) = input().copy(declaredPermissions = edit)
+
+    @Test
+    fun `saving a changed declaration reopens once and the session decides with it`() = runBlocking {
+        checker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+        runBlocking { session.open(profile) }
+        checker.calls.clear()
+        assertFalse(session.permissions("prod-eu")!!.topologyUnlocked, "precondition: safest mode")
+
+        val result = vm.saveProfileChanges(
+            "prod-eu", declaring(DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = true, write = false))),
+        )
+
+        assertTrue(result is SaveConnectionResult.Saved, "got $result")
+        assertEquals(1, checker.calls.size, "exactly one reopen per successful save")
+        assertEquals(DeclaredPermissions(true, false), checker.calls.single().declaredPermissions)
+        val decided = session.permissions("prod-eu")
+        assertTrue(decided is PermissionCheckResult.DeclaredByUser, "expected DeclaredByUser, got $decided")
+        assertTrue(decided.topologyUnlocked)
+        assertFalse(decided.publishingEnabled)
+    }
+
+    @Test
+    fun `clearing the declaration reopens once and the session falls back to safest mode`() = runBlocking {
+        checker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Set(DeclaredPermissions(true, true))))
+        assertTrue(session.permissions("prod-eu") is PermissionCheckResult.DeclaredByUser, "precondition")
+        checker.calls.clear()
+
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Clear))
+
+        assertEquals(1, checker.calls.size)
+        assertNull(checker.calls.single().declaredPermissions)
+        assertTrue(session.permissions("prod-eu") is PermissionCheckResult.Unreadable)
+    }
+
+    @Test
+    fun `an unchanged declaration still reopens once after a successful save`() = runBlocking {
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Set(DeclaredPermissions(true, true))))
+        checker.calls.clear()
+
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Set(DeclaredPermissions(true, true))))
+
+        assertEquals(1, checker.calls.size)
+    }
+
+    @Test
+    fun `Keep on a profile with a saved declaration reopens with that declaration`() = runBlocking {
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Set(DeclaredPermissions(false, true))))
+        checker.calls.clear()
+
+        vm.saveProfileChanges("prod-eu", declaring(DeclaredPermissionsEdit.Keep).copy(host = "other"))
+
+        assertEquals(DeclaredPermissions(false, true), checker.calls.single().declaredPermissions)
+    }
+
+    @Test
+    fun `a failed save with a new declaration runs no check and saves no declaration`() = runBlocking {
+        repo.add(profile.copy(name = "dev"))
+        val result = vm.saveProfileChanges(
+            "prod-eu", input(name = "dev").copy(declaredPermissions = DeclaredPermissionsEdit.Set(DeclaredPermissions(true, true))),
+        )
+        assertTrue(result is SaveConnectionResult.NameAlreadyExists, "got $result")
+        assertTrue(checker.calls.isEmpty())
+        assertNull(repo.profiles.getValue("prod-eu").declaredPermissions)
+    }
+
+    @Test
+    fun `setCaCertificate does not reopen the session`() = runBlocking {
+        val outcome = vm.setCaCertificate("prod-eu", "/some/ca.pem")
+        assertEquals(CaCertificateValidationResult.Valid, outcome)
+        assertTrue(checker.calls.isEmpty(), "a CA change per keystroke must not run a permission check")
+    }
 }
