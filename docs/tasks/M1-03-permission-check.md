@@ -22,6 +22,10 @@ In:
   (suspend, takes profile + secret), and a small use case / session gate `ConnectionSession.open(profile)` that runs the
   check first and only then reports the connection as usable; `ConnectionsViewModel` (or the save path) re-runs the
   check when an existing profile is saved. Pure decision function: patterns to locked/unlocked, enabled/disabled.
+- `core`, declared permissions (decision D, `docs/spec.md` "Broker-read permission"): `DeclaredPermissions(configure,
+  write)` and an optional `declaredPermissions` field on `ConnectionProfile` (default null), plus the rule in
+  `ConnectionSession`: the real check runs first; only when it returns `Unreadable` (except cause `NO_PASSWORD`) and
+  the profile has a declaration is the result `DeclaredByUser`. No persistence and no UI for the field here.
 - `data-rabbit`: `ManagementApiPermissionChecker` using the existing Ktor Java client and TLS/CA setup from
   `StreamAndManagementReachabilityChecker` (reuse, do not duplicate the SSLContext code: extract if needed).
   HTTPS only, port 15671 default. Never logs the password.
@@ -33,7 +37,11 @@ In:
 - Fake `PermissionChecker` in `acceptance-tests` (existing `Fakes.kt` style).
 
 Out:
-- Sidebar "Topology locked" pill and topology screen text (new task `M1-07`, scenario tagged `@needs-M1-07`).
+- Sidebar "Topology locked" pill, declared-permission wording and topology screen text (new task `M1-07`, scenarios tagged
+  `@needs-M1-07`).
+- Persisting `declaredPermissions` in the profile JSON, the `setDeclaredPermissions` setter and the edit panel fields
+  (new task `M1-06`, scenarios tagged `@needs-M1-06`). Until M1-06 nothing in the app can set the field, so in the
+  running app the safest mode still applies; tests set it with `profile.copy(declaredPermissions = ...)`.
 - Any real declare, publish or stream list (M2, M5). Combining with the self-constraint level into an effective
   permission (M5 enforcement; this task exposes only the broker half).
 - The `@broker` scenario "The broker has the final say" (needs queue declare, M5; keep untouched).
@@ -45,14 +53,21 @@ Out:
   - "What the app unlocks depends on the user's permissions" (all four examples) @smoke
   - "The check runs before the first connection is used"
   - "The check runs again when the profile is edited"
-  - "Permissions cannot be read for this user" (@needs-spike; passes with the fallback: message "permissions could not
-    be read", topology locked, publishing disabled). The step "streams can still be listed and browsed" asserts the
+  - "Permissions cannot be read for this user" (spike resolved, tag `@needs-spike` removed; safest mode, message starts
+    "Permissions could not be read"). The step "streams can still be listed and browsed" asserts the
     capability flag only (no stream list exists yet); say so in the step name or comment.
-- Deferred by tag, do not implement steps: "A locked connection says so in the sidebar..." (`@needs-M1-07`),
-  "Browsing streams does not need the configure permission" (`@needs-M2`). Update the Cucumber tag filter to exclude
-  `@needs-M1-07` too.
+  - "Declared permissions are used when permissions cannot be read" (all four examples)
+  - "What the broker says wins over declared permissions"
+  - "Declared permissions do not help when the password is missing"
+- Deferred by tag, do not implement steps: "A locked connection says so in the sidebar..." and "Declared permissions are
+  shown as the user's own claim" (`@needs-M1-07`), "Declared permissions are saved with the profile" and "A profile saved
+  before declarations existed has none" (`@needs-M1-06`),
+  "Browsing streams does not need the configure permission" (`@needs-M2`). The Cucumber tag filter excludes
+  `@needs-M1-07` and `@needs-M1-06` too (test developer updates `RunPermissionCheckAcceptanceTest`).
 - Unit (core): decision function for the four patterns plus a pattern that is not `.*` (for example `^orders\\..*`
-  counts as configure present); non-empty means allowed, since the broker has the final say.
+  counts as configure present); non-empty means allowed, since the broker has the final say; `^$` also counts as
+  present (documented consequence). Session unit tests: override applies only on `Unreadable`, never over `Checked`,
+  never for `NO_PASSWORD`, and never when the profile has no declaration.
 - `@broker` (new, skipped without Docker like the existing ones): `ManagementApiPermissionChecker` against a real TLS
   broker for an admin user and for the non-admin user from the spike. Also a test with a wrong password and a
   refused connection producing `Unreadable`, not an exception.
@@ -64,7 +79,7 @@ Out:
 - Errors are typed results at the boundary: 401, 403, 404, timeout, bad JSON all map to `Unreadable` with a reason
   the UI can show later; do not catch broadly, map known failures.
 - Unidirectional flow: view model state gets `permissions: PermissionCheckResult?` per connection; no hidden
-  global state. Each profile is its own environment, so keep results keyed by profile id and drop them on edit.
+  global state. Each profile is its own environment, so keep results keyed by profile name (the existing identity: the secret store is keyed by name too) and drop them on edit or rename.
 - Management client note for M2: this is the first management API call that needs JSON parsing; keep a small
   `ManagementApiClient` wrapper in `data-rabbit` so M2 reuses it.
 - Fake broker for `@fake-broker`; real broker only in `@broker` tests and the spike.
@@ -74,14 +89,10 @@ None in this task (see `M1-07`). Source for later: `docs/ux/Main.dc.html` (sideb
 "Permission check" banner), `docs/ux/Topology.dc.html` (locked state).
 
 ## Open points
-- Spike result decides the fallback. Options if a non-admin user cannot read their own permissions:
-  (A) fall back to safest mode and tell the user (current spec and scenario; recommended, no extra privilege);
-  (B) ask the user to supply a separate admin credential just for the check (more secrets, not recommended);
-  (C) probe by attempting an operation (rejected: it would change broker state). Not a blocker for step 1; if the
-  spike shows (A) is the only path for the typical read-only user, record that read-only users will always see
-  locked topology and that is acceptable (they have no configure anyway) but publishing would also be disabled
-  even if they have write: raise as `@needs-decision` then.
-- Field names of the permissions response are unverified until the spike; do not hard-code beyond what it shows.
+- Decided (D, product owner): safest mode stays the default when permissions are unreadable, and the profile may carry a
+  user declaration that applies only then (rules in `docs/spec.md` "Broker-read permission"). Options B (separate admin
+  credential) and C (probing) are rejected.
+- Field names of the permissions response are verified by the spike: `user`, `vhost`, `configure`, `write`, `read`.
 - No new dependency or build tool: Ktor client and kotlinx-serialization already in `data-rabbit`.
 
 ## Definition of done
@@ -89,9 +100,11 @@ Tests written first and failing for the right reason; all scenarios above pass; 
 brief and `docs/spec.md` (open question moved); no unrelated changes; `docs/tasks/README.md` updated.
 
 ## Status
-- Round: 1, step 2 done (tests written first, red: missing types). Next: step 3, senior developer.
+- Round: 1, architect decisions done (spike resolved, decision D, contract below). Next: step 2b, test developer adjusts
+  the red tests to the final contract (list below); then step 3, senior developer.
 - Branch: `m1-03-permission-check`
 - Base branch: `main` (needs only M1-02, already in main; does not need M1-04 or M1-05)
+- New siblings: `M1-06-profile-declared-permissions`, `M1-07-permission-state-ui` (not started; both start after this task).
 
 ### Spike result (step 1, real RabbitMQ 4 broker, Testcontainers, HTTPS 15671, throwaway TLS fixture)
 Recorded by `data-rabbit/src/test/.../PermissionsEndpointSpikeTest.kt` (`@Tag("broker")`, asserts the findings).
@@ -115,23 +128,97 @@ Users had permissions on `/`: untagged `^orders\..*`/""/`.*`; `monitoring` and `
 - Not tested: the 404 case for an administrator with no permissions on the vhost is covered by a `@broker`
   test (asserts "not unlocked", not the exact status); the management endpoint was not tried with a user
   that has the `policymaker` tag or other tags.
-- DECISION NEEDED from the architect (not decided by test developer): the consequence above (publishing
-  disabled for a write-capable non-admin user) is the `@needs-decision` case named in Open points. Options A/B/C
-  as above; A is what the tests assume.
+- DECIDED (architect, product owner chose D): safest mode stays the default, plus a per-profile user declaration that
+  applies only when permissions are unreadable (spec "Broker-read permission"). Not a `@needs-decision` any more.
 
 ### Step 2: tests written (all red: they do not compile, the production types are missing)
 - `core/src/jvmTest/.../PermissionDecisionTest.kt`, `ConnectionSessionTest.kt`
 - `acceptance-tests/src/test/.../permissions/` (`RunPermissionCheckAcceptanceTest` filter
   `not @needs-M2 and not @needs-M1-07 and not @broker`, `PermissionCheckSteps`, `PermissionFakes`)
 - `data-rabbit/src/test/.../RealBrokerPermissionCheckTest.kt` (`@broker`), spike test as above.
-- Contract the tests assume (proposed, senior developer may adjust names but must tell the test developer):
-  in `dev.caerbannog.core.connections`: `BrokerPermissions(configure, write, read)`;
-  `sealed interface PermissionCheckResult { val topologyUnlocked; val publishingEnabled; val canBrowseStreams }`
-  with `Checked(topologyUnlocked, publishingEnabled)` and `Unreadable(reason)` (both flags false, browse true);
-  `fun decidePermissions(BrokerPermissions): PermissionCheckResult.Checked`;
-  `interface PermissionChecker { suspend fun check(profile, password: String): PermissionCheckResult }`;
-  `ConnectionSession(checker, secretStore)` with `suspend open(profile)`, `suspend reopen(profile)`,
-  `isUsable(name)`, `permissions(name)`; a missing stored password gives `Unreadable` without calling the broker;
-  `ConnectionsViewModel(..., session: ConnectionSession? = null)` plus
-  `suspend fun saveProfileChanges(originalName, input): SaveConnectionResult` (saves, then `session.reopen`);
-  `data-rabbit`: `ManagementApiPermissionChecker(connectTimeoutMillis = 5_000)`.
+- First proposal (superseded by the final contract below).
+
+### Final contract (architect; the senior developer implements it, the tests match it)
+All in `dev.caerbannog.core.connections` (core, common code, no JVM-only types):
+
+```kotlin
+data class BrokerPermissions(val configure: String, val write: String, val read: String)  // "" = none
+data class DeclaredPermissions(val configure: Boolean, val write: Boolean)
+// ConnectionProfile gains, last parameter, default keeps old callers compiling:
+//   val declaredPermissions: DeclaredPermissions? = null
+
+enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BAD_RESPONSE, NO_PASSWORD }
+
+sealed interface PermissionCheckResult {
+    val topologyUnlocked: Boolean
+    val publishingEnabled: Boolean
+    val canBrowseStreams: Boolean            // true in every case: reading never depends on the check
+    data class Checked(override val topologyUnlocked: Boolean, override val publishingEnabled: Boolean) : PermissionCheckResult
+    data class DeclaredByUser(override val topologyUnlocked: Boolean, override val publishingEnabled: Boolean,
+                              val unreadable: Unreadable) : PermissionCheckResult
+    data class Unreadable(val cause: UnreadableCause, val detail: String? = null) : PermissionCheckResult {
+        val userMessage: String               // core-owned, starts with "Permissions could not be read"
+    }                                         // topologyUnlocked = false, publishingEnabled = false
+}
+
+fun decidePermissions(permissions: BrokerPermissions): PermissionCheckResult.Checked
+// configure.isNotEmpty() -> topologyUnlocked; write.isNotEmpty() -> publishingEnabled; read ignored.
+// Exactly-empty string means none; "^$" counts as present (broker has the final say).
+fun decideDeclared(declared: DeclaredPermissions, unreadable: PermissionCheckResult.Unreadable): PermissionCheckResult.DeclaredByUser
+
+interface PermissionChecker { suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult }
+// Returns Checked or Unreadable only. Never DeclaredByUser: the override is the session's job, not the adapter's.
+
+class ConnectionSession(checker: PermissionChecker, secretStore: SecretStore) {
+    suspend fun open(profile: ConnectionProfile): PermissionCheckResult
+    suspend fun reopen(profile: ConnectionProfile): PermissionCheckResult
+    fun isUsable(name: String): Boolean
+    fun permissions(name: String): PermissionCheckResult?
+}
+```
+
+Session rules:
+- Results are keyed by profile name. `isUsable(name)` is false until a check has finished; `open` and `reopen` clear
+  the stored result for that name before calling the checker, so the connection is never usable while the check runs.
+  Usable means a result exists (including `Unreadable`: safest mode is a usable connection that browses only).
+- Password missing in the secret store: result `Unreadable(NO_PASSWORD)`, checker not called, no declaration applied.
+- Otherwise call the checker once. `Checked` is stored as is. `Unreadable` with a declaration on the profile becomes
+  `decideDeclared(...)` (the `Unreadable` stays inside for the message). `Unreadable` without a declaration is stored
+  as is. A `Checked` result is never replaced by the declaration, whatever it claims.
+- `reopen(profile)` is the same as `open` (kept as a separate name for intent); it exists so a save can be asserted
+  to trigger a second check.
+
+`ConnectionsViewModel(repository, secretStore, reachabilityChecker, caValidator, session: ConnectionSession? = null)`:
+`suspend fun saveProfileChanges(originalName: String, input: ConnectionProfileInput): SaveConnectionResult`. It saves with
+the same rules as `updateConnection` (including rename and the password-unchanged rule), and only when the result is
+`Saved` calls `session.reopen(savedProfile)` (for a rename also forgets the result under `originalName`). When the save
+fails, no check runs and the earlier result stays. A null session means no check (existing M1-02 tests unchanged).
+The existing `updateConnection` stays as it is; the UI will move to `saveProfileChanges` in M1-07.
+
+`data-rabbit`: `ManagementApiPermissionChecker(connectTimeoutMillis: Long = 5_000)` implements `PermissionChecker`.
+HTTPS, `GET /api/permissions/{urlencoded vhost}/{user}`, basic auth, TLS/CA code shared with the reachability checker.
+Mapping: 200 with the object shape to `Checked(decidePermissions(...))`; 401 or 403 to `NOT_AUTHORIZED` (a 401 is also what
+a wrong password gives and the two cannot be told apart, so `userMessage` words it that way); 404 to `NOT_FOUND`
+(administrator with no permissions on the vhost: never unlocked); timeout to `TIMEOUT`; connection refused or TLS failure
+to `UNREACHABLE`; malformed JSON or missing fields to `BAD_RESPONSE`. `detail` holds only safe text (status code,
+exception class), never the password, URL credentials or response bodies that could echo them.
+
+Answers to the test developer's questions: (a) confirmed as above; (b) yes, core owns the wording through
+`Unreadable.userMessage`, the fake supplies only a cause; the `reason: String` field is dropped; (c) keyed by name, not
+id; (d) confirmed, `^$` counts as present.
+
+### Tests that must change (test developer, step 2b)
+- `PermissionFakes.kt`, `PermissionCheckSteps.kt`: refusal becomes `Unreadable(UnreadableCause.NOT_AUTHORIZED)` (no
+  free text); the "tells me" step asserts `userMessage.startsWith("Permissions could not be read")`; add steps for the
+  new scenarios (`the profile {string} declares configure {string} and write {string}` sets
+  `profile.copy(declaredPermissions = ...)` and updates the repository copy used by the session; `no password is stored for {string}`;
+  `the app says these permissions are declared by me, not confirmed by the broker` asserts `DeclaredByUser`;
+  `the app says these permissions were read from the broker` asserts `Checked`).
+- `RunPermissionCheckAcceptanceTest`: filter `not @needs-M2 and not @needs-M1-07 and not @needs-M1-06 and not @broker`.
+- `PermissionDecisionTest`: add `^$` present, add `decideDeclared` cases (four combinations, carries the `Unreadable`).
+- `ConnectionSessionTest`: `Unreadable(reason)` constructions become `Unreadable(cause)`; add override rules (applies on
+  `Unreadable`, not over `Checked`, not for `NO_PASSWORD`, not without a declaration, results keyed by name, not usable
+  while the check runs, rename drops the old key).
+- `RealBrokerPermissionCheckTest`: constructor and cause mapping as above (401 `NOT_AUTHORIZED`, refused `UNREACHABLE`).
+- Spike test and its recorded findings stay as they are.
+

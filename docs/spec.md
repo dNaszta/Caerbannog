@@ -147,7 +147,7 @@ This is the app's own rule, layered on top of the broker's. It resolves what was
 
 ### Broker-read permission
 
-Unchanged from before: before the first connection, and again whenever the profile is edited, the app reads the connection user's permissions on the virtual host from the management API.
+Before the first connection, and again whenever the profile is saved with changes, the app reads the connection user's permissions on the virtual host from the management API (`GET /api/permissions/{vhost}/{user}`, HTTPS, port 15671). The answer is an object with `configure`, `write` and `read` patterns; an empty pattern (`""`) means no permission, any non-empty pattern counts as permission present (the broker has the final say, so `^$` also counts as present).
 
 | Permission found for the connection's user | What the broker-read half allows |
 | --- | --- |
@@ -155,7 +155,18 @@ Unchanged from before: before the first connection, and again whenever the profi
 | No configure permission | Read topology and statistics; edit, validate and export migration files; no topology changes |
 | No write permission | Test publishing is disabled |
 
-If permissions cannot be read at all, the app falls back to the safest mode: topology locked, test publishing disabled, streams still listable and browsable (see `tests/bdd/features/02_permission_check.feature`, "Permissions cannot be read for this user").
+**Who can read permissions (spike result, real RabbitMQ 4 broker, `docs/tasks/M1-03-permission-check.md` Status).** Only an administrator can. Users with no tag, `management` or `monitoring` get 401 on `GET /api/permissions/{vhost}/{user}` and `GET /api/users/{user}/permissions`; `GET /api/whoami` works for `management` and `monitoring` but returns only name and tags, no permissions, and gives 401 for a user with no tag. So the check returns "could not be read" for almost every real stream user, and a 401 cannot tell "not an administrator" from "wrong password".
+
+**Safest mode (default).** If permissions cannot be read, the app falls back to topology locked, test publishing disabled, streams still listable and browsable (see `tests/bdd/features/02_permission_check.feature`, "Permissions cannot be read for this user"). A new profile has no declaration, so it always starts in safest mode.
+
+**Declared permissions (product decision D).** So that a non-administrator stream user is not locked out, the profile may carry an optional declaration of what the user may do: configure yes/no and write yes/no (read is not needed, reading is always allowed). The declaration is the user's own claim; the app cannot verify it and the broker still enforces every action (see "The broker has the final say"). Rules:
+
+- The real check always runs first. When it can read the permissions, the broker's answer wins and the declaration is ignored, even if it claims more (or less).
+- The declaration applies only when the result is "could not be read", for any cause except a missing stored password (without a password nothing can connect, so the app stays in safest mode).
+- A declaration can claim more than the safest mode (unlock topology, enable publishing) or less (for example declare no write to keep publishing off).
+- The result says where it came from: read from the broker, or declared by the user after the read failed. The UI must show which, in plain words ("You declared that svc-explorer can change topology; the broker could not confirm it and still enforces its own permissions"), and must never present a declared result with the same wording or "verified" styling as a broker-read result.
+- The declaration is independent of the self-constraint level; the effective permission below still takes the stricter of the self-constraint level and this half. No additional secret or credential is asked for.
+- Stored on the connection profile in the profile JSON as an optional field; a file without it loads as "no declaration" (see task `M1-06`).
 
 ### Effective permission
 
@@ -222,7 +233,8 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 
 **Open questions**
 
-- [ ] How does the app read the user's own permissions? The management API lists permissions for administrators; confirm whether a non-administrator user can see their own, and what the fallback is.
 - [ ] Confirm the exact fields returned by the stream publisher and consumer endpoints (offset, messages behind, counters) on a real broker; the API reference does not list them.
+
+Resolved: how the app reads the user's own permissions. Only administrators can read them through the management API (M1-03 spike, real RabbitMQ 4); the default for everyone else is safest mode, and the user may declare their rights on the profile (decision D, see Broker-read permission). Rejected: a separate admin credential (more secrets) and probing by attempting an operation (changes broker state).
 
 Resolved: RabbitMQ's configure permission covers both creating and deleting, so a broker-only check could not allow one without the other. Resolved by the self-constraint level (see "Topology migrations and permission guardrails" / Self-constraint level): the app adds its own rule on top, reserving delete for the Full control level.
