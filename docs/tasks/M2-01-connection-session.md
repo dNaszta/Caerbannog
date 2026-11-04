@@ -107,3 +107,23 @@ added, spec Risks entry for last-write-wins closed (architect moves it) once mer
   - (4) A superseded `open` returns its own check's result, documented in the KDoc; the return value is NOT asserted (callers must read session state, never the return value, for what is current). Session state must reflect only the latest started check.
   - (5) Confirmed: the old M1-09 test "the check that finishes last wins" pinned the bug and is rightly replaced.
   - Also: `select(name)` for a name with no result shows `status = null` ("Not checked"); `forget` of a running check must still prevent its late result from becoming usable.
+- Step 3 (senior developer, 2026-11-04): built, red to green in core (137 tests), ui (102), desktopApp (5), no new dependency.
+  Acceptance is NOT green as committed: two defects in the step-2 steps (see below); with them patched locally acceptance is
+  45 run, 5 skipped, 0 failed and both new `02` scenarios pass. Needs the test developer.
+  - Session: one immutable snapshot (statuses, per-name tokens, last token, current name) in a `MutableStateFlow`, atomic
+    `update`; `statuses` and `current` are published copies (republish loop so concurrent writers converge). A cancelled check
+    removes its own Checking entry unless a newer check owns the name. `forget` drops status and token and clears current.
+    The token map moved from `ConnectionsViewModel` into the session; the view model has no token logic left.
+  - View model: `state` is a small `StateFlow` wrapper that overlays `session.statuses` and `session.current` on its own state
+    (readable synchronously from `value`, no scope owned). It uses `@OptIn(ExperimentalForInheritanceCoroutinesApi)`:
+    architect, please confirm this is acceptable (alternative: an internal Unconfined scope that is never cancelled).
+  - UI: drawer card reads `state.currentConnection`, host from the saved profile (omitted if the profile is gone); interim
+    `connectButton` (OutlinedButton, "Connect") before "Check connection and permissions", saved profile only, KDoc-style
+    comment says M2-05 replaces it.
+  - Test-developer defects: (a) `PermissionCheckSteps` step `saved connections {string} and {string}` and `I am connected to`,
+    `I switch to`, `the sidebar shows {string} as the current connection` duplicate steps already defined in
+    `ConnectionsSteps` / `SwitchBetweenConnectionsSteps` (Cucumber `DuplicateStepDefinitionException`; the pending versions
+    must go or the new ones be moved); (b) `ensureSaved` reads `viewModel.state.value.profiles`, stale after a direct
+    `repository.add`, so the Background profile is added twice (use `repository.list()`). A working patch is in the
+    developer's scratchpad `steps-fix.patch` (not committed).
+

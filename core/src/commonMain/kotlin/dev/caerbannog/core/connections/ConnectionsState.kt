@@ -16,8 +16,10 @@ data class ConnectionsState(
     val lastCheckResult: ConnectionCheckResult? = null,
     val lastSaveResult: SaveConnectionResult? = null,
     val lastCaCertificateValidationResult: CaCertificateValidationResult? = null,
-    /** What the screen knows about each profile's permission check, keyed by profile name; no entry means not checked yet. */
+    /** What the screen knows about each profile's permission check (mirrored from the session), keyed by profile name; no entry means not checked yet. */
     val permissionChecks: Map<String, PermissionCheckStatus> = emptyMap(),
+    /** The session's current connection (not the edit-panel selection), mirrored from [ConnectionSession.current]. */
+    val currentConnection: CurrentConnection? = null,
 ) {
     val selectedProfile: ConnectionProfile?
         get() = profiles.firstOrNull { it.name == selectedProfileName }

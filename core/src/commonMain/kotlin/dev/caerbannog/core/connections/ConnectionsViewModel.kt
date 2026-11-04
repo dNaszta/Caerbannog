@@ -1,10 +1,13 @@
 package dev.caerbannog.core.connections
 
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * State holder for the Connections screen: [state] flows in, these methods are the events that flow
@@ -21,7 +24,12 @@ class ConnectionsViewModel(
     private val session: ConnectionSession? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
-    val state: StateFlow<ConnectionsState> = _state.asStateFlow()
+
+    /**
+     * What the screen shows: the view model's own state with the permission checks and the current connection
+     * read from the [ConnectionSession] (one source of truth). Readable synchronously from `value`.
+     */
+    val state: StateFlow<ConnectionsState> = SessionMirroredState(_state, session)
 
     /** Adds a brand-new profile; without an explicit level it starts at [TopologyControlLevel.READ_ONLY]. */
     fun addConnection(input: ConnectionProfileInput): SaveConnectionResult {
@@ -87,13 +95,22 @@ class ConnectionsViewModel(
         val result = updateConnection(originalName, input)
         if (result is SaveConnectionResult.Saved && session != null) {
             val name = result.profile.name
-            if (name != originalName) {
-                invalidateChecks(originalName)
-                session.forget(originalName)
-            }
-            runCheck(session, result.profile, replacing = originalName)
+            // The result of the old name belongs to the old environment; forget also clears current if it was that name.
+            if (name != originalName) session.forget(originalName)
+            session.open(result.profile)
         }
         return result
+    }
+
+    /**
+     * Makes the saved profile [name] the current connection and checks its permissions. An unknown name does
+     * nothing. Interim entry point until the sidebar connection picker (M2-05).
+     */
+    suspend fun connect(name: String) {
+        val profile = repository.list().firstOrNull { it.name == name } ?: return
+        val activeSession = session ?: return
+        activeSession.select(name)
+        activeSession.open(profile)
     }
 
     /**
@@ -106,44 +123,7 @@ class ConnectionsViewModel(
         val activeSession = session ?: return
         // The profile can be deleted or renamed while the reachability check was running.
         val profile = repository.list().firstOrNull { it.name == name } ?: return
-        runCheck(activeSession, profile, replacing = name)
-    }
-
-    // Every check gets a token; its Checking and Done entries are written only while that token is still the
-    // current one for the name. Delete, rename and a newer check make it stale, so a late result can never
-    // resurrect a removed profile or show up on a new profile that reused the name.
-    private suspend fun runCheck(activeSession: ConnectionSession, profile: ConnectionProfile, replacing: String) {
-        val name = profile.name
-        val token = beginCheck(name)
-        writeIfCurrent(name, token) { it - replacing + (name to PermissionCheckStatus.Checking) }
-        val permissions = activeSession.open(profile)
-        if (!writeIfCurrent(name, token) { it + (name to PermissionCheckStatus.Done(permissions)) } && tokens.value.byName[name] == null) {
-            activeSession.forget(name)
-        }
-    }
-
-    private data class Tokens(val last: Long = 0, val byName: Map<String, Long> = emptyMap())
-
-    private val tokens = MutableStateFlow(Tokens())
-
-    private fun beginCheck(name: String): Long =
-        tokens.updateAndGet { it.copy(last = it.last + 1, byName = it.byName + (name to it.last + 1)) }.last
-
-    private fun invalidateChecks(name: String) {
-        tokens.update { it.copy(byName = it.byName - name) }
-    }
-
-    private fun writeIfCurrent(
-        name: String,
-        token: Long,
-        change: (Map<String, PermissionCheckStatus>) -> Map<String, PermissionCheckStatus>,
-    ): Boolean {
-        var written = false
-        _state.update {
-            written = tokens.value.byName[name] == token
-            if (written) it.copy(permissionChecks = change(it.permissionChecks)) else it
-        }
-        return written
+        activeSession.open(profile)
     }
 
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
@@ -208,12 +188,10 @@ class ConnectionsViewModel(
         val name = _state.value.pendingDeleteName ?: return
         repository.delete(name)
         secretStore.delete(name)
-        invalidateChecks(name)
         session?.forget(name)
         _state.update {
             it.copy(
                 profiles = repository.list(),
-                permissionChecks = it.permissionChecks - name,
                 pendingDeleteName = null,
                 selectedProfileName = it.selectedProfileName.takeUnless { selected -> selected == name },
             )
@@ -261,4 +239,34 @@ class ConnectionsViewModel(
     private fun profileNamed(name: String): ConnectionProfile =
         repository.list().firstOrNull { it.name == name }
             ?: error("No saved connection named '$name'")
+}
+
+/**
+ * [ConnectionsState] with the session's statuses and current connection laid over it. A combined flow that
+ * also answers `value` synchronously, so no scope has to be owned by the view model; the session flows are
+ * the source of truth and nothing here is copied or cached.
+ */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class SessionMirroredState(
+    private val own: StateFlow<ConnectionsState>,
+    private val session: ConnectionSession?,
+) : StateFlow<ConnectionsState> {
+    private fun overlay(base: ConnectionsState, statuses: Map<String, PermissionCheckStatus>, current: CurrentConnection?) =
+        base.copy(permissionChecks = statuses, currentConnection = current)
+
+    override val value: ConnectionsState
+        get() = overlay(own.value, session?.statuses?.value.orEmpty(), session?.current?.value)
+
+    override val replayCache: List<ConnectionsState> get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<ConnectionsState>): Nothing {
+        val live = session
+        val source: Flow<ConnectionsState> = if (live == null) {
+            own
+        } else {
+            combine(own, live.statuses, live.current, ::overlay)
+        }
+        source.distinctUntilChanged().collect(collector)
+        error("A state flow never completes")
+    }
 }
