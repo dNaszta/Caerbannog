@@ -194,3 +194,6 @@ Reviewed: `git diff main...m2-02c-spike-test-stability` (`StreamManagementApiSpi
 | 4 | idea | new test | Covers the consequence that matters most (unnamed and `noTrackingStrategy` write nothing); it is the base for the M3 browse safety test | reuse in M3 |
 
 Consequences written down: (1) M3 safety rule in `docs/spec.md` "Paging model" (unnamed or `noTrackingStrategy` browsing consumer; `queryStreamStats` to be confirmed read-only in M2-03); (2) M2-06 Caught up and settled-values rule; (3) the `@gate-M2` tolerance has its cause (other applications' tracking entries, spec "Caveats").
+
+### Decisions taken (product owner, 2026-11-04)
+The "Product decisions needed now" list above is answered: N1 (c) Size column blank until M3; D4 confirmed; D5 (b) first offset in the M2 list, stream-client becomes a production dependency in M2-03; S3a (a) message and no lists; S3b (a) lists with a fixed own-connections notice. Testcontainers: no decision given, default "no bump now". See `docs/tasks/README.md` "M2 decisions".
