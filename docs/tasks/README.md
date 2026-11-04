@@ -13,6 +13,6 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M1-03-permission-check | Permission check: read the user's vhost permissions, lock topology and test publishing, safe fallback | M1 | done (accepted with follow-ups, round 1; merged into local `main`, not pushed) |
 | M1-06-profile-declared-permissions | Declared permissions on the profile: model persistence (back-compat), setter, edit panel fields | M1 | not started (after M1-03) |
 | M1-07-permission-state-ui | Permission state in the UI: sidebar pill, banner, declared vs verified wording | M1 | not started (after M1-03, M1-05) |
-| M1-09-permission-check-hardening | Permission check hardening: no exception leaves the check, thread-safe results | M1 | not started (after M1-03, before M1-07) |
+| M1-09-permission-check-hardening | Permission check hardening: no exception leaves the check, thread-safe results | M1 | briefed and confirmed (round 0, step 1); not started (after M1-03, before M1-07; adds `UnreadableCause.UNEXPECTED`) |
 | M1-08-keychain-test-opt-in | Move real-keychain tests out of the default `test` task | M1 | briefed and confirmed; not started (renamed from M1-06 to avoid clash with M1-06-profile-declared-permissions) |
 | M1-10-topology-level-on-new-connection | Choose the topology control level while creating a connection (apply on Save when editing; confirm Full control) | M1 | done (accepted with follow-ups, round 0; merged into local `main`, not pushed) |
