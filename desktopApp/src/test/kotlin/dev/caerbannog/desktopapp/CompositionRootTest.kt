@@ -1,11 +1,15 @@
 package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.connections.ConnectionProfileInput
+import dev.caerbannog.core.connections.PermissionCheckResult
+import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.SecretStore
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -71,5 +75,34 @@ class CompositionRootTest {
 
         assertEquals(input.password, secrets.retrieve(input.name))
         assertTrue(!file.readText().contains(input.password!!), "password must not be written to the profiles file")
+    }
+
+    // --- M1-07: the view model is wired to a ConnectionSession ------------------------------------
+    // There is no seam for the checker, so the test points the profile at a loopback port that was free a
+    // moment ago and is closed again: connection refused, deterministic, nothing leaves this machine.
+
+    private fun closedLoopbackPort(): Int = ServerSocket(0).use { it.localPort }
+
+    @Test
+    fun `the view model runs a permission check through the session and shows Unreadable for a closed port`() = runBlocking {
+        val file = File(dir, "connections.json")
+        val secrets = InMemorySecretStore()
+        val viewModel = createConnectionsViewModel(file, secrets)
+        val port = closedLoopbackPort()
+        viewModel.addConnection(input.copy(host = "127.0.0.1", streamPort = port, managementPort = port))
+
+        viewModel.checkConnectionAndPermissions(input.name)
+
+        val status = viewModel.state.value.permissionChecks[input.name]
+        val done = assertIs<PermissionCheckStatus.Done>(status, "the check must have produced a result, got $status")
+        assertIs<PermissionCheckResult.Unreadable>(done.result, "a closed port cannot be a verified result")
+        assertTrue(!done.result.topologyUnlocked, "an unreadable result locks topology")
+    }
+
+    @Test
+    fun `a fresh view model has not checked anything`() {
+        val viewModel = createConnectionsViewModel(File(dir, "connections.json"), InMemorySecretStore())
+
+        assertEquals(emptyMap(), viewModel.state.value.permissionChecks)
     }
 }

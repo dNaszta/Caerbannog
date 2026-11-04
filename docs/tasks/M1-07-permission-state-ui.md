@@ -12,6 +12,12 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
      (`.banner.warn`) updated.
   3. New request: a visible cue that the edit panel scrolls (scrollbar), and the panel should look like the design
      again. Verdict in "Layout verdict" below.
+- Step 2 (tests first, test developer): done, red. Written: core `PermissionSummaryTest`,
+  `ConnectionsViewModelPermissionChecksTest`; BDD steps in `PermissionCheckSteps` (five scenarios untagged, runner
+  filter `not @needs-M2 and not @broker`); UI tests in `ConnectionsScreenUiTest` (existing tests use a
+  `selectProfile(i)` helper that clicks the card via its `permissionPill:<name>` tag); `CompositionRootTest`
+  (closed loopback port, no network); `desktopApp` got a test-only coroutines dependency. Red: core, acceptance and
+  desktopApp tests do not compile (missing contract types); `:ui:jvmTest` compiles and fails (32 of 54).
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Goal

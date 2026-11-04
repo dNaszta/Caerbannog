@@ -41,7 +41,7 @@ tests/bdd/
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
 | `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
 | `@needs-M2` | Step definitions exist and compile but are deliberately left pending (`PendingException`) because the scenario needs a later milestone's feature ("Switch between connections" in `01`, needs M2's stream list; in `02` the browsing scenario and the three topology-screen text scenarios, which need the M2 topology screen); excluded from the default Cucumber run |
-| `@needs-M1-07` | Needs the permission-state UI from task `M1-07` (pill and edit panel banner wording, asserted in core); the test developer removes the tag per scenario when its steps exist, and the runner filter drops it at the end; excluded from the default Cucumber run until then |
+| `@needs-M1-07` | Retired: the permission-state UI (task `M1-07`) is built and its five scenarios in `02` (sidebar pill, edit panel banner wording, asserted in core through `permissionPill` / `permissionBanner`) run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 | `@needs-M1-06` | Retired: declared permissions on the profile (task `M1-06`) are built and their two scenarios in `02` run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 
 Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@broker` in a separate CI job.
