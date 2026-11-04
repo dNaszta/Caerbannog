@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,9 +37,16 @@ internal fun ConnectionsDrawer(state: ConnectionsState, modifier: Modifier = Mod
         modifier = modifier.testTag("connectionsDrawer").background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 16.dp)) {
-            Text("Caerbannog", style = MaterialTheme.typography.titleLarge)
-            Text("behind the rabbit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ConnectionIcon(AppIcon.CrueltyFree, IconSize, tint = MaterialTheme.colorScheme.primary)
+            Column {
+                Text("Caerbannog", style = MaterialTheme.typography.titleLarge)
+                Text("behind the rabbit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         DrawerConnectionCard(state)
         // The only nav item in M1, shown as the active one.
@@ -47,7 +56,12 @@ internal fun ConnectionsDrawer(state: ConnectionsState, modifier: Modifier = Mod
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         ) {
-            Row(modifier = Modifier.padding(start = 16.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ConnectionIcon(AppIcon.Power, IconSize)
                 Text("Connections", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 18.dp))
             }
         }
@@ -91,7 +105,11 @@ internal fun ConnectionsAppBar(onNewConnection: () -> Unit, modifier: Modifier =
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Connections", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        Button(onClick = onNewConnection) { Text("New connection") }
+        Button(onClick = onNewConnection) {
+            ConnectionIcon(AppIcon.Add, SmallIconSize)
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text("New connection")
+        }
     }
 }
 

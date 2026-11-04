@@ -170,3 +170,22 @@ installer notes, manual check recorded.
   and name-ellipsis tests at 640 and 1280 are in the run and pass today. Tag contract: `icon:<mockup name>` on the icon
   node itself (unmerged tree), toggle description on the same node as `icon:visibility` / `icon:visibility_off` is not
   required (found by description). Sizes (18/24) are not asserted (no pixel tests).
+- 2026-11-04 (senior developer, step 3, branch `m1-12b-connections-icons`): four commits. (1) Password hint shortened to
+  `Blank keeps the saved password` (PNG 02 shows it whole). (2) Compile proof: `material-icons-extended:1.7.3` explicit
+  coordinate in `ui` commonMain (no version catalog in the repo), throwaway probe; `:ui:compileKotlinJvm`, `:ui:jvmTest` (compiles)
+  and `:desktopApp:compileKotlin` passed; stop rule not triggered. `:desktopApp:run` NOT run (it reads the real `~/.caerbannog`);
+  runtime proof is the `:ui:jvmTest` and `:ui:screenshotTest` runs, which render every icon (no NoSuchMethodError or
+  ClassNotFound). (3) `ConnectionsIcons.kt` (only file importing `androidx.compose.material.icons`; `AppIcon` enum, `PillTone.icon()`,
+  `ConnectionIcon` with `icon:<name>` tag, no description unless given), all slots per the table, reveal toggle
+  (`remember(selected?.name)`, `semantics { password() }` kept). Suite: core 111, data-rabbit 17, desktopApp 5, ui 98
+  (the brief said 97: that is `ConnectionsScreenUiTest` alone, plus `AppUiTest`), acceptance 43 (5 skipped); no
+  `ConnectionsScreenshotTest` in the default run. Two ui tests stay red, both test-side defects (production behaviour verified
+  by PNG): (a) hint test: `hasVisualOverflow` is true for any shrink-wrapped single-line `Text` with `TextOverflow.Ellipsis`
+  (the CA hint, which is plainly whole in the PNG, also reports `size.width 202 < multiParagraph.width 228` and
+  `hasVisualOverflow = true`; the hint's `getLineRight(0)` is 195.7 of 228); use `isLineEllipsized(0)` instead. (b) TLS-line
+  test: at 1280x880 the line is below the fold of the scrolling panel, so its bounds and the lock's are `0,0,0,0`; the test needs
+  `performScrollTo()` first. One deviation to decide: with the trailing upload icon the CA label `CA certificate (optional)`
+  wraps to two lines at 1280 (field 260dp wide) and the CA field is taller than the Password field (mockup: one line). Also the
+  three bottom buttons no longer fit one line with their icons (Save was squeezed to one letter wide), so that row is now a
+  `FlowRow` (Save wraps below when narrow). Installer size: not measured (`packageDmg` not run); extended jar 37.8 MB.
+  Manual user check pending.
