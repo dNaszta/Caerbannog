@@ -313,7 +313,7 @@ class ConnectionSessionTest {
                 a.await()
                 assertFalse(session.isUsable("prod-eu"), "a stale result must not make the connection usable")
                 assertNull(session.permissions("prod-eu"), "a stale result must not be shown while the newer check runs")
-                assertEquals(PermissionCheckStatus.Checking, session.statuses.value["prod-eu"])
+                assertEquals(PermissionCheckStatus.Checking, session.state.value.statuses["prod-eu"])
 
                 second.finish(locked)
                 b.await()
@@ -357,7 +357,7 @@ class ConnectionSessionTest {
         }
         assertFalse(session.isUsable("prod-eu"), "forget during a running check must still win")
         assertNull(session.permissions("prod-eu"))
-        assertNull(session.statuses.value["prod-eu"])
+        assertNull(session.state.value.statuses["prod-eu"])
     }
 
     @Test
@@ -402,20 +402,19 @@ class ConnectionSessionTest {
     // --- M2-01: the current connection ---------------------------------------------------------------
     // Contract proposed by the test developer (brief leaves names open):
     //   data class CurrentConnection(val name: String, val status: PermissionCheckStatus?) // null = not checked
-    //   val current: StateFlow<CurrentConnection?>
-    //   val statuses: StateFlow<Map<String, PermissionCheckStatus>>  // Checking / Done per name, no entry = not checked
+    //   val state: StateFlow<SessionState>  // M2-01b: SessionState(statuses, current); statuses: Checking / Done per name, no entry = not checked
     //   fun select(name: String)                                      // makes `name` current; no check, no profile lookup
 
     @Test
     fun `there is no current connection at first`() {
-        assertNull(ConnectionSession(RecordingChecker(unlocked), secrets).current.value)
+        assertNull(ConnectionSession(RecordingChecker(unlocked), secrets).state.value.current)
     }
 
     @Test
     fun `select makes a never-checked connection current as not checked`() {
         val session = ConnectionSession(RecordingChecker(unlocked), secrets)
         session.select("prod-eu")
-        assertEquals(CurrentConnection("prod-eu", null), session.current.value)
+        assertEquals(CurrentConnection("prod-eu", null), session.state.value.current)
         assertFalse(session.isUsable("prod-eu"), "select must not run a check or make anything usable")
     }
 
@@ -424,7 +423,7 @@ class ConnectionSessionTest {
         val session = ConnectionSession(RecordingChecker(unlocked), twoNames)
         session.open(profile)
         session.select("prod-eu")
-        assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(unlocked)), session.current.value)
+        assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(unlocked)), session.state.value.current)
     }
 
     @Test
@@ -436,9 +435,9 @@ class ConnectionSessionTest {
         session.open(profile.copy(name = "dev"))
 
         session.select("prod-eu")
-        assertEquals(PermissionCheckStatus.Done(unlocked), session.current.value?.status)
+        assertEquals(PermissionCheckStatus.Done(unlocked), session.state.value.current?.status)
         session.select("dev")
-        assertEquals(CurrentConnection("dev", PermissionCheckStatus.Done(locked)), session.current.value)
+        assertEquals(CurrentConnection("dev", PermissionCheckStatus.Done(locked)), session.state.value.current)
         assertEquals(unlocked, session.permissions("prod-eu"), "the previous connection keeps its own result")
     }
 
@@ -450,18 +449,18 @@ class ConnectionSessionTest {
         withTimeout(10_000) {
             val a = async(Dispatchers.Default) { session.open(profile) }
             val first = checker.nextStarted()
-            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Checking), session.current.value)
+            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Checking), session.state.value.current)
             first.finish(allowed)
             a.await()
-            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(allowed)), session.current.value)
+            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(allowed)), session.state.value.current)
 
             val b = async(Dispatchers.Default) { session.open(profile) }
             val second = checker.nextStarted()
-            assertEquals(PermissionCheckStatus.Checking, session.current.value?.status, "a re-check clears the old result")
+            assertEquals(PermissionCheckStatus.Checking, session.state.value.current?.status, "a re-check clears the old result")
             second.finish(locked)
             b.await()
         }
-        assertEquals(PermissionCheckStatus.Done(locked), session.current.value?.status)
+        assertEquals(PermissionCheckStatus.Done(locked), session.state.value.current?.status)
     }
 
     @Test
@@ -469,7 +468,7 @@ class ConnectionSessionTest {
         val session = ConnectionSession(RecordingChecker(unlocked), twoNames)
         session.select("prod-eu")
         session.open(profile.copy(name = "dev"))
-        assertEquals(CurrentConnection("prod-eu", null), session.current.value)
+        assertEquals(CurrentConnection("prod-eu", null), session.state.value.current)
     }
 
     @Test
@@ -479,9 +478,9 @@ class ConnectionSessionTest {
         session.select("prod-eu")
 
         session.forget("dev")
-        assertEquals("prod-eu", session.current.value?.name)
+        assertEquals("prod-eu", session.state.value.current?.name)
         session.forget("prod-eu")
-        assertNull(session.current.value)
+        assertNull(session.state.value.current)
         assertFalse(session.isUsable("prod-eu"))
     }
 
@@ -497,7 +496,7 @@ class ConnectionSessionTest {
             pending.finish(allowed)
             a.await()
         }
-        assertNull(session.current.value)
+        assertNull(session.state.value.current)
     }
 
     @Test
@@ -505,7 +504,7 @@ class ConnectionSessionTest {
         val session = ConnectionSession(RecordingChecker(unlocked), MapSecretStore(mapOf("prod-eu" to "pw-Zq9-secret")))
         session.open(profile)
         session.select("prod-eu")
-        assertFalse(session.current.value.toString().contains("pw-Zq9-secret"))
-        assertFalse(session.statuses.value.toString().contains("pw-Zq9-secret"))
+        assertFalse(session.state.value.current.toString().contains("pw-Zq9-secret"))
+        assertFalse(session.state.value.statuses.toString().contains("pw-Zq9-secret"))
     }
 }

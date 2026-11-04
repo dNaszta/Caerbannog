@@ -18,8 +18,8 @@ import kotlin.test.assertTrue
  * Contract proposed by the test developer (brief leaves names open):
  *   suspend fun ConnectionsViewModel.connect(name: String)   // known profile: session.select(name) then the check
  *                                                             // (session.open); unknown name: no-op
- *   ConnectionsState.currentConnection: CurrentConnection?   // mirrors session.current
- *   ConnectionsState.permissionChecks                        // mirrors session.statuses (read from the session)
+ *   ConnectionsState.currentConnection: CurrentConnection?   // mirrors session.state.value.current
+ *   ConnectionsState.permissionChecks                        // mirrors session.state.value.statuses (read from the session)
  * The edit-panel selection (selectedProfileName) and the current connection are independent.
  */
 class ConnectionsViewModelSessionTest {
@@ -110,7 +110,7 @@ class ConnectionsViewModelSessionTest {
     fun `connect to an unknown name changes nothing and runs no check`() = runBlocking {
         vm.connect("nope")
         assertNull(current())
-        assertNull(session.current.value)
+        assertNull(session.state.value.current)
         assertEquals(emptyMap(), checks())
         // the checker was never asked: nothing is queued
         assertFalse(session.isUsable("nope"))
@@ -155,7 +155,7 @@ class ConnectionsViewModelSessionTest {
         vm.confirmDelete()
 
         assertNull(current())
-        assertNull(session.current.value)
+        assertNull(session.state.value.current)
         assertNull(checks()["prod-eu"])
     }
 
