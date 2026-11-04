@@ -83,7 +83,7 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
 
 ## Status
 
-- Step: 4 (verification passed; awaiting architect verdict)
+- Step: 5 done - ACCEPTED (architect, round 1). Task done; merge pending (human).
 - Round: 1
 - Branch: `m1-04-connections-screen-feedback-gaps`
 - Order note (architect, 2026-11-04): picked before `M1-05` because it is corrective to already-accepted
@@ -111,3 +111,8 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
   banner node still present). Restored: ConnectionsScreenUiTest 5/5 (the new 3 plus 2 existing), core jvmTest 6/6, ui jvmTest
   6/6, acceptance-tests (Cucumber, `not @needs-M2`; includes @smoke and @fake-broker of 01_connections) 17 run, 1 skipped, 0 failed.
   @broker not run: Docker unavailable here and no @broker scenario exists for this task. No blocker or major findings.
+- Review (architect, step 5): Accepted. Scope held; the `verticalScroll` on `EditPanel` is accepted as a necessary
+  enabler (without it the banner and Save are unreachable at 1024x768), no follow-up brief. Minor, optional notes: the
+  collision banner stays until the next save or selection switch (not cleared on editing the name); the
+  `lastCaCertificateValidationResult` clearing has no dedicated UI test; no visible scrollbar on the panel; the
+  `ErrorBanner` has no accessibility role. Revisit these when the real screen gets its first human run.

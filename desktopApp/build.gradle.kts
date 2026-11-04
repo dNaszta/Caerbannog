@@ -24,6 +24,18 @@ kotlin {
 dependencies {
     implementation(project(":ui"))
     implementation(compose.desktop.currentOs)
+
+    // M1-05 (test side only): the composition-root test needs core's types on its classpath. The
+    // production `implementation(project(":core"))` / `(":data-rabbit")` lines are the senior
+    // developer's part of the task.
+    testImplementation(project(":core"))
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 compose.desktop {
