@@ -26,7 +26,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | --- | --- | --- | --- |
 | M2-01-connection-session | Connection session as the single source of truth: latest-started check wins, current connection, drawer card from the session | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04); merged into local `main` (not pushed); branch `m2-01-connection-session` kept; follow-up `M2-01b-session-single-state`; no Docker |
 | M2-01b-session-single-state | One atomic public session state flow; remove the `StateFlow` inheritance waiver and the publish loop | M2 | briefed (2026-11-04); do before M2-03 and M2-04; no Docker |
-| M2-02-management-api-spike | Spike on a real broker (Testcontainers, TLS fixture): stream list fields, publisher and consumer fields, first/last offset source, stream search by name, super stream shape, non-admin view, Testcontainers deprecation; deliverable is knowledge in the brief Status and `docs/spec.md`, asserted by `@broker` spike tests | M2 | implemented 2026-11-04, ready for review (branch `m2-02-management-api-spike`); findings in the brief Status; S1 and S2 done, S3 open; needs Docker |
+| M2-02-management-api-spike | Spike on a real broker (Testcontainers, TLS fixture): stream list fields, publisher and consumer fields, first/last offset source, stream search by name, super stream shape, non-admin view, Testcontainers deprecation; deliverable is knowledge in the brief Status and `docs/spec.md`, asserted by `@broker` spike tests | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04; branch `m2-02-management-api-spike`, not merged); findings in the brief Status and `docs/spec.md` "Management API facts"; S1 and S2 done, S3 open; needs Docker |
 | M2-03-stream-gateway | Core `StreamCatalog` interface, fake, real management client for the stream list and stats (and stream client if the spike says offsets need it) | M2 | planned, depends on M2-02 and decisions D3 to D5 (see "M2 decisions"); brief not written yet |
 | M2-04-stream-list-core | Stream list view model: derive counts, sort, filter by name and kind, page, refresh, empty state (scenarios in `03`) | M2 | planned, depends on M2-01 and M2-03 |
 | M2-05-stream-list-screen | Stream list screen per `docs/ux/Streams.dc.html`, drawer navigation, un-skip `Switch between connections` | M2 | planned, depends on M2-04 |
@@ -45,10 +45,11 @@ Raised in the architect's M2 plan (2026-11-04). Spike decisions S1 to S3 live in
 | D1 | What "connected" means and how a connection is held (checked once, or a held session) | open |
 | D2 | Reconnect behaviour after a lost connection | open |
 | D3 | Stream list refresh (manual, timed, or both) | open |
-| D4 | Where first and last offset come from (management API or stream protocol `queryStreamStats`) | open; partly answered by S1 (stream-client allowed in tests), final answer from the M2-02 spike, question 3 |
-| D5 | When the stream client is used in production (only for browsing, or also for stats) | open; depends on D4 and the spike |
+| D4 | Where first and last offset come from (management API or stream protocol `queryStreamStats`) | answered by the M2-02 spike, pending product owner confirmation: count from management `messages`, first offset from the stream protocol only, last written offset = first + messages - 1 |
+| D5 | When the stream client is used in production (only for browsing, or also for stats) | open; recommended: browsing only (M3), the M2 list shows counts, no first offset |
 | D6 | Password during a session (the session never holds it today) | open |
 | D7 | TLS hostname verification for real data calls | open |
 | S1 | Test dependency `stream-client:1.12.0` for the M2-02 spike | decided (option A) |
 | S2 | Testcontainers: reproduce on 1.21.3, trial 2.0.5 on a scratch branch, no bump without report | decided |
-| S3 | Non-admin visibility of stream data | open until spike findings |
+| S3 | Non-admin visibility of stream data | open; findings in; decision needed: no-tag users (recommend message) and `management`-tag users (recommend lists with a notice) |
+| N1 | Size column in the stream list has no data source | open; recommend drop |
