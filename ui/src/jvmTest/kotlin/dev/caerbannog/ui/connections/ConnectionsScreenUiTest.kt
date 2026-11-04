@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
@@ -91,11 +92,11 @@ class ConnectionsScreenUiTest {
         val existing = ConnectionProfile(name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer")
         setContent { ConnectionsScreen(testViewModel(existing)) }
 
-        onNodeWithText("New connection").performClick()
+        onAllNodesWithText("New connection")[0].performClick()
         onNodeWithText("Name").performTextInput("uat-eu")
         onNodeWithText("Host").performTextInput("other.example.com")
         onNodeWithText("Username").performTextInput("someone")
-        onNodeWithText("Save").performClick()
+        onNodeWithText("Save").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithText("A connection named 'uat-eu' already exists.").assertExists()
@@ -109,7 +110,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(testViewModel(a, b)) }
 
         onAllNodesWithText("Select")[0].performClick()
-        onNodeWithText("Check connection").performClick()
+        onNodeWithText("Check connection").performScrollTo().performClick()
         waitForIdle()
         onNodeWithText(passedBanner, substring = true).assertExists()
 
@@ -127,7 +128,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(testViewModel(a)) }
 
         onNodeWithText("Select").performClick()
-        onNodeWithText("Check connection").performClick()
+        onNodeWithText("Check connection").performScrollTo().performClick()
         waitForIdle()
         onNodeWithText(passedBanner, substring = true).assertExists()
 
