@@ -15,7 +15,7 @@ In:
   (update the UI test that finds the title, if any).
 - `acceptance-tests/build.gradle.kts`: comment next to `project(":data-rabbit")` that steps must not instantiate the
   keychain-backed secret store (keyring and JNA native libs are on the classpath only for the file repository).
-- Architect (docs only, done at the same time): the mockup shows the two yes/no choices as Yes/No radio pairs, as built.
+- Architect (docs only, not yet done): update the mockup, which shows toggle icons, so the two yes/no choices appear as Yes/No radio pairs, as built.
 Out: CA certificate applies on Save (idea, separate task if wanted); acceptance scenario for Keep.
 
 ## Acceptance
