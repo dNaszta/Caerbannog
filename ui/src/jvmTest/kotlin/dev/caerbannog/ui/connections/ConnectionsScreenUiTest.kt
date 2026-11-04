@@ -987,7 +987,7 @@ class ConnectionsScreenUiTest {
 
         val passwordField = onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
         passwordField.assertExists("expected a password-masked field")
-        onNodeWithText("Password (leave blank to keep unchanged)").performTextInput("hunter2")
+        onNodeWithText("Password").performTextInput("hunter2")
 
         // Not onNodeWithText("hunter2"): hasText also reads the test-only InputText property, which holds the raw
         // typed text on any field. EditableText is what the screen shows (and what accessibility sees): it must be
@@ -1137,12 +1137,12 @@ class ConnectionsScreenUiTest {
         onNode(matcher, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
     private val gridLabelsInMockupOrder = listOf(
-        "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate",
+        "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate (optional)",
     )
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.gridField(label: String): SemanticsNode {
-        val isField = hasText(label, substring = label == "Password" || label == "CA certificate")
+        val isField = hasText(label)
         val nodes = onAllNodes(isField.and(hasSetTextAction().or(hasText("Stream port (TLS)").or(hasText("Management port (HTTPS)")))))
             .fetchSemanticsNodes()
         assertEquals(1, nodes.size, "expected exactly one text field labelled '$label', found ${nodes.size}")
@@ -1205,7 +1205,7 @@ class ConnectionsScreenUiTest {
         assertEquals(gridLabelsInMockupOrder, readingOrder, "fields must read left to right, top to bottom in the mockup order; positions $pos")
 
         val left = listOf("Name", "Host", "Stream port (TLS)", "Password").map { pos.getValue(it) }
-        val right = listOf("Virtual host", "Username", "Management port (HTTPS)", "CA certificate").map { pos.getValue(it) }
+        val right = listOf("Virtual host", "Username", "Management port (HTTPS)", "CA certificate (optional)").map { pos.getValue(it) }
         assertEquals(1, left.map { it.x }.distinct().size, "left column must share one x: $left")
         assertEquals(1, right.map { it.x }.distinct().size, "right column must share one x: $right")
         assertTrue(right.first().x > left.first().x, "second column must be right of the first: $pos")
@@ -1213,7 +1213,7 @@ class ConnectionsScreenUiTest {
         assertEquals(pos.getValue("Name").y, pos.getValue("Virtual host").y, "Name and Virtual host share a row")
         assertEquals(pos.getValue("Host").y, pos.getValue("Username").y, "Host and Username share a row")
         assertEquals(pos.getValue("Stream port (TLS)").y, pos.getValue("Management port (HTTPS)").y, "the ports share a row")
-        assertEquals(pos.getValue("Password").y, pos.getValue("CA certificate").y, "Password and CA certificate share a row")
+        assertEquals(pos.getValue("Password").y, pos.getValue("CA certificate (optional)").y, "Password and CA certificate share a row")
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -1393,4 +1393,73 @@ class ConnectionsScreenUiTest {
     @Test
     fun `in a narrow window the pill still stays inside the card on one line and the name ellipsizes`() =
         runDesktopComposeUiTest(640, 880) { assertPillContainedAndNameEllipsized() }
+
+    // --- M1-12a round 2: short labels, long text as single-line supporting text ----------------------
+
+    private val passwordHint = "Leave blank to keep the saved password"
+    private val caHint = "Blank uses the system trust store"
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.textNodes(text: String) =
+        onAllNodes(hasText(text), useUnmergedTree = true).fetchSemanticsNodes()
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the Password and CA labels are exactly the short mockup labels for a new and a saved profile`() {
+        listOf(false, true).forEach { saved ->
+            runDesktopComposeUiTest(1280, 880) {
+                setContent { ConnectionsScreen(permissionViewModel(*if (saved) arrayOf(prod) else emptyArray())) }
+                if (saved) selectProfile(0)
+
+                val password = onAllNodes(hasText("Password").and(hasSetTextAction())).fetchSemanticsNodes()
+                assertEquals(1, password.size, "saved=$saved: exactly one field labelled exactly 'Password'")
+                val ca = onAllNodes(hasText("CA certificate (optional)").and(hasSetTextAction())).fetchSemanticsNodes()
+                assertEquals(1, ca.size, "saved=$saved: exactly one field labelled exactly 'CA certificate (optional)'")
+                assertEquals(0, textNodes("Password (leave blank to keep unchanged)").size, "saved=$saved: the long label is gone")
+                assertEquals(
+                    0, textNodes("CA certificate (optional - blank uses the system trust store)").size,
+                    "saved=$saved: the long CA label is gone",
+                )
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a saved profile shows the keep-password hint under the Password field and a new one does not`() {
+        runDesktopComposeUiTest(1280, 880) {
+            setContent { ConnectionsScreen(permissionViewModel(prod)) }
+            selectProfile(0)
+
+            val hint = textNodes(passwordHint)
+            assertEquals(1, hint.size, "saved profile: the hint '$passwordHint' must be shown once")
+            val field = onNode(hasText("Password").and(hasSetTextAction())).fetchSemanticsNode()
+            assertTrue(hint.single().positionInRoot.y >= field.positionInRoot.y, "the hint sits under the Password field")
+            assertEquals(1, onAllNodes(hasText(passwordHint, substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
+            val layouts = mutableListOf<TextLayoutResult>()
+            hint.single().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+            assertEquals(1, layouts.single().lineCount, "the hint is a single line")
+        }
+        runDesktopComposeUiTest(1280, 880) {
+            setContent { ConnectionsScreen(permissionViewModel()) }
+            assertEquals(0, textNodes(passwordHint).size, "new profile: no keep-password hint")
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the CA supporting text is shown for a new and a saved profile on one line`() {
+        listOf(false, true).forEach { saved ->
+            runDesktopComposeUiTest(1280, 880) {
+                setContent { ConnectionsScreen(permissionViewModel(*if (saved) arrayOf(prod) else emptyArray())) }
+                if (saved) selectProfile(0)
+
+                val hint = textNodes(caHint)
+                assertEquals(1, hint.size, "saved=$saved: the hint '$caHint' must be shown once")
+                val layouts = mutableListOf<TextLayoutResult>()
+                hint.single().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                assertEquals(1, layouts.single().lineCount, "saved=$saved: the hint is a single line")
+            }
+        }
+    }
 }
