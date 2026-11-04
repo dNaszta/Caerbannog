@@ -256,9 +256,12 @@ class RealBrokerCatalogTest {
     @Test
     fun `stream detail has the message count and the retention arguments`() = runBlocking<Unit> {
         val name = unique("detail-")
-        val e = env()
-        e.streamCreator().stream(name).maxAge(java.time.Duration.ofDays(7)).create()
+        // The broker reports x-max-age in the form it was declared with: "7D" as text here (management API), but
+        // "604800s" when the stream client converts maxAge(Duration). So the stream is declared with the text form
+        // (architect ruling, M2-03 part 2 step 3); the mapper passes the broker text through unchanged.
+        assertEquals(201, adminCall("PUT", "/api/queues/%2F/$name", """{"durable":true,"arguments":{"x-queue-type":"stream","x-max-age":"7D"}}"""), "declare stream $name with x-max-age=7D")
         streamsToDelete += "%2F" to name
+        val e = env()
         publish(e, name, 10)
         val held = connection()
 

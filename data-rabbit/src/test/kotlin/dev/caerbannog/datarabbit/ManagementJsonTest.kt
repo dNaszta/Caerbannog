@@ -89,6 +89,12 @@ class ManagementJsonTest {
     }
 
     @Test
+    fun `a max age the broker reports as 604800s is passed through unchanged, not normalised`() {
+        val body = """{"name":"s","vhost":"/","type":"stream","messages":1,"arguments":{"x-queue-type":"stream","x-max-age":"604800s"}}"""
+        assertEquals("604800s", success(ManagementJson.parseStreamDetail(body)).retention.maxAge)
+    }
+
+    @Test
     fun `a stream without arguments has no retention`() {
         val page = success(ManagementJson.parseStreamPage(FixtureFiles.text("m2-02/queues-page-one-stream.json")))
         assertEquals(Retention(), page.rows.single().retention)
