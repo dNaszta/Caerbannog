@@ -38,7 +38,24 @@ kotlin {
 }
 
 tasks.named<Test>("jvmTest") {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // M1-12a: the screenshot helper is opt-in (`./gradlew :ui:screenshotTest`), like keychainTest.
+        excludeTags("screenshot")
+    }
+}
+
+// Renders the Connections screen to PNGs in ui/build/screenshots/ for a by-eye comparison with docs/ux/Main.dc.html.
+// Not wired from `test` or `check`. Same classpath as jvmTest; the working dir is the project dir (the test writes
+// to user.dir/build/screenshots).
+tasks.register<Test>("screenshotTest") {
+    group = "verification"
+    description = "Writes Connections screen screenshots to ui/build/screenshots/ (opt-in, not part of test)."
+    val jvmTest = tasks.named<Test>("jvmTest").get()
+    testClassesDirs = jvmTest.testClassesDirs
+    classpath = jvmTest.classpath
+    workingDir = projectDir
+    useJUnitPlatform { includeTags("screenshot") }
+    outputs.upToDateWhen { false }
 }
 
 // Root `./gradlew test` (and `task test`) runs the same-named task in every project, but a Kotlin
