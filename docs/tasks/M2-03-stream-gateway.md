@@ -142,3 +142,26 @@ My own bug found and fixed: 6 of my core tests (3 in `ActiveConnectionTest`, 3 i
 
 Mutations (core and acceptance run separately; tree restored with git checkout): 16 of 17 killed by core tests, 5 also by Cucumber (open on NO_PASSWORD, delete keeps current, open before check, password in session state; a step expectation changed in the feature failed the run). Survivor: `session.select` outside the lock: caught in 2 of 20 runs of the concurrency test only (nondeterministic, see finding 2). Acceptance does not catch: Disconnect clearing current, topology level, CA change, notes, second held connection, close twice, cancel; they are unit-covered.
 
+
+### Part 1, step 5: architect review (2026-11-04)
+Verdict: **Accepted with follow-ups.** Part 1 is done (not merged; merge into local `main` with `--no-ff`, then branch part 2 from `main`). Reviewed: `git diff main...m2-03-connection-lifecycle` (core `ActiveConnection`, `LinkState`, `ConnectionGateway`, view model hooks, ui note, fake, tests, feature 13 steps) against the brief, spec "Connection lifecycle" and the rulings of eb56f39. Not reviewed: every test body line by line (relied on the verify report: 17 mutations, 16 killed, 20 repeated runs, count check). Rule checks: no non-TLS path, no queue message access, no data-rabbit change, password never in state or logs (a test and mutation cover it), no `!!`, one documented broad catch at the boundary.
+
+| # | Severity | File | Finding | Ruling |
+| --- | --- | --- | --- | --- |
+| 1 | minor (good) | `ActiveConnection.kt` | Same generation-plus-short-lock pattern as `ConnectionSession`, immutable sealed state, one flow, typed results, NO_PASSWORD before open, a throwing gateway or close never leaks text | none |
+| 2 | minor | `ActiveConnection.kt` `connect` | `session.select` inside the lock is only probabilistically tested (survivor caught 2 of 20 runs) | Accept. The placement is right (the newest connect owns the current connection); a deterministic test needs a hook in the session and is not worth it. Do not move it out of the lock |
+| 3 | minor, latent | `ActiveConnection.kt` `locked` | `select` runs under a non-reentrant spin lock while the session calls observers synchronously: an observer that calls an `ActiveConnection` method would spin forever | Decided now: document it, do not restructure. KDoc on `ActiveConnection` and `ConnectionSession.observe` (part 2, with the F1 text): "observers must not throw and must not call ActiveConnection or the session". The chip and view models collect `StateFlow`s, they are not synchronous observers. Revisit if a synchronous observer is ever added |
+| 4 | minor | `closeQuietly` | A throwing `close()` leaves no trace | Part 2: the real holder logs the exception class name only (no message, no secrets) |
+| 5 | idea | feature 13 scenario 4 | Checks state only | Optional: add "And the app holds one connection" (steps exist through the fake's log); do it in part 2 if touched |
+| 6 | idea | test style | `runBlocking<Unit>` | Mandatory style from now on; see `M2-TESTHYGIENE-01` |
+
+Follow-ups, all in part 2 (`m2-03-stream-catalog`), listed in its section below.
+
+### Part 2 checklist (added at the part 1 review)
+- Composition root: wire `ActiveConnection(session, realGateway)` into `desktopApp` and the view model (`active = ...`), and call `close()` in `onCloseRequest`. Until then the interim edit-panel Connect keeps the M2-01 behaviour (part 1 does not wire it).
+- Real holder: log the class name only when a `close()` throws; never a message or password.
+- Replace the thin step "first offsets will read unavailable" with a real `StreamOffsets` assertion; remove `@needs-M2-03b` from "A user without the management tag ..." and make it pass with `Capabilities`.
+- KDoc: "observers must not throw and must not call ActiveConnection or the session" on `ActiveConnection` and `ConnectionSession.observe` (same text as F1 of M2-01b).
+- Decide `testFixtures` versus a `core-testing` module when `FakeStreamCatalog` is added (ruling 6).
+- Tests: `runBlocking<Unit>` (or `runTest`) always; the test engineer checks that the `@Test` count equals the XML count for every new class.
+- Optional: "And the app holds one connection" in scenario 4 of `13`.

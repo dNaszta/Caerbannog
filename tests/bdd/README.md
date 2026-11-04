@@ -100,3 +100,5 @@ Resolved: whether the broker's configure permission alone is a sufficient guardr
 self-constraint level (`docs/spec.md`, "Topology migrations and permission guardrails"): the app adds its own
 rule on top, reserving delete for the Full control level. `01` now covers storing/editing the level; `02` and
 `10` will need scenarios for the combined effective-permission check once M1-03 and M5 scope that enforcement.
+
+- Test code that calls suspending functions uses `runBlocking<Unit> { ... }` or `runTest`: a `@Test` function that returns a value is silently never run by JUnit 5 (task `M2-TESTHYGIENE-01`).
