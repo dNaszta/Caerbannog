@@ -1,8 +1,65 @@
-# Stream list view model (input note)
+# Stream list core (view model, refresh, paging, display rules)
 
-Milestone: M2    Depends on: M2-01b, M2-03 (D3 values and scope decided; default and D2 are flagged proposals)    Size: M
+Milestone: M2    Depends on: M2-01b, M2-03 (both merged into local `main`)    Size: L (split in two commits-groups, see Plan; if it passes three days, cut after step C and make the rest M2-04b)
 
-Status: input note; the full brief is written when M2-03 is accepted.
+Status: briefed and confirmed 2026-11-04 (architect), branch `m2-04-stream-list-core`. Next: test developer, step 2 (tests first). Default refresh 5 s is a trial: record calls per tick here.
+
+## Goal
+`core` has a stream list view model that, for the held connection, loads every stream (all pages of the management queue list, streams only), shows rows with counts, first and last offset, publishers and consumers as display strings, filters, sorts and pages them in memory, refreshes on a timer under the D3 rules, and reacts to the connection state. No Compose code. All `@fake-broker` scenarios of `03` that do not need super streams pass.
+
+## Why
+Spec "Stream list" and the D3, D4, D5, D8, D9 and UI1 decisions in `docs/tasks/README.md`; scenarios in `tests/bdd/features/03_stream_list.feature`. M2-05 draws this state; M2-06 and M2-07 extend it.
+
+## Scope
+In:
+- `StreamListViewModel` (name free) in `core/streams`: state in, events out, one immutable state with sealed screen states: `NotConnected`, `Connecting`, `Loading`, `Rows`, `Empty`, `CannotReadStatistics` (visibility NONE, text `CatalogMessages.NOT_MANAGEMENT_USER`), `Failed(reason)`; stale flag plus banner data for a lost connection (D2, flagged default, one place to change).
+- Row model with display strings only (what is shown is what is copied, UI1): name, type, approximate messages (`n/a` when `messages` is null, never 0), first offset (loading, value, `unavailable`), last offset (first + messages - 1, only when both present, else `unavailable`), publishers (D8), consumers, retention (D9), blank Size (N1: no size in the model).
+- Accessor from `ActiveConnection` (below), `RefreshPolicy` (D3), in-memory `AppSettings` interface plus fake (value in memory only), `Retention.displayMaxAge()` (D9).
+- Paging strategy over all queues (below), in-memory filter by name, sort by name, page of N streams from the filtered list, "streams a to b of total".
+- `StreamCatalog.publisherCounts(vhost)` on the interface, the fake and the real `ManagementStreamCatalog` (D8).
+- `core-testing` module (decision below) and moving the three fakes.
+- F1 items: composition-root logging, unwrap `CompletionException`, drop the unused `body` parameter of `ManagementErrors.map`.
+- Step definitions for `03` (new `RunStreamListAcceptanceTest`, tags `@fake-broker`, excluding `@needs-M2`).
+Out: Compose screens, app bar chip, `settings.json` file (M2-05); super stream grouping and the kind filter (M2-07); publishers and consumers tab (M2-06); detail screen; any topology change; any message read.
+
+## Acceptance
+BDD, all in `tests/bdd/features/03_stream_list.feature` (`@fake-broker`): "The list shows the statistics of every stream" (@smoke), "The message count and the offsets agree" (3 rows), "The first offset cannot be read for one stream", "A user without the management tag", "The publishers column depends on what the user may see" (new, D8), "The publishers column is unavailable without the stream management plugin" (new), "Counts are labelled as approximate", "Filter streams by name", "Sort the list", "Refresh updates the statistics", "The list refreshes by itself at the chosen interval", "With the refresh interval off the list never refreshes by itself", "The refresh interval is 5 seconds on a fresh install", "A broker with no streams", "Long lists are paged", "Paging counts streams, not queues" (new). "Filter by kind" is now `@needs-M2` (needs M2-07). `@gate-M2` stays `@broker`, M2-09.
+Unit tests in `core` (not Gherkin), each written first:
+1. `RefreshPolicy` (virtual time, injected clock and ticker, no sleeps): values Off/5/10/30/60 as a closed type; default is one constant `DEFAULT_REFRESH = 5 s`; a tick is a data call, never a permission check, never writes to `ConnectionSession`; ticks only while Connected and the list is shown; a tick still running makes the next one skip; a failed tick keeps rows, marks stale, timer keeps running; Disconnect, Connect to another profile, or a connect that supersedes the held one cancels the running tick and the timer; a late result of a superseded tick (fake catalog completing after the switch) is dropped and changes no state; page, filter or sort change reloads at once and restarts the timer; "Updated N s ago" counts from the last successful load; manual refresh while a tick runs does not run two loads at once.
+2. Accessor: `ActiveConnection` exposes a source only while Connected (null otherwise); the view model never gets a `HeldConnection` (it is `AutoCloseable`); after a switch or disconnect, a call through an old source returns `CatalogResult.Unreachable` / `FirstOffset.Unavailable` without touching the closed connection, and the view model ignores it by load token (it must never turn into a D2 "Connection lost").
+3. D8: `publisherCounts(vhost)` test first in `FakeStreamCatalogTest` and `ManagementRequestsTest`/`ManagementJsonTest` (path `/api/stream/publishers/{vhost}`, grouped by stream, uses the recorded fixture) and `RealBrokerCatalogTest` (`@broker`). Column "unavailable" unless `Capabilities.visibility == FULL` and plugin PRESENT; exactly one `publisherCounts` call per refresh, not per row (fake counts calls); never a partial number for OWN_CONNECTIONS_ONLY or NONE.
+4. D9 `Retention.displayMaxAge()` table: `7D`->`7D`; `604800s`->`7D`; `3600s`->`1h`; `90m`->`90m`; `5400s`->`90m`; `86401s`->`86401s`; `0s`->`0s`; `1Y`, `2M` unchanged (no 30-day month or 365-day year assumption, a seconds value converts to D, h, m, s only); unknown text (`abc`, `7X`, empty) unchanged, no exception; null -> blank; `99999999999999999999s` unchanged, no overflow; negative text unchanged. Copied text of retention for `604800s` is `7D`.
+5. Paging strategy: reads pages of 500 until `page == pageCount`, keeps `type == stream` only, display total is the stream count; 12 streams among 700 queues gives "1 to 5 of 12"; a failure on page 2 fails the load as a whole and keeps the old rows stale (no half list); call count per refresh asserted (`ceil(queues/500)` list calls).
+6. Row states: `NotFound` on a row means reload the list and show nothing else; `FirstOffset.Empty` shows blank offsets; `messages == null` shows `n/a`; first-offset calls only for visible rows, at most the limit already set by the gateway.
+7. Connection states: Disconnected gives "Not connected" and no rows; Connecting gives loading; Failed gives reason and Retry (Retry = connect, then load); D2 default (flagged): Unreachable or timeout on a data call makes the link Failed("Connection lost"), rows kept stale, no auto reconnect.
+8. F1 checks: composition root passes a logger (test in `CompositionRootWiringTest`: a failed close is logged with the class name only, no secret); `StreamEnvironments` failure surfaces the real cause class, not `CompletionException` (unit test with a failing builder); `ManagementErrors.map(status, on404)` has no `body` parameter and its suppression is gone.
+
+## Design notes
+- Modules: view model, `RefreshPolicy`, paging strategy, `AppSettings`, row model and `Retention` rule in `core` (commonMain, no JVM types: clock and ticker are interfaces, tests use `kotlinx-coroutines-test` virtual time). `data-rabbit` gets only `publisherCounts` and F1. `ui` is untouched.
+- State flow: one `StateFlow<StreamListState>` (same pattern as `ConnectionsViewModel`; no inheritance of StateFlow). The view model needs a coroutine scope for the timer: it is passed in and owned by the composition root; `close()` cancels it. Collect `ActiveConnection.state` for connection changes (a collector, not a synchronous session observer: the rule "observers must not call ActiveConnection" in the KDoc of `observe` and `ActiveConnection` stays; F1 of M2-01b is already written there, only verify it is still present).
+- Accessor (decided): `class StreamSource(val catalog: StreamCatalog, val offsets: StreamOffsets, val vhost...)` built by `ActiveConnection` per held connection, wrapping them with a "still current" check (same token as the connect that opened it). `ActiveConnection.source: StreamSource?`, non-null only in Connected. Vhost comes from the profile, as the catalog calls already take it.
+- Load token: every load gets an increasing token; results apply only if the token is current and the link is the same connection. This is the "latest started wins" rule applied to data calls.
+- Paging: no use of the broker `name` filter in M2-04 (the app holds all streams and filters in memory), which also answers case-sensitivity for now (the in-memory filter is a case-insensitive substring; the broker-side case question stays open for the global search task). If a vhost is so big that the list is too heavy, see Open points.
+- Calls per tick (to be measured and recorded in Status, with the real broker and the fake): list calls = `ceil(queues/500)`; publishers = 1 (FULL only) else 0; first offset = one `queryStreamStats` per visible row on the current page (at most page size, parallelism limit already in the gateway). Default page size for M2-04 is a constant (50, a view setting, may change in M2-05 UX); the scenario passes 5.
+- Fakes: `FakeStreamCatalog`, `FakeStreamOffsets`, `FakeConnectionGateway` (and the small helpers they need) move to a new JVM module `core-testing` (Kotlin JVM, `main` source set, depends on `core`; consumers: `core` jvmTest, `acceptance-tests`, later `ui` and `data-rabbit` tests via `testImplementation(project(":core-testing"))`). Reason: three consumers (core tests, acceptance, ui in M2-05) and the current `srcDir` copy trick in `acceptance-tests/build.gradle.kts` does not reach `ui`. Keep the package `dev.caerbannog.core.connections.fakes` to keep the diff mechanical. Remove the srcDir hack and the "same file in core jvmTest and through an extra srcDir" KDoc lines. Risk: core's own tests depending on a module that depends on core; Gradle accepts it (no task cycle) but check `./gradlew test` and `verifyTestDiscovery`. If it cannot work, fall back to a `java-test-fixtures`-like setup and tell the architect; do not copy files. The module is test-only: it must not be reached from `desktopApp` runtime or the installer.
+- Do the move as the first commit, with no behaviour change, so its diff can be reviewed alone. Plan: (A) core-testing move; (B) D9 retention rule, `RefreshPolicy`, `AppSettings` fake; (C) accessor and paging strategy and `publisherCounts`; (D) view model and the scenarios; (E) F1.
+- Safety: no code path reads, gets or purges queue messages; list calls and `queryStreamStats` only; TLS paths untouched.
+
+## UX
+Screen `docs/ux/Streams.dc.html` is built in M2-05. Here: the state names and display strings it will draw, including the texts "Not connected", "Connection lost", `unavailable`, `n/a`, and the "counts are approximate" label as data in the state.
+
+## Open points
+- D2 (lost connection) stays PROPOSED: built as a flagged default, one place to change; scenario in `13` stays `@needs-decision`. Not decided here.
+- D3 default 5 s: decided as a trial; the Status must record calls per tick measured on a real broker so the owner can change it. Not blocking.
+- D9 wording and UI1 scope (all list and detail values copyable) are the coordinator's reading, still to confirm; tests pin `7D`; a change is one function.
+- Cost of paging over all queues: at 5 s per tick a vhost with thousands of queues makes several list calls per tick. Developer measures and reports; the developer does not change the approach alone. Alternative (pass the name filter to the broker, show the broker's numbers) needs a product wording change; not chosen.
+- "Verify the observer KDoc": the text "observers must not throw" exists on `ConnectionSession.observe`; M2-01b follow-up F1 therefore needs no code change, only the check.
+- The `04` and `11` scenarios are not part of this task.
+
+## Definition of done
+Tests written first and failing for the right reason, then passing: `./gradlew test --rerun-tasks --continue` green including `verifyTestDiscovery`; `brokerTest` for `publisherCounts` green on a real broker; no unrelated changes; Status records calls per tick and the page size constant; README row and spec updated if behaviour changed.
+
+## Decisions log (input note, kept as written)
 
 ## Inputs from the decisions of 2026-11-04
 - Rows come from `StreamCatalog`; first offset comes lazily from `StreamOffsets` per visible row (D5 b). Row state for the offset: loading, value, `unavailable` (failed or denied call). Last offset = first offset + `messages` - 1, computed only when both are present; otherwise unavailable. The count is management `messages` and is always shown when the broker returned it (`messages` may be missing for about 5 s after creation: show n/a, not 0).

@@ -59,6 +59,28 @@ Feature: Stream list
     Then I see the message "This user cannot read stream statistics. Ask for the monitoring tag."
     And no stream list is shown
 
+  # Product decision D8 (a): a partial publisher count is never shown. Only the "monitoring" or
+  # "administrator" tag sees every connection, so only then is the number real.
+  @fake-broker
+  Scenario Outline: The publishers column depends on what the user may see
+    Given the user of "uat-eu" has the tag "<tag>"
+    And a stream "orders-events" with <publishers> publishers
+    When I open the stream list
+    Then the publishers of "orders-events" read "<shown>"
+
+    Examples:
+      | tag            | publishers | shown       |
+      | administrator  | 2          | 2           |
+      | monitoring     | 2          | 2           |
+      | management     | 2          | unavailable |
+
+  @fake-broker
+  Scenario: The publishers column is unavailable without the stream management plugin
+    Given the broker has no stream management plugin
+    And a stream "orders-events" exists
+    When I open the stream list
+    Then the publishers of "orders-events" read "unavailable"
+
   @fake-broker
   Scenario: Counts are labelled as approximate
     Given a stream "orders-events" exists
@@ -71,7 +93,8 @@ Feature: Stream list
     When I search the list for "orders"
     Then only "orders-events" is listed
 
-  @fake-broker
+  # Super streams are listed by M2-07; until then this scenario is pending (tag @needs-M2, see README).
+  @fake-broker @needs-M2
   Scenario: Filter by kind
     Given a stream "audit-log" and a super stream "orders" with 3 partitions exist
     When I choose the "Super streams" filter
@@ -130,6 +153,14 @@ Feature: Stream list
     When I open the stream list with 5 streams per page
     Then I see streams 1 to 5 of 12
     And I can move to the next page
+
+  # The broker pages over all queues, so quorum queues must not hide streams or inflate the total.
+  @fake-broker
+  Scenario: Paging counts streams, not queues
+    Given the broker has 12 streams and 700 quorum queues
+    When I open the stream list with 5 streams per page
+    Then I see streams 1 to 5 of 12
+    And no quorum queue is listed
 
   @broker @gate-M2
   Scenario: Statistics agree with the Management UI
