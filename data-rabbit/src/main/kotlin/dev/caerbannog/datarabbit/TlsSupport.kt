@@ -37,10 +37,15 @@ internal object TlsSupport {
         endpointIdentificationAlgorithm = ""
     }
 
-    fun buildSslContext(caCertificatePath: String?): SSLContext {
-        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+    /**
+     * The one place that decides what is trusted, for the management client and the stream client alike: the
+     * profile's CA certificate as the ONLY anchor (the JVM roots are not added), else the JVM default store.
+     * Throws [java.io.IOException] or [java.security.GeneralSecurityException] when the file cannot be read.
+     */
+    fun trustManagerFactory(caCertificatePath: String?): TrustManagerFactory {
+        val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         if (caCertificatePath == null) {
-            trustManagerFactory.init(null as KeyStore?)
+            factory.init(null as KeyStore?)
         } else {
             val certificate = File(caCertificatePath).inputStream().use { input ->
                 CertificateFactory.getInstance("X.509").generateCertificate(input)
@@ -49,10 +54,13 @@ internal object TlsSupport {
                 load(null, null)
                 setCertificateEntry("ca-certificate", certificate)
             }
-            trustManagerFactory.init(trustStore)
+            factory.init(trustStore)
         }
-        return SSLContext.getInstance("TLS").apply {
-            init(null, trustManagerFactory.trustManagers, null)
-        }
+        return factory
     }
+
+    fun buildSslContext(caCertificatePath: String?): SSLContext =
+        SSLContext.getInstance("TLS").apply {
+            init(null, trustManagerFactory(caCertificatePath).trustManagers, null)
+        }
 }
