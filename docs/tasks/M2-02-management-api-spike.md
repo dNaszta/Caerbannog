@@ -39,7 +39,7 @@ Options:
 - B. `amqp-client` 5.37.0: can publish to and consume from a stream queue over AMQP 0-9-1, but gives no stream-protocol publishers, no `queryStreamStats`, and is a second client we will not ship. Not recommended.
 - C. No dependency: run `pivotalrabbitmq/stream-perf-test` as a second Testcontainers `GenericContainer` on a shared network to create publishers and consumers. No jar added, but a second image, TLS options unverified, no `queryStreamStats`, and offsets/consumers cannot be controlled precisely. Fallback only.
 Recommendation: A with 1.12.0, test scope. If the product owner prefers to wait for 1.13.1 to pass two weeks (after 2026-11-17), start with C or run the non-client questions first.
-What is blocked without a decision: question 2 (non-empty publisher and consumer field names and the non-admin view of real rows) and the `queryStreamStats` half of question 3. The spike can still start and complete questions 1 (management side), 4, 5, 6, 7 and the empty-case/status-code part of 2 and 3. Plainly: the spike cannot be fully completed, and `04_publishers_consumers.feature` cannot leave `@needs-spike`, without D1 (A or C).
+Nothing is blocked now: S1 is decided (A), so questions 2 and 3 run in full.
 
 **S2: Testcontainers version.** Facts: 1.21.3 pinned, 1.21.4 is the last 1.x, 2.0.5 is current (2.x renames artifacts, may change `RabbitMQContainer` package and `withPluginsEnabled`, may drop the Docker API workaround or not). A bump is a dependency change. Options: (a) stay on 1.21.3 and record the exact message (default, no decision needed); (b) bump to 1.21.4 (patch, no rename); (c) move to 2.0.5 (older than two weeks), done as a separate commit in this task only if the spike shows the warning is fixed there and the `api.version=1.43` pin still works. Recommendation: reproduce on 1.21.3, try (c) on a scratch branch, report; the product owner approves the bump in the review. No bump without approval.
 
@@ -47,16 +47,16 @@ What is blocked without a decision: question 2 (non-empty publisher and consumer
 
 ## Acceptance
 - BDD: none are run by this spike. It does not un-skip scenarios. It unblocks: `03_stream_list.feature` all scenarios (M2-04), `04_publishers_consumers.feature` (`@needs-spike` removed in M2-06 after review), `06_super_streams.feature` (M2-07), `03` `@gate-M2` (M2-09).
-- Spike tests: `StreamManagementApiSpikeTest` (and `D1` helper classes if A), tagged `broker`, run only by `./gradlew :data-rabbit:brokerTest` / `task test:broker`, excluded from `test`. Each of the seven questions has at least one assertion on a real answer (status code, field name present and its JSON type, value). Field names and types are asserted, not just printed, as in `PermissionsEndpointSpikeTest`.
+- Spike tests: `StreamManagementApiSpikeTest` (and stream-client helper classes), tagged `broker`, run only by `./gradlew :data-rabbit:brokerTest` / `task test:broker`, excluded from `test`. Each of the seven questions has at least one assertion on a real answer (status code, field name present and its JSON type, value). Field names and types are asserted, not just printed, as in `PermissionsEndpointSpikeTest`.
 - Determinism: container started once per class; unique queue names per test (UUID suffix); every queue and exchange created is deleted in `@AfterEach`; users created in `@BeforeAll` and removed in `@AfterAll`; no `Thread.sleep`. The management stats are refreshed on an interval (default 5 s): poll with a bounded `awaitUntil(timeout, interval)` helper (condition on the value, fail with the last body), never a fixed sleep. State how long the stats lag is in Status. Publish a fixed number of messages (for example 1000) and assert exact counts after the wait. Also run the class twice in a row to show it is stable (`--rerun-tasks`, twice).
 - Secrets: spike uses the throwaway admin and users of the fixture only; the trust-all `SSLContext` stays in test code, never in `src/main`. Do not log passwords.
-- No change to `core`, `ui`, `desktopApp`, to production code in `data-rabbit/src/main`, nor to any dependency, unless D1 or D2 is approved (then `data-rabbit/build.gradle.kts` only, as its own commit).
+- No change to `core`, `ui`, `desktopApp`, to production code in `data-rabbit/src/main`, nor to any dependency, except the S1 test dependency (`data-rabbit/build.gradle.kts` only, as its own first commit); a Testcontainers bump (S2) is trialled on a scratch branch only.
 - Spec: open question closed or narrowed with exact field names; new "Management API facts (M2-02 spike)" section in `docs/spec.md` with the endpoint table; the stream list, publisher/consumer and super stream sections corrected where the findings disagree (the architect edits the spec, the spike reports the findings in Status). Scenario `04` header and `@needs-spike` updated after review.
 - Status records the M2-03 inputs (below).
 
 ## M2-03 inputs this spike must deliver (list in Status, one line each)
 1. Endpoint and path for the stream list; JSON fields (name, type) for name, vhost, size, messages, consumers, publishers, leader, arguments; which can be null.
-2. Source of first and last offset (management or stream protocol), and therefore whether M2-03 needs the stream client (links to D1, and to the spec's decision on the dependency).
+2. Source of first and last offset (management or stream protocol), and therefore whether M2-03 needs the stream client (links to S1 and D4, and to the spec's decision on the dependency).
 3. Publisher and consumer endpoints and fields for M2-06, incl. offset and lag source, and the plugin-missing signature (status and body).
 4. Paging and search: server-side name filter and regex, max page size, `pagination` fields.
 5. Super stream detection and partition grouping rule.
@@ -75,7 +75,7 @@ None. Findings may change the columns in `docs/ux/Streams.dc.html` (for example 
 - Management API field names for publishers and consumers: the point of this spike. Until it is run they stay open and unverified; do not copy field names from memory into code or the spec.
 - Non-admin read of stream endpoints, search by name server side, stream client for offsets: open until this spike confirms them.
 - S1 decided, S2 decided (scratch only), S3 open (above). D1 to D7 are now defined in `docs/tasks/README.md` ("M2 decisions").
-- `rabbitmq-streams add_super_stream` availability in the image: check; if absent, creating a super stream needs a client (falls under D1) or declaring exchange, queues and bindings by hand through the API (acceptable for question 5 only if the findings say so).
+- `rabbitmq-streams add_super_stream` availability in the image: check; if absent, creating a super stream needs a client (allowed by S1) or declaring exchange, queues and bindings by hand through the API (acceptable for question 5 only if the findings say so).
 - RabbitMQ 4 tags: image tag `rabbitmq:4-management` floats. Record the exact version from `/api/overview` (`rabbitmq_version`) in Status; consider pinning (idea).
 
 ## Definition of done
