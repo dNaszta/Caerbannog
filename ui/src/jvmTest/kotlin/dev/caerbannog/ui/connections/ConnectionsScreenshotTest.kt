@@ -171,4 +171,21 @@ class ConnectionsScreenshotTest {
 
         assertWritten(snapshot("connections-04-delete-dialog.png"))
     }
+
+    // M2-01: the drawer card follows the current connection (uat-eu, green) while the panel shows prod-eu.
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `screenshot - connected card with another profile open in the panel`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(viewModel(prodEu, uatEu, ciEu)) }
+        selectProfile(1)
+        onNodeWithTag("connectButton").performScrollTo().performClick()
+        waitForIdle()
+        selectProfile(0)
+        onNodeWithText("Edit connection").performScrollTo()
+        onNodeWithTag("connectButton").assertExists()
+
+        assertWritten(snapshot("connections-05-connected.png"))
+        onNodeWithTag("connectButton").performScrollTo()
+        assertWritten(snapshot("connections-06-connect-button.png"))
+    }
 }

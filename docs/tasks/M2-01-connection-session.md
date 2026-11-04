@@ -126,4 +126,11 @@ added, spec Risks entry for last-write-wins closed (architect moves it) once mer
     must go or the new ones be moved); (b) `ensureSaved` reads `viewModel.state.value.profiles`, stale after a direct
     `repository.add`, so the Background profile is added twice (use `repository.list()`). A working patch is in the
     developer's scratchpad `steps-fix.patch` (not committed).
+- Step 4 (verify, test developer, 2026-11-04): pass. Step-side defects fixed: duplicate step phrases came from the spike runner
+  scanning every step package (glue `dev.caerbannog.acceptance`); the spike steps and runner moved to
+  `acceptance.spike` with glue narrowed, so each phrase has exactly one definition and the pending 01 `Switch between
+  connections` steps stay as they were; `ensureSaved` reads the repository. Full `./gradlew test --rerun-tasks` green: core 137,
+  ui 102, desktopApp 5, data-rabbit 17, acceptance 45 (5 skipped by design); both new `02` scenarios pass. 10 mutations plus a
+  non-atomic-update mutation all caught; 20 repeat runs of the session/view model tests green. Opt-in screenshots added
+  (`connections-05-connected.png`, `-06-connect-button.png`).
 
