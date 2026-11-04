@@ -126,6 +126,38 @@ class ConnectionsViewModelSingleStateTest {
         assertTrue(violations.isEmpty(), "inconsistent view model states (${violations.size}): ${violations.take(5)}")
     }
 
+    @Test
+    fun `after concurrent session changes the view model state equals the final session state`() = runBlocking {
+        val session = newSession()
+        val vm = newVm(session)
+        repeat(ROUNDS) {
+            val writers = profiles.map { profile ->
+                async(Dispatchers.Default) {
+                    session.select(profile.name)
+                    session.open(profile)
+                    if (profile.name != "a") session.forget(profile.name)
+                }
+            }
+            withTimeout(TIMEOUT_MS) { writers.awaitAll() }
+            val final = session.state.value
+            assertEquals(final.statuses, vm.state.value.permissionChecks, "view model lost or kept a stale session change (round $it)")
+            assertEquals(final.current, vm.state.value.currentConnection, "view model current differs from the session (round $it)")
+            session.forget("a")
+        }
+    }
+
+    @Test
+    fun `after close the view model no longer follows the session`() {
+        val session = newSession()
+        val vm = newVm(session)
+        session.select("a")
+        assertEquals("a", vm.state.value.currentConnection?.name)
+        vm.close()
+        session.select("b")
+        assertEquals("a", vm.state.value.currentConnection?.name, "a closed view model must not follow the session")
+        vm.close() // closing twice is harmless
+    }
+
     private companion object {
         const val ROUNDS = 2_000
         const val TIMEOUT_MS = 30_000L
