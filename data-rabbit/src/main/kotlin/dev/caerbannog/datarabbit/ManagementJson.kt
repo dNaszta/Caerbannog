@@ -61,13 +61,15 @@ internal object ManagementJson {
         CatalogResult.Success(summary(obj))
     }
 
+    // Measured against RabbitMQ 4 (M2-03 broker run): for a few seconds after a client attaches the row carries
+    // `"connection_details":{}` and zero counters, so the connection name is "" until the broker fills it in.
     fun parsePublishers(body: String): CatalogResult<List<PublisherRow>> = guarded(body) { root ->
         CatalogResult.Success(
             root.asArray().map { it.asObject() }.map { row ->
-                val connection = row["connection_details"].asObject()
+                val connection = row["connection_details"] as? JsonObject
                 PublisherRow(
-                    connectionName = connection.requiredString("name"),
-                    user = connection.string("user"),
+                    connectionName = connection?.string("name").orEmpty(),
+                    user = connection?.string("user"),
                     publisherId = row.requiredInt("publisher_id"),
                     reference = row.string("reference"),
                     published = row.long("published") ?: 0,
@@ -83,10 +85,10 @@ internal object ManagementJson {
         val rows = root.asArray().map { it.asObject() }
             .filter { it["queue"].asObject().requiredString("name") == stream }
             .map { row ->
-                val connection = row["connection_details"].asObject()
+                val connection = row["connection_details"] as? JsonObject
                 ConsumerRow(
-                    connectionName = connection.requiredString("name"),
-                    user = connection.string("user"),
+                    connectionName = connection?.string("name").orEmpty(),
+                    user = connection?.string("user"),
                     subscriptionId = row.requiredInt("subscription_id"),
                     name = (row["properties"] as? JsonObject)?.string("name"),
                     active = (row["active"] as? JsonPrimitive)?.booleanOrNull ?: false,

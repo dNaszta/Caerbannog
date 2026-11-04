@@ -381,6 +381,24 @@ class RealBrokerCatalogTest {
         assertTrue(held.catalog.listStreams(StreamListRequest()) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
     }
 
+    // ---- stream side TLS (added by the developer at the build, brief part 2 step 2 note 3) ----
+
+    @Test
+    fun `the stream client refuses a server certificate the profile CA did not issue, and trusts the one that did`() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(rabbit.isRunning, "no broker container")
+        val name = unique("tls-")
+        publish(createStream(name), name, 1)
+
+        StreamEnvironments(profile(ca = caPath), rabbit.adminPassword, TlsSupport.trustManagerFactory(caPath)).use {
+            assertEquals(FirstOffset.Value(0), FirstOffsetMapper.map { it.read("/", name) }, "control: the right CA works on the stream port")
+        }
+        StreamEnvironments(profile(ca = wrongCaPath), rabbit.adminPassword, TlsSupport.trustManagerFactory(wrongCaPath)).use {
+            val refused = runCatching { it.read("/", name) }.exceptionOrNull()
+            assertTrue(refused != null, "a wrong CA must stop the stream connection, nothing may be read")
+            assertEquals(FirstOffset.Unavailable, FirstOffsetMapper.map { it.read("/", name) })
+        }
+    }
+
     // ---- no plugin ----
 
     @Test

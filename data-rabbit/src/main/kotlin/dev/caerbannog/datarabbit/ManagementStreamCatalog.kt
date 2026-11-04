@@ -57,11 +57,14 @@ internal class ManagementStreamCatalog(
         }
     }
 
-    // A 404 on a per-stream path means either a missing plugin or a missing stream: the top-level probe tells.
+    // Without the plugin a per-stream path answers 400 (measured, spec "Management API facts"); with the plugin a
+    // missing stream answers 404. Either way the top-level probe tells whether the plugin is the reason.
     private suspend fun <T> callPerStream(url: String, parse: (String) -> CatalogResult<T>): CatalogResult<T> {
         val result = call(url, on404 = CatalogResult.NotFound, parse)
-        if (result != CatalogResult.NotFound) return result
-        return if (probePlugin() == PluginStatus.MISSING) CatalogResult.PluginMissing else CatalogResult.NotFound
+        if (result != CatalogResult.NotFound && result != CatalogResult.BadPaging) return result
+        if (probePlugin() == PluginStatus.MISSING) return CatalogResult.PluginMissing
+        // A 400 with the plugin present is not a paging error here: nothing was paged.
+        return if (result == CatalogResult.BadPaging) CatalogResult.Unexpected else result
     }
 
     private suspend fun <T> call(url: String, on404: CatalogResult.Failure, parse: (String) -> CatalogResult<T>): CatalogResult<T> =
