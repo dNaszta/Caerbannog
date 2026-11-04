@@ -83,7 +83,7 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
 
 ## Status
 
-- Step: 2 (tests written and committed; red run NOT yet observed - see note; ready for senior developer once red is confirmed)
+- Step: 3 (production fixes done; 3 UI tests still red because of test defects, see Build note; blocked on test developer)
 - Round: 1
 - Branch: `m1-04-connections-screen-feedback-gaps`
 - Order note (architect, 2026-11-04): picked before `M1-05` because it is corrective to already-accepted
@@ -97,3 +97,12 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
   could not be executed in the test developer's sandbox (Gradle test-executor process spawn blocked), so
   failing-for-the-right-reason is unconfirmed; expected failures are "node with text ... does not exist"
   (collision) and "expected no node, found banner" (the two stale-banner cases).
+- Build (senior developer, step 3): red confirmed (assertion errors). Production done: `EditPanel` renders
+  `NameAlreadyExists` as an error banner (`ErrorBanner`, shared with the check-connection error);
+  `selectConnection`/`startNewConnection` clear check, save and CA results; `refreshAfter` already sets
+  `lastSaveResult` for add, update and rename. Also made the edit panel `verticalScroll`: at the test
+  window (1024x768) it is taller than the window, so the banner and buttons were off-screen.
+  The three tests still fail for TEST reasons, not production: (1) `onNodeWithText("New connection")` matches
+  two nodes (sidebar button and panel title) in the collision test; (2) clicks on "Check connection" and
+  "Save" land off-screen, so need `performScrollTo()` first. With those test edits (patch kept at
+  scratchpad `test-fix.patch`) all 6 tests pass. Test developer to apply.

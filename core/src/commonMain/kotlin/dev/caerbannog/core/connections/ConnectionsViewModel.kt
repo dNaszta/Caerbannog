@@ -139,12 +139,19 @@ class ConnectionsViewModel(
     // rest of this view model - see docs/tasks/M1-02-connection-profiles.md's Design notes, decision 4.
 
     fun selectConnection(name: String) {
-        _state.update { it.copy(selectedProfileName = name) }
+        _state.update { it.copy(selectedProfileName = name).withoutResultBanners() }
     }
 
     fun startNewConnection() {
-        _state.update { it.copy(selectedProfileName = null) }
+        _state.update { it.copy(selectedProfileName = null).withoutResultBanners() }
     }
+
+    // Banners belong to the profile they were produced for; a switch must not carry them over.
+    private fun ConnectionsState.withoutResultBanners(): ConnectionsState = copy(
+        lastCheckResult = null,
+        lastSaveResult = null,
+        lastCaCertificateValidationResult = null,
+    )
 
     private fun storePasswordIfPresent(name: String, password: String?) {
         if (!password.isNullOrBlank()) secretStore.store(name, password)

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,6 +38,7 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import kotlinx.coroutines.launch
 
@@ -154,7 +157,8 @@ private fun EditPanel(
     var password by remember(selected?.name) { mutableStateOf("") }
     var caCertificatePath by remember(selected?.name) { mutableStateOf(selected?.caCertificatePath.orEmpty()) }
 
-    Column(modifier = modifier) {
+    // Scrollable: the panel is taller than a small window, which would push the banners and Save off-screen.
+    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -206,6 +210,11 @@ private fun EditPanel(
         state.lastCheckResult?.let { result ->
             Spacer(modifier = Modifier.height(8.dp))
             CheckConnectionBanner(result)
+        }
+
+        (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
+            Spacer(modifier = Modifier.height(8.dp))
+            ErrorBanner("A connection named '${collision.name}' already exists.")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -278,10 +287,16 @@ private fun CheckConnectionBanner(result: ConnectionCheckResult) {
         is ConnectionCheckResult.TlsRefused ->
             "The connection was refused. The app does not connect without TLS."
     }
-    val isError = result !is ConnectionCheckResult.BothReachable
-    Surface(color = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer) {
-        Text(text, modifier = Modifier.padding(12.dp))
+    if (result is ConnectionCheckResult.BothReachable) {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) { Text(text, modifier = Modifier.padding(12.dp)) }
+    } else {
+        ErrorBanner(text)
     }
+}
+
+@Composable
+private fun ErrorBanner(text: String) {
+    Surface(color = MaterialTheme.colorScheme.errorContainer) { Text(text, modifier = Modifier.padding(12.dp)) }
 }
 
 @Composable
