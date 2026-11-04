@@ -259,7 +259,7 @@ class PermissionCheckSteps {
     // --- M2-01: overlapping checks, current connection ------------------------------------------
 
     private fun ensureSaved(name: String) {
-        if (viewModel.state.value.profiles.none { it.name == name }) {
+        if (repository.list().none { it.name == name }) {
             val saved = ConnectionProfile(name = name, host = "rabbit.example", virtualHost = "/", username = "svc-explorer")
             check(repository.add(saved) is SaveConnectionResult.Saved)
             secretStore.store(name, "s3cret-for-$name")
