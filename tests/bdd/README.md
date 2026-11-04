@@ -41,6 +41,8 @@ tests/bdd/
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
 | `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
 | `@needs-M2` | Step definitions exist and compile but are deliberately left pending (`PendingException`) because the scenario needs a later milestone's feature (currently only "Switch between connections" in `01`, needs M2's stream list); excluded from the default Cucumber run |
+| `@needs-M1-07` | Needs the permission-state UI (sidebar "Topology locked" pill, topology screen explanation) from task `M1-07`; no step definitions until that task starts; excluded from the default Cucumber run |
+| `@needs-M1-06` | Needs declared permissions on the connection profile (model field persisted in the profile JSON, edit panel fields) from task `M1-06`; no step definitions until that task starts; excluded from the default Cucumber run |
 
 Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@broker` in a separate CI job.
 
@@ -70,10 +72,11 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 
 ## Open points that affect these tests
 
-- How a non-administrator user's own permissions are read (`02`, `@needs-spike`).
 - Exact fields of the stream publisher and consumer endpoints (`04`, `@needs-spike`).
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
 - Whether streams are found by name through the same API call as queues (`11`, `@needs-spike`).
+
+Resolved: how a non-administrator user's own permissions are read (`02`): they cannot be; safest mode by default, plus optional permissions declared on the profile (`docs/spec.md`, "Broker-read permission").
 
 Resolved: whether the broker's configure permission alone is a sufficient guardrail. Resolved by the
 self-constraint level (`docs/spec.md`, "Topology migrations and permission guardrails"): the app adds its own

@@ -10,3 +10,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M1-04-connections-screen-feedback-gaps | Connections screen: surface save errors, clear stale banners | M1 | not started |
 | M1-05-wire-desktopapp-connections | Wire desktopApp to the real Connections screen | M1 | not started |
 | M1-TASKFILE-02-test-task-runs-all-modules | `./gradlew test` / `task test` must also run core and ui `jvmTest` | M1 | done (architect: Accepted, 2026-11-04; branch not yet merged to `main`) |
+| M1-03-permission-check | Permission check: read the user's vhost permissions, lock topology and test publishing, safe fallback | M1 | done (accepted with follow-ups, round 1; not yet merged) |
+| M1-06-profile-declared-permissions | Declared permissions on the profile: model persistence (back-compat), setter, edit panel fields | M1 | not started (after M1-03) |
+| M1-07-permission-state-ui | Permission state in the UI: sidebar pill, banner, declared vs verified wording | M1 | not started (after M1-03, M1-05) |
+| M1-09-permission-check-hardening | Permission check hardening: no exception leaves the check, thread-safe results | M1 | not started (after M1-03, before M1-07) |

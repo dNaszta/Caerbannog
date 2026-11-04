@@ -38,22 +38,22 @@ Feature: Permission check before the first connection
     Then the permission check runs again
     And topology changes are locked
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: A locked connection says so in the sidebar and on topology screens
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
     Then the sidebar shows "Topology locked" next to "prod-eu"
     And the topology screen explains that the user has no configure permission on virtual host "/"
 
-  @fake-broker
+  @fake-broker @needs-M2
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
     Then I can list streams and browse their messages
 
-  @needs-spike @fake-broker
-  # Open question: can a non-administrator read their own permissions through the management API?
-  # Expected behavior until confirmed: fall back to the safest mode.
+  @fake-broker
+  # Spike result: only administrators can read permissions through the management API, so this is the
+  # normal case for a stream user. Safest mode is the default when nothing is declared on the profile.
   Scenario: Permissions cannot be read for this user
     Given the management API refuses to return the user's permissions
     When the permission check runs
@@ -61,6 +61,65 @@ Feature: Permission check before the first connection
     And topology changes are locked
     And test publishing is disabled
     And streams can still be listed and browsed
+
+  @fake-broker
+  Scenario Outline: Declared permissions are used when permissions cannot be read
+    Given the profile "prod-eu" declares configure "<configure>" and write "<write>"
+    And the management API refuses to return the user's permissions
+    When the permission check runs
+    Then the app tells me that permissions could not be read
+    And the app says these permissions are declared by me, not confirmed by the broker
+    And topology changes are <topology>
+    And test publishing is <publishing>
+    And streams can still be listed and browsed
+
+    Examples:
+      | configure | write | topology | publishing |
+      | yes       | yes   | unlocked | enabled    |
+      | no        | yes   | locked   | enabled    |
+      | yes       | no    | unlocked | disabled   |
+      | no        | no    | locked   | disabled   |
+
+  @fake-broker
+  Scenario: What the broker says wins over declared permissions
+    Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the user has these permissions on "/": configure "", write "", read ".*"
+    When the permission check runs
+    Then topology changes are locked
+    And test publishing is disabled
+    And the app says these permissions were read from the broker
+
+  @fake-broker
+  Scenario: Declared permissions do not help when the password is missing
+    Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And no password is stored for "prod-eu"
+    When the permission check runs
+    Then the app tells me that permissions could not be read
+    And topology changes are locked
+    And test publishing is disabled
+
+  @fake-broker @needs-M1-06
+  Scenario: Declared permissions are saved with the profile
+    Given I edit the profile "prod-eu"
+    When I declare that the user can change topology and can publish
+    And I save the profile
+    And I reopen the saved profile "prod-eu"
+    Then the profile declares configure "yes" and write "yes"
+
+  @fake-broker @needs-M1-06
+  Scenario: A profile saved before declarations existed has none
+    Given a saved profile file from before declared permissions existed
+    When the profiles are loaded
+    Then "prod-eu" declares nothing
+    And the permission check, if it cannot read permissions, uses the safest mode
+
+  @fake-broker @needs-M1-07
+  Scenario: Declared permissions are shown as the user's own claim
+    Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the management API refuses to return the user's permissions
+    When I connect to "prod-eu"
+    Then the sidebar shows "Topology unlocked (declared)" next to "prod-eu"
+    And the topology screen says the broker could not confirm the permissions and still enforces its own
 
   @broker
   Scenario: The broker has the final say

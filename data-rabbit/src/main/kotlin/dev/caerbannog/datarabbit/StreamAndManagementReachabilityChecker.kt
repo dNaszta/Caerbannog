@@ -4,25 +4,16 @@ import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.Endpoint
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.java.Java
 import io.ktor.client.request.get
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.HttpStatusCode
-import java.io.File
 import java.io.IOException
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
-import java.time.Duration
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
-import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLSocket
-import javax.net.ssl.TrustManagerFactory
 
 /**
  * Real [BrokerReachabilityChecker]: a raw TLS handshake on the stream port, plus an HTTPS call to the
@@ -48,7 +39,7 @@ class StreamAndManagementReachabilityChecker(
 
     override suspend fun check(profile: ConnectionProfile): ConnectionCheckResult {
         val sslContext = try {
-            buildSslContext(profile.caCertificatePath)
+            TlsSupport.buildSslContext(profile.caCertificatePath)
         } catch (e: Exception) {
             return ConnectionCheckResult.EndpointUnreachable(
                 Endpoint.STREAM,
@@ -66,7 +57,7 @@ class StreamAndManagementReachabilityChecker(
                 raw.connect(InetSocketAddress(profile.host, profile.streamPort), connectTimeoutMillis.toInt())
                 val ssl = sslContext.socketFactory.createSocket(raw, profile.host, profile.streamPort, true) as SSLSocket
                 ssl.use {
-                    it.sslParameters = permissiveSslParameters()
+                    it.sslParameters = TlsSupport.permissiveSslParameters()
                     it.soTimeout = connectTimeoutMillis.toInt()
                     it.startHandshake()
                 }
@@ -87,7 +78,7 @@ class StreamAndManagementReachabilityChecker(
     }
 
     private suspend fun checkManagementEndpoint(profile: ConnectionProfile, sslContext: SSLContext): ConnectionCheckResult {
-        val client = buildHttpClient(sslContext)
+        val client = TlsSupport.buildHttpClient(sslContext, connectTimeoutMillis)
         try {
             client.get("https://${profile.host}:${profile.managementPort}/api/overview")
         } catch (e: SSLException) {
@@ -113,7 +104,7 @@ class StreamAndManagementReachabilityChecker(
      * scenario this task proves stay the same.
      */
     private suspend fun checkStreamManagementPlugin(profile: ConnectionProfile, sslContext: SSLContext): ConnectionCheckResult {
-        val client = buildHttpClient(sslContext)
+        val client = TlsSupport.buildHttpClient(sslContext, connectTimeoutMillis)
         try {
             val response = client.get("https://${profile.host}:${profile.managementPort}/api/stream/connections")
             return if (response.status == HttpStatusCode.NotFound) {
@@ -127,45 +118,6 @@ class StreamAndManagementReachabilityChecker(
             return ConnectionCheckResult.EndpointUnreachable(Endpoint.MANAGEMENT, e.message ?: "unreachable")
         } finally {
             client.close()
-        }
-    }
-
-    private fun buildHttpClient(sslContext: SSLContext): HttpClient = HttpClient(Java) {
-        expectSuccess = false
-        engine {
-            config {
-                sslContext(sslContext)
-                sslParameters(permissiveSslParameters())
-                connectTimeout(Duration.ofMillis(connectTimeoutMillis))
-            }
-        }
-        install(HttpTimeout) {
-            connectTimeoutMillis = this@StreamAndManagementReachabilityChecker.connectTimeoutMillis
-            requestTimeoutMillis = this@StreamAndManagementReachabilityChecker.connectTimeoutMillis
-        }
-    }
-
-    /** No hostname/CN verification - see this class's header for why that is out of scope here. */
-    private fun permissiveSslParameters(): SSLParameters = SSLParameters().apply {
-        endpointIdentificationAlgorithm = ""
-    }
-
-    private fun buildSslContext(caCertificatePath: String?): SSLContext {
-        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        if (caCertificatePath == null) {
-            trustManagerFactory.init(null as KeyStore?)
-        } else {
-            val certificate = File(caCertificatePath).inputStream().use { input ->
-                CertificateFactory.getInstance("X.509").generateCertificate(input)
-            }
-            val trustStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-                load(null, null)
-                setCertificateEntry("ca-certificate", certificate)
-            }
-            trustManagerFactory.init(trustStore)
-        }
-        return SSLContext.getInstance("TLS").apply {
-            init(null, trustManagerFactory.trustManagers, null)
         }
     }
 }
