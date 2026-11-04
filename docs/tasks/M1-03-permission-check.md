@@ -222,3 +222,11 @@ id; (d) confirmed, `^$` counts as present.
 - `RealBrokerPermissionCheckTest`: constructor and cause mapping as above (401 `NOT_AUTHORIZED`, refused `UNREACHABLE`).
 - Spike test and its recorded findings stay as they are.
 
+
+### Step 2b (test developer, after decision D)
+Tests changed to the Final contract: `PermissionFakes`/`PermissionCheckSteps` (cause `NOT_AUTHORIZED`, userMessage prefix,
+declared / no-password / DeclaredByUser / Checked steps), runner filter excludes `@needs-M1-06`, `PermissionDecisionTest`
+(`^$`, `decideDeclared`, userMessage prefix for every cause), `ConnectionSessionTest` (override rules, usable-while-checking),
+new `ConnectionsViewModelPermissionTest` (saveProfileChanges rules), `RealBrokerPermissionCheckTest` (cause mapping,
+adapter never returns `DeclaredByUser`). Spike test unchanged. Red: missing `declaredPermissions`, `DeclaredPermissions`,
+`UnreadableCause`, `decideDeclared`, `ConnectionSession`, `saveProfileChanges`, `ManagementApiPermissionChecker`.

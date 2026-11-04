@@ -9,8 +9,10 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.SaveConnectionResult
+import dev.caerbannog.core.connections.UnreadableCause
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -19,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.fail
 
 /**
  * Steps for tests/bdd/features/02_permission_check.feature (M1-03). No step exists for the scenarios
@@ -28,7 +31,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * core types BrokerPermissions, PermissionCheckResult (with topologyUnlocked, publishingEnabled,
  * canBrowseStreams on the sealed type), PermissionChecker, decidePermissions, ConnectionSession, and a
  * suspend `ConnectionsViewModel.saveProfileChanges(originalName, input)` that saves like updateConnection
- * and, on success, re-runs the check through the session. Red state: those types do not exist yet.
+ * and, on success, re-runs the check through the session; DeclaredPermissions/UnreadableCause per the
+ * brief's "Final contract". Red state: those types do not exist yet.
  */
 class PermissionCheckSteps {
 
@@ -70,7 +74,7 @@ class PermissionCheckSteps {
 
     @Given("the management API refuses to return the user's permissions")
     fun theManagementApiRefuses() {
-        broker.refusal = "permissions could not be read: the management API refused (HTTP 401)"
+        broker.refusal = UnreadableCause.NOT_AUTHORIZED
     }
 
     @Given("I am connected to {string} and the user has configure permission")
@@ -136,12 +140,41 @@ class PermissionCheckSteps {
 
     @Then("the app tells me that permissions could not be read")
     fun appTellsUnreadable() {
-        val r = result
-        assertTrue(r is PermissionCheckResult.Unreadable, "expected Unreadable, got $r")
+        val unreadable = when (val r = result) {
+            is PermissionCheckResult.Unreadable -> r
+            is PermissionCheckResult.DeclaredByUser -> r.unreadable
+            else -> fail("expected permissions that could not be read, got $r")
+        }
         assertTrue(
-            (r as PermissionCheckResult.Unreadable).reason.contains("permissions could not be read"),
-            "the reason shown to the user must say permissions could not be read, got '${r.reason}'",
+            unreadable.userMessage.startsWith("Permissions could not be read"),
+            "the message shown to the user must start with 'Permissions could not be read', got '${unreadable.userMessage}'",
         )
+    }
+
+    @Given("the profile {string} declares configure {string} and write {string}")
+    fun profileDeclares(name: String, configure: String, write: String) {
+        assertEquals(profile.name, name)
+        profile = profile.copy(
+            declaredPermissions = DeclaredPermissions(configure = configure == "yes", write = write == "yes"),
+        )
+        // the session is handed the profile as the repository holds it
+        check(repository.update(profile) is SaveConnectionResult.Saved)
+    }
+
+    @Given("no password is stored for {string}")
+    fun noPasswordStored(name: String) {
+        secretStore.delete(name)
+        assertEquals(null, secretStore.retrieve(name), "precondition: no password stored")
+    }
+
+    @Then("the app says these permissions are declared by me, not confirmed by the broker")
+    fun declaredByUser() {
+        assertTrue(result is PermissionCheckResult.DeclaredByUser, "expected DeclaredByUser, got $result")
+    }
+
+    @Then("the app says these permissions were read from the broker")
+    fun readFromBroker() {
+        assertTrue(result is PermissionCheckResult.Checked, "expected Checked, got $result")
     }
 
     // Capability flag only: no stream list exists yet (M2), so this asserts that the check result does not

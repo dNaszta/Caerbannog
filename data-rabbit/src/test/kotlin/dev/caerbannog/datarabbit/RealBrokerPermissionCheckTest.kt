@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.PermissionCheckResult
+import dev.caerbannog.core.connections.UnreadableCause
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -113,21 +114,24 @@ class RealBrokerPermissionCheckTest {
             val u = user(tag, "pw-user")
             ctl("set_permissions", "-p", vh, u, ".*", ".*", ".*")
             val result = check(profile(vh, u), "pw-user")
-            assertTrue(result is PermissionCheckResult.Unreadable, "tag=$tag: expected Unreadable, got $result")
+            assertEquals(UnreadableCause.NOT_AUTHORIZED, (result as? PermissionCheckResult.Unreadable)?.cause, "tag=$tag: got $result")
             assertFalse(result.topologyUnlocked, "tag=$tag")
             assertFalse(result.publishingEnabled, "tag=$tag")
         }
     }
 
     @Test
-    fun `a wrong password is Unreadable and the reason does not contain the password`() {
+    fun `a wrong password is Unreadable and nothing shown contains the contain the password`() {
         val vh = vhost()
         val admin = user("administrator", "pw-admin")
         ctl("set_permissions", "-p", vh, admin, ".*", ".*", ".*")
         val result = check(profile(vh, admin), "wrong-password-xyz")
         assertTrue(result is PermissionCheckResult.Unreadable, "got $result")
-        assertFalse((result as PermissionCheckResult.Unreadable).reason.contains("wrong-password-xyz"))
-        assertFalse(result.reason.contains("pw-admin"))
+        // a wrong password and a missing right both come back as 401: same cause (see brief)
+        assertEquals(UnreadableCause.NOT_AUTHORIZED, (result as PermissionCheckResult.Unreadable).cause)
+        for (text in listOf(result.detail.orEmpty(), result.userMessage, result.toString())) {
+            assertFalse(text.contains("wrong-password-xyz"), "password leaked: $text")
+        }
     }
 
     @Test
@@ -136,15 +140,28 @@ class RealBrokerPermissionCheckTest {
         val admin = user("administrator", "pw-admin")
         // no set_permissions: GET /api/permissions/{vhost}/{user} answers 404
         val result = check(profile(vh, admin), "pw-admin")
+        assertEquals(UnreadableCause.NOT_FOUND, (result as? PermissionCheckResult.Unreadable)?.cause, "got $result")
         assertFalse(result.topologyUnlocked, "got $result")
         assertFalse(result.publishingEnabled, "got $result")
     }
 
     @Test
-    fun `a refused connection is Unreadable, not an exception`() {
+    fun `a refused connection is Unreadable UNREACHABLE, not an exception`() {
         val freePort = ServerSocket(0).use { it.localPort }
         val result = check(profile("/", "guest", managementPort = freePort), "guest")
-        assertTrue(result is PermissionCheckResult.Unreadable, "got $result")
+        assertEquals(UnreadableCause.UNREACHABLE, (result as? PermissionCheckResult.Unreadable)?.cause, "got $result")
         assertFalse(result.topologyUnlocked)
+    }
+
+    @Test
+    fun `the adapter never returns DeclaredByUser, even for a profile with a declaration`() {
+        val vh = vhost()
+        val u = user(null, "pw-user")
+        ctl("set_permissions", "-p", vh, u, ".*", ".*", ".*")
+        val declared = profile(vh, u).copy(
+            declaredPermissions = dev.caerbannog.core.connections.DeclaredPermissions(configure = true, write = true),
+        )
+        val result = check(declared, "pw-user")
+        assertTrue(result is PermissionCheckResult.Unreadable, "the override is the session's job, got $result")
     }
 }

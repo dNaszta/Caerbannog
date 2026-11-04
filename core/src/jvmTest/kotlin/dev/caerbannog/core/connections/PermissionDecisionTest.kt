@@ -60,9 +60,42 @@ class PermissionDecisionTest {
 
     @Test
     fun `unreadable permissions are never unlocked and never enabled`() {
-        val unreadable: PermissionCheckResult = PermissionCheckResult.Unreadable("permissions could not be read")
+        val unreadable: PermissionCheckResult = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
         assertFalse(unreadable.topologyUnlocked)
         assertFalse(unreadable.publishingEnabled)
         assertTrue(unreadable.canBrowseStreams, "reading streams never needs configure or write")
+    }
+
+    @Test
+    fun `an exactly empty string means none and anything else means present`() {
+        assertFalse(decide("", "").topologyUnlocked)
+        assertTrue(decide("^$", "").topologyUnlocked)
+        assertTrue(decide(" ", " ").publishingEnabled, "not exactly empty: present, the broker has the final say")
+    }
+
+    private val unreadable = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED, "HTTP 401")
+
+    private fun declared(configure: Boolean, write: Boolean) =
+        decideDeclared(DeclaredPermissions(configure = configure, write = write), unreadable)
+
+    @Test
+    fun `declared permissions map to the four combinations and carry the unreadable result`() {
+        assertEquals(PermissionCheckResult.DeclaredByUser(true, true, unreadable), declared(true, true))
+        assertEquals(PermissionCheckResult.DeclaredByUser(false, true, unreadable), declared(false, true))
+        assertEquals(PermissionCheckResult.DeclaredByUser(true, false, unreadable), declared(true, false))
+        assertEquals(PermissionCheckResult.DeclaredByUser(false, false, unreadable), declared(false, false))
+    }
+
+    @Test
+    fun `the unreadable message starts with the fixed wording for every cause`() {
+        for (cause in UnreadableCause.values()) {
+            val message = PermissionCheckResult.Unreadable(cause).userMessage
+            assertTrue(message.startsWith("Permissions could not be read"), "$cause: '$message'")
+        }
+    }
+
+    @Test
+    fun `a declaration never lets browsing depend on it`() {
+        assertTrue(declared(false, false).canBrowseStreams)
     }
 }

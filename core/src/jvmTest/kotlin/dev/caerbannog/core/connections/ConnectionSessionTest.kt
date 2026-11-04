@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *   suspend fun reopen(profile): PermissionCheckResult // drops the stored result, checks again
  *   fun isUsable(profileName): Boolean
  *   fun permissions(profileName): PermissionCheckResult?
- * Results are kept per profile name; nothing global. Red state: types do not exist yet.
+ * Final contract and rules: docs/tasks/M1-03-permission-check.md. Red state: types do not exist yet.
  */
 class ConnectionSessionTest {
 
@@ -60,7 +60,7 @@ class ConnectionSessionTest {
     fun `a missing stored password is Unreadable, not an exception and not unlocked`() = runBlocking {
         val checker = RecordingChecker(unlocked)
         val result = ConnectionSession(checker, MapSecretStore(emptyMap())).open(profile)
-        assertTrue(result is PermissionCheckResult.Unreadable, "got $result")
+        assertEquals(PermissionCheckResult.Unreadable(UnreadableCause.NO_PASSWORD), result)
         assertFalse(result.topologyUnlocked)
         assertTrue(checker.calls.isEmpty(), "must not call the broker without a password")
     }
@@ -68,7 +68,7 @@ class ConnectionSessionTest {
     @Test
     fun `an unreadable check still leaves the connection usable but in safest mode`() = runBlocking {
         val session = ConnectionSession(
-            RecordingChecker(PermissionCheckResult.Unreadable("permissions could not be read")),
+            RecordingChecker(PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)),
             MapSecretStore(mapOf("prod-eu" to "pw")),
         )
         session.open(profile)
@@ -97,5 +97,69 @@ class ConnectionSessionTest {
         session.open(profile)
         assertFalse(session.isUsable("dev"))
         assertNull(session.permissions("dev"))
+    }
+
+    // --- declared permissions override (decision D) ---
+
+    private val refused = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+    private val declaring = profile.copy(declaredPermissions = DeclaredPermissions(configure = true, write = false))
+    private val secrets = MapSecretStore(mapOf("prod-eu" to "pw"))
+
+    @Test
+    fun `a declaration is applied when the check is unreadable`() = runBlocking {
+        val session = ConnectionSession(RecordingChecker(refused), secrets)
+        assertEquals(PermissionCheckResult.DeclaredByUser(true, false, refused), session.open(declaring))
+        assertEquals(PermissionCheckResult.DeclaredByUser(true, false, refused), session.permissions("prod-eu"))
+    }
+
+    @Test
+    fun `a declaration never replaces what the broker said`() = runBlocking {
+        val broker = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = false)
+        val session = ConnectionSession(RecordingChecker(broker), secrets)
+        assertEquals(broker, session.open(declaring.copy(declaredPermissions = DeclaredPermissions(true, true))))
+    }
+
+    @Test
+    fun `a declaration is not applied when no password is stored`() = runBlocking {
+        val checker = RecordingChecker(unlocked)
+        val result = ConnectionSession(checker, MapSecretStore(emptyMap())).open(declaring)
+        assertEquals(PermissionCheckResult.Unreadable(UnreadableCause.NO_PASSWORD), result)
+        assertTrue(checker.calls.isEmpty())
+    }
+
+    @Test
+    fun `without a declaration an unreadable result stays unreadable`() = runBlocking {
+        assertEquals(refused, ConnectionSession(RecordingChecker(refused), secrets).open(profile))
+    }
+
+    @Test
+    fun `the declaration of one profile does not leak to another`() = runBlocking {
+        val other = profile.copy(name = "dev")
+        val session = ConnectionSession(RecordingChecker(refused), MapSecretStore(mapOf("prod-eu" to "a", "dev" to "b")))
+        session.open(declaring)
+        assertEquals(refused, session.open(other))
+        assertTrue(session.permissions("prod-eu") is PermissionCheckResult.DeclaredByUser)
+    }
+
+    @Test
+    fun `the connection is not usable while the check runs`() = runBlocking {
+        lateinit var session: ConnectionSession
+        var usableDuring: Boolean? = null
+        var permissionsDuring: PermissionCheckResult? = null
+        val checker = object : PermissionChecker {
+            override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
+                usableDuring = session.isUsable("prod-eu")
+                permissionsDuring = session.permissions("prod-eu")
+                return unlocked
+            }
+        }
+        session = ConnectionSession(checker, secrets)
+        session.open(profile)
+        assertEquals(false, usableDuring)
+        assertNull(permissionsDuring)
+        // and again on a re-check: the earlier result is cleared first
+        session.reopen(profile)
+        assertEquals(false, usableDuring, "reopen must clear the stored result before asking the broker")
+        assertNull(permissionsDuring)
     }
 }
