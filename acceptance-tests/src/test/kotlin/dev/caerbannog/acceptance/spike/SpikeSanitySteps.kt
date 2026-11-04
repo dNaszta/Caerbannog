@@ -1,4 +1,4 @@
-package dev.caerbannog.acceptance
+package dev.caerbannog.acceptance.spike
 
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
  * M1-01 skeleton spike, Acceptance item 4: "One trivial Cucumber-JVM scenario (Kotlin steps) runs
  * and passes outside the canonical `tests/bdd/features/` tree."
  *
+ * (M2-01: lives in its own package so the spike runner glue does not scan the other step packages.)
  * Step definitions for the throwaway spike_sanity.feature only. Deliberately has nothing to do with
  * Caerbannog's domain - the fixture is a plain counter.
  *

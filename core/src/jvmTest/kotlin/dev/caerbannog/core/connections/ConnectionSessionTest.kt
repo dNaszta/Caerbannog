@@ -1,12 +1,10 @@
 package dev.caerbannog.core.connections
 
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -270,37 +268,244 @@ class ConnectionSessionTest {
         }
     }
 
-    @Test
-    fun `for the same profile the check that finishes last wins`() = runBlocking {
-        val first = PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true)
-        val second = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = false)
-        val started = listOf(CompletableDeferred<Unit>(), CompletableDeferred())
-        val gates = listOf(CompletableDeferred<Unit>(), CompletableDeferred())
-        val results = listOf(first, second)
-        val calls = AtomicInteger()
-        val checker = object : PermissionChecker {
-            override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
-                val n = calls.getAndIncrement()
-                started[n].complete(Unit)
-                gates[n].await()
-                return results[n]
-            }
-        }
-        val session = ConnectionSession(checker, secrets)
+    // --- M2-01: the latest STARTED check per profile name wins ---------------------------------------
+    // Replaces the M1-09 test "for the same profile the check that finishes last wins", which pinned the
+    // behaviour the spec Risks entry calls a bug. Gated checker: no sleeps. What `open` returns for a
+    // superseded check is not asserted (brief leaves it open); the session state is.
 
+    private val allowed = PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true)
+    private val locked = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = false)
+    private val twoNames = MapSecretStore(mapOf("prod-eu" to "pw", "dev" to "pw2"))
+
+    @Test
+    fun `an older check finishing last does not overwrite the newer result`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, secrets)
         withTimeout(10_000) {
             val a = async(Dispatchers.Default) { session.open(profile) }
-            started[0].await()
+            val first = checker.nextStarted()
             val b = async(Dispatchers.Default) { session.open(profile) }
-            started[1].await()
+            val second = checker.nextStarted()
 
-            gates[1].complete(Unit) // the later start finishes first
-            assertEquals(second, b.await())
-            gates[0].complete(Unit) // the earlier start finishes last: it wins
-            assertEquals(first, a.await())
+            second.finish(locked)
+            b.await()
+            assertEquals(locked, session.permissions("prod-eu"))
+
+            first.finish(allowed) // the older start finishes last: dropped
+            a.await()
+        }
+        assertEquals(locked, session.permissions("prod-eu"), "the older check must not overwrite the newer one")
+        assertTrue(session.isUsable("prod-eu"))
+    }
+
+    @Test
+    fun `an older check finishing first is replaced by the newer result and does not make the connection usable meanwhile`() =
+        runBlocking {
+            val checker = GatedPermissionChecker()
+            val session = ConnectionSession(checker, secrets)
+            withTimeout(10_000) {
+                val a = async(Dispatchers.Default) { session.open(profile) }
+                val first = checker.nextStarted()
+                val b = async(Dispatchers.Default) { session.open(profile) }
+                val second = checker.nextStarted()
+
+                first.finish(allowed)
+                a.await()
+                assertFalse(session.isUsable("prod-eu"), "a stale result must not make the connection usable")
+                assertNull(session.permissions("prod-eu"), "a stale result must not be shown while the newer check runs")
+                assertEquals(PermissionCheckStatus.Checking, session.statuses.value["prod-eu"])
+
+                second.finish(locked)
+                b.await()
+            }
+            assertEquals(locked, session.permissions("prod-eu"))
+            assertTrue(session.isUsable("prod-eu"))
         }
 
-        assertEquals(first, session.permissions("prod-eu"), "the check that finished last must win")
-        assertTrue(session.isUsable("prod-eu"))
+    @Test
+    fun `checks of different profile names are independent`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, twoNames)
+        val dev = profile.copy(name = "dev")
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val prodCheck = checker.nextStarted()
+            val b = async(Dispatchers.Default) { session.open(dev) }
+            val devCheck = checker.nextStarted()
+
+            prodCheck.finish(allowed) // the earlier start finishes first, for another name: both keep their result
+            a.await()
+            assertEquals(allowed, session.permissions("prod-eu"))
+            assertFalse(session.isUsable("dev"))
+            devCheck.finish(locked)
+            b.await()
+        }
+        assertEquals(allowed, session.permissions("prod-eu"))
+        assertEquals(locked, session.permissions("dev"))
+    }
+
+    @Test
+    fun `a check that finishes after forget does not make the connection usable`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, secrets)
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val pending = checker.nextStarted()
+            session.forget("prod-eu")
+            pending.finish(allowed)
+            a.await()
+        }
+        assertFalse(session.isUsable("prod-eu"), "forget during a running check must still win")
+        assertNull(session.permissions("prod-eu"))
+        assertNull(session.statuses.value["prod-eu"])
+    }
+
+    @Test
+    fun `after forget a new open works and the forgotten check stays dropped`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, secrets)
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val old = checker.nextStarted()
+            session.forget("prod-eu")
+            val b = async(Dispatchers.Default) { session.open(profile) }
+            val fresh = checker.nextStarted()
+            old.finish(allowed)
+            a.await()
+            assertFalse(session.isUsable("prod-eu"))
+            fresh.finish(locked)
+            b.await()
+        }
+        assertEquals(locked, session.permissions("prod-eu"))
+    }
+
+    @Test
+    fun `a rename during a check drops the old name and keeps the new one`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, twoNames)
+        val renamed = profile.copy(name = "dev")
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val oldCheck = checker.nextStarted()
+            session.forget("prod-eu") // what a rename does to the old name
+            val b = async(Dispatchers.Default) { session.open(renamed) }
+            val newCheck = checker.nextStarted()
+            newCheck.finish(locked)
+            b.await()
+            oldCheck.finish(allowed)
+            a.await()
+        }
+        assertFalse(session.isUsable("prod-eu"))
+        assertEquals(locked, session.permissions("dev"))
+    }
+
+    // --- M2-01: the current connection ---------------------------------------------------------------
+    // Contract proposed by the test developer (brief leaves names open):
+    //   data class CurrentConnection(val name: String, val status: PermissionCheckStatus?) // null = not checked
+    //   val current: StateFlow<CurrentConnection?>
+    //   val statuses: StateFlow<Map<String, PermissionCheckStatus>>  // Checking / Done per name, no entry = not checked
+    //   fun select(name: String)                                      // makes `name` current; no check, no profile lookup
+
+    @Test
+    fun `there is no current connection at first`() {
+        assertNull(ConnectionSession(RecordingChecker(unlocked), secrets).current.value)
+    }
+
+    @Test
+    fun `select makes a never-checked connection current as not checked`() {
+        val session = ConnectionSession(RecordingChecker(unlocked), secrets)
+        session.select("prod-eu")
+        assertEquals(CurrentConnection("prod-eu", null), session.current.value)
+        assertFalse(session.isUsable("prod-eu"), "select must not run a check or make anything usable")
+    }
+
+    @Test
+    fun `select of an already checked connection shows its stored result at once`() = runBlocking {
+        val session = ConnectionSession(RecordingChecker(unlocked), twoNames)
+        session.open(profile)
+        session.select("prod-eu")
+        assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(unlocked)), session.current.value)
+    }
+
+    @Test
+    fun `selecting another connection switches current and keeps both results`() = runBlocking {
+        val checker = RecordingChecker(unlocked)
+        val session = ConnectionSession(checker, twoNames)
+        session.open(profile)
+        checker.result = locked
+        session.open(profile.copy(name = "dev"))
+
+        session.select("prod-eu")
+        assertEquals(PermissionCheckStatus.Done(unlocked), session.current.value?.status)
+        session.select("dev")
+        assertEquals(CurrentConnection("dev", PermissionCheckStatus.Done(locked)), session.current.value)
+        assertEquals(unlocked, session.permissions("prod-eu"), "the previous connection keeps its own result")
+    }
+
+    @Test
+    fun `current follows its check from checking to done and to a newer check`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, secrets)
+        session.select("prod-eu")
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val first = checker.nextStarted()
+            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Checking), session.current.value)
+            first.finish(allowed)
+            a.await()
+            assertEquals(CurrentConnection("prod-eu", PermissionCheckStatus.Done(allowed)), session.current.value)
+
+            val b = async(Dispatchers.Default) { session.open(profile) }
+            val second = checker.nextStarted()
+            assertEquals(PermissionCheckStatus.Checking, session.current.value?.status, "a re-check clears the old result")
+            second.finish(locked)
+            b.await()
+        }
+        assertEquals(PermissionCheckStatus.Done(locked), session.current.value?.status)
+    }
+
+    @Test
+    fun `a check of another connection does not change current`() = runBlocking {
+        val session = ConnectionSession(RecordingChecker(unlocked), twoNames)
+        session.select("prod-eu")
+        session.open(profile.copy(name = "dev"))
+        assertEquals(CurrentConnection("prod-eu", null), session.current.value)
+    }
+
+    @Test
+    fun `forget of the current connection clears current, forget of another one does not`() = runBlocking {
+        val session = ConnectionSession(RecordingChecker(unlocked), twoNames)
+        session.open(profile)
+        session.select("prod-eu")
+
+        session.forget("dev")
+        assertEquals("prod-eu", session.current.value?.name)
+        session.forget("prod-eu")
+        assertNull(session.current.value)
+        assertFalse(session.isUsable("prod-eu"))
+    }
+
+    @Test
+    fun `a stale check finishing after forget of the current connection leaves current empty`() = runBlocking {
+        val checker = GatedPermissionChecker()
+        val session = ConnectionSession(checker, secrets)
+        session.select("prod-eu")
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            val pending = checker.nextStarted()
+            session.forget("prod-eu")
+            pending.finish(allowed)
+            a.await()
+        }
+        assertNull(session.current.value)
+    }
+
+    @Test
+    fun `no state object holds the password`() = runBlocking {
+        val session = ConnectionSession(RecordingChecker(unlocked), MapSecretStore(mapOf("prod-eu" to "pw-Zq9-secret")))
+        session.open(profile)
+        session.select("prod-eu")
+        assertFalse(session.current.value.toString().contains("pw-Zq9-secret"))
+        assertFalse(session.statuses.value.toString().contains("pw-Zq9-secret"))
     }
 }

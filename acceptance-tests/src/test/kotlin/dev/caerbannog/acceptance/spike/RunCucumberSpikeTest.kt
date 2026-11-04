@@ -1,4 +1,4 @@
-package dev.caerbannog.acceptance
+package dev.caerbannog.acceptance.spike
 
 import io.cucumber.junit.platform.engine.Constants.GLUE_PROPERTY_NAME
 import org.junit.platform.suite.api.ConfigurationParameter
@@ -17,5 +17,5 @@ import org.junit.platform.suite.api.Suite
 @Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("features")
-@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance")
+@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.spike")
 class RunCucumberSpikeTest

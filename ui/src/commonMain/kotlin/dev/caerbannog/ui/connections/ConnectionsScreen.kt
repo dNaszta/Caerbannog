@@ -99,6 +99,7 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
                                 if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
                             },
                             onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
+                            onConnect = { name -> scope.launch { viewModel.connect(name) } },
                             modifier = panelModifier,
                         )
                     },
@@ -127,6 +128,7 @@ private fun EditPanel(
     onDeleteRequest: (String) -> Unit,
     onValidateCaCertificate: (name: String?, path: String) -> Unit,
     onCheckConnection: (String) -> Unit,
+    onConnect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selected = state.selectedProfile
@@ -279,6 +281,11 @@ private fun EditPanel(
                     }
                 }
                 if (selected != null) {
+                    // Interim (M2-01): the smallest way to make a saved profile current. M2-05 replaces it with
+                    // the sidebar connection picker; do not build on it.
+                    OutlinedButton(onClick = { onConnect(selected.name) }, modifier = Modifier.testTag("connectButton")) {
+                        Text("Connect")
+                    }
                     OutlinedButton(onClick = { onCheckConnection(selected.name) }) {
                         ConnectionIcon(AppIcon.WifiTethering, SmallIconSize)
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))

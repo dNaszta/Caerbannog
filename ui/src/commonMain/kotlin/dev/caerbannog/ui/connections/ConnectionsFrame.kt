@@ -28,7 +28,7 @@ import dev.caerbannog.core.connections.permissionPill
 // The frame of docs/ux/Main.dc.html: drawer, app bar, content. Text only; icons come with M1-12b.
 
 /**
- * Left drawer. M1 has no session yet, so the Connection card shows the profile open in the edit panel.
+ * Left drawer. The Connection card shows the session's current connection, not the profile open in the edit panel.
  * Search and the Streams, Topology and Migrations items are not built: their screens come with M2 to M4.
  */
 @Composable
@@ -70,7 +70,8 @@ internal fun ConnectionsDrawer(state: ConnectionsState, modifier: Modifier = Mod
 
 @Composable
 private fun DrawerConnectionCard(state: ConnectionsState) {
-    val selected = state.selectedProfile
+    val current = state.currentConnection
+    val host = state.profiles.firstOrNull { it.name == current?.name }?.host
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(12.dp),
@@ -78,20 +79,22 @@ private fun DrawerConnectionCard(state: ConnectionsState) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Connection", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (selected == null) {
+            if (current == null) {
                 Text("No connection selected", style = MaterialTheme.typography.titleSmall)
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        selected.name,
+                        current.name,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    PermissionPillView(permissionPill(state.permissionChecks[selected.name]), Modifier.testTag("drawerPermissionPill"))
+                    PermissionPillView(permissionPill(current.status), Modifier.testTag("drawerPermissionPill"))
                 }
-                Text(selected.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (host != null) {
+                    Text(host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

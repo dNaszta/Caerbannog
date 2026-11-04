@@ -80,3 +80,68 @@ added, spec Risks entry for last-write-wins closed (architect moves it) once mer
 
 ## Status
 - State: briefed 2026-11-04 by the architect, awaiting product owner confirmation and the team loop (step 1 onward).
+- Step 2 (tests first, test developer, 2026-11-04): red. Written: `ConnectionSessionTest` (latest-started-wins in both release
+  orders, names independent, forget/rename during a check, `current` follows select/forget/check; replaces the M1-09 test
+  that pinned last-finished-wins), `ConnectionsViewModelSessionTest` (new), `GatedPermissionChecker` (core test fake),
+  acceptance steps for the two new `02` scenarios (`PermissionCheckSteps`, `PermissionFakes`), UI tests in
+  `ConnectionsScreenUiTest` (drawer card follows the session; four M1-12a stand-in drawer tests rewritten, two icon tests
+  adjusted to click Connect first), README unit row. Core and acceptance do not compile (missing members); 9 UI tests fail.
+  Contract the developer must follow: see the test developer's step-2 report (names below).
+  - `data class CurrentConnection(val name: String, val status: PermissionCheckStatus?)` in core (null status = not checked;
+    reuses `PermissionCheckStatus` Checking/Done).
+  - `ConnectionSession`: `val current: StateFlow<CurrentConnection?>`, `val statuses: StateFlow<Map<String, PermissionCheckStatus>>`
+    (Checking from the start of `open`, Done at the end), `fun select(name: String)` (no check, no lookup), `open` keeps its
+    signature and returns its own result; `forget(name)` also invalidates a running check for that name and clears `current`
+    when it is that name. Token logic lives in the session.
+  - `ConnectionsViewModel`: `suspend fun connect(name: String)` (unknown name: no-op; else `session.select` then the check);
+    `ConnectionsState.currentConnection: CurrentConnection?` and `permissionChecks` both mirrored from the session (must be
+    readable synchronously from `state.value`).
+  - UI: button tagged `connectButton`, text "Connect", in the edit panel of a saved profile only; calls `viewModel.connect`.
+  - Brief gaps: names above; rename of the current profile clears `current` (user reconnects), to be confirmed; the existing
+    M1-12a drawer tests asserted the stand-in, so "unchanged" cannot hold for them.
+- Architect rulings (2026-11-04, before step 3), final contract:
+  - Types: `CurrentConnection(name: String, status: PermissionCheckStatus?)` (null = not checked); `ConnectionSession.current: StateFlow<CurrentConnection?>`; `ConnectionSession.statuses: StateFlow<Map<String, PermissionCheckStatus>>`; `select(name)` (no check, no lookup); `open` keeps its signature; `forget(name)`; `ConnectionsViewModel.suspend connect(name)` (unknown name is a no-op, else select then open); `ConnectionsState.currentConnection` and `permissionChecks` mirror the session. Accepted as the test developer picked them.
+  - (1) Connect button: accepted as the interim, smallest drivable option: one `connectButton` "Connect" in the edit panel of a saved profile only. It is visible but small, and is replaced by the sidebar connection picker in M2-05. Not a product decision; the product owner is told in the report. Not chosen: card click (hidden, conflicts with selecting for edit) and reusing "Check connection and permissions" (it would silently change what a check means).
+  - (2) Rename of the current profile: `forget(oldName)` clears `current`; the user presses Connect again. Current does not follow a rename (a rename changes the environment key and the check result belongs to the old name).
+  - (3) Confirmed: "M1 UI tests unchanged" applied to everything except the four drawer tests that pinned the stand-in; their replacement by seven tests is correct.
+  - (4) A superseded `open` returns its own check's result, documented in the KDoc; the return value is NOT asserted (callers must read session state, never the return value, for what is current). Session state must reflect only the latest started check.
+  - (5) Confirmed: the old M1-09 test "the check that finishes last wins" pinned the bug and is rightly replaced.
+  - Also: `select(name)` for a name with no result shows `status = null` ("Not checked"); `forget` of a running check must still prevent its late result from becoming usable.
+- Step 3 (senior developer, 2026-11-04): built, red to green in core (137 tests), ui (102), desktopApp (5), no new dependency.
+  Acceptance is NOT green as committed: two defects in the step-2 steps (see below); with them patched locally acceptance is
+  45 run, 5 skipped, 0 failed and both new `02` scenarios pass. Needs the test developer.
+  - Session: one immutable snapshot (statuses, per-name tokens, last token, current name) in a `MutableStateFlow`, atomic
+    `update`; `statuses` and `current` are published copies (republish loop so concurrent writers converge). A cancelled check
+    removes its own Checking entry unless a newer check owns the name. `forget` drops status and token and clears current.
+    The token map moved from `ConnectionsViewModel` into the session; the view model has no token logic left.
+  - View model: `state` is a small `StateFlow` wrapper that overlays `session.statuses` and `session.current` on its own state
+    (readable synchronously from `value`, no scope owned). It uses `@OptIn(ExperimentalForInheritanceCoroutinesApi)`:
+    architect, please confirm this is acceptable (alternative: an internal Unconfined scope that is never cancelled).
+  - UI: drawer card reads `state.currentConnection`, host from the saved profile (omitted if the profile is gone); interim
+    `connectButton` (OutlinedButton, "Connect") before "Check connection and permissions", saved profile only, KDoc-style
+    comment says M2-05 replaces it.
+  - Test-developer defects: (a) `PermissionCheckSteps` step `saved connections {string} and {string}` and `I am connected to`,
+    `I switch to`, `the sidebar shows {string} as the current connection` duplicate steps already defined in
+    `ConnectionsSteps` / `SwitchBetweenConnectionsSteps` (Cucumber `DuplicateStepDefinitionException`; the pending versions
+    must go or the new ones be moved); (b) `ensureSaved` reads `viewModel.state.value.profiles`, stale after a direct
+    `repository.add`, so the Background profile is added twice (use `repository.list()`). A working patch is in the
+    developer's scratchpad `steps-fix.patch` (not committed).
+- Step 4 (verify, test developer, 2026-11-04): pass. Step-side defects fixed: duplicate step phrases came from the spike runner
+  scanning every step package (glue `dev.caerbannog.acceptance`); the spike steps and runner moved to
+  `acceptance.spike` with glue narrowed, so each phrase has exactly one definition and the pending 01 `Switch between
+  connections` steps stay as they were; `ensureSaved` reads the repository. Full `./gradlew test --rerun-tasks` green: core 137,
+  ui 102, desktopApp 5, data-rabbit 17, acceptance 45 (5 skipped by design); both new `02` scenarios pass. 10 mutations plus a
+  non-atomic-update mutation all caught; 20 repeat runs of the session/view model tests green. Opt-in screenshots added
+  (`connections-05-connected.png`, `-06-connect-button.png`).
+
+- Architect step 5 review (2026-11-04): Accepted with follow-ups. Reviewed `git diff main...m2-01-connection-session` (core session, view model, state, drawer, screen, tests list, spec) against the brief and rulings; not run: @broker, the real app, keyboard and narrow window for Connect, rename through the UI.
+  Good: one snapshot updated atomically with tokens; cancellation cleans up Checking; M1-09 rules intact (no throw, UNEXPECTED, declaration rule, class name only); core has no Compose or JVM types; no secrets in session state (names and results only); the ViewModel token map is gone, one source of truth; Connect is marked interim in code; mutation, atomicity and flakiness proofs are strong.
+  | # | Severity | Where | Finding | Ruling |
+  | --- | --- | --- | --- | --- |
+  | 1 | minor | `ProfileCard.kt:89` | Current profile card still says "Not connected" while the drawer shows it current | Leave; M2-05 replaces Connect and owns this wording (added to M2-05 scope) |
+  | 2 | minor | `ConnectionsViewModel.kt` `SessionMirroredState` | Unsupported `StateFlow` inheritance, non-atomic `value` across three sources | Accept with waiver (spec Risks), removed in follow-up `M2-01b-session-single-state`, to be done before M2-03; upgrade consequence: compile error, one private class |
+  | 3 | minor | `ConnectionSession.publish()` | `statuses` and `current` can be briefly inconsistent | Accept now; fixed in M2-01b |
+  | 4 | idea | Connect button | No icon | Leave; it is replaced in M2-05 |
+  | 5 | idea | connect cancelled | `current` stays with status null | Accept (reads as Not checked) |
+  What M2-03 needs from the session: current name via `current`, `permissions(name)`/`isUsable` to gate calls, and (decision D6) the password; today the session never holds it. Nothing else.
+- State: done (Accepted with follow-ups); not merged; merge by the coordinator.
