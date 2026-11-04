@@ -69,6 +69,17 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   `permissionDimNote`; pill 12sp Medium single line, name ellipsis; stale-write guard in the view model with a
   per-name token (bumped on every check start, invalidated on delete and rename; a late result is written only while
   its token is current, and a late `session.open` result for a removed name is forgotten). Colours remain manual.
+- Round 2, step 4 (test developer): pass with findings (no blocker, no major). Clean `./gradlew test --rerun-tasks
+  --continue`: core 104 (+2 added now = 106), data-rabbit 19, acceptance 43 (5 skipped by design: `@needs-M2`), desktopApp
+  5, ui 64, all green; the five former `@needs-M1-07` scenarios pass. Mutations all caught except: pill without
+  `maxLines`/`softWrap=false` (the single-line test cannot fail: the Row measures the unweighted pill first, so the guard
+  is defensive only), WARNING pill using the OK colour (pixels, manual). The late `session.open` not calling `forget` was
+  NOT caught by any test; added two core tests (deleted and renamed while in flight: session must not stay usable),
+  green now and red under that mutation. Open minors: late reachability result can set the banner for a deleted
+  profile; two overlapping checks of the same name can leave the session with the older result while the state shows the
+  newer (session is last-write-wins, the token guards only the state); token check and state write are not one atomic
+  step across the two flows (tiny window, UI runs on one thread). Mockup deviations (manual look): card padding 12 vs
+  16dp and no 1dp outline-variant border, banner headline SemiBold vs bold, no icons (M1-12).
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

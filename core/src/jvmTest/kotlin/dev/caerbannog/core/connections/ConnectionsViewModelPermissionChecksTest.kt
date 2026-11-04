@@ -348,4 +348,32 @@ class ConnectionsViewModelPermissionChecksTest {
 
         assertNull(checks()["prod-eu"], "the new profile was never checked")
     }
+
+    // --- round 2 verify: the session must not keep a result for a profile that is gone ---------------
+
+    @Test
+    fun `a late check of a deleted profile leaves nothing usable in the session`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        vm.requestDelete("prod-eu")
+        vm.confirmDelete()
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertEquals(false, session.isUsable("prod-eu"), "a deleted profile must not stay usable through a late result")
+        assertNull(session.permissions("prod-eu"))
+    }
+
+    @Test
+    fun `a late check of a renamed profile leaves nothing usable under the old name in the session`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        vm.saveProfileChanges("prod-eu", input(name = "prod-eu-2"))
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertEquals(false, session.isUsable("prod-eu"), "the old name must not stay usable")
+    }
 }
