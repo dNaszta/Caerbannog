@@ -3,7 +3,7 @@
 Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired; branch base), M1-02-connection-profiles    Size: S
 
 ## Status
-- State: step 3 done (implemented, all green; ready for verification and review). Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
+- State: done (accepted with follow-ups, round 0; step 5 architect review; not merged). Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
   while creating a connection; (2) in edit mode it applies on Save, one rule everywhere; (3) choosing Full control asks
   for a confirmation.
 - Branch (when started): `m1-10-topology-level-on-new-connection`, based on `m1-05-wire-desktopapp-connections`.
@@ -23,6 +23,10 @@ Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired;
   desktopApp 3, data-rabbit fast green. 7 mutations of the key rules each fail the right tests; tree restored.
   Plain `./gradlew test` (= `task test`) does NOT run core/ui `jvmTest` (dry-run lists only acceptance-tests,
   data-rabbit, desktopApp): the documented command misses two modules. Open for the architect.
+- Step 5 (architect review): Accepted with follow-ups. Follow-up: `M1-TASKFILE-02-test-task-runs-all-modules`
+  (plain `./gradlew test` skips core and ui). Mockup `docs/ux/Main.dc.html` now shows the selector and the dialog.
+  Stale `brokerTest` XML under `data-rabbit/build` (RealBrokerPermissionCheckTest, 6 failures) is output from an
+  earlier run on `m1-03-permission-check`, where that class exists; not from this branch, no action.
 - Round: 0
 
 ## Goal
