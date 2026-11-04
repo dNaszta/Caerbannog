@@ -16,6 +16,11 @@ import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.UnreadableCause
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
+import dev.caerbannog.core.streams.CatalogMessages
+import dev.caerbannog.core.streams.CatalogResult
+import dev.caerbannog.core.streams.FirstOffset
+import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.streams.Visibility
 import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
@@ -31,6 +36,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 
@@ -39,12 +45,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * Docker, no network, no keychain, no ~/.caerbannog). The whole app side is real core code
  * (ConnectionsViewModel, ConnectionSession, ActiveConnection); only the broker is fake.
  *
- * No steps on purpose: the lost-connection scenario (@needs-decision, D2), the three app bar scenarios
- * (@needs-M2, M2-05), and "A user without the management tag ..." (@needs-M2-03b, part 2).
+ * No steps on purpose: the lost-connection scenario (@needs-decision, D2) and the three app bar scenarios
+ * (@needs-M2, M2-05).
  *
- * Two steps are deliberately thinner than their wording until part 2 / M2-05, stated here so nobody reads them as full:
- *  - "first offsets will read unavailable" can only check that the connection is held and its stream port does
- *    not answer (StreamOffsets does not exist before part 2); part 2 replaces it with the real StreamOffsets result.
+ * Part 2 (M2-03b): "A user without the management tag ..." asserts through the held connection's catalog
+ * (`Capabilities.visibility` NONE, every list NotAuthorised, the message text from core); "first offsets will
+ * read unavailable" asks the held connection's real `StreamOffsets` port (a `FirstOffset.Unavailable` result).
+ * Both go through the fake gateway's catalog and offsets: that the REAL gateway answers the same way is pinned
+ * by data-rabbit tests (ManagementErrorsTest, RabbitMqConnectionGatewayTest, RealBrokerCatalogTest).
+ *
+ * One step is still thinner than its wording until M2-05:
  *  - "I see the note ..." compares core's ConnectionNotes.HOST_NAME_NOT_VERIFIED with the scenario text; that
  *    the edit panel shows it is pinned by ui ConnectionsScreenUiTest ("the edit panel says the host name is not verified").
  */
@@ -143,6 +153,12 @@ class ConnectionLifecycleSteps {
     @Given("no password is stored for {string}")
     fun noPasswordIsStoredFor(name: String) {
         secretStore.delete(name)
+    }
+
+    @Given("the broker answers {string} for the user of {string}")
+    fun theBrokerAnswersForTheUserOf(answer: String, name: String) {
+        assertEquals("Not management user", answer, "only the 401 reason of a user without the management tag is modelled")
+        gateway.noManagementTag(name)
     }
 
     @Given("the stream port of {string} does not answer")
@@ -279,7 +295,30 @@ class ConnectionLifecycleSteps {
         assertEquals("unavailable", text)
         val held = gateway.heldNow.singleOrNull()
         assertNotNull(held, "the connection must still be held")
-        assertFalse(held!!.streamPortAnswers, "the stream port of ${held.profileName} was set not to answer")
+        val result = runBlocking { withTimeout(TIMEOUT_MS) { held!!.offsets.firstOffset("/", "orders-events") } }
+        assertEquals(FirstOffset.Unavailable, result, "first offset of a stream while the stream port is silent")
+    }
+
+    @Then("the stream and publisher lists are replaced by the message {string}")
+    fun theListsAreReplacedByTheMessage(message: String) {
+        assertEquals(message, CatalogMessages.NOT_MANAGEMENT_USER, "the message text owned by core")
+        val held = gateway.heldNow.singleOrNull()
+        assertNotNull(held, "the connection must be held")
+        runBlocking {
+            withTimeout(TIMEOUT_MS) {
+                val capabilities = held!!.catalog.capabilities()
+                assertInstanceOf(CatalogResult.Success::class.java, capabilities, "capabilities: $capabilities")
+                assertEquals(Visibility.NONE, (capabilities as CatalogResult.Success).value.visibility)
+                assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest()), "stream list")
+                assertEquals(CatalogResult.NotAuthorised, held.catalog.publishers("/", "orders-events"), "publishers")
+                assertEquals(CatalogResult.NotAuthorised, held.catalog.consumers("/", "orders-events"), "consumers")
+            }
+        }
+    }
+
+    @Then("the app holds one connection")
+    fun theAppHoldsOneConnection() {
+        assertEquals(listOf(lastName), gateway.heldNow.map { it.profileName }, "connections held: ${gateway.log}")
     }
 
     @Then("I am told {string}")

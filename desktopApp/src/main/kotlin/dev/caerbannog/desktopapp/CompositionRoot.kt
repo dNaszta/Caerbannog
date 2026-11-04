@@ -1,6 +1,8 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
+import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.PermissionChecker
@@ -8,6 +10,7 @@ import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
 import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
+import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import java.io.File
@@ -30,3 +33,46 @@ fun createConnectionsViewModel(
     caCertificateValidator = X509CaCertificateValidator(),
     session = ConnectionSession(permissionChecker, secretStore),
 )
+
+/**
+ * What the window needs: the view model and the one [ActiveConnection] it shares with the app (M2-03 part 2).
+ * [close] ends the held connection; the window's close request calls it through [handleCloseRequest].
+ */
+class AppComposition(val viewModel: ConnectionsViewModel, val active: ActiveConnection) {
+    /** Closes the held connection, if any. Safe to call twice. */
+    fun close() = active.close()
+}
+
+/**
+ * Like [createConnectionsViewModel], plus the real [ConnectionGateway] behind an [ActiveConnection] that the view
+ * model's Connect uses (the interim edit-panel Connect of M2-01 now opens a real held connection). One
+ * [ConnectionSession] serves both, so the permission check and the connection cannot disagree.
+ */
+fun createAppComposition(
+    profilesFile: File = JsonFileConnectionProfileRepository.defaultFile(),
+    secretStore: SecretStore = JavaKeyringSecretStore(),
+    permissionChecker: PermissionChecker = ManagementApiPermissionChecker(),
+    reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
+    gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore),
+): AppComposition {
+    val session = ConnectionSession(permissionChecker, secretStore)
+    val active = ActiveConnection(session, gateway)
+    val viewModel = ConnectionsViewModel(
+        repository = JsonFileConnectionProfileRepository(profilesFile),
+        secretStore = secretStore,
+        reachabilityChecker = reachabilityChecker,
+        caCertificateValidator = X509CaCertificateValidator(),
+        session = session,
+        active = active,
+    )
+    return AppComposition(viewModel, active)
+}
+
+/** Window close request: close the held connection first, then always exit, even if closing went wrong. */
+fun handleCloseRequest(composition: AppComposition, exitApplication: () -> Unit) {
+    try {
+        composition.close()
+    } finally {
+        exitApplication()
+    }
+}

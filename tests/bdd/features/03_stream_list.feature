@@ -110,12 +110,12 @@ Feature: Stream list
     And 10 minutes pass
     Then "orders-events" still shows the last offset 100
 
-  # Product decision on the default is proposed (Off) and awaits the product owner.
-  @fake-broker @needs-decision
-  Scenario: The refresh interval is off on a fresh install
+  # Decided by the product owner 2026-11-04: the default is 5 seconds, to be revisited after trying it.
+  @fake-broker
+  Scenario: The refresh interval is 5 seconds on a fresh install
     Given the app has no saved settings
     When I look at the refresh interval
-    Then the refresh interval is off
+    Then the refresh interval is 5 seconds
 
   @fake-broker
   Scenario: A broker with no streams

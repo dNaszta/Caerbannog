@@ -15,6 +15,9 @@ import kotlinx.coroutines.sync.Mutex
  * number; a connect that finds its number outdated closes whatever the broker opened for it and writes
  * nothing. The generation, the held connection and the state change together under a short lock (pure field
  * operations, never held across a suspension or a broker call); readers of [state] never take it.
+ *
+ * Observers (collectors of [state]) must not throw and must not call this class or the session: they run on the
+ * writing thread, inside the change.
  */
 class ActiveConnection(
     private val session: ConnectionSession,

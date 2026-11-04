@@ -1,5 +1,8 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.streams.StreamCatalog
+import dev.caerbannog.core.streams.StreamOffsets
+
 /**
  * Opens the clients of one connection profile (management API over HTTPS, stream client lazily). Gateway
  * pattern: core does not know Ktor or the stream client; `data-rabbit` implements it (M2-03 part 2), tests use
@@ -21,4 +24,10 @@ sealed interface OpenResult {
 }
 
 /** One open connection to a broker. [close] is idempotent and releases every client and secret reference. */
-interface HeldConnection : AutoCloseable
+interface HeldConnection : AutoCloseable {
+    /** Stream list and details over the management API of this connection. */
+    val catalog: StreamCatalog
+
+    /** First offsets over the stream protocol of this connection. */
+    val offsets: StreamOffsets
+}

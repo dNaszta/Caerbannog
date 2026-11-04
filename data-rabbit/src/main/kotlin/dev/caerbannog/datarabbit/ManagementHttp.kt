@@ -1,0 +1,76 @@
+package dev.caerbannog.datarabbit
+
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.URLParserException
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.URISyntaxException
+import java.net.http.HttpTimeoutException
+import javax.net.ssl.SSLException
+import kotlin.coroutines.cancellation.CancellationException
+
+/** What one management API call came back with. No exception text is kept: it could carry a host or a URL. */
+internal sealed interface ManagementReply {
+    data class Response(val status: Int, val body: String) : ManagementReply
+
+    /** Timeout, refused connection, closed holder, malformed address. */
+    data object Unreachable : ManagementReply
+
+    /** The TLS handshake failed (an untrusted certificate, or a port that does not speak TLS). */
+    data object TlsRefused : ManagementReply
+}
+
+/**
+ * The HTTP client of one held connection and the one place that knows the password for it (D6: read once from the
+ * store by the gateway, kept here, forgotten on [close]). Never logs; every failure is a [ManagementReply] value.
+ */
+internal class ManagementHttp(
+    private val client: HttpClient,
+    private val username: String,
+    password: String,
+) : AutoCloseable {
+
+    @Volatile
+    private var password: String? = password
+
+    @Volatile
+    private var closed = false
+
+    suspend fun get(url: String): ManagementReply {
+        val secret = password
+        if (closed || secret == null) return ManagementReply.Unreachable
+        return try {
+            val response = client.get(url) { basicAuth(username, secret) }
+            ManagementReply.Response(response.status.value, response.bodyAsText())
+        } catch (e: CancellationException) {
+            // A client closed under a running call reports cancellation; that is a lost connection, not the caller leaving.
+            if (closed) ManagementReply.Unreachable else throw e
+        } catch (e: SSLException) {
+            ManagementReply.TlsRefused
+        } catch (e: HttpRequestTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: HttpTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: SocketTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: IOException) {
+            ManagementReply.Unreachable
+        } catch (e: URISyntaxException) {
+            ManagementReply.Unreachable
+        } catch (e: URLParserException) {
+            ManagementReply.Unreachable
+        } catch (e: IllegalArgumentException) {
+            ManagementReply.Unreachable
+        }
+    }
+
+    override fun close() {
+        closed = true
+        password = null
+        client.close()
+    }
+}

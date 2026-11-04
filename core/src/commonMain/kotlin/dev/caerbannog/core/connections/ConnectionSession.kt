@@ -54,7 +54,8 @@ class ConnectionSession(
      * Calls [onChange] on the writing thread after every change of [state], so a holder that derives its own
      * state can follow synchronously without owning a coroutine scope. The callback should read [state] (the
      * latest value), not rely on the order of calls. Returns the function that unregisters it; the session
-     * keeps a reference until then, so a holder that outlives its use must call it.
+     * keeps a reference until then, so a holder that outlives its use must call it. Observers must not throw
+     * and must not call [ActiveConnection] or this session: they run on the writing thread, after the change.
      */
     fun observe(onChange: () -> Unit): () -> Unit {
         listeners.update { it + onChange }

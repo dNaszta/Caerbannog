@@ -45,6 +45,10 @@ dependencies {
     // production dependency.
     implementation("com.github.javakeyring:java-keyring:1.0.4")
 
+    // M2-03 part 2: the held connection reads the first offset with queryStreamStats (M2-02 spike
+    // decision S1 had it in test scope only). Production scope, and it brings Netty along.
+    implementation("com.rabbitmq:stream-client:1.12.0")
+
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -57,9 +61,6 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
 
-    // M2-02 spike, decision S1 (docs/tasks/M2-02-management-api-spike.md): stream client in TEST scope only,
-    // to create stream-protocol publishers/consumers and call queryStreamStats against a real broker.
-    testImplementation("com.rabbitmq:stream-client:1.12.0")
 }
 
 tasks.test {
