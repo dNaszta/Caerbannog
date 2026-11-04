@@ -215,3 +215,13 @@ installer notes, manual check recorded.
   reverted: red, `lineCount expected 1 but was 4`). Suite 98 tests, 4 red, all CA-label tests (intended until production
   drops '(optional)'): labels test, field order, collapse to one column, trailing icons.
 - 2026-11-04 (senior developer, step 3b): CA label is now `CA certificate` (one line, level with Password at 1280; checked in all four PNGs). Suite green: core 111, data-rabbit 17, desktopApp 5, ui 99 (the test developer added one), acceptance 43 (5 skipped); no ConnectionsScreenshotTest in the default run. Only ConnectionsScreen.kt line 206 changed.
+- 2026-11-04 (test developer, step 4, verify, branch `m1-12b-connections-icons`): pass, no blocker or major. Clean `./gradlew test
+  --rerun-tasks --continue` green: core 111, data-rabbit 17, desktopApp 5, ui 99, acceptance 43 (5 skipped, 0 failed); no
+  ConnectionsScreenshotTest in the default run; `test --dry-run` lists `:core:test` and `:ui:test`, not screenshotTest or keychainTest.
+  `:ui:screenshotTest` green; all four PNGs looked at: brand, nav, add, pill, banner, eye, upload, TLS lock, delete and wifi icons
+  in place, no truncation, Password and CA fields level, hint whole, Save wraps below the fold of the scroll panel (reachable).
+  18 mutations run, 17 caught by a failing test (revert with `git checkout`, tree clean). One equivalent mutant: removing
+  `semantics { password() }` is not detected because the field already carries the Password semantics from the framework (the
+  existing test asserts it masked and shown) - minor, no action. Dependency diff: only material-icons-extended:1.7.3; only
+  ConnectionsIcons.kt imports `androidx.compose.material.icons`; ui does not import data-rabbit; reveal state only in the screen.
+  Not run: `:desktopApp:run`, keychainTest, packageDmg, manual look.
