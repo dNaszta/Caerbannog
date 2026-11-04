@@ -6,12 +6,12 @@ import androidx.compose.ui.window.application
 import dev.caerbannog.ui.connections.ConnectionsScreen
 
 /**
- * M1-05: renders the real Connections screen. All wiring lives in [createConnectionsViewModel]; the
- * view model is created once via `remember` so recomposition does not rebuild it.
+ * M1-05: renders the real Connections screen. M2-03 part 2: all wiring lives in [createAppComposition]
+ * (created once via `remember`); closing the window closes the held connection first.
  */
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Caerbannog") {
-        val viewModel = remember { createConnectionsViewModel() }
-        ConnectionsScreen(viewModel)
+    val composition = remember { createAppComposition() }
+    Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog") {
+        ConnectionsScreen(composition.viewModel)
     }
 }
