@@ -156,3 +156,96 @@ installer notes, manual check recorded.
 - 2026-11-04 (architect): brief sharpened against main 28e0bdc (icon table with sizes and artifacts, reveal toggle
   behaviour, test plan, build order with the compile proof as step 0 and the stop rule, accessibility). Ready to start on
   branch `m1-12b-connections-icons` from main. Not started.
+- 2026-11-04 (test developer, step 2, tests first, branch `m1-12b-connections-icons`): two commits, no production code, no
+  dependency, no Gherkin change. Commit 1 (`M1-12b: tests for the shorter Password hint`): `passwordHint` constant is
+  `Blank keeps the saved password`; the keep-password-hint test also asserts `assertFalse(hasVisualOverflow)` at 1280 wide;
+  mutation-proved (with the old string in the constant the new assertion fails: "must not be ellipsized at 1280 wide"; with the
+  new string the test fails on the missing text). Commit 2: 16 new `ConnectionsScreenUiTest` tests (suite 97, 16 red incl. the
+  hint test from commit 1, all on assertions): toggle (default masked new and saved, click shows and `Hide password`, second
+  click masks, merged button has click action plus description), reset on profile switch and on New connection, typed
+  password in no `Text`/`EditableText` while masked, pill/drawer pill/banner icon per status (not checked, Checking, Checked
+  unlocked/locked, Declared unlocked/locked, Unreadable), the only content descriptions are the two toggle strings and
+  every `icon:*` except visibility has none, brand/nav/add/delete/wifi_tethering/upload_file/visibility/lock-in-TLS-line
+  placement by bounds, `icon:check_circle` only after BothReachable (absent for the four failure results). The M1-12a pill
+  and name-ellipsis tests at 640 and 1280 are in the run and pass today. Tag contract: `icon:<mockup name>` on the icon
+  node itself (unmerged tree), toggle description on the same node as `icon:visibility` / `icon:visibility_off` is not
+  required (found by description). Sizes (18/24) are not asserted (no pixel tests).
+- 2026-11-04 (senior developer, step 3, branch `m1-12b-connections-icons`): four commits. (1) Password hint shortened to
+  `Blank keeps the saved password` (PNG 02 shows it whole). (2) Compile proof: `material-icons-extended:1.7.3` explicit
+  coordinate in `ui` commonMain (no version catalog in the repo), throwaway probe; `:ui:compileKotlinJvm`, `:ui:jvmTest` (compiles)
+  and `:desktopApp:compileKotlin` passed; stop rule not triggered. `:desktopApp:run` NOT run (it reads the real `~/.caerbannog`);
+  runtime proof is the `:ui:jvmTest` and `:ui:screenshotTest` runs, which render every icon (no NoSuchMethodError or
+  ClassNotFound). (3) `ConnectionsIcons.kt` (only file importing `androidx.compose.material.icons`; `AppIcon` enum, `PillTone.icon()`,
+  `ConnectionIcon` with `icon:<name>` tag, no description unless given), all slots per the table, reveal toggle
+  (`remember(selected?.name)`, `semantics { password() }` kept). Suite: core 111, data-rabbit 17, desktopApp 5, ui 98
+  (the brief said 97: that is `ConnectionsScreenUiTest` alone, plus `AppUiTest`), acceptance 43 (5 skipped); no
+  `ConnectionsScreenshotTest` in the default run. Two ui tests stay red, both test-side defects (production behaviour verified
+  by PNG): (a) hint test: `hasVisualOverflow` is true for any shrink-wrapped single-line `Text` with `TextOverflow.Ellipsis`
+  (the CA hint, which is plainly whole in the PNG, also reports `size.width 202 < multiParagraph.width 228` and
+  `hasVisualOverflow = true`; the hint's `getLineRight(0)` is 195.7 of 228); use `isLineEllipsized(0)` instead. (b) TLS-line
+  test: at 1280x880 the line is below the fold of the scrolling panel, so its bounds and the lock's are `0,0,0,0`; the test needs
+  `performScrollTo()` first. One deviation to decide: with the trailing upload icon the CA label `CA certificate (optional)`
+  wraps to two lines at 1280 (field 260dp wide) and the CA field is taller than the Password field (mockup: one line). Also the
+  three bottom buttons no longer fit one line with their icons (Save was squeezed to one letter wide), so that row is now a
+  `FlowRow` (Save wraps below when narrow). Installer size: not measured (`packageDmg` not run); extended jar 37.8 MB.
+  Manual user check pending.
+- 2026-11-04 (architect), ruling before verification (screenshot 02 looked at):
+  1. CA label: option (a). The label becomes exactly `CA certificate` (the hint `Blank uses the system trust store` keeps
+     saying it may stay blank; the field is optional by behaviour, and this is a deliberate, small deviation from the
+     mockup's `(optional)`; product impact none: no scenario or spec text uses the label). Production: `ConnectionsScreen.kt`
+     line ~206. Tests to change in `ConnectionsScreenUiTest.kt` (all literal `CA certificate (optional)` to `CA certificate`):
+     lines ~1142, 1210, 1218, 1418-1419 (test name and message too), 1826; keep the old-long-label absence checks
+     (`CA certificate (optional - blank uses the system trust store)`) and add one assertion that no node has the text
+     `CA certificate (optional)`. Keep a test that the CA and Password fields have equal heights / same y at 1280 (line 1218 does the y check; add heights equal).
+     Reject (b) (taller CA field breaks the grid row), (c) (poor), (d) (smaller label text departs from M3). Update the
+     M1-12a note and `docs/ux/Main.dc.html` is left as is (design source); say so in the Status.
+  2. Button row: `FlowRow` accepted (Save must never be squeezed; wrapping below is fine and keeps M3 button text size).
+     `@OptIn(ExperimentalLayoutApi::class)` is accepted for this one use; add a test that at the narrow panel width Save's
+     width is at least its text width (not one letter) if not already present.
+  3. Test defects confirmed: (a) the hint assertion must be `assertFalse(layout.isLineEllipsized(0))`, not
+     `hasVisualOverflow`; (b) the TLS-line test calls `performScrollTo()` on the text before reading bounds, and asserts
+     non-zero bounds. Both are test-only fixes.
+- 2026-11-04 (test developer, step 2b, tests only): (1) keep-password hint: `hasVisualOverflow` replaced; measured that
+  `isLineEllipsized(0)` stays false for a truncated line here (80dp mutation: lineEnd 10 of 30, ellipsized=false), so the test
+  asserts `!isLineEllipsized(0)` and `getLineEnd(0, visibleEnd = true) == hint.length`. Mutation-proved: red with the hint
+  forced to 80dp (`expected: <30> but was: <10>`), green on production. (2) TLS-line test scrolls to the text and asserts it
+  is laid out (non-zero bounds). (3) CA label is now `CA certificate` everywhere in the tests; added: no node mentions
+  `CA certificate (optional)`, and Password and CA fields have equal heights at 1280. (4) new test: at 480 wide Save is at
+  least as wide as its text and its label is one line; mutation-proved (FlowRow temporarily replaced by Row in production,
+  reverted: red, `lineCount expected 1 but was 4`). Suite 98 tests, 4 red, all CA-label tests (intended until production
+  drops '(optional)'): labels test, field order, collapse to one column, trailing icons.
+- 2026-11-04 (senior developer, step 3b): CA label is now `CA certificate` (one line, level with Password at 1280; checked in all four PNGs). Suite green: core 111, data-rabbit 17, desktopApp 5, ui 99 (the test developer added one), acceptance 43 (5 skipped); no ConnectionsScreenshotTest in the default run. Only ConnectionsScreen.kt line 206 changed.
+- 2026-11-04 (test developer, step 4, verify, branch `m1-12b-connections-icons`): pass, no blocker or major. Clean `./gradlew test
+  --rerun-tasks --continue` green: core 111, data-rabbit 17, desktopApp 5, ui 99, acceptance 43 (5 skipped, 0 failed); no
+  ConnectionsScreenshotTest in the default run; `test --dry-run` lists `:core:test` and `:ui:test`, not screenshotTest or keychainTest.
+  `:ui:screenshotTest` green; all four PNGs looked at: brand, nav, add, pill, banner, eye, upload, TLS lock, delete and wifi icons
+  in place, no truncation, Password and CA fields level, hint whole, Save wraps below the fold of the scroll panel (reachable).
+  18 mutations run, 17 caught by a failing test (revert with `git checkout`, tree clean). One equivalent mutant: removing
+  `semantics { password() }` is not detected because the field already carries the Password semantics from the framework (the
+  existing test asserts it masked and shown) - minor, no action. Dependency diff: only material-icons-extended:1.7.3; only
+  ConnectionsIcons.kt imports `androidx.compose.material.icons`; ui does not import data-rabbit; reveal state only in the screen.
+  Not run: `:desktopApp:run`, keychainTest, packageDmg, manual look.
+
+### Step 5: architect review (2026-11-04) - verdict: Accepted
+Reviewed `git diff main...m1-12b-connections-icons` (8 files) against the brief, the rulings, `docs/ux/Main.dc.html`,
+`m3.css` and the test report. Not reviewed: packageDmg and installer size, pixel sizes (visual only), keyboard focus beyond
+the click-target test, `@broker`, `:desktopApp:run` (never run, reads the real `~/.caerbannog`).
+
+| # | Severity | File | Finding | Action |
+| --- | --- | --- | --- | --- |
+| 1 | minor | ConnectionsIcons.kt:3-24 | Imports not in alphabetical order (`androidx.compose.material.icons` after `ui.unit`). | Fix when ktlint is chosen. |
+| 2 | idea | ConnectionsIcons.kt | `AppIcon` enum plus one `when` is right for 12 icons: one import point, exhaustive. Keep. | none |
+| 3 | idea | ConnectionsScreen.kt (toggle) | Description on the `Icon` inside the `IconButton` is as briefed and gives the button its name in the merged tree. Keep. | none |
+| 4 | idea | ConnectionsScreen.kt EditPanel | `@OptIn(ExperimentalLayoutApi::class)` for FlowRow is narrow (one function). When EditPanel is split in M2, keep the opt-in next to the FlowRow. | none |
+| 5 | minor | ConnectionsScreen.kt | `visibility` toggle shows a Password hint with no change to rules; `semantics { password() }` kept (survivor mutant is equivalent, harmless). | none |
+
+Good: one new dependency, one import point, passwordVisible is local state reset by `remember(selected?.name)`, no
+behaviour change to M1-06/07/10/12a, decorative icons have no description, FlowRow fixes the squeezed Save with a test.
+Dependency maintenance: `material-icons-extended` is frozen at 1.7.3 (no 1.9 release). It works with Compose Multiplatform
+1.9.3 / Kotlin 2.4.21 today because icons are plain `ImageVector` data. Revisit when (a) a Compose Multiplatform or Kotlin
+upgrade breaks compilation or gives a runtime error, (b) an icon newer than 2024 is needed, or (c) installer size matters
+(+~38 MB jar; consider ProGuard or a move to Compose resources with SVG). Because only `ConnectionsIcons.kt` imports it, the
+move replaces that file alone. Do not add other files that import `androidx.compose.material.icons`.
+Deviation: CA label is `CA certificate` (no "(optional)", ruled). Design source updated: `docs/ux/Main.dc.html` line 82 now
+reads `CA certificate`, so mockup and build agree.
+Result: M1-12b done on the branch, not merged, not pushed.

@@ -4,6 +4,8 @@ import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,12 +37,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
@@ -113,6 +119,7 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
 }
 
 /** `null` for [originalName] means "New connection" - [onSave] adds rather than updates. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EditPanel(
     state: ConnectionsState,
@@ -129,6 +136,8 @@ private fun EditPanel(
     var virtualHost by remember(selected?.name) { mutableStateOf(selected?.virtualHost ?: "/") }
     var username by remember(selected?.name) { mutableStateOf(selected?.username.orEmpty()) }
     var password by remember(selected?.name) { mutableStateOf("") }
+    // Local UI state only: never in the view model or on disk. Masked again when another profile is selected.
+    var passwordVisible by remember(selected?.name) { mutableStateOf(false) }
     var caCertificatePath by remember(selected?.name) { mutableStateOf(selected?.caCertificatePath.orEmpty()) }
     // Form state like every other field: applied on Save only. pendingLevel non-null = confirmation open.
     var level by remember(selected?.name) { mutableStateOf(selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY) }
@@ -172,9 +181,18 @@ private fun EditPanel(
                             onValueChange = { password = it },
                             label = { Text("Password") },
                             supportingText = if (selected == null) null else {
-                                { Text("Leave blank to keep the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                { Text("Blank keeps the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                             },
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    ConnectionIcon(
+                                        icon = if (passwordVisible) AppIcon.VisibilityOff else AppIcon.Visibility,
+                                        size = IconSize,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    )
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().semantics { password() },
                         )
                     },
@@ -185,8 +203,9 @@ private fun EditPanel(
                                 caCertificatePath = path
                                 if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
                             },
-                            label = { Text("CA certificate (optional)") },
+                            label = { Text("CA certificate") },
                             supportingText = { Text("Blank uses the system trust store", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            trailingIcon = { ConnectionIcon(AppIcon.UploadFile, IconSize) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     },
@@ -234,7 +253,10 @@ private fun EditPanel(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Text("TLS is always on. The app does not connect without it.", style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ConnectionIcon(AppIcon.Lock, IconSize)
+                Text("TLS is always on. The app does not connect without it.", style = MaterialTheme.typography.bodySmall)
+            }
 
             state.lastCheckResult?.let { result ->
                 Spacer(modifier = Modifier.height(8.dp))
@@ -247,13 +269,21 @@ private fun EditPanel(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // FlowRow: with the button icons the three buttons no longer fit one line in a narrow panel (Save was squeezed).
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (selected != null) {
-                    TextButton(onClick = { onDeleteRequest(selected.name) }) { Text("Delete profile") }
+                    TextButton(onClick = { onDeleteRequest(selected.name) }) {
+                        ConnectionIcon(AppIcon.Delete, SmallIconSize)
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Delete profile")
+                    }
                 }
-                Spacer(modifier = Modifier.width(1.dp))
                 if (selected != null) {
-                    OutlinedButton(onClick = { onCheckConnection(selected.name) }) { Text("Check connection and permissions") }
+                    OutlinedButton(onClick = { onCheckConnection(selected.name) }) {
+                        ConnectionIcon(AppIcon.WifiTethering, SmallIconSize)
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Check connection and permissions")
+                    }
                 }
                 Button(onClick = {
                     val input = ConnectionProfileInput(
@@ -374,9 +404,12 @@ private fun PermissionCheckSection(banner: PermissionBanner) {
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().testTag("permissionBanner"),
         ) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(banner.headline, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                banner.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                banner.tone.icon()?.let { ConnectionIcon(it, IconSize) }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(banner.headline, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    banner.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
             }
         }
         // Outside the banner Surface on purpose: it is a note about the banner, not part of the verdict.
@@ -405,7 +438,12 @@ private fun CheckConnectionBanner(result: ConnectionCheckResult) {
             "The connection was refused. The app does not connect without TLS."
     }
     if (result is ConnectionCheckResult.BothReachable) {
-        Surface(color = MaterialTheme.colorScheme.primaryContainer) { Text(text, modifier = Modifier.padding(12.dp)) }
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ConnectionIcon(AppIcon.CheckCircle, IconSize)
+                Text(text, modifier = Modifier.weight(1f))
+            }
+        }
     } else {
         ErrorBanner(text)
     }

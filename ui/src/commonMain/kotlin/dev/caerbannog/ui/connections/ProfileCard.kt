@@ -123,14 +123,14 @@ internal object PermissionColors {
 internal fun PermissionPillView(pill: PermissionPill, modifier: Modifier = Modifier) {
     val (text, tone) = pill
     Surface(color = PermissionColors.container(tone), contentColor = PermissionColors.content(tone), shape = RoundedCornerShape(12.dp), modifier = modifier) {
-        Text(
-            text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            softWrap = false,
+        Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).heightIn(min = 16.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            tone.icon()?.let { ConnectionIcon(it, SmallIconSize) }
+            Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+        }
     }
 }
 
