@@ -57,6 +57,13 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
     button "Check connection and permissions" and after a successful Save of an existing profile. After launch every
     pill reads "Not checked". The user should confirm or change this before M2.
   - Moved to `M1-12`: column widths and card colours (item 5), icons in pill and banner.
+- Round 2, step 2 (tests first, test developer): red as expected, 8 failing tests. Core (4): delete or rename while a
+  gated check is in flight leaves no entry; reuse of the old name reads 'Not checked' (one test after the late result,
+  one strict test with the late result arriving after the reuse). UI (4): card takes focus and Enter / Space selects
+  it; dim note under tag `permissionDimNote`, not inside `permissionBanner` (two tests, incl. the updated old one).
+  Also added: dim note absent without declaration, before a check, when the declaration is used; single-line pill via
+  `GetTextLayoutResult` (already green); unmerged-tree lookups everywhere. Colours stay manual:
+  `PermissionColors` is a private composable-only object, not testable as data.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

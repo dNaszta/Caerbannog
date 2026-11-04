@@ -2,6 +2,8 @@ package dev.caerbannog.ui.connections
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
@@ -9,9 +11,13 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -19,6 +25,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -842,7 +849,7 @@ class ConnectionsScreenUiTest {
 
         assertTagged("permissionPill:prod-eu", "Can change topology (declared)")
         assertTagged("permissionBanner", "You declared that svc-explorer can change topology and can publish test messages.")
-        onNodeWithText("Your declaration is not used, because the broker answered.").assertDoesNotExist()
+        onNodeWithText("Your declaration is not used, because the broker answered.", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -856,7 +863,7 @@ class ConnectionsScreenUiTest {
         checkButton()
 
         assertTagged("permissionPill:prod-eu", "Topology locked")
-        assertTagged("permissionBanner", "Your declaration is not used, because the broker answered.")
+        assertTagged("permissionDimNote", "Your declaration is not used, because the broker answered.")
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -954,7 +961,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
 
-        onNodeWithTag("editPanelScrollbar").assertExists()
+        onNodeWithTag("editPanelScrollbar", useUnmergedTree = true).assertExists()
         onNodeWithText("Save").performScrollTo().assertExists()
     }
 
@@ -981,9 +988,9 @@ class ConnectionsScreenUiTest {
     fun `the New connection panel has no permission banner and no pill`() = runDesktopComposeUiTest {
         setContent { ConnectionsScreen(permissionViewModel()) }
 
-        onNodeWithTag("permissionBanner").assertDoesNotExist()
-        onNodeWithText("Permission check has not run yet.").assertDoesNotExist()
-        onNodeWithText("Not checked").assertDoesNotExist()
+        onNodeWithTag("permissionBanner", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithText("Permission check has not run yet.", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithText("Not checked", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -996,7 +1003,7 @@ class ConnectionsScreenUiTest {
         onAllNodesWithText("New connection")[0].performClick()
         waitForIdle()
 
-        onNodeWithTag("permissionBanner").assertDoesNotExist()
+        onNodeWithTag("permissionBanner", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -1009,5 +1016,119 @@ class ConnectionsScreenUiTest {
         assertTagged("permissionPill:prod-eu", "Not checked")
         assertTagged("permissionBanner", "Permission check has not run yet.")
         assertEquals(0, fakeChecker.calls.size)
+    }
+
+    // --- Round 2: dim note outside the banner, keyboard focus on the card, single-line pill ----------
+
+    private val dimText = "Your declaration is not used, because the broker answered."
+    private val declaringProd get() = prod.copy(declaredPermissions = DeclaredPermissions(configure = true, write = true))
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.dimNoteNodes() = onAllNodesWithTag("permissionDimNote", useUnmergedTree = true)
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the dim note is its own line under the dim note tag and not inside the banner`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = false)
+        setContent { ConnectionsScreen(permissionViewModel(declaringProd)) }
+        selectProfile(0)
+
+        checkButton()
+
+        assertTagged("permissionDimNote", dimText)
+        onNode(hasTestTag("permissionBanner").and(hasAnyDescendant(hasText(dimText))), useUnmergedTree = true)
+            .assertDoesNotExist()
+        onNode(hasTestTag("permissionBanner").and(hasAnyDescendant(hasTestTag("permissionDimNote"))), useUnmergedTree = true)
+            .assertDoesNotExist()
+        assertTagged("permissionBanner", "svc-explorer cannot change topology on virtual host /.")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `no dim note without a declaration`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        checkButton()
+
+        assertTagged("permissionBanner", "svc-explorer can change topology on virtual host /.")
+        dimNoteNodes().assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `no dim note before any check, even with a declaration`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(declaringProd)) }
+        selectProfile(0)
+
+        dimNoteNodes().assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `no dim note when the declaration is used`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+        setContent { ConnectionsScreen(permissionViewModel(declaringProd)) }
+        selectProfile(0)
+
+        checkButton()
+
+        assertTagged("permissionPill:prod-eu", "Can change topology (declared)")
+        dimNoteNodes().assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.card() = onNode(
+        hasClickAction().and(hasAnyDescendant(hasTestTag("permissionPill:prod-eu"))),
+        useUnmergedTree = true,
+    )
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the profile card takes keyboard focus and Enter selects it`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        card().performSemanticsAction(SemanticsActions.RequestFocus)
+        card().assertIsFocused()
+        card().performKeyInput { pressKey(Key.Enter) }
+        waitForIdle()
+
+        onNodeWithText("Edit connection").assertExists()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the profile card takes keyboard focus and Space selects it`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        card().performSemanticsAction(SemanticsActions.RequestFocus)
+        card().assertIsFocused()
+        card().performKeyInput { pressKey(Key.Spacebar) }
+        waitForIdle()
+
+        onNodeWithText("Edit connection").assertExists()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the long declared pill text stays on one line`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+        val longName = prod.copy(
+            name = "a-rather-long-profile-name-for-a-narrow-card",
+            declaredPermissions = DeclaredPermissions(configure = true, write = true),
+        )
+        setContent { ConnectionsScreen(permissionViewModel(longName)) }
+        selectProfile(0)
+        checkButton()
+
+        val text = "Can change topology (declared)"
+        val node = onNode(
+            hasText(text).and(hasAnyAncestor(hasTestTag("permissionPill:${longName.name}")).or(hasTestTag("permissionPill:${longName.name}"))),
+            useUnmergedTree = true,
+        ).fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        val ok = node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts) ?: false
+        assertEquals(true, ok, "the pill text must expose its layout")
+        assertEquals(1, layouts.single().lineCount, "the pill text '$text' must not wrap in the 280dp card")
     }
 }

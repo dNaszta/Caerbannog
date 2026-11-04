@@ -59,9 +59,14 @@ class ConnectionsViewModelPermissionChecksTest {
     private class GatedChecker : PermissionChecker {
         var result: PermissionCheckResult = PermissionCheckResult.Checked(true, true)
         var gate: CompletableDeferred<Unit>? = null
+        /** Holds only the next call (then cleared), so a later call in the same test is not blocked. */
+        var firstCallGate: CompletableDeferred<Unit>? = null
         val calls = mutableListOf<ConnectionProfile>()
         override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
             calls += profile
+            val once = firstCallGate
+            firstCallGate = null
+            once?.await()
             gate?.await()
             return result
         }
@@ -279,5 +284,68 @@ class ConnectionsViewModelPermissionChecksTest {
 
         assertEquals(setOf("prod-eu"), checks().keys)
         assertTrue(session.isUsable("prod-eu"))
+    }
+
+    // --- stale writes: a late result must not resurrect a deleted or renamed profile (round 2) ------
+
+    @Test
+    fun `a profile deleted while its check is in flight leaves no entry when the check completes`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        assertEquals(PermissionCheckStatus.Checking, checks()["prod-eu"], "precondition: check in flight")
+
+        vm.requestDelete("prod-eu")
+        vm.confirmDelete()
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertEquals(emptyMap(), checks(), "the late result must not come back for a deleted profile")
+    }
+
+    @Test
+    fun `a profile renamed while its check is in flight leaves no entry under the old name`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        assertEquals(PermissionCheckStatus.Checking, checks()["prod-eu"], "precondition: check in flight")
+
+        val renamed = vm.saveProfileChanges("prod-eu", input(name = "prod-eu-2"))
+        assertIs<SaveConnectionResult.Saved>(renamed)
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertEquals(setOf("prod-eu-2"), checks().keys, "the old name must stay gone after the late result")
+        assertNull(checks()["prod-eu"])
+    }
+
+    @Test
+    fun `a new profile that reuses the old name reads Not checked after the late result`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        vm.saveProfileChanges("prod-eu", input(name = "prod-eu-2"))
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertIs<SaveConnectionResult.Saved>(vm.addConnection(input(name = "prod-eu")))
+
+        assertNull(checks()["prod-eu"], "no entry means 'Not checked' for the new profile")
+    }
+
+    // Strictest case: the name is reused while the old check is still in flight. A guard that only asks "does
+    // a profile with this name exist" would let the old result through; this test asks for more (see report).
+    @Test
+    fun `the late result of the old profile does not appear on a profile that reused its name`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        checker.firstCallGate = gate
+        checker.result = PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true)
+        val job = launch(Dispatchers.Unconfined) { vm.checkConnectionAndPermissions("prod-eu") }
+        vm.saveProfileChanges("prod-eu", input(name = "prod-eu-2"))
+        assertIs<SaveConnectionResult.Saved>(vm.addConnection(input(name = "prod-eu")))
+        gate.complete(Unit)
+        withTimeout(10_000) { job.join() }
+
+        assertNull(checks()["prod-eu"], "the new profile was never checked")
     }
 }
