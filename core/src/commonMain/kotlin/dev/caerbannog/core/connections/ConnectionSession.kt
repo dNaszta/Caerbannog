@@ -5,12 +5,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
 
 /** The connection the user is working with: its name and what is known about its permission check. */
 data class CurrentConnection(
     val name: String,
     /** Null means not checked yet; [PermissionCheckStatus.Checking] and [PermissionCheckStatus.Done] otherwise. */
     val status: PermissionCheckStatus?,
+)
+
+/** Everything a reader may see of a [ConnectionSession], in one immutable value. */
+data class SessionState(
+    /** Checking from the start of a check, Done at the end; no entry means not checked. */
+    val statuses: Map<String, PermissionCheckStatus> = emptyMap(),
+    /** The chosen connection, or null; its status is always the one in [statuses]. */
+    val current: CurrentConnection? = null,
 )
 
 /**
@@ -22,47 +31,57 @@ class ConnectionSession(
     private val checker: PermissionChecker,
     private val secretStore: SecretStore,
 ) {
-    // One immutable snapshot, changed only through atomic updates, so a check, a forget and a select can
-    // never see each other half-done. Tokens: every started check gets the next number; only the latest
-    // started check per name may write its result.
-    private data class Snapshot(
-        val statuses: Map<String, PermissionCheckStatus> = emptyMap(),
-        val tokens: Map<String, Long> = emptyMap(),
-        val lastToken: Long = 0,
-        val currentName: String? = null,
-    ) {
-        val current: CurrentConnection? get() = currentName?.let { CurrentConnection(it, statuses[it]) }
+    // Tokens: every started check gets the next number; only the latest started check per name may write
+    // its result. They are private bookkeeping next to the public state, so a change touches two values and
+    // is serialized by a short lock (pure map operations, never held across a suspension). Readers of
+    // [state] never take the lock and always see one complete SessionState.
+    private data class Tokens(val byName: Map<String, Long> = emptyMap(), val last: Long = 0)
+
+    private val lock = Mutex()
+    private var tokens = Tokens()
+    private val _state = MutableStateFlow(SessionState())
+    private val listeners = MutableStateFlow<List<() -> Unit>>(emptyList())
+
+    /**
+     * The one public view of the session: statuses (Checking from the start of [open], Done at the end; no
+     * entry means not checked; only the latest started check shows) and the current connection chosen with
+     * [select] (cleared by [forget] of that name). Every value is complete: `current.status` always equals
+     * the status of that name.
+     */
+    val state: StateFlow<SessionState> = _state.asStateFlow()
+
+    /**
+     * Calls [onChange] on the writing thread after every change of [state], so a holder that derives its own
+     * state can follow synchronously without owning a coroutine scope. The callback should read [state] (the
+     * latest value), not rely on the order of calls. Returns the function that unregisters it; the session
+     * keeps a reference until then, so a holder that outlives its use must call it.
+     */
+    fun observe(onChange: () -> Unit): () -> Unit {
+        listeners.update { it + onChange }
+        return { listeners.update { current -> current - onChange } }
     }
 
-    private val snapshot = MutableStateFlow(Snapshot())
-    private val _statuses = MutableStateFlow<Map<String, PermissionCheckStatus>>(emptyMap())
-    private val _current = MutableStateFlow<CurrentConnection?>(null)
-
-    /** Checking from the start of [open], Done at the end; no entry means not checked. Only the latest started check shows. */
-    val statuses: StateFlow<Map<String, PermissionCheckStatus>> = _statuses.asStateFlow()
-
-    /** The connection chosen with [select], or null; cleared by [forget] of that name. */
-    val current: StateFlow<CurrentConnection?> = _current.asStateFlow()
-
-    private fun change(transform: (Snapshot) -> Snapshot) {
-        snapshot.update(transform)
-        publish()
-    }
-
-    // The public flows are copies of the snapshot. Two threads may publish out of order, so each one
-    // re-reads until what it wrote is the latest snapshot: the last writer always converges.
-    private fun publish() {
-        while (true) {
-            val seen = snapshot.value
-            _statuses.value = seen.statuses
-            _current.value = seen.current
-            if (snapshot.value === seen) return
+    // Runs [transform] on the tokens and the public state as one step; null means no change.
+    private fun change(transform: (Tokens, SessionState) -> Pair<Tokens, SessionState>?) {
+        // Spin on tryLock: the critical section is a few map operations, and this stays non-suspending.
+        while (!lock.tryLock()) Unit
+        try {
+            val next = transform(tokens, _state.value) ?: return
+            tokens = next.first
+            _state.value = next.second.withCurrentStatus()
+        } finally {
+            lock.unlock()
         }
+        listeners.value.forEach { it() }
     }
+
+    // `current` is derived from statuses and the chosen name, so the pair cannot drift.
+    private fun SessionState.withCurrentStatus(): SessionState =
+        current?.let { copy(current = it.copy(status = statuses[it.name])) } ?: this
 
     /** Makes [name] the current connection without a check or a lookup; shows its stored result at once, if any. */
     fun select(name: String) {
-        change { it.copy(currentName = name) }
+        change { t, s -> t to s.copy(current = CurrentConnection(name, null)) }
     }
 
     /**
@@ -72,28 +91,24 @@ class ConnectionSession(
      *
      * Only the latest STARTED check per name is kept: if a newer check of the same name started, or the name
      * was forgotten, this check's result is dropped from session state. The return value is always this
-     * check's own result, so callers must read [statuses], [current] or [permissions] for what is current.
+     * check's own result, so callers must read [state] or [permissions] for what is current.
      */
     suspend fun open(profile: ConnectionProfile): PermissionCheckResult {
         val name = profile.name
         var token = 0L
-        change {
-            token = it.lastToken + 1
-            it.copy(
-                statuses = it.statuses + (name to PermissionCheckStatus.Checking),
-                tokens = it.tokens + (name to token),
-                lastToken = token,
-            )
+        change { t, s ->
+            token = t.last + 1
+            Tokens(t.byName + (name to token), token) to s.copy(statuses = s.statuses + (name to PermissionCheckStatus.Checking))
         }
         val result = try {
             check(profile)
         } catch (e: CancellationException) {
             // A cancelled check must not leave "Checking" behind, unless a newer check owns the name.
-            change { if (it.tokens[name] == token) it.copy(statuses = it.statuses - name, tokens = it.tokens - name) else it }
+            change { t, s -> if (t.byName[name] == token) Tokens(t.byName - name, t.last) to s.copy(statuses = s.statuses - name) else null }
             throw e
         }
-        change {
-            if (it.tokens[name] == token) it.copy(statuses = it.statuses + (name to PermissionCheckStatus.Done(result))) else it
+        change { t, s ->
+            if (t.byName[name] == token) t to s.copy(statuses = s.statuses + (name to PermissionCheckStatus.Done(result))) else null
         }
         return result
     }
@@ -127,20 +142,17 @@ class ConnectionSession(
 
     /** Drops the stored result and invalidates a running check, e.g. for the old name after a rename or a delete. */
     fun forget(name: String) {
-        change {
-            it.copy(
-                statuses = it.statuses - name,
-                tokens = it.tokens - name,
-                currentName = it.currentName.takeUnless { current -> current == name },
-            )
+        change { t, s ->
+            Tokens(t.byName - name, t.last) to
+                s.copy(statuses = s.statuses - name, current = s.current.takeUnless { it?.name == name })
         }
     }
 
     /** True once a check finished; Checking is not usable. */
-    fun isUsable(name: String): Boolean = snapshot.value.statuses[name] is PermissionCheckStatus.Done
+    fun isUsable(name: String): Boolean = _state.value.statuses[name] is PermissionCheckStatus.Done
 
     /** The finished result, or null while checking or not checked. */
-    fun permissions(name: String): PermissionCheckResult? = (snapshot.value.statuses[name] as? PermissionCheckStatus.Done)?.result
+    fun permissions(name: String): PermissionCheckResult? = (_state.value.statuses[name] as? PermissionCheckStatus.Done)?.result
 
     private fun applyDeclaration(profile: ConnectionProfile, result: PermissionCheckResult): PermissionCheckResult {
         val declared = profile.declaredPermissions

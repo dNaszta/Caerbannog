@@ -1,12 +1,8 @@
 package dev.caerbannog.core.connections
 
-import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
@@ -25,11 +21,36 @@ class ConnectionsViewModel(
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 
+    // The session tells this view model after each of its changes; the view model copies the latest session
+    // state into its own single MutableStateFlow. No scope or custom StateFlow is needed, and `state.value` is
+    // already current when the session call that changed it returns. Problem solved: derived state without a
+    // coroutine scope that someone must close.
+    private val stopObserving: () -> Unit = session?.let { live ->
+        val unregister = live.observe { applySession(live) }
+        applySession(live)
+        unregister
+    } ?: {}
+
     /**
      * What the screen shows: the view model's own state with the permission checks and the current connection
-     * read from the [ConnectionSession] (one source of truth). Readable synchronously from `value`.
+     * of the [ConnectionSession] laid over it (the session stays the one source of truth). Plain
+     * [StateFlow]: collect it or read `value` synchronously.
      */
-    val state: StateFlow<ConnectionsState> = SessionMirroredState(_state, session)
+    val state: StateFlow<ConnectionsState> = _state.asStateFlow()
+
+    /**
+     * Stops following the session. Optional: the view model and the session live for the whole window, so the
+     * composition root need not call it; call it when a view model is dropped while its session lives on.
+     */
+    fun close() = stopObserving()
+
+    // Reads the session inside the transform, so a retry or a late call always applies the latest state.
+    private fun applySession(live: ConnectionSession) {
+        _state.update {
+            val seen = live.state.value
+            it.copy(permissionChecks = seen.statuses, currentConnection = seen.current)
+        }
+    }
 
     /** Adds a brand-new profile; without an explicit level it starts at [TopologyControlLevel.READ_ONLY]. */
     fun addConnection(input: ConnectionProfileInput): SaveConnectionResult {
@@ -239,34 +260,4 @@ class ConnectionsViewModel(
     private fun profileNamed(name: String): ConnectionProfile =
         repository.list().firstOrNull { it.name == name }
             ?: error("No saved connection named '$name'")
-}
-
-/**
- * [ConnectionsState] with the session's statuses and current connection laid over it. A combined flow that
- * also answers `value` synchronously, so no scope has to be owned by the view model; the session flows are
- * the source of truth and nothing here is copied or cached.
- */
-@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
-private class SessionMirroredState(
-    private val own: StateFlow<ConnectionsState>,
-    private val session: ConnectionSession?,
-) : StateFlow<ConnectionsState> {
-    private fun overlay(base: ConnectionsState, statuses: Map<String, PermissionCheckStatus>, current: CurrentConnection?) =
-        base.copy(permissionChecks = statuses, currentConnection = current)
-
-    override val value: ConnectionsState
-        get() = overlay(own.value, session?.statuses?.value.orEmpty(), session?.current?.value)
-
-    override val replayCache: List<ConnectionsState> get() = listOf(value)
-
-    override suspend fun collect(collector: FlowCollector<ConnectionsState>): Nothing {
-        val live = session
-        val source: Flow<ConnectionsState> = if (live == null) {
-            own
-        } else {
-            combine(own, live.statuses, live.current, ::overlay)
-        }
-        source.distinctUntilChanged().collect(collector)
-        error("A state flow never completes")
-    }
 }
