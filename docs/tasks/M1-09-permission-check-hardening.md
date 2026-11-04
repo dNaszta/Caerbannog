@@ -126,5 +126,9 @@ Tests first and failing for the right reason, no unrelated changes, M1-03 brief 
 - Round: 0, step 4 done (test developer): pass with findings, no blocker or major. Independent run: core 48, data-rabbit 13 (default) + 11 (brokerTest, Docker, green), ui 19, acceptance 38 (7 skipped, all by design: @needs-M1-06 x2, @needs-M1-07 x2, @needs-M2 x2, @broker x1), desktopApp 3.
   - Mutants killed: no checker catch, swallowed cancellation (checker), e.message in detail, declaration on retrieve failure, non-atomic map update (15 of 15 runs), dropped URISyntaxException catch, UNEXPECTED text naming the management API. Survived: (a) HttpTimeoutException mapped to UNREACHABLE (no test, by design in the brief); (b) swallowing CancellationException around `secretStore.retrieve` (minor, no test).
   - Flakiness: core session and view model tests 20 of 20 green, `PermissionCheckerFailureTest` 10 of 10 green.
+- Round: 0, step 5 done (architect): **Accepted with follow-ups.** Done.
+  - Follow-up (minor, test-only, do in the M1-07 test step or any later commit): add `a secret store that throws CancellationException makes open throw and leaves isUsable false` in `ConnectionSessionTest`. Code is already correct; the mutant survives only for lack of a test.
+  - Idea, not a task: `forget(name)` during an in-flight `open` is overwritten when the check finishes (same last-wins rule). Revisit if rename-while-checking shows up in M1-07.
+  - Unverified, stays open: real connect timeout to a blackhole (`HttpConnectTimeoutException` is covered by the type catch only).
 - Branch: `m1-09-permission-check-hardening`, based on `main`. Not pushed.
 - Must land before `M1-07-permission-state-ui`.
