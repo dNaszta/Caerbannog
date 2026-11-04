@@ -9,3 +9,4 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M1-02-connection-profiles | Connection profiles | M1 | done |
 | M1-04-connections-screen-feedback-gaps | Connections screen: surface save errors, clear stale banners | M1 | not started |
 | M1-05-wire-desktopapp-connections | Wire desktopApp to the real Connections screen | M1 | not started |
+| M1-TASKFILE-02-test-task-runs-all-modules | `./gradlew test` / `task test` must also run core and ui `jvmTest` | M1 | done (architect: Accepted, 2026-11-04; branch not yet merged to `main`) |
