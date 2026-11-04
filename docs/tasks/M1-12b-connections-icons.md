@@ -214,3 +214,4 @@ installer notes, manual check recorded.
   least as wide as its text and its label is one line; mutation-proved (FlowRow temporarily replaced by Row in production,
   reverted: red, `lineCount expected 1 but was 4`). Suite 98 tests, 4 red, all CA-label tests (intended until production
   drops '(optional)'): labels test, field order, collapse to one column, trailing icons.
+- 2026-11-04 (senior developer, step 3b): CA label is now `CA certificate` (one line, level with Password at 1280; checked in all four PNGs). Suite green: core 111, data-rabbit 17, desktopApp 5, ui 99 (the test developer added one), acceptance 43 (5 skipped); no ConnectionsScreenshotTest in the default run. Only ConnectionsScreen.kt line 206 changed.

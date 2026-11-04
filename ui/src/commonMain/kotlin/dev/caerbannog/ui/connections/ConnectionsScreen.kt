@@ -203,7 +203,7 @@ private fun EditPanel(
                                 caCertificatePath = path
                                 if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
                             },
-                            label = { Text("CA certificate (optional)") },
+                            label = { Text("CA certificate") },
                             supportingText = { Text("Blank uses the system trust store", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             trailingIcon = { ConnectionIcon(AppIcon.UploadFile, IconSize) },
                             modifier = Modifier.fillMaxWidth(),
