@@ -63,6 +63,13 @@ Feature: Connect and disconnect
     And topology is locked (see 02, safest mode)
 
   @fake-broker
+  Scenario: A user without the management tag is connected but sees no lists
+    Given the broker answers "Not management user" for the user of "uat-eu"
+    When I connect to "uat-eu"
+    Then its state is "Connected"
+    And the stream and publisher lists are replaced by the message "This user cannot read stream statistics. Ask for the monitoring tag."
+
+  @fake-broker
   Scenario: The stream protocol is unavailable but the connection is usable
     Given the stream port of "uat-eu" does not answer
     When I connect to "uat-eu"

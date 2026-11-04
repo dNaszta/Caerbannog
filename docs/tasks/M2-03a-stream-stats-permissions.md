@@ -78,5 +78,18 @@ Item 6, one Environment: build (locator connect plus TLS) 17 to 32 ms; 20 sequen
 
 For the product owner: no decision needed. D7 (a) is implementable as decided (profile CA, host name not verified) with `endpointIdentificationAlgorithm(null)`; the M5 per-profile switch can later pass `"HTTPS"`. Not run: keychainTest, desktopApp, any non-admin publish or consumer.
 
+### Architect review (2026-11-04): Accepted with follow-ups
+Reviewed: `StreamClientSpikeTest.kt` (TLS, credentials, unreachable, matrix tests read in full or in the relevant parts), the Status, the diff stat (test class, this brief, README only; no production code, no build file change). Not reviewed: I did not rerun the tests; the two green runs (14 tests, about 73 s each) and the fast suite are as reported by the test developer.
+
+| # | Severity | File:line | Finding | Suggested fix |
+| --- | --- | --- | --- | --- |
+| 1 | minor | `StreamClientSpikeTest.kt` closed-port and non-routable tests | Two `println` lines carry timings that are not asserted (the asserts are only `< 10 s`). Acceptable for a spike; the recorded numbers live in Status | None; do not copy into M2-03 tests |
+| 2 | minor | non-routable test | Machine dependent (a network that answers "unreachable" at once passes through the `ConnectionStreamException` branch); the bound is the only assertion, stated as optional in the test | None; M2-03 must not rely on it |
+| 3 | minor | `assumeTrue` gaps in (a), (b) and the netty-default test | Skipped silently on a machine with no second name; Status states the gap honestly and (c) plus the SAN-name control still run | M2-03 TLS test: same pattern, and try a DNS-name SAN mismatch when possible |
+| 4 | idea | management helper `trustAllManagement` | Trust-all exists only for the admin REST helper (the same as the M2-02 spike), not in any stream TLS item: the TLS items use CA-only contexts (checked) | None |
+| 5 | idea | Status "Not covered" | The virtual host the `Environment` uses was not tried | Follow-up inside M2-03 (brief updated), not a new task |
+
+Good: assertions on exception class and stable message fragments, not prints; the negative controls ((b), (c), Netty default pinned with a version check) make the TLS result meaningful; no sleeps outside the bounded poll helper; unique names and cleanup; the password is asserted absent from exception chains and 401 bodies; the finding that Netty 4.2 verifies host names by default is the most valuable result for the product code.
+
 ## Definition of done
 Tests written first and passing twice with `--rerun-tasks`, no production change, no new dependency, Status filled. The architect then updates `docs/spec.md` ("Management API facts", the open question, the D7 TLS line if the finding changes it) and the M2-03 brief.
