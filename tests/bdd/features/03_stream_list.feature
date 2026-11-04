@@ -138,7 +138,7 @@ Feature: Stream list
   Scenario: The refresh interval is 5 seconds on a fresh install
     Given the app has no saved settings
     When I look at the refresh interval
-    Then the refresh interval is 5 seconds
+    Then the refresh interval shown is 5 seconds
 
   @fake-broker
   Scenario: A broker with no streams
