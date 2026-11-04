@@ -1,6 +1,10 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.connections.BrokerReachabilityChecker
+import dev.caerbannog.core.connections.ConnectionCheckResult
+import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
+import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.SaveConnectionResult
@@ -9,7 +13,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -77,32 +80,48 @@ class CompositionRootTest {
         assertTrue(!file.readText().contains(input.password!!), "password must not be written to the profiles file")
     }
 
-    // --- M1-07: the view model is wired to a ConnectionSession ------------------------------------
-    // There is no seam for the checker, so the test points the profile at a loopback port that was free a
-    // moment ago and is closed again: connection refused, deterministic, nothing leaves this machine.
+    // --- M1-07: the view model is wired to a ConnectionSession built from the injected checker ------
+    // Fake checkers only: no socket, no network, deterministic.
 
-    private fun closedLoopbackPort(): Int = ServerSocket(0).use { it.localPort }
+    private class FakeReachability : BrokerReachabilityChecker {
+        override suspend fun check(profile: ConnectionProfile) = ConnectionCheckResult.BothReachable
+    }
+
+    private class FakePermissions(val result: PermissionCheckResult) : PermissionChecker {
+        val passwords = mutableListOf<String>()
+        override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
+            passwords += password
+            return result
+        }
+    }
 
     @Test
-    fun `the view model runs a permission check through the session and shows Unreadable for a closed port`() = runBlocking {
-        val file = File(dir, "connections.json")
+    fun `the view model shows the injected checker's result through the session`() = runBlocking {
         val secrets = InMemorySecretStore()
-        val viewModel = createConnectionsViewModel(file, secrets)
-        val port = closedLoopbackPort()
-        viewModel.addConnection(input.copy(host = "127.0.0.1", streamPort = port, managementPort = port))
+        val fake = FakePermissions(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = false))
+        val viewModel = createConnectionsViewModel(
+            File(dir, "connections.json"), secrets, permissionChecker = fake, reachabilityChecker = FakeReachability(),
+        )
+        viewModel.addConnection(input)
 
         viewModel.checkConnectionAndPermissions(input.name)
 
-        val status = viewModel.state.value.permissionChecks[input.name]
-        val done = assertIs<PermissionCheckStatus.Done>(status, "the check must have produced a result, got $status")
-        assertIs<PermissionCheckResult.Unreadable>(done.result, "a closed port cannot be a verified result")
-        assertTrue(!done.result.topologyUnlocked, "an unreadable result locks topology")
+        assertEquals(
+            PermissionCheckStatus.Done(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = false)),
+            viewModel.state.value.permissionChecks[input.name],
+        )
+        assertEquals(ConnectionCheckResult.BothReachable, viewModel.state.value.lastCheckResult)
+        assertEquals(listOf(input.password), fake.passwords, "the session must read the password from the same secret store")
     }
 
     @Test
     fun `a fresh view model has not checked anything`() {
-        val viewModel = createConnectionsViewModel(File(dir, "connections.json"), InMemorySecretStore())
+        val fake = FakePermissions(PermissionCheckResult.Checked(true, true))
+        val viewModel = createConnectionsViewModel(
+            File(dir, "connections.json"), InMemorySecretStore(), permissionChecker = fake, reachabilityChecker = FakeReachability(),
+        )
 
         assertEquals(emptyMap(), viewModel.state.value.permissionChecks)
+        assertTrue(fake.passwords.isEmpty(), "no check at start-up")
     }
 }

@@ -164,7 +164,8 @@ class PermissionSummaryTest {
             val banner = permissionBanner(profile, done(unreadable))
             assertEquals(PillTone.LOCKED, banner.tone, "cause $cause")
             assertEquals(unreadable.userMessage, banner.headline, "cause $cause")
-            assertNull(banner.dimNote)
+            assertNull(banner.detail, "the unreadable banner has no detail ($cause)")
+            assertNull(banner.dimNote, "the unreadable banner has no dim note ($cause)")
         }
     }
 

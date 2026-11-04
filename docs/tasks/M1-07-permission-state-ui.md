@@ -18,6 +18,10 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   `selectProfile(i)` helper that clicks the card via its `permissionPill:<name>` tag); `CompositionRootTest`
   (closed loopback port, no network); `desktopApp` got a test-only coroutines dependency. Red: core, acceptance and
   desktopApp tests do not compile (missing contract types); `:ui:jvmTest` compiles and fails (32 of 54).
+- Step 2 follow-up (architect rulings): `CompositionRootTest` now passes fake checkers through the new
+  `permissionChecker`/`reachabilityChecker` parameters (red: compile error until the seam exists); UI tests added for
+  the New-connection panel without banner/pill and for the saved-but-unchecked case; core test asserts the Unreadable
+  banner has null detail and dimNote. Test-only `kotlinx-coroutines-core` in `desktopApp` accepted.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

@@ -964,4 +964,39 @@ class ConnectionsScreenUiTest {
         onNodeWithText("Password (leave blank to keep unchanged)").performTextInput("hunter2")
         onNodeWithText("hunter2").assertDoesNotExist()
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the New connection panel has no permission banner and no pill`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel()) }
+
+        onNodeWithTag("permissionBanner").assertDoesNotExist()
+        onNodeWithText("Permission check has not run yet.").assertDoesNotExist()
+        onNodeWithText("Not checked").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `starting a new connection after a saved one hides the permission banner`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        assertTagged("permissionBanner", "Permission check has not run yet.")
+
+        onAllNodesWithText("New connection")[0].performClick()
+        waitForIdle()
+
+        onNodeWithTag("permissionBanner").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a saved profile that was never checked shows Not checked and the neutral banner`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        assertTagged("permissionPill:prod-eu", "Not checked")
+        selectProfile(0)
+        assertTagged("permissionPill:prod-eu", "Not checked")
+        assertTagged("permissionBanner", "Permission check has not run yet.")
+        assertEquals(0, fakeChecker.calls.size)
+    }
 }
