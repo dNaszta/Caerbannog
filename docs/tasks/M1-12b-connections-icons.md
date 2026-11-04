@@ -205,3 +205,12 @@ installer notes, manual check recorded.
   3. Test defects confirmed: (a) the hint assertion must be `assertFalse(layout.isLineEllipsized(0))`, not
      `hasVisualOverflow`; (b) the TLS-line test calls `performScrollTo()` on the text before reading bounds, and asserts
      non-zero bounds. Both are test-only fixes.
+- 2026-11-04 (test developer, step 2b, tests only): (1) keep-password hint: `hasVisualOverflow` replaced; measured that
+  `isLineEllipsized(0)` stays false for a truncated line here (80dp mutation: lineEnd 10 of 30, ellipsized=false), so the test
+  asserts `!isLineEllipsized(0)` and `getLineEnd(0, visibleEnd = true) == hint.length`. Mutation-proved: red with the hint
+  forced to 80dp (`expected: <30> but was: <10>`), green on production. (2) TLS-line test scrolls to the text and asserts it
+  is laid out (non-zero bounds). (3) CA label is now `CA certificate` everywhere in the tests; added: no node mentions
+  `CA certificate (optional)`, and Password and CA fields have equal heights at 1280. (4) new test: at 480 wide Save is at
+  least as wide as its text and its label is one line; mutation-proved (FlowRow temporarily replaced by Row in production,
+  reverted: red, `lineCount expected 1 but was 4`). Suite 98 tests, 4 red, all CA-label tests (intended until production
+  drops '(optional)'): labels test, field order, collapse to one column, trailing icons.

@@ -1139,7 +1139,7 @@ class ConnectionsScreenUiTest {
         onNode(matcher, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
     private val gridLabelsInMockupOrder = listOf(
-        "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate (optional)",
+        "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate",
     )
 
     @OptIn(ExperimentalTestApi::class)
@@ -1207,7 +1207,7 @@ class ConnectionsScreenUiTest {
         assertEquals(gridLabelsInMockupOrder, readingOrder, "fields must read left to right, top to bottom in the mockup order; positions $pos")
 
         val left = listOf("Name", "Host", "Stream port (TLS)", "Password").map { pos.getValue(it) }
-        val right = listOf("Virtual host", "Username", "Management port (HTTPS)", "CA certificate (optional)").map { pos.getValue(it) }
+        val right = listOf("Virtual host", "Username", "Management port (HTTPS)", "CA certificate").map { pos.getValue(it) }
         assertEquals(1, left.map { it.x }.distinct().size, "left column must share one x: $left")
         assertEquals(1, right.map { it.x }.distinct().size, "right column must share one x: $right")
         assertTrue(right.first().x > left.first().x, "second column must be right of the first: $pos")
@@ -1215,7 +1215,10 @@ class ConnectionsScreenUiTest {
         assertEquals(pos.getValue("Name").y, pos.getValue("Virtual host").y, "Name and Virtual host share a row")
         assertEquals(pos.getValue("Host").y, pos.getValue("Username").y, "Host and Username share a row")
         assertEquals(pos.getValue("Stream port (TLS)").y, pos.getValue("Management port (HTTPS)").y, "the ports share a row")
-        assertEquals(pos.getValue("Password").y, pos.getValue("CA certificate (optional)").y, "Password and CA certificate share a row")
+        assertEquals(pos.getValue("Password").y, pos.getValue("CA certificate").y, "Password and CA certificate share a row")
+        val passwordHeight = gridField("Password").boundsInRoot.height
+        val caHeight = gridField("CA certificate").boundsInRoot.height
+        assertEquals(passwordHeight, caHeight, "the Password and CA fields must have equal heights at 1280")
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -1415,8 +1418,13 @@ class ConnectionsScreenUiTest {
 
                 val password = onAllNodes(hasText("Password").and(hasSetTextAction())).fetchSemanticsNodes()
                 assertEquals(1, password.size, "saved=$saved: exactly one field labelled exactly 'Password'")
-                val ca = onAllNodes(hasText("CA certificate (optional)").and(hasSetTextAction())).fetchSemanticsNodes()
-                assertEquals(1, ca.size, "saved=$saved: exactly one field labelled exactly 'CA certificate (optional)'")
+                val ca = onAllNodes(hasText("CA certificate").and(hasSetTextAction())).fetchSemanticsNodes()
+                assertEquals(1, ca.size, "saved=$saved: exactly one field labelled exactly 'CA certificate'")
+                assertEquals(0, textNodes("CA certificate (optional)").size, "saved=$saved: the '(optional)' label is gone")
+                assertEquals(
+                    0, onAllNodes(hasText("CA certificate (optional)", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size,
+                    "saved=$saved: no node may mention 'CA certificate (optional)'",
+                )
                 assertEquals(0, textNodes("Password (leave blank to keep unchanged)").size, "saved=$saved: the long label is gone")
                 assertEquals(
                     0, textNodes("CA certificate (optional - blank uses the system trust store)").size,
@@ -1442,7 +1450,13 @@ class ConnectionsScreenUiTest {
             hint.single().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
             assertEquals(1, layouts.single().lineCount, "the hint is a single line")
             // lineCount == 1 also holds for an ellipsized line; the hint must fit the grid cell at 1280 wide.
-            assertFalse(layouts.single().hasVisualOverflow, "the hint '$passwordHint' must not be ellipsized at 1280 wide")
+            // hasVisualOverflow is true for any shrink-wrapped Text with Ellipsis, and isLineEllipsized stays false for a
+            // truncated line here (measured), so the visible end of the line must reach the end of the text.
+            assertFalse(layouts.single().isLineEllipsized(0), "the hint '$passwordHint' must not be ellipsized at 1280 wide")
+            assertEquals(
+                passwordHint.length, layouts.single().getLineEnd(0, visibleEnd = true),
+                "the whole hint '$passwordHint' must be visible at 1280 wide, not cut with an ellipsis",
+            )
         }
         runDesktopComposeUiTest(1280, 880) {
             setContent { ConnectionsScreen(permissionViewModel()) }
@@ -1823,7 +1837,7 @@ class ConnectionsScreenUiTest {
                     assertEquals(1, icons.size, "saved=$saved: expected one icon:$iconName inside the '$label' field $field")
                     assertTrue(icons.single().left > field.center.x, "saved=$saved: icon:$iconName is trailing (right half of '$label')")
                 }
-                assertTrailing("upload_file", "CA certificate (optional)")
+                assertTrailing("upload_file", "CA certificate")
                 assertTrailing("visibility", "Password")
                 assertEquals(1, iconNodes("upload_file").size, "saved=$saved: the upload icon appears once")
                 onNode(hasClickAction().and(hasAnyDescendant(hasTestTag("icon:upload_file")))).assertDoesNotExist()
@@ -1836,7 +1850,9 @@ class ConnectionsScreenUiTest {
     fun `the TLS line has a lock icon before the text`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel()) }
 
+        onNode(hasText("TLS is always on", substring = true)).performScrollTo()
         val text = onNode(hasText("TLS is always on", substring = true), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(text.width > 0f && text.height > 0f, "the TLS text must be laid out (not 0,0,0,0): $text")
         val locks = iconNodes("lock").map { it.boundsInRoot }
         val beside = locks.filter { it.right <= text.left + 0.5f && it.top < text.bottom && it.bottom > text.top }
         assertEquals(1, beside.size, "expected one icon:lock before the TLS line $text, locks found: $locks")
@@ -1865,5 +1881,25 @@ class ConnectionsScreenUiTest {
                 if (expectIcon) onNodeWithText(passedBanner, substring = true).assertExists()
             }
         }
+    }
+
+    // --- M1-12b: the button row wraps instead of squeezing Save --------------------------------------
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `in a narrow panel the Save button is at least as wide as its text`() = runDesktopComposeUiTest(480, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        onNode(hasClickAction().and(hasText("Save"))).performScrollTo()
+
+        val save = onNode(hasClickAction().and(hasText("Save"))).fetchSemanticsNode().boundsInRoot
+        val textNodes = onAllNodes(hasText("Save"), useUnmergedTree = true).fetchSemanticsNodes()
+            .filter { it.boundsInRoot.left >= save.left - 0.5f && it.boundsInRoot.right <= save.right + 0.5f && it.boundsInRoot.top >= save.top - 0.5f }
+        assertTrue(textNodes.isNotEmpty(), "the 'Save' label must sit inside the Save button $save")
+        val layouts = mutableListOf<TextLayoutResult>()
+        textNodes.first().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        val textWidth = layouts.single().size.width.toFloat()
+        assertTrue(save.width >= textWidth, "Save must not be squeezed: button width ${save.width} < text width $textWidth")
+        assertEquals(1, layouts.single().lineCount, "the Save label must stay on one line")
     }
 }
