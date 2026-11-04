@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fixture.GoodFixtureTest" tests="3" skipped="0" failures="0" errors="0">
+  <testcase name="a" classname="fixture.GoodFixtureTest" time="0.001"/>
+  <testcase name="b" classname="fixture.GoodFixtureTest" time="0.001"/>
+  <testcase name="c" classname="fixture.GoodFixtureTest" time="0.001"/>
+</testsuite>

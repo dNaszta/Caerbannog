@@ -101,4 +101,4 @@ self-constraint level (`docs/spec.md`, "Topology migrations and permission guard
 rule on top, reserving delete for the Full control level. `01` now covers storing/editing the level; `02` and
 `10` will need scenarios for the combined effective-permission check once M1-03 and M5 scope that enforcement.
 
-- Test code that calls suspending functions uses `runBlocking<Unit> { ... }` or `runTest`: a `@Test` function that returns a value is silently never run by JUnit 5 (task `M2-TESTHYGIENE-01`).
+- Test code that calls suspending functions uses `runBlocking<Unit> { ... }` or `runTest`: a `@Test` function that returns a value is silently never run by JUnit 5 (task `M2-TESTHYGIENE-01`). The Gradle task `verifyTestDiscovery` (part of `check` and of root `./gradlew test` / `task test`) fails the build when a test class's `@Test` count differs from the XML testcase count, or a `@Test` function has a non-Unit declared type or ends in `assertIs`/`assertFailsWith`/... inside `= runBlocking { }`; `@broker`, `@keychain` and screenshot classes are compared only when their own task has run (otherwise "unchecked"). Its self-test fixtures are in `tests/guard-fixtures/`.

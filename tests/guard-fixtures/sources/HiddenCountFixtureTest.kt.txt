@@ -1,0 +1,13 @@
+package fixture
+
+// Three test methods; the result file next to it reports only two testcases: one was not discovered.
+class HiddenCountFixtureTest {
+    @Test
+    fun one() {}
+
+    @Test
+    fun two() {}
+
+    @Test
+    fun three() {}
+}
