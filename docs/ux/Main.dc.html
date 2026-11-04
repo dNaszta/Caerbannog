@@ -56,9 +56,21 @@ body{margin:0}
 <div class="t-bs dim">localhost</div>
 <div class="t-bs dim">Not connected</div>
 </div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">dev-eu</span><span class="pill warn">Can change topology (declared)</span></div>
+<div class="t-bs dim">rabbit-dev.example.com</div>
+<div class="t-bs dim">Not connected</div>
+</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">ci-eu</span><span class="pill">Not checked</span></div>
+<div class="t-bs dim">rabbit-ci.example.com</div>
+<div class="t-bs dim">Not connected</div>
+</div>
+<div class="t-bs dim" style="padding:0 4px">Pill states: Not checked (grey, before any check), Checking... (grey), Can change topology (green, read from the broker), Topology locked (red, read from the broker or could not be read), Can change topology (declared) or Topology locked (declared) (warning colour, the user's own claim, never green).</div>
 </section>
 <section class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:20px">
 <div class="t-tl">Edit connection</div>
+<div class="t-bs dim">Scrolling: the panel is one card. When it is taller than the window it scrolls inside the window and shows a thin vertical scrollbar on its right edge (always visible, not only on hover), so the user can see there is more. Sections are separated by 20 px; the title stays at the top of the scrolled content.</div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px 16px">
 <div class="tf focus"><span class="l">Name</span><div class="v"><span>uat-eu</span></div></div>
 <div class="tf"><span class="l">Virtual host</span><div class="v"><span>/</span></div></div>
@@ -87,7 +99,11 @@ body{margin:0}
 </div>
 <div style="display:flex;flex-direction:column;gap:8px">
 <div class="t-ts">Permission check</div>
-<div class="banner ok"><span class="ms" aria-hidden="true">verified_user</span><div><b>svc-explorer can change topology on virtual host /.</b> It has configure, write and read permissions there, so topology screens and migrations are unlocked for this connection.</div></div>
+<div class="banner ok"><span class="ms" aria-hidden="true">verified_user</span><div><b>svc-explorer can change topology on virtual host /.</b> The broker confirmed it, so topology screens and migrations are unlocked for this connection. Test publishing is enabled.</div></div>
+<div class="t-bs dim">Your declaration is not used, because the broker answered.</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">help</span><div><b>You declared that svc-explorer can change topology and can publish test messages.</b> The broker could not confirm it and still enforces its own permissions.<br><span class="t-bs">Permissions could not be read: the broker refused the request. Either this user is not an administrator (only administrators can read permissions) or the password is wrong.</span></div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div>Permissions could not be read: the user has no permissions on this virtual host. Topology stays locked and test publishing disabled; streams can still be browsed.</div></div>
+<div class="t-bs dim">Banner variants above, top to bottom: verified (green, shown only for a broker-read result, plus the dim line only when the profile also has a declaration), declared (warning colour), could not be read (red, safest mode). While the check runs the panel shows "Checking permissions...". Before any check it shows "Permission check has not run yet."</div>
 <div class="t-bs dim">The check runs before the first connection and again whenever you edit this profile. If the user cannot change topology, the topology screens open read-only.</div>
 </div>
 <div style="display:flex;align-items:center;gap:12px;color:var(--on-surface-variant)"><span class="ms" aria-hidden="true">lock</span><div class="t-bs">TLS is always on. The app does not connect without it.</div></div>

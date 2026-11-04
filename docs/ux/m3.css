@@ -59,6 +59,7 @@ html,body{margin:0}
 .banner.err{background:var(--error-container);color:var(--on-error-container)}
 .banner.info{background:var(--primary-container);color:var(--on-primary-container)}
 .banner.ok{background:var(--ok-container);color:var(--on-ok-container)}
+.banner.warn{background:var(--tertiary-container);color:var(--on-tertiary-container)}
 .sheet{flex:0 0 380px;max-width:100%;background:var(--sc-low);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
 .code{font:400 13px/20px 'Roboto Mono',monospace;background:var(--sc);border-radius:12px;padding:16px;white-space:pre;overflow:auto;color:var(--on-surface)}
 .kv{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--outline-variant)}

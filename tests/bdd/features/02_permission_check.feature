@@ -38,12 +38,24 @@ Feature: Permission check before the first connection
     Then the permission check runs again
     And topology changes are locked
 
-  @fake-broker @needs-M1-07
-  Scenario: A locked connection says so in the sidebar and on topology screens
+  @fake-broker
+  Scenario: A locked connection says so in the sidebar
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
     Then the sidebar shows "Topology locked" next to "prod-eu"
-    And the topology screen explains that the user has no configure permission on virtual host "/"
+
+  @fake-broker @needs-M2
+  Scenario: The topology screen explains why it is locked
+    Given the user has no configure permission on "/"
+    When I connect to "prod-eu"
+    Then the topology screen explains that the user has no configure permission on virtual host "/"
+
+  @fake-broker
+  Scenario: A verified connection says so in the sidebar and in the edit panel
+    Given the user has these permissions on "/": configure ".*", write ".*", read ".*"
+    When I connect to "prod-eu"
+    Then the sidebar shows "Can change topology" next to "prod-eu"
+    And the edit panel says the broker confirmed that "svc-explorer" can change topology on virtual host "/"
 
   @fake-broker @needs-M2
   Scenario: Browsing streams does not need the configure permission
@@ -113,13 +125,35 @@ Feature: Permission check before the first connection
     Then "prod-eu" declares nothing
     And the permission check, if it cannot read permissions, uses the safest mode
 
-  @fake-broker @needs-M1-07
+  @fake-broker
   Scenario: Declared permissions are shown as the user's own claim
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the management API refuses to return the user's permissions
     When I connect to "prod-eu"
-    Then the sidebar shows "Topology unlocked (declared)" next to "prod-eu"
-    And the topology screen says the broker could not confirm the permissions and still enforces its own
+    Then the sidebar shows "Can change topology (declared)" next to "prod-eu"
+    And the edit panel says the broker could not confirm the permissions and still enforces its own
+
+  @fake-broker
+  Scenario: A declaration is not used when the broker answers
+    Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the user has no configure permission on "/"
+    When I connect to "prod-eu"
+    Then the sidebar shows "Topology locked" next to "prod-eu"
+    And the edit panel says "Your declaration is not used, because the broker answered."
+
+  @fake-broker
+  Scenario: Permissions that could not be read are shown as locked with the reason
+    Given the management API refuses to return the user's permissions
+    When I connect to "prod-eu"
+    Then the sidebar shows "Topology locked" next to "prod-eu"
+    And the edit panel tells me that permissions could not be read
+
+  @fake-broker @needs-M2
+  Scenario: The topology screen says declared permissions are not confirmed
+    Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the management API refuses to return the user's permissions
+    When I connect to "prod-eu"
+    Then the topology screen says the broker could not confirm the permissions and still enforces its own
 
   @broker
   Scenario: The broker has the final say
