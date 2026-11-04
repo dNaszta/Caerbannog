@@ -151,6 +151,19 @@ class ConnectionsScreenUiTest {
         onNodeWithText("Delete profile").assertExists()
     }
 
+    // M2-03 part 1, scenario "The connection panel says the host name is not verified" (13, product decision D7).
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the edit panel says the host name is not verified`() = runDesktopComposeUiTest {
+        val profile = ConnectionProfile(name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer")
+        setContent { ConnectionsScreen(testViewModel(profile)) }
+
+        selectProfile(0)
+
+        onNodeWithText("Edit connection").assertExists()
+        onNodeWithText("Host name is not verified.", substring = true).performScrollTo().assertExists()
+    }
+
     private val passedBanner = "Connection test passed"
 
     @OptIn(ExperimentalTestApi::class)

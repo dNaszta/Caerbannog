@@ -62,7 +62,8 @@ Feature: Connect and disconnect
     Then its state is "Connected"
     And topology is locked (see 02, safest mode)
 
-  @fake-broker
+  # Needs Capabilities.visibility and the list message: M2-03 part 2 (catalog) and M2-04/M2-05. Not part 1.
+  @fake-broker @needs-M2-03b
   Scenario: A user without the management tag is connected but sees no lists
     Given the broker answers "Not management user" for the user of "uat-eu"
     When I connect to "uat-eu"
