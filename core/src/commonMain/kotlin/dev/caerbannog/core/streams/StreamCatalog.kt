@@ -15,6 +15,12 @@ interface StreamCatalog {
     /** Publishers of one stream; [CatalogResult.PluginMissing] without `rabbitmq_stream_management`. */
     suspend fun publishers(vhost: String, stream: String): CatalogResult<List<PublisherRow>>
 
+    /**
+     * Publisher count per stream of [vhost] in ONE call (D8); streams without a publisher are absent. Only the
+     * stream list calls it, and only for a user who sees every connection (a partial number is never shown).
+     */
+    suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>>
+
     /** Consumers of one stream; the broker has no per-stream path, so the implementation filters on the stream name. */
     suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>>
 

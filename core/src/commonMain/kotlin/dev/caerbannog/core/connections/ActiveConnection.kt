@@ -25,11 +25,28 @@ class ActiveConnection(
 ) {
     private val lock = Mutex()
     private var generation = 0L
+    @Volatile
     private var held: HeldConnection? = null
+    private val _source = MutableStateFlow<StreamSource?>(null)
     private val _state = MutableStateFlow<LinkState>(LinkState.Disconnected())
 
     /** The state of the connection the app holds or tried to hold last. Read it for the app bar chip. */
     val state: StateFlow<LinkState> = _state.asStateFlow()
+
+    /**
+     * The catalog and offsets of the held connection, only while Connected, otherwise null. Never the
+     * [HeldConnection] itself (it is closable, the UI must not be able to close it). A source of a connection
+     * that was closed or superseded answers "unreachable" and touches nothing.
+     */
+    val source: StreamSource? get() = _source.value
+
+    /**
+     * [source] as a flow. Why it exists next to [state]: reconnecting the same profile gives an equal
+     * `Connected(name)`, so a collector of [state] cannot tell the old connection from the new one; a
+     * [StreamSource] is compared by reference, so every new connection is a new value. Written before [state] on
+     * connect and after it on every end, so a reader that combines both sees at worst a transient "Connecting".
+     */
+    val sources: StateFlow<StreamSource?> = _source.asStateFlow()
 
     /** [state] if it is about [name], otherwise [LinkState.Disconnected] for that name (profile cards). */
     fun stateOf(name: String): LinkState = _state.value.takeIf { it.name == name } ?: LinkState.Disconnected(name)
@@ -49,6 +66,7 @@ class ActiveConnection(
     private fun supersede(next: LinkState): HeldConnection? {
         generation++
         _state.value = next
+        _source.value = null
         return held.also { held = null }
     }
 
@@ -94,6 +112,7 @@ class ActiveConnection(
                     (generation == mine).also {
                         if (it) {
                             held = opened.connection
+                            _source.value = guardedSource(opened.connection, profile.virtualHost)
                             _state.value = LinkState.Connected(name)
                         }
                     }
@@ -112,6 +131,28 @@ class ActiveConnection(
         throw e
     } catch (e: Exception) {
         OpenResult.Failed(ConnectionFailureReason.UNEXPECTED)
+    }
+
+    private fun guardedSource(connection: HeldConnection, vhost: String): StreamSource {
+        val isCurrent = { held === connection }
+        return StreamSource(
+            catalog = GuardedCatalog(connection.catalog, isCurrent),
+            offsets = GuardedOffsets(connection.offsets, isCurrent),
+            vhost = vhost,
+        )
+    }
+
+    /**
+     * D2 (PROPOSED, flagged default, the one place to change): the view model saw the broker unreachable on a data
+     * call made with [source]. If [source] is still the current one, the link becomes Failed("Connection lost") and
+     * the held connection is closed; otherwise (superseded, already lost) nothing happens. No permission check, no
+     * reconnect. Call it from your own coroutine, never from an observer of [state].
+     */
+    fun connectionLost(source: StreamSource) {
+        val old = locked {
+            if (_source.value === source) supersede(LinkState.Failed(_state.value.name.orEmpty(), ConnectionFailureReason.CONNECTION_LOST)) else null
+        }
+        old.closeQuietly()
     }
 
     private fun finishIfCurrent(mine: Long, next: LinkState) {

@@ -25,6 +25,9 @@ object ConnectionFailureReason {
     const val NO_PASSWORD_STORED: String = "No password is stored"
     const val CREDENTIALS_REFUSED: String = "Credentials were refused"
 
+    /** D2 (proposed): a data call found the broker unreachable while connected. */
+    const val CONNECTION_LOST: String = "Connection lost"
+
     // For an unexpected gateway failure; the exception text is never shown (it could carry a secret).
     internal const val UNEXPECTED: String = "The connection could not be opened"
 }
