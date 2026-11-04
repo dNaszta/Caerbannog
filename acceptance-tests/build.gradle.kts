@@ -32,6 +32,7 @@ val cucumberVersion = "7.20.1"
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(project(":core"))
+    testImplementation(project(":core-testing"))
     // Guard: acceptance steps must not instantiate the keychain-backed JavaKeyringSecretStore.
     // Keyring and JNA native libs are on the classpath only because the file repository needs data-rabbit.
     // The real-keychain tests run only via :data-rabbit:keychainTest.
@@ -54,16 +55,6 @@ dependencies {
 sourceSets {
     test {
         resources.srcDir(rootProject.projectDir.resolve("tests/bdd/features"))
-    }
-}
-
-// M2-03 part 1: FakeConnectionGateway is written once, in core's jvmTest (the unit tests need it too), and compiled
-// into this module from the same file: one fake, no copy. Only this directory is shared, not core's other tests.
-kotlin {
-    sourceSets {
-        named("test") {
-            kotlin.srcDir(rootProject.projectDir.resolve("core/src/jvmTest/kotlin/dev/caerbannog/core/connections/fakes"))
-        }
     }
 }
 

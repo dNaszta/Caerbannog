@@ -17,8 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * M2-03 part 1 test double for [ConnectionGateway]. One source file, compiled into two modules: `core`
- * (jvmTest) and `acceptance-tests` (extra source directory, see its build.gradle.kts), so the unit tests and
+ * M2-03 part 1 test double for [ConnectionGateway]. Lives in the `core-testing` module, so the unit tests and
  * the Gherkin steps use the same fake. No Docker, no network, no keychain.
  *
  * Honest by design: a failed open leaves nothing open; a cancelled open leaves nothing open; every opened

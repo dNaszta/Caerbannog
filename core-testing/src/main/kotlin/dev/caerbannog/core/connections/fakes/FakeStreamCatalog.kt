@@ -15,8 +15,8 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * M2-03 part 2 test double for [StreamCatalog]. Same file in `core` jvmTest and, through an extra srcDir, in
- * `acceptance-tests` (decision recorded in docs/tasks/M2-03-stream-gateway.md, part 2 step 2). It is built from
+ * M2-03 part 2 test double for [StreamCatalog]. Lives in `core-testing`, shared by the `core` and `acceptance-tests`
+ * tests (decision recorded in docs/tasks/M2-03-stream-gateway.md, part 2 step 2). It is built from
  * domain objects, not from JSON: `core` has no JSON library, the recorded bodies are parsed in `data-rabbit`
  * tests (ManagementJsonTest) into the very values [RecordedStreams] uses here.
  *
