@@ -4,14 +4,18 @@ Feature: Stream list
   I want to see all streams on a connection with their statistics
   So that I can find the stream I care about and judge its health at a glance
 
-  Message counts are approximate: committed offset minus first offset, plus one.
-  RabbitMQ's own Management UI can show a slightly different count, because offset tracking
-  data is stored in the stream.
+  Message counts are approximate: the count is the broker's own message count for the stream,
+  and the last offset is the first offset plus that count minus one. (Do not use committed
+  offset minus first offset plus one: the committed offset is where the last chunk starts, so it
+  undercounts messages published in batches; M2-02 spike.) The count can be slightly higher than
+  the number of user messages, because offset tracking data is stored in the stream; RabbitMQ's
+  own Management UI shows the same number.
+  The size column is pending a product decision: the broker reports no size in bytes for streams.
 
   Background:
     Given I am connected to "uat-eu"
 
-  @smoke @fake-broker
+  @smoke @fake-broker @needs-decision
   Scenario: The list shows the statistics of every stream
     Given these streams exist
       | name            | first offset | last offset | size   | publishers | consumers |
@@ -22,7 +26,7 @@ Feature: Stream list
     Then each stream is shown with its type, approximate messages, first offset, last offset, size, publishers and consumers
 
   @fake-broker
-  Scenario Outline: The message count is derived from the offsets
+  Scenario Outline: The message count and the offsets agree
     Given a stream "s" with first offset <first> and last offset <last>
     When I open the stream list
     Then the stream "s" shows about <count> messages
@@ -84,5 +88,5 @@ Feature: Stream list
   Scenario: Statistics agree with the Management UI
     Given a real broker with a stream "orders-events" containing 1000 messages
     When I open the stream list
-    Then the size, publisher count and consumer count of "orders-events" equal those in the RabbitMQ Management UI
+    Then the publisher count and consumer count of "orders-events" equal those in the RabbitMQ Management UI
     And the message count differs from the Management UI by no more than the offset tracking entries

@@ -81,9 +81,10 @@ Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`)
 
 ## Open points that affect these tests
 
-- Exact fields of the stream publisher and consumer endpoints (`04`, `@needs-spike`).
+- `04` keeps `@needs-spike` until M2-06 reviews it; the exact fields of the stream publisher and consumer endpoints were confirmed by the M2-02 spike (`docs/spec.md`, "Management API facts"). What a user without the management tag, or with only the `management` tag, sees (`03`, `04`, `@needs-decision` once decided, product decision S3).
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
-- Whether streams are found by name through the same API call as queues (`11`, `@needs-spike`).
+- Case-sensitivity of the server-side `name` filter (the `11` scenario "Search is case-insensitive for plain text"); not tested by the M2-02 spike.
+- The `size` column in `03` and `06` has no data source (`@needs-decision`).
 
 Resolved: how a non-administrator user's own permissions are read (`02`): they cannot be; safest mode by default, plus optional permissions declared on the profile (`docs/spec.md`, "Broker-read permission").
 

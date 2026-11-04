@@ -5,8 +5,12 @@ Feature: Publishers and consumers of a stream
   So that I can tell whether a consumer is behind and which service is responsible
 
   Data comes from the management API (rabbitmq_stream_management).
-  The exact fields returned are still to be confirmed against a real broker,
-  so these scenarios describe the intent and need re-checking in the M1 spike.
+  Fields confirmed on a real RabbitMQ 4.4.0 broker (M2-02 spike, docs/spec.md "Management API facts"):
+  publisher reference, published, confirmed, errored (shown as "errors"), connection; consumer offset,
+  offset_lag, active, connection. A named consumer's lag can be 1 higher than the number of user messages
+  behind, because its offset tracking entry occupies an offset, so "Caught up" needs M2-06 to decide how to
+  read offset_lag. Users with only the management tag see only their own connections' rows, and users with
+  no management tag see nothing (product decision S3 pending). The @needs-spike tag stays until M2-06 reviews this file.
 
   Background:
     Given I am connected to "uat-eu"

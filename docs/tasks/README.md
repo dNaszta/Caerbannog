@@ -30,9 +30,10 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M2-03-stream-gateway | Core `StreamCatalog` interface, fake, real management client for the stream list and stats (and stream client if the spike says offsets need it) | M2 | planned, depends on M2-02 and decisions D3 to D5 (see "M2 decisions"); brief not written yet |
 | M2-04-stream-list-core | Stream list view model: derive counts, sort, filter by name and kind, page, refresh, empty state (scenarios in `03`) | M2 | planned, depends on M2-01 and M2-03 |
 | M2-05-stream-list-screen | Stream list screen per `docs/ux/Streams.dc.html`, drawer navigation, un-skip `Switch between connections` | M2 | planned, depends on M2-04 |
-| M2-06-publishers-consumers | Publishers and consumers tab (`04`), counts match the list | M2 | planned, depends on M2-02 and M2-05 |
+| M2-06-publishers-consumers | Publishers and consumers tab (`04`), counts match the list | M2 | input note written (`M2-06-publishers-consumers.md`); full brief after M2-03, depends on M2-02 and M2-05 |
 | M2-07-super-streams-in-list | Super streams as one entry with partitions (M2 part of `06`) | M2 | planned, depends on M2-04 |
 | M2-08-topology-read-only | Topology screen (queues, exchanges, bindings, stats; M2 part of `09`) and the three `@needs-M2` text scenarios in `02`; may be split | M2 | planned, depends on M2-01 and M2-03 |
+| M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (optional, needs bump approval); no hurry |
 | M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | planned, last; needs Docker |
 
 ## M2 decisions
