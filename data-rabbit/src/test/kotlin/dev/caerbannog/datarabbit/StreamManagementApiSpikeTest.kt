@@ -417,21 +417,31 @@ class StreamManagementApiSpikeTest {
             "peer_host" to T.STRING, "peer_port" to T.NUMBER), "publisher connection_details")
         assertEquals(rabbit.adminUsername, pub["connection_details"]!!.jsonObject["user"]!!.jsonPrimitive.content)
 
-        val cons = awaitUntil("consumer row with consumed=10 for $name", fetch = { admin.get("/api/stream/consumers/%2F") },
-            done = { r -> r.status == 200 && r.arr.any { it.jsonObject["queue"]!!.jsonObject["name"]!!.jsonPrimitive.content == name && it.jsonObject["consumed"]?.jsonPrimitive?.long == 10L } })
+        // Wait for the SETTLED consumer row, not just for consumed=10. `consumed` is live, but `offset` is refreshed with the
+        // periodic stats: until the first refresh (about 4-5 s) the row shows offset 10 (the next offset) with lag 0, afterwards
+        // 9 (the last delivered offset) and, because of the tracking entry below, lag 1. Asserting on the first row that has
+        // consumed=10 raced with that refresh (M2-02c). Same wait for each value, no tolerance in the assertions.
+        fun rowOf(r: Resp) = r.arr.map { it.jsonObject }.firstOrNull { it["queue"]!!.jsonObject["name"]!!.jsonPrimitive.content == name }
+        val cons = awaitUntil("consumer row consumed=10, offset=9, offset_lag=1 for $name", fetch = { admin.get("/api/stream/consumers/%2F") },
+            done = { r -> r.status == 200 && rowOf(r)?.let { it["consumed"]?.jsonPrimitive?.long == 10L && it["offset"]?.jsonPrimitive?.long == 9L && it["offset_lag"]?.jsonPrimitive?.long == 1L } == true })
         fixture("stream-consumers.json", cons, listOf(name))
-        val c = cons.arr.map { it.jsonObject }.single { it["queue"]!!.jsonObject["name"]!!.jsonPrimitive.content == name }
+        val c = rowOf(cons)!!
         assertShape(c, mapOf("subscription_id" to T.NUMBER, "consumed" to T.NUMBER, "credits" to T.NUMBER, "offset" to T.NUMBER,
             "offset_lag" to T.NUMBER, "active" to T.BOOLEAN, "activity_status" to T.STRING, "properties" to T.OBJECT,
             "queue" to T.OBJECT, "connection_details" to T.OBJECT), "consumer row")
         assertEquals("spike-cons", c["properties"]!!.jsonObject["name"]!!.jsonPrimitive.content, "consumer reference is under properties.name")
-        assertEquals(9, c["offset"]!!.jsonPrimitive.long, "last delivered offset (10 messages: 0..9)")
-        // The named consumer of the Java client leaves one offset tracking entry in the stream even though the test
-        // never stores an offset (tracking.offsets below): 10 messages + 1 entry = offset 10 exists, so lag is 1 and
-        // messages is 11. Offset tracking entries are counted by the management `messages` (the @gate-M2 tolerance).
+        assertEquals(9, c["offset"]!!.jsonPrimitive.long, "last delivered offset (10 messages: 0..9), once the row is refreshed")
+        // Why there is a tracking entry although this test never stores an offset: the Java client's manual tracking strategy
+        // has a safety net (OffsetTrackingCoordinator.ManualTrackingTracker.flushIfNecessary, about 1 s after consuming): a named
+        // consumer that never stored gets store(lastRequestedOffset), and that field starts at 0. So `tracking.offsets` holds
+        // spike-cons = 0 (the client's artefact, not a delivered offset). Storing an offset is a write to the stream: a tracking
+        // chunk takes offset 10, the consumer is not delivered it (last delivered stays 9), committed chunk id becomes 10 and
+        // lag = 10 - 9 = 1. Management `messages` counts that entry too (11). Deterministic, only its visibility is delayed.
         assertEquals(1, c["offset_lag"]!!.jsonPrimitive.long, "offset_lag counts the tracking entry after offset 9")
         assertEquals(11, awaitMessages(name, 11).obj["messages"]!!.jsonPrimitive.long, "10 messages + 1 tracking entry")
-        assertTrue(admin.get("/api/stream/%2F/$name/tracking").obj["offsets"]!!.jsonObject.containsKey("spike-cons"))
+        val offsets = awaitUntil("tracking.offsets has spike-cons", fetch = { admin.get("/api/stream/%2F/$name/tracking") },
+            done = { it.status == 200 && it.obj["offsets"]!!.jsonObject.containsKey("spike-cons") }).obj["offsets"]!!.jsonObject
+        assertEquals(0, offsets["spike-cons"]!!.jsonPrimitive.long, "the client's manual-tracking safety net stores its initial lastRequestedOffset 0")
         assertEquals(true, c["active"]!!.jsonPrimitive.booleanOrNull)
         assertEquals("up", c["activity_status"]!!.jsonPrimitive.content)
 
@@ -452,6 +462,32 @@ class StreamManagementApiSpikeTest {
         val tracking = admin.get("/api/stream/%2F/$name/tracking")
         assertEquals(10 - 1L, tracking.obj["writers"]!!.jsonObject["spike-pub"]!!.jsonPrimitive.long, "writer reference -> last published publishing id (0-based sequence)")
         fixture("stream-tracking.json", tracking)
+    }
+
+    @Test
+    fun `Q2 a consumer without tracking leaves no entry - lag 0, messages equals the user messages (what browsing must use)`() {
+        val env = env()
+        for ((label, configure) in listOf<Pair<String, (com.rabbitmq.stream.ConsumerBuilder) -> com.rabbitmq.stream.ConsumerBuilder>>(
+            "unnamed" to { it },
+            "named, noTrackingStrategy" to { it.name("spike-notrack").noTrackingStrategy() },
+        )) {
+            val name = unique("spike-q2n-")
+            declareStream(name)
+            publishViaClient(env, name, 10, ref = "spike-pub")
+            val got = CountDownLatch(10)
+            val c = configure(env.consumerBuilder().stream(name).offset(OffsetSpecification.first())).messageHandler { _, _ -> got.countDown() }.build()
+            closeables += c
+            assertTrue(got.await(30, TimeUnit.SECONDS), "$label: 10 messages not delivered")
+            // Settled row: the offset flips from 10 (next) to 9 (last delivered) at the first stats refresh, see the test above.
+            val row = awaitUntil("$label: consumer row offset=9", fetch = { admin.get("/api/stream/consumers/%2F") },
+                done = { r -> r.status == 200 && r.arr.any { it.jsonObject["queue"]!!.jsonObject["name"]!!.jsonPrimitive.content == name && it.jsonObject["offset"]?.jsonPrimitive?.long == 9L } })
+                .arr.map { it.jsonObject }.single { it["queue"]!!.jsonObject["name"]!!.jsonPrimitive.content == name }
+            assertEquals(0, row["offset_lag"]!!.jsonPrimitive.long, "$label: caught up means lag 0 when nothing was stored")
+            assertEquals(10, awaitMessages(name, 10).obj["messages"]!!.jsonPrimitive.long, "$label: no tracking entry, messages == user messages")
+            // The client's tracking safety net runs about 1 s after consuming; the waits above took longer than that.
+            assertEquals(0, admin.get("/api/stream/%2F/$name/tracking").obj["offsets"]!!.jsonObject.size, "$label: nothing stored")
+            c.close()
+        }
     }
 
     @Test
