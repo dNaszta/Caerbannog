@@ -68,5 +68,10 @@ Tests still prove the real keychain round trip when run on demand; default run i
 index updated.
 
 ## Status
-- State: briefed and confirmed against main (2026-11-04); not started. Branch to create: `m1-08-keychain-test-opt-in`, based on main.
-- Next: step 2 test engineer records the red state (19 in data-rabbit, no `keychainTest` task); step 3 senior developer builds; step 4 verifies; real keychain run once only with user approval.
+- State: step 2 done (red state recorded on main, 2026-11-04). Branch `m1-08-keychain-test-opt-in` created from main. No test code to write.
+- Red evidence (main, before any change):
+  - `./gradlew :data-rabbit:test --rerun-tasks`: BUILD SUCCESSFUL, XML = 19 tests in 5 classes: CaCertificateValidatorTest 3, JsonConnectionProfileRepositoryTest 9, KeyringRoundTripSpikeTest 1, KeyringSecretStoreTest 1, PermissionCheckerFailureTest 5. Both Keyring classes present. (This one default run touched the real keychain, as every default run does today; accepted for the baseline.)
+  - `./gradlew :data-rabbit:tasks --all | grep -i keychain`: no match. `./gradlew :data-rabbit:keychainTest --dry-run`: BUILD FAILED, task not found. `keychainTest` was NOT run.
+  - `:data-rabbit:brokerTest --rerun-tasks` (Docker, no keychain): BUILD SUCCESSFUL, 11 tests in 4 classes (RealBrokerPermissionCheckTest 8, PermissionsEndpointSpikeTest 1, RabbitMqContainerSpikeTest 1, RealBrokerReachabilityTest 1). Baseline 11 confirmed.
+- Grep checks: `@Tag("broker")` classes are exactly those 4 in data-rabbit. Real keyring use (`JavaKeyringSecretStore`/javakeyring) in code: only `data-rabbit` main + the two Keyring tests, and the default parameter `secretStore: SecretStore = JavaKeyringSecretStore()` in `desktopApp/.../CompositionRoot.kt` (line 23, production default, not a test). `CompositionRootTest` only mentions it in a comment (never uses it). `acceptance-tests` mentions it only in comments/guard text (build.gradle.kts, Fakes.kt); no construction. core only in a KDoc comment. Note: acceptance-tests classpath has keyring/JNA via data-rabbit (existing guard comment).
+- Next: step 3 senior developer builds; step 4 verifies; real keychain run once only with user approval.
