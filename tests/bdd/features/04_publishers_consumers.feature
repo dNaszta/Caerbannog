@@ -10,7 +10,7 @@ Feature: Publishers and consumers of a stream
   offset_lag, active, connection. A named consumer's lag can be 1 higher than the number of user messages
   behind, because its offset tracking entry occupies an offset, so "Caught up" needs M2-06 to decide how to
   read offset_lag. Users with only the management tag see only their own connections' rows, and users with
-  no management tag see nothing (product decision S3 pending). The @needs-spike tag stays until M2-06 reviews this file.
+  no management tag see nothing (product decisions S3a and S3b, decided: message, and a fixed notice). The @needs-spike tag stays until M2-06 reviews this file.
 
   Background:
     Given I am connected to "uat-eu"
@@ -57,6 +57,26 @@ Feature: Publishers and consumers of a stream
     When I open the "Publishers and consumers" tab of "orders-events"
     Then I am told to enable "rabbitmq_stream_management"
     And the rest of the stream screen keeps working
+
+  @fake-broker
+  Scenario: A user with only the management tag sees their own connections
+    Given the user of "uat-eu" has the management tag but not the monitoring tag
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then the tab shows the notice "Showing only your own connections. The monitoring tag shows all."
+    And the notice is shown even when the lists are empty
+
+  @fake-broker
+  Scenario: A user without the management tag
+    Given the user of "uat-eu" has no management tag
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then I see the message "This user cannot read stream statistics. Ask for the monitoring tag."
+    And no publishers or consumers are listed
+
+  @fake-broker
+  Scenario: A consumer that stored its offset is caught up at one message behind
+    Given a consumer "billing" on "orders-events" that stored its offset and is 1 message behind
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then its status is "Caught up"
 
   @broker
   Scenario: Counts on the tab match counts in the stream list

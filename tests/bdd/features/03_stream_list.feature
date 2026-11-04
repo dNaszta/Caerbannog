@@ -10,20 +10,26 @@ Feature: Stream list
   undercounts messages published in batches; M2-02 spike.) The count can be slightly higher than
   the number of user messages, because offset tracking data is stored in the stream; RabbitMQ's
   own Management UI shows the same number.
-  The size column is pending a product decision: the broker reports no size in bytes for streams.
+  The Size column is shown but left blank (a dash) until M3: the broker reports no size in bytes
+  for streams (product decision N1, option c). First and last offset come from the stream protocol,
+  one statistics call per visible stream. When that call fails or is denied, the row still shows its
+  counts from the management API and the offset cells read "unavailable".
+  A user without the management tag gets a message instead of the list; a user with only the
+  "monitoring" tag or more gets the full list (product decision S3a).
 
   Background:
     Given I am connected to "uat-eu"
 
-  @smoke @fake-broker @needs-decision
+  @smoke @fake-broker
   Scenario: The list shows the statistics of every stream
     Given these streams exist
-      | name            | first offset | last offset | size   | publishers | consumers |
-      | orders-events   | 0            | 48299       | 212 MB | 2          | 3         |
-      | audit-log       | 880000       | 2083999     | 3.4 GB | 1          | 1         |
-      | payments-stream | 0            | 7849        | 31 MB  | 1          | 0         |
+      | name            | first offset | last offset | publishers | consumers |
+      | orders-events   | 0            | 48299       | 2          | 3         |
+      | audit-log       | 880000       | 2083999     | 1          | 1         |
+      | payments-stream | 0            | 7849        | 1          | 0         |
     When I open the stream list
-    Then each stream is shown with its type, approximate messages, first offset, last offset, size, publishers and consumers
+    Then each stream is shown with its type, approximate messages, first offset, last offset, publishers and consumers
+    And the Size cell of each stream is blank
 
   @fake-broker
   Scenario Outline: The message count and the offsets agree
@@ -36,6 +42,22 @@ Feature: Stream list
       | 0      | 48299   | 48,300    |
       | 880000 | 2083999 | 1,204,000 |
       | 0      | 0       | 1         |
+
+  @fake-broker
+  Scenario: The first offset cannot be read for one stream
+    Given a stream "orders-events" whose statistics call is denied
+    And a stream "audit-log" with first offset 0 and last offset 99
+    When I open the stream list
+    Then "orders-events" is listed with its message count, publishers and consumers
+    And the first offset and last offset cells of "orders-events" read "unavailable"
+    And "audit-log" shows first offset 0 and last offset 99
+
+  @fake-broker
+  Scenario: A user without the management tag
+    Given the user of "uat-eu" has no management tag
+    When I open the stream list
+    Then I see the message "This user cannot read stream statistics. Ask for the monitoring tag."
+    And no stream list is shown
 
   @fake-broker
   Scenario: Counts are labelled as approximate

@@ -13,6 +13,8 @@ Status: input note only. The full brief is written when M2-03 is accepted. It re
 - Jump to a consumer's offset: `offset` is the last delivered offset; the browser starts at offset + 1 or at the offset (the `04` scenario says "starting at offset 47950"); decide with M3.
 - Not tested by the spike: unnamed producers (`reference`), super stream producers.
 
-## S3 handling options (decision pending, see the M2-02 brief, "Product decisions needed")
-- Users with the `management` tag see only their own connections' publishers and consumers: show the lists with a fixed notice "Showing only your own connections; the monitoring tag shows all", never an empty state that looks like "nobody is connected".
-- Users with no management tag get 401 on every management call: the Streams area shows one message ("This user cannot read stream statistics; ask for the monitoring tag") and no lists. A stream-protocol-only mode for these users needs the open spike question (can such a user call `queryStreamStats`?) and has no stream list (the stream protocol cannot list streams).
+## S3 handling (decided by the product owner, 2026-11-04: S3a (a) and S3b (a))
+- S3b: users with the `management` tag see only their own connections' publishers and consumers: show the lists with a fixed notice "Showing only your own connections; the monitoring tag shows all", never an empty state that looks like "nobody is connected".
+- S3a: users with no management tag get 401 on every management call: the Streams area shows one message ("This user cannot read stream statistics; ask for the monitoring tag") and no lists. A stream-protocol-only mode for these users needs the open spike question (can such a user call `queryStreamStats`?) and has no stream list (the stream protocol cannot list streams).
+
+Scenarios added in `04` for these states: "A user with only the management tag sees their own connections", "A user without the management tag", "A consumer that stored its offset is caught up at one message behind". The stream-protocol-only mode for no-tag users is not built (decided).
