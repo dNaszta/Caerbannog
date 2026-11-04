@@ -8,9 +8,9 @@ import org.junit.platform.suite.api.SelectClasspathResource
 import org.junit.platform.suite.api.Suite
 
 /**
- * M1-03: runs tests/bdd/features/02_permission_check.feature. `not @needs-M2 and not @needs-M1-07 and not @needs-M1-06`
- * leaves out the scenarios deferred by tag (sidebar/declared UI needs M1-07, profile persistence of declarations
- * needs M1-06, stream browsing needs M2);
+ * M1-03: runs tests/bdd/features/02_permission_check.feature. `not @needs-M2 and not @needs-M1-07 and not @broker`
+ * leaves out the scenarios deferred by tag (sidebar/declared UI needs M1-07, stream browsing needs M2).
+ * M1-06 is done: its two persistence scenarios now run (the @needs-M1-06 tag is no longer used);
  * the `@broker` scenario "The broker has the final say" has no steps (needs queue declare, M5) and is
  * excluded as well, because it is not `@fake-broker`.
  */
@@ -20,6 +20,6 @@ import org.junit.platform.suite.api.Suite
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.permissions")
 @ConfigurationParameter(
     key = FILTER_TAGS_PROPERTY_NAME,
-    value = "not @needs-M2 and not @needs-M1-07 and not @needs-M1-06 and not @broker",
+    value = "not @needs-M2 and not @needs-M1-07 and not @broker",
 )
 class RunPermissionCheckAcceptanceTest

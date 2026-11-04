@@ -262,4 +262,114 @@ class ConnectionsViewModelTest {
         val renamed = repository.list().single { it.name == "uat-us-2" }
         assertEquals(TopologyControlLevel.DECLARE_AND_EDIT, renamed.topologyControlLevel)
     }
+
+    // --- Declared permissions (M1-06): ConnectionProfileInput.declaredPermissions is a DeclaredPermissionsEdit.
+    // Red state: DeclaredPermissionsEdit and the new input field do not exist yet.
+
+    private val yesYes = DeclaredPermissions(configure = true, write = true)
+    private val noYes = DeclaredPermissions(configure = false, write = true)
+
+    private fun inputDeclaring(name: String, edit: DeclaredPermissionsEdit? = null) =
+        if (edit == null) input(name, "rabbit-$name.example.com")
+        else input(name, "rabbit-$name.example.com").copy(declaredPermissions = edit)
+
+    private fun savedWith(declared: DeclaredPermissions?): Pair<ConnectionsViewModel, InMemoryRepository> {
+        val repository = InMemoryRepository()
+        repository.add(profile("prod-eu").copy(declaredPermissions = declared))
+        return viewModel(repository, InMemorySecretStore()) to repository
+    }
+
+    @Test
+    fun `the default edit is Keep`() {
+        assertEquals(DeclaredPermissionsEdit.Keep, input("a", "h").declaredPermissions)
+    }
+
+    @Test
+    fun `add with Set stores the declaration`() {
+        val repository = InMemoryRepository()
+        val vm = viewModel(repository, InMemorySecretStore())
+        val result = vm.addConnection(inputDeclaring("prod-eu", DeclaredPermissionsEdit.Set(noYes)))
+        assertTrue(result is SaveConnectionResult.Saved, "got $result")
+        assertEquals(noYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `add with Keep or Clear stores no declaration`() {
+        listOf(DeclaredPermissionsEdit.Keep, DeclaredPermissionsEdit.Clear).forEach { edit ->
+            val repository = InMemoryRepository()
+            val vm = viewModel(repository, InMemorySecretStore())
+            vm.addConnection(inputDeclaring("prod-eu", edit))
+            assertNull(repository.list().single().declaredPermissions, "add with $edit must not declare anything")
+        }
+    }
+
+    @Test
+    fun `update with Keep keeps the saved declaration`() {
+        val (vm, repository) = savedWith(yesYes)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu", DeclaredPermissionsEdit.Keep))
+        assertEquals(yesYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with the default input keeps the saved declaration`() {
+        val (vm, repository) = savedWith(yesYes)
+        vm.updateConnection("prod-eu", input("prod-eu", "changed.example.com"))
+        assertEquals(yesYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with Keep keeps the saved declaration on rename`() {
+        val (vm, repository) = savedWith(noYes)
+        val result = vm.updateConnection("prod-eu", inputDeclaring("prod-eu-2", DeclaredPermissionsEdit.Keep))
+        assertTrue(result is SaveConnectionResult.Saved, "got $result")
+        assertEquals(listOf("prod-eu-2"), repository.list().map { it.name })
+        assertEquals(noYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with Set replaces the saved declaration`() {
+        val (vm, repository) = savedWith(yesYes)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu", DeclaredPermissionsEdit.Set(noYes)))
+        assertEquals(noYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with Set declares on a profile that had none`() {
+        val (vm, repository) = savedWith(null)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu", DeclaredPermissionsEdit.Set(yesYes)))
+        assertEquals(yesYes, repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with Clear removes the saved declaration`() {
+        val (vm, repository) = savedWith(yesYes)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu", DeclaredPermissionsEdit.Clear))
+        assertNull(repository.list().single().declaredPermissions)
+        assertNull(vm.state.value.profiles.single().declaredPermissions)
+    }
+
+    @Test
+    fun `update with Clear on a profile without declaration stays undeclared`() {
+        val (vm, repository) = savedWith(null)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu", DeclaredPermissionsEdit.Clear))
+        assertNull(repository.list().single().declaredPermissions)
+    }
+
+    @Test
+    fun `Set on rename moves the new declaration to the new name`() {
+        val (vm, repository) = savedWith(yesYes)
+        vm.updateConnection("prod-eu", inputDeclaring("prod-eu-2", DeclaredPermissionsEdit.Set(noYes)))
+        assertEquals(noYes, repository.list().single { it.name == "prod-eu-2" }.declaredPermissions)
+    }
+
+    @Test
+    fun `a failed update leaves the saved declaration untouched`() {
+        val repository = InMemoryRepository()
+        repository.add(profile("prod-eu").copy(declaredPermissions = yesYes))
+        repository.add(profile("dev"))
+        val vm = viewModel(repository, InMemorySecretStore())
+        val result = vm.updateConnection("prod-eu", inputDeclaring("dev", DeclaredPermissionsEdit.Clear))
+        assertTrue(result is SaveConnectionResult.NameAlreadyExists, "got $result")
+        assertEquals(yesYes, repository.list().single { it.name == "prod-eu" }.declaredPermissions)
+    }
 }

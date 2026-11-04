@@ -3,8 +3,39 @@
 Milestone: M1    Depends on: M1-03-permission-check (core `DeclaredPermissions`, session rule)    Size: S
 
 ## Status
-- State: briefed and confirmed against `main` (architect, 2026-11-04); not started.
+- State: done. Architect step 5: Accepted with follow-ups (2026-11-04), no blocker or major. Not pushed; merge by the coordinator.
+  - Decisions for the user to see: the UX deviation from the earlier three-state-per-right idea (one switch plus two yes/no
+    choices) was the architect's recommendation, adopted by the coordinator without asking the user. Reason: `DeclaredPermissions`
+    is a pair of required booleans, a per-right "not declared" would create half declarations the model and M1-03 do not define.
+    The user can reverse it (per-right `Boolean?`, touching spec and M1-03).
+  - Extra 'Declared permissions' title above the switch: kept; the mockup has it too (as "Declared permissions (your own
+    statement)"). The build shows the shorter text; follow-up `M1-11` aligns the wording.
+  - Known gaps: Keep-clears-declaration mutation is caught by core tests only (acceptance scenarios only use Set), accepted.
+    The screen still calls `updateConnection` until M1-07, so a UI save does not reopen the session yet.
+  - `acceptance-tests` -> `:data-rabbit` (test scope, project-internal) accepted; the comment guard is in `M1-11`.
+- Earlier: step 4 done (test developer): verdict pass, no blocker or major.
+  - Step 3: `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38, acceptance-tests 38 with 5 skipped by tag filter, desktopApp 3); `:data-rabbit:brokerTest` green. No test edited.
+  - Step 4 (test developer, independent): `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38,
+    acceptance 38 with 5 skipped by design, desktopApp 3); `:data-rabbit:brokerTest` 11 green. Both former @needs-M1-06
+    scenarios run and pass. 17 mutations (view model, DTO, UI, acceptance) all caught; one (Keep clears) is caught by core only,
+    not by acceptance, because the BDD scenarios only use Set. Findings: 2 minor/idea, none open as blocker or major.
 - Branch (when started): `m1-06-profile-declared-permissions`, based on `main`.
+- Round: 0, step 2 done (test developer), branch `m1-06-profile-declared-permissions`.
+  - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'DeclaredPermissionsEdit'` (ConnectionsViewModelTest: 12 new
+    tests; ConnectionsViewModelPermissionTest: 6 new). Also `:acceptance-tests:compileTestKotlin` (steps use the new type).
+  - Red, `data-rabbit` (`JsonConnectionProfileRepositoryTest`): 3 of 7 new tests fail (declaration not written/read; the key is
+    rejected as unknown). Green already, kept as characterisation/guards: M1-02 fixture loads with no declaration, undeclared
+    profiles write exactly the fixture text (golden, no key), incomplete declaration object is refused.
+  - Red, `ui`: 16 of 20 new tests fail on assertions (switch not found); 4 are already green by design (switch off saves nothing, an
+    untouched Save keeps the declaration, other fields independent).
+  - Red, BDD (checked with a throw-away stub of the core type, removed again): "Declared permissions are saved with the profile"
+    fails on the assertion; "A profile saved before declarations existed has none" is green already (loads the fixture with the real
+    `JsonFileConnectionProfileRepository`; `acceptance-tests` -> `data-rabbit` pulls no unstable runtime: the keyring library is not
+    loaded by this scenario). It guards back-compat and must stay green.
+  - Contract the UI tests pin beyond the brief: the two yes/no choices are RadioButtons in the order configure-Yes, configure-No,
+    write-Yes, write-No, shown (as radios 3..6 after the three topology radios) only while the Role.Switch is on. A different widget
+    needs a test change agreed with the test developer.
+  - Fixture: `data-rabbit/src/test/resources/fixtures/connections-m1-02.json` (copy in `acceptance-tests/src/test/resources/fixtures/`).
 - Brief revised: apply-on-Save through `ConnectionProfileInput` (no `setDeclaredPermissions`), clear-by-sentinel,
   no reopen in `setCaCertificate`, one switch plus two yes/no choices instead of three-state per right, UI session
   wiring left to M1-07. Reasons in Design notes.

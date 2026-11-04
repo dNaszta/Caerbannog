@@ -24,9 +24,15 @@ val cucumberVersion = "7.20.1"
 // per the task brief's Design notes, the fakes for ConnectionProfileRepository/SecretStore/
 // BrokerReachabilityChecker live in THIS module, not in core or data-rabbit, so acceptance-tests
 // does not need a dependency on data-rabbit for this feature file.
+//
+// M1-06 changes that for ONE scenario: "A profile saved before declarations existed has none" needs a real
+// profile file, so acceptance-tests now depends on data-rabbit (project-internal, no new third-party
+// library) and loads the M1-02 format fixture with the real JsonFileConnectionProfileRepository. Every
+// other scenario still uses the in-memory fakes above.
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(project(":core"))
+    testImplementation(project(":data-rabbit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
     testImplementation("io.cucumber:cucumber-junit-platform-engine:$cucumberVersion")

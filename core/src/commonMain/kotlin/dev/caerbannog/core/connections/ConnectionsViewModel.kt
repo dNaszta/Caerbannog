@@ -32,6 +32,7 @@ class ConnectionsViewModel(
             streamPort = input.streamPort,
             managementPort = input.managementPort,
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
+            declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
         val result = repository.add(profile)
         if (result is SaveConnectionResult.Saved) {
@@ -58,6 +59,11 @@ class ConnectionsViewModel(
             streamPort = input.streamPort,
             managementPort = input.managementPort,
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
+            declaredPermissions = when (val edit = input.declaredPermissions) {
+                DeclaredPermissionsEdit.Keep -> original.declaredPermissions
+                DeclaredPermissionsEdit.Clear -> null
+                is DeclaredPermissionsEdit.Set -> edit.permissions
+            },
         )
 
         val result = if (input.name == originalName) {

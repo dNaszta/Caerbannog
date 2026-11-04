@@ -98,7 +98,7 @@ Feature: Permission check before the first connection
     And topology changes are locked
     And test publishing is disabled
 
-  @fake-broker @needs-M1-06
+  @fake-broker
   Scenario: Declared permissions are saved with the profile
     Given I edit the profile "prod-eu"
     When I declare that the user can change topology and can publish
@@ -106,7 +106,7 @@ Feature: Permission check before the first connection
     And I reopen the saved profile "prod-eu"
     Then the profile declares configure "yes" and write "yes"
 
-  @fake-broker @needs-M1-06
+  @fake-broker
   Scenario: A profile saved before declarations existed has none
     Given a saved profile file from before declared permissions existed
     When the profiles are loaded

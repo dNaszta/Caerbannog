@@ -21,6 +21,6 @@ data class ConnectionProfile(
     val managementPort: Int = 15671,
     val caCertificatePath: String? = null,
     val topologyControlLevel: TopologyControlLevel = TopologyControlLevel.READ_ONLY,
-    /** The user's own claim, used only when permissions cannot be read. Not persisted yet (M1-06). */
+    /** The user's own claim, used only when permissions cannot be read. Saved with the profile; applied on Save through [ConnectionProfileInput.declaredPermissions]. */
     val declaredPermissions: DeclaredPermissions? = null,
 )
