@@ -3,9 +3,30 @@
 Milestone: M1    Depends on: none (any branch; touches build files and Taskfile only)    Size: S
 
 ## Status
-- State: not started (briefed and confirmed by the architect; ready for the test developer).
+- State: step 2 done (tests first, red established on unfixed `main` base); ready for the senior developer.
 - Round: 0
 - Branch: `m1-taskfile-02-test-task-runs-all-modules`, created from `main` (not from the M1-10 branch; see Base branch).
+- Step 2, red evidence (no production code, no Gherkin; acceptance is by command output; no extra script or Taskfile
+  target added, since the brief asks for none and forbids touching `Taskfile.yml`):
+  - `./gradlew test --dry-run`: the only `test` tasks listed are `:acceptance-tests:test`, `:data-rabbit:test`,
+    `:desktopApp:test`. `:core:jvmTest` and `:ui:jvmTest` are NOT listed (grep count of `jvmTest` = 0). Core and ui
+    only appear as compile prerequisites. Exit 0, which is the bug.
+  - `./gradlew test --rerun-tasks --continue`: BUILD SUCCESSFUL; XML results only under
+    `acceptance-tests/build/test-results/test` and `data-rabbit/build/test-results/test`. Nothing for core or ui.
+  - Baseline for the fixed `./gradlew test` (from `./gradlew test :core:jvmTest :ui:jvmTest --rerun-tasks --continue`,
+    BUILD SUCCESSFUL, test-results dirs cleaned before the run; tests / failures / errors / skipped):
+    | Module (task) | Tests | Fail | Err | Skip |
+    | --- | --- | --- | --- | --- |
+    | acceptance-tests (test) | 17 | 0 | 0 | 1 |
+    | core (jvmTest) | 6 | 0 | 0 | 0 |
+    | data-rabbit (test) | 8 | 0 | 0 | 0 |
+    | ui (jvmTest) | 3 | 0 | 0 | 0 |
+    | desktopApp (test) | no results written (no tests on `main`) | | | |
+    Total 34 on `main`. The "30 tests" in the Goal is the count on the M1-10 branch (ui has 3 here), so compare per module
+    against this table when verifying on this branch.
+  - The fix is correct when: dry run lists both jvmTest tasks, and a plain `./gradlew test --rerun-tasks` yields the
+    same per-module numbers as the table, with results under `core/build/test-results/jvmTest` and
+    `ui/build/test-results/jvmTest`.
 
 ## Goal
 `./gradlew test` and `task test` run the tests of `core` and `ui` (30 tests on the M1-10 branch) as well as
