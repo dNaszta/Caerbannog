@@ -54,7 +54,7 @@ Milestone: M1    Depends on: none (any branch; touches build files and Taskfile 
   - Keychain question: data-rabbit's 8 tests include 2 real-keychain tests (`KeyringSecretStoreTest` 1, `KeyringRoundTripSpikeTest` 1)
     plus CaCertificateValidatorTest 3 and JsonConnectionProfileRepositoryTest 3. Existing behaviour: data-rabbit's `test` is
     unchanged versus main (excludes only tag `broker`); `@broker` tests are excluded, brokerTest not run. The change adds no keychain
-    or broker test: core and ui tests have none. Follow-up stays with `M1-06-keychain-test-opt-in`.
+    or broker test: core and ui tests have none. Follow-up stays with `M1-08-keychain-test-opt-in`.
   - Clean state: `rm -rf core/build ui/build; ./gradlew test` BUILD SUCCESSFUL. `:core:tasks --all` and `:ui:tasks --all` show one
     `test` (our description) next to `jvmTest`, `allTests`, `check`; no clash with the KMP plugin. `check --dry-run` does not add
     `:core:test`/`:ui:test` (no duplicate run); `:core:check :ui:check` and `:core:test` succeed.
@@ -89,7 +89,7 @@ Out: CI (none exists), `brokerTest` (stays separate), any test content change.
 - `./gradlew test --dry-run` lists `:core:jvmTest` and `:ui:jvmTest` (through `test`) besides the existing modules.
 - `./gradlew test --rerun-tasks` and `task test` run core and ui tests; the report counts match the per-module
   runs. Mutation check: break one core test on purpose, `task test` fails, restore.
-- Neither `JavaKeyringSecretStore` tests nor any `@broker` test is pulled in (see `M1-06-keychain-test-opt-in`).
+- Neither `JavaKeyringSecretStore` tests nor any `@broker` test is pulled in (see `M1-08-keychain-test-opt-in`).
 - No BDD scenario is needed (build wiring). Automatic demonstration, by command output in the status block:
   1. `./gradlew test --dry-run` contains `:core:jvmTest` and `:ui:jvmTest` (before the fix it does not).
   2. Mutation check: make one core test fail, `./gradlew test` exits non-zero naming `:core:jvmTest`; same for one ui

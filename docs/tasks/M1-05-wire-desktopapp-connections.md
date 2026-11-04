@@ -128,7 +128,7 @@ No product decision and no new dependency or build-tool choice is needed. Nothin
   `JavaKeyringSecretStore` with a throwaway profile name (touches the real keychain on every `test` run), outside
   this brief's rule but worth the architect's attention.
 - Step: 5 done - ACCEPTED WITH FOLLOW-UPS (architect, round 1). Code, tests and layering pass review (`ui` does not
-  import `data-rabbit`; no test uses defaults/`defaultFile()`/real keychain). Follow-up: `M1-06-keychain-test-opt-in`.
+  import `data-rabbit`; no test uses defaults/`defaultFile()`/real keychain). Follow-up: `M1-08-keychain-test-opt-in`.
   Pending (human): manual `:desktopApp:run` and, if wanted, the optional local-broker check; the M1 gate
   "Connects to a local broker" is closed on automated evidence and becomes fully closed after that run.
   `@broker` not re-proven this round (no Docker here; unchanged by M1-05). Merge pending (human).
