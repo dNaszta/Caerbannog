@@ -3,7 +3,7 @@
 Milestone: M1    Depends on: none (any branch; touches build files and Taskfile only)    Size: S
 
 ## Status
-- State: step 3 done (build fix in place, evidence below); ready for test developer verification and architect review.
+- State: step 4 done (verified, pass, no findings); ready for architect review (step 5).
 - Round: 0
 - Branch: `m1-taskfile-02-test-task-runs-all-modules`, created from `main` (not from the M1-10 branch; see Base branch).
 - Step 2, red evidence (no production code, no Gherkin; acceptance is by command output; no extra script or Taskfile
@@ -38,6 +38,22 @@ Milestone: M1    Depends on: none (any branch; touches build files and Taskfile 
     same for `AppUiTest` -> `:ui:jvmTest FAILED`. Both restored with `git checkout`.
   - Not pulled in: `--dry-run` has 0 `brokerTest` tasks; core/ui tests contain no keyring or `@broker` references
     (only a main-source interface mentions them). Only core and ui `test` were added.
+- Step 4, verification (test developer, independent run on this branch, sandbox off):
+  - Dry run: lists `:core:jvmTest`, `:core:test`, `:ui:jvmTest`, `:ui:test` besides acceptance-tests, data-rabbit, desktopApp; 0 `brokerTest`.
+  - `rm -rf */build/test-results; ./gradlew test --rerun-tasks --continue`: BUILD SUCCESSFUL, XML totals (tests/fail/err/skip):
+    acceptance-tests 17/0/0/1, core 6/0/0/0, data-rabbit 8/0/0/0, ui 3/0/0/0. Identical to the baseline.
+  - Mutation (exit codes captured, not through grep): `assertEquals(5, 2 + 2)` in core `SpikeSanityTest`: `./gradlew test`
+    exit 1, `task test` exit 201, both name `:core:jvmTest FAILED`. `fail("mutation")` in ui `AppUiTest`: `./gradlew test`
+    exit 1, `task test` exit 201, both `:ui:jvmTest FAILED`. Restored with `git checkout`; tree clean.
+  - `git diff main --stat`: core and ui build files, spec.md, brief, tasks README only; `Taskfile.yml` and `data-rabbit` diff empty.
+  - Keychain question: data-rabbit's 8 tests include 2 real-keychain tests (`KeyringSecretStoreTest` 1, `KeyringRoundTripSpikeTest` 1)
+    plus CaCertificateValidatorTest 3 and JsonConnectionProfileRepositoryTest 3. Existing behaviour: data-rabbit's `test` is
+    unchanged versus main (excludes only tag `broker`); `@broker` tests are excluded, brokerTest not run. The change adds no keychain
+    or broker test: core and ui tests have none. Follow-up stays with `M1-06-keychain-test-opt-in`.
+  - Clean state: `rm -rf core/build ui/build; ./gradlew test` BUILD SUCCESSFUL. `:core:tasks --all` and `:ui:tasks --all` show one
+    `test` (our description) next to `jvmTest`, `allTests`, `check`; no clash with the KMP plugin. `check --dry-run` does not add
+    `:core:test`/`:ui:test` (no duplicate run); `:core:check :ui:check` and `:core:test` succeed.
+  - Build files: comment and style fine; no change to `jvmTest`. Spec sentence accurate.
 
 ## Goal
 `./gradlew test` and `task test` run the tests of `core` and `ui` (30 tests on the M1-10 branch) as well as
