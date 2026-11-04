@@ -33,6 +33,7 @@ Replaces the sidebar picker idea, the drawer "Connection" card and the interim e
 **Why a chip and not the drawer card.** The connection decides what every screen may do (topology locked, no publishing), so it must be visible and reachable from every screen without a navigation step. The product owner asked for it in the top right.
 
 ## Other inputs
+- Copyable values (product owner 2026-11-04, "it should be copyable", said about retention; coordinator assumed all detail and list values, to confirm): stream name, offsets, counts, retention, leader and node are selectable text; copy gives exactly the displayed string (retention `7D`, not `604800s`). Use the Compose `SelectionContainer` around the table and the detail panel and a UI test for the retention cell. Keyboard: a focused cell copies with the platform copy shortcut. Add it to the UX file notes if missing.
 - The `02` scenario "Switching connection shows the permission state of the new current connection" and the deferred acceptance scenario "Switch between connections" (`SwitchBetweenConnectionsSteps`) are un-skipped here: switching means Connect on the other profile in the popup.
 - The connection panel shows the one-line note "Host name is not verified." (D7 (a)).
 - Scenarios: `13_connection_lifecycle.feature` (the three app bar scenarios at the end, `@needs-M2`, un-skip here; the earlier ones run in M2-03 at core level), `03` (refresh, interval), `02` as above.

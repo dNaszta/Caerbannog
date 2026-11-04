@@ -260,3 +260,31 @@ Report format as in step 4 of part 1 (verdict, counts, mutations table, findings
 ### Part 2, step 4: verification result (test developer, 2026-11-04)
 Retention test fixed per ruling 1 (stream declared through the management API with `x-max-age=7D`, assertion `7D` unchanged) and `ManagementJsonTest` pins that `604800s` maps unchanged. Counts from the XML: `brokerTest` 57 of 57, `data-rabbit` unit 86, acceptance 66 (9 skipped, all `@needs-M2`/`@needs-decision`), desktopApp 12, ui 103, core 228; all green, `verifyTestDiscovery` green. `RealBrokerCatalogTest` and the new classes passed 10 of 10 repeated runs. Mutations: eight of nine killed; (b) is an equivalent mutant (see below), (e) survived until the "parallel calls are limited" test was strengthened (it released the calls before the extra ones could start), now killed. Added: `StreamHostNameToleranceTest`, a broker-stopped-mid-session broker test, a window-closed-during-Connect test. Full report in the hand-back message.
 
+
+### Part 2, step 5: architect review (2026-11-04)
+Verdict: ACCEPTED WITH FOLLOW-UPS. Ready to merge `m2-03-stream-catalog` into local `main` (not pushed). Reviewed: full `git diff main..HEAD` of production code (`core` streams model and interfaces, `data-rabbit` gateway, holder, management client, stream environments, mapper, errors, timeouts, `desktopApp` composition root and `Main.kt`), the test developer's step 4 report, spec and README edits. Not reviewed line by line: the 3,000 lines of test code beyond their names, counts and the mutation table; the Cucumber glue.
+
+Rules check: TLS only (the base URL builder refuses `http://`, mutation a killed; the stream side always uses `tls().sslContext` with the profile CA, never trust-all, mutation c killed); only `queryStreamStats` is called on the stream client (no consumer, no publisher, no purge; `reading first offsets writes nothing` passes on a real broker); every management call is a GET; password read once (D6), kept as a nullable volatile in `ManagementHttp` and `StreamEnvironments`, nulled on close, never logged (holder logs only the exception class name, mutation d killed), reasons carry no host or URL; timeouts named in `ConnectionTimeouts`; close is idempotent, never throws, every resource gets its close (mutation h killed); the 401 "Not management user" is a connection, visibility NONE (M2-03a).
+
+| # | Severity | File:line | Finding | Ruling |
+| --- | --- | --- | --- | --- |
+| 1 | minor | `desktopApp/.../CompositionRoot.kt` `createAppComposition` | `RabbitMqConnectionGateway(secretStore)` is built with the default no-op `log`, so the holder's "Closing a connection resource failed" line goes nowhere | F1: pass a logger when the app gets one (M2-04 or M5); no secret risk either way |
+| 2 | minor | `StreamEnvironments.close` | `future.thenAccept { it.close() }` swallows a throwing environment close silently, and a close of an environment still building depends on the builder seeing `closed` (handled, tested by the window-close-during-Connect test) | accept; F1 covers logging |
+| 3 | minor | `StreamEnvironments.environmentFor` | a second caller waiting on `existing.join()` gets a `CompletionException` when the first build fails; the mapper turns any exception into `Unavailable`, so behaviour is right, but the wrapped type is an accident | idea: unwrap the cause so the failure class is the real one when logging arrives (F1) |
+| 4 | minor | `ManagementErrors.map` | unused `body` parameter kept with a suppression "for a future status" | remove when touched; not blocking |
+| 5 | idea | `Main.kt` | password is also held inside the stream client's `Environment` (unavoidable with this API); the holder cannot wipe it | accepted, noted for the security pass in M5 |
+| 6 | minor (spec) | `docs/spec.md` line 64 | "`endpointIdentificationAlgorithm(null)` is required" was stronger than the evidence (test developer finding 1: dropping it is unobservable on stream-client 1.12.0, mutation b equivalent) | spec softened (kept the call, kept `StreamHostNameToleranceTest` as the regression pin) |
+
+Test developer findings: 
+- Finding 1 (mutation b equivalent): accepted as above, spec softened, no code change; if a later stream-client version changes TLS handling the pin test will show it.
+- Finding 2 (parallelism test too weak): fixed by the test developer, mutation e now killed.
+- Finding 3 (Cmd+Q and SIGTERM do not go through `onCloseRequest`, so the held connection is not closed by us): ACCEPTED RISK for M2, with an optional small follow-up (M2-11 shutdown hook). Reason: the connection is read-only and unnamed (no consumer, no publisher, nothing registered on the broker beyond a TCP connection per vhost), so a dropped process leaves nothing to clean up and the broker closes the sockets; it only costs a log line on the broker. The window-close path (the usual one) is covered by `handleCloseRequest` tests including a Connect still running.
+- Coverage note on the 401 "Not management user" branch: no action. The branch is covered at three levels: unit `ManagementErrorsTest` with the captured M2-03a body (exact `reason` match, other 401 bodies stay credentials-refused), the gateway/catalog unit tests, and the real-broker test `a user without the management tag is connected, visibility none, lists not authorised`. The only gap, that a future RabbitMQ version may change the reason text, would turn such users into "credentials refused" (fail closed, visible); the fixture is the pin. Scenario `13` "A user without the management tag ..." stays `@needs-M2-03b` until the UI exists.
+
+Follow-ups (briefs or notes):
+- F1 logging seam: when the app has a logger (M2-04), pass it to `RabbitMqConnectionGateway`; unwrap `CompletionException`; drop the unused `body` parameter. No separate task file; in the M2-04 checklist.
+- M2-11-shutdown-hook (optional, S): `docs/tasks/M2-11-shutdown-hook.md`.
+- D9 display and copyable values: in `M2-04-stream-list-core.md` and `M2-05-stream-list-screen.md`.
+- M2-06 inputs are already in `M2-06-publishers-consumers.md`.
+
+Product decisions: none blocking. To confirm (coordinator's reading, wording only): D9 normalise to the compact form (`7D`), and "copyable" applying to all detail and list values (README D9 and UI1).
