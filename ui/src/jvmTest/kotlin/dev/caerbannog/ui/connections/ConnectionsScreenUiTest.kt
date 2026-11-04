@@ -16,6 +16,11 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -52,6 +57,7 @@ import dev.caerbannog.core.connections.TopologyControlLevel
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -109,6 +115,14 @@ class ConnectionsScreenUiTest {
         waitForIdle()
     }
 
+    /**
+     * The "New connection" button. Found by text plus click action, because the empty panel's title is also
+     * the text "New connection" (not clickable); after M1-12a the button lives in the app bar, not the list.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.newConnectionButton(): SemanticsNodeInteraction =
+        onNode(hasText("New connection").and(hasClickAction()))
+
     private fun testViewModel(vararg seeds: ConnectionProfile): ConnectionsViewModel {
         repository = InMemoryRepository()
         seeds.forEach { repository.add(it) }
@@ -143,7 +157,7 @@ class ConnectionsScreenUiTest {
         val existing = ConnectionProfile(name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer")
         setContent { ConnectionsScreen(testViewModel(existing)) }
 
-        onAllNodesWithText("New connection")[0].performClick()
+        newConnectionButton().performClick()
         onNodeWithText("Name").performTextInput("uat-eu")
         onNodeWithText("Host").performTextInput("other.example.com")
         onNodeWithText("Username").performTextInput("someone")
@@ -183,7 +197,7 @@ class ConnectionsScreenUiTest {
         waitForIdle()
         onNodeWithText(passedBanner, substring = true).assertExists()
 
-        onNodeWithText("New connection").performClick()
+        newConnectionButton().performClick()
         waitForIdle()
 
         onNodeWithText(passedBanner, substring = true).assertDoesNotExist()
@@ -749,7 +763,7 @@ class ConnectionsScreenUiTest {
     fun `clicking New connection after editing a declared profile shows the switch off`() = runDesktopComposeUiTest {
         selectSaved(declared(configure = true, write = true))
 
-        onNodeWithText("New connection").performClick()
+        newConnectionButton().performClick()
         waitForIdle()
 
         assertNotDeclared()
@@ -935,7 +949,7 @@ class ConnectionsScreenUiTest {
     @Test
     fun `adding a new connection runs no permission check`() = runDesktopComposeUiTest {
         setContent { ConnectionsScreen(permissionViewModel()) }
-        onAllNodesWithText("New connection")[0].performClick()
+        newConnectionButton().performClick()
         fillNewConnection()
 
         save()
@@ -1000,7 +1014,7 @@ class ConnectionsScreenUiTest {
         selectProfile(0)
         assertTagged("permissionBanner", "Permission check has not run yet.")
 
-        onAllNodesWithText("New connection")[0].performClick()
+        newConnectionButton().performClick()
         waitForIdle()
 
         onNodeWithTag("permissionBanner", useUnmergedTree = true).assertDoesNotExist()
@@ -1109,26 +1123,272 @@ class ConnectionsScreenUiTest {
         onNodeWithText("Edit connection").assertExists()
     }
 
+    // --- M1-12a: layout (app bar, drawer, field grid), pill containment ------------------------------
+    // Written before the code (red). Tags the production code must provide (names are the contract of this test):
+    //   "connectionsAppBar"      the app bar container (title text "Connections" and the New connection button inside)
+    //   "connectionsDrawer"      the drawer container (brand, Connection card, nav item inside)
+    //   "drawerConnectionCard"   the drawer's Connection card (label, profile name, host, pill inside)
+    //   "drawerPermissionPill"   the pill inside that card (NOT "permissionPill:<name>", which is the list card's pill)
+    //   "profileCard:<name>"     each profile card in the list (the click target, the pill's parent)
+    // Layout is asserted at the mockup's preview size 1280x880.
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.nodeBounds(matcher: SemanticsMatcher): Rect =
+        onNode(matcher, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+
+    private val gridLabelsInMockupOrder = listOf(
+        "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate",
+    )
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.gridField(label: String): SemanticsNode {
+        val isField = hasText(label, substring = label == "Password" || label == "CA certificate")
+        val nodes = onAllNodes(isField.and(hasSetTextAction().or(hasText("Stream port (TLS)").or(hasText("Management port (HTTPS)")))))
+            .fetchSemanticsNodes()
+        assertEquals(1, nodes.size, "expected exactly one text field labelled '$label', found ${nodes.size}")
+        return nodes.single()
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the long declared pill text stays on one line`() = runDesktopComposeUiTest {
+    fun `the app bar shows the title Connections and a New connection button at its right`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        assertTagged("connectionsAppBar", "Connections")
+        val bar = nodeBounds(hasTestTag("connectionsAppBar"))
+        val title = nodeBounds(hasText("Connections").and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        val button = nodeBounds(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        assertTrue(title.left < button.left, "title must be left of the button: title $title, button $button")
+        assertTrue(button.center.x > bar.center.x, "the button must sit in the right half of the app bar: bar $bar, button $button")
+        assertTrue(bar.right - button.right <= 48f * 2, "the button must be at the right edge of the app bar: bar $bar, button $button")
+        assertTrue(button.top >= bar.top && button.bottom <= bar.bottom, "the button must be inside the app bar: bar $bar, button $button")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the New connection button is only in the app bar, not in the profile list`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        onAllNodes(hasText("New connection").and(hasClickAction())).assertCountEquals(1)
+        onAllNodes(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+            .assertCountEquals(1)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the app bar New connection button opens the empty panel`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        onNodeWithText("Edit connection").assertExists()
+
+        onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar")))).performClick()
+        waitForIdle()
+
+        onNodeWithText("Edit connection").assertDoesNotExist()
+        onNode(hasText("New connection").and(hasClickAction().not())).assertExists()
+        val nameValue = onNode(hasText("Name").and(hasSetTextAction())).fetchSemanticsNode().config
+            .getOrNull(SemanticsProperties.EditableText)?.text
+        assertEquals("", nameValue, "the New connection panel must have an empty Name field")
+        onNodeWithText("Delete profile").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the field labels are in the mockup order in two columns`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        val pos = gridLabelsInMockupOrder.associateWith { gridField(it).positionInRoot }
+        val readingOrder = pos.entries.sortedWith(compareBy({ it.value.y }, { it.value.x })).map { it.key }
+        assertEquals(gridLabelsInMockupOrder, readingOrder, "fields must read left to right, top to bottom in the mockup order; positions $pos")
+
+        val left = listOf("Name", "Host", "Stream port (TLS)", "Password").map { pos.getValue(it) }
+        val right = listOf("Virtual host", "Username", "Management port (HTTPS)", "CA certificate").map { pos.getValue(it) }
+        assertEquals(1, left.map { it.x }.distinct().size, "left column must share one x: $left")
+        assertEquals(1, right.map { it.x }.distinct().size, "right column must share one x: $right")
+        assertTrue(right.first().x > left.first().x, "second column must be right of the first: $pos")
+        // Same row = same y.
+        assertEquals(pos.getValue("Name").y, pos.getValue("Virtual host").y, "Name and Virtual host share a row")
+        assertEquals(pos.getValue("Host").y, pos.getValue("Username").y, "Host and Username share a row")
+        assertEquals(pos.getValue("Stream port (TLS)").y, pos.getValue("Management port (HTTPS)").y, "the ports share a row")
+        assertEquals(pos.getValue("Password").y, pos.getValue("CA certificate").y, "Password and CA certificate share a row")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the field grid collapses to one column in a narrow window`() = runDesktopComposeUiTest(600, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        val pos = gridLabelsInMockupOrder.associateWith { gridField(it).positionInRoot }
+        assertEquals(1, pos.values.map { it.x }.distinct().size, "narrow: every field in one column; positions $pos")
+        val readingOrder = pos.entries.sortedBy { it.value.y }.map { it.key }
+        assertEquals(gridLabelsInMockupOrder, readingOrder, "narrow: the order stays the mockup order; positions $pos")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the two port fields are read-only and show 5551 and 15671`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        fun check(label: String, value: String) {
+            val config = gridField(label).config
+            assertEquals(value, config.getOrNull(SemanticsProperties.EditableText)?.text, "'$label' must show $value")
+            assertFalse(config.contains(SemanticsActions.SetText), "'$label' must be read-only (no set-text action)")
+        }
+        check("Stream port (TLS)", "5551")
+        check("Management port (HTTPS)", "15671")
+        // Sanity for the check itself: an editable field does offer set-text.
+        assertTrue(gridField("Host").config.contains(SemanticsActions.SetText), "Host must stay editable")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the port fields show the ports of a profile that has others and stay read-only`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod.copy(streamPort = 6551, managementPort = 16671))) }
+        selectProfile(0)
+
+        assertEquals("6551", gridField("Stream port (TLS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
+        assertEquals("16671", gridField("Management port (HTTPS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
+        assertFalse(gridField("Stream port (TLS)").config.contains(SemanticsActions.SetText))
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a new connection shows the standard ports, read-only`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel()) }
+
+        assertEquals("5551", gridField("Stream port (TLS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
+        assertEquals("15671", gridField("Management port (HTTPS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
+        assertFalse(gridField("Management port (HTTPS)").config.contains(SemanticsActions.SetText))
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer shows the selected profile's name, host and pill`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        assertTagged("drawerConnectionCard", "Connection")
+        assertTagged("drawerConnectionCard", "prod-eu")
+        assertTagged("drawerConnectionCard", "rabbit.example")
+        assertTagged("drawerPermissionPill", "Not checked")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer pill follows the permission check of the selected profile`() = runDesktopComposeUiTest(1280, 880) {
         fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
-        val longName = prod.copy(
-            name = "a-rather-long-profile-name-for-a-narrow-card",
-            declaredPermissions = DeclaredPermissions(configure = true, write = true),
-        )
-        setContent { ConnectionsScreen(permissionViewModel(longName)) }
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
         checkButton()
 
-        val text = "Can change topology (declared)"
-        val node = onNode(
-            hasText(text).and(hasAnyAncestor(hasTestTag("permissionPill:${longName.name}")).or(hasTestTag("permissionPill:${longName.name}"))),
-            useUnmergedTree = true,
-        ).fetchSemanticsNode()
-        val layouts = mutableListOf<TextLayoutResult>()
-        val ok = node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts) ?: false
-        assertEquals(true, ok, "the pill text must expose its layout")
-        assertEquals(1, layouts.single().lineCount, "the pill text '$text' must not wrap in the 280dp card")
+        assertTagged("drawerPermissionPill", "Topology locked")
+        assertTagged("permissionPill:prod-eu", "Topology locked")
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer shows the other profile after the selection changes`() = runDesktopComposeUiTest(1280, 880) {
+        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
+        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
+        selectProfile(0)
+        selectProfile(1)
+
+        assertTagged("drawerConnectionCard", "dev-eu")
+        assertTagged("drawerConnectionCard", "rabbit-dev.example")
+        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("prod-eu"))), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer says No connection selected when nothing is selected`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        assertTagged("drawerConnectionCard", "No connection selected")
+        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
+
+        selectProfile(0)
+        onNode(hasText("No connection selected"), useUnmergedTree = true).assertDoesNotExist()
+
+        newConnectionButton().performClick()
+        waitForIdle()
+        assertTagged("drawerConnectionCard", "No connection selected")
+        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer has the brand, the Connection card and one Connections nav item as text`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        assertTagged("connectionsDrawer", "Caerbannog")
+        assertTagged("connectionsDrawer", "behind the rabbit")
+        assertTagged("connectionsDrawer", "Connection")
+        assertTagged("connectionsDrawer", "Connections")
+        val drawer = nodeBounds(hasTestTag("connectionsDrawer"))
+        assertTrue(drawer.left <= 1f && drawer.width in 270f..600f, "the drawer sits at the left edge, about 280dp wide: $drawer")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer has no Search field and no Streams, Topology or Migrations items in M1`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        listOf("Search streams, queues, exchanges", "Streams", "Topology", "Migrations").forEach { text ->
+            onAllNodesWithText(text, useUnmergedTree = true).assertCountEquals(0)
+        }
+    }
+
+    // The pill must stay inside the profile card and never wrap; the name gives way (one line, ellipsis).
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.assertPillContainedAndNameEllipsized() {
+        val longName = "a-rather-long-profile-name-".repeat(6) + "end"
+        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
+        val profile = prod.copy(name = longName, declaredPermissions = DeclaredPermissions(configure = true, write = true))
+        setContent { ConnectionsScreen(permissionViewModel(profile)) }
+        selectProfile(0)
+        checkButton()
+
+        val pillText = "Can change topology (declared)"
+        val cardTag = hasTestTag("profileCard:$longName")
+        val pillTag = hasTestTag("permissionPill:$longName")
+        val card = nodeBounds(cardTag)
+        val pill = nodeBounds(pillTag)
+        assertTrue(pill.width > 0f, "the pill must have a width: $pill")
+        assertTrue(pill.left >= card.left && pill.right <= card.right, "the pill must stay inside the card: card $card, pill $pill")
+        assertTrue(pill.width < card.width, "the pill must be narrower than the card: card $card, pill $pill")
+
+        fun layoutOf(textMatcher: SemanticsMatcher): TextLayoutResult {
+            val layouts = mutableListOf<TextLayoutResult>()
+            val node = onNode(textMatcher, useUnmergedTree = true).fetchSemanticsNode()
+            val ok = node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts) ?: false
+            assertTrue(ok, "the text node must expose its layout")
+            return layouts.single()
+        }
+        val pillLayout = layoutOf(hasText(pillText).and(hasAnyAncestor(pillTag).or(pillTag)))
+        assertEquals(1, pillLayout.lineCount, "the pill text '$pillText' must not wrap")
+        assertFalse(pillLayout.isLineEllipsized(0), "the pill text must not be cut: it is the information")
+
+        val nameLayout = layoutOf(hasText(longName).and(hasAnyAncestor(cardTag)))
+        assertEquals(1, nameLayout.lineCount, "the profile name must stay on one line")
+        // Ellipsis shows as visual overflow with the visible part shorter than the text (isLineEllipsized is
+        // unreliable when the name only gets a few dp next to a wide pill).
+        assertTrue(nameLayout.hasVisualOverflow, "a very long profile name must ellipsize, not push the pill out")
+        assertTrue(
+            nameLayout.getLineEnd(0, visibleEnd = true) < longName.length,
+            "the visible part of the name must be shorter than the full name (ellipsized)",
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `with a very long name the pill stays inside the card on one line and the name ellipsizes`() =
+        runDesktopComposeUiTest(1280, 880) { assertPillContainedAndNameEllipsized() }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `in a narrow window the pill still stays inside the card on one line and the name ellipsizes`() =
+        runDesktopComposeUiTest(640, 880) { assertPillContainedAndNameEllipsized() }
 }
