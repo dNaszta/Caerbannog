@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasSetTextAction
@@ -51,6 +52,7 @@ import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.UnreadableCause
 import dev.caerbannog.core.connections.DeclaredPermissions
+import dev.caerbannog.core.connections.Endpoint
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.TopologyControlLevel
@@ -1461,6 +1463,406 @@ class ConnectionsScreenUiTest {
                 val layouts = mutableListOf<TextLayoutResult>()
                 hint.single().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
                 assertEquals(1, layouts.single().lineCount, "saved=$saved: the hint is a single line")
+            }
+        }
+    }
+
+    // --- M1-12b: Material icons and the password reveal toggle ---------------------------------------
+    // Test hook contract for the developer: every icon carries testTag("icon:<mockup name>") (Material Symbols
+    // snake_case name, e.g. icon:verified_user) and contentDescription = null, except the two password toggle
+    // icons, which carry "Show password" / "Hide password". Icons are looked up in the unmerged tree under the
+    // tagged container: permissionPill:<name>, drawerPermissionPill, permissionBanner, connectionsAppBar,
+    // connectionsDrawer. No pixel tests; tags are plain strings, so these tests do not need the icon library.
+
+    private val showPassword = "Show password"
+    private val hidePassword = "Hide password"
+    private val bullet = "\u2022"
+
+    private fun SemanticsNode.tag(): String? = config.getOrNull(SemanticsProperties.TestTag)
+
+    /** Tags `icon:*` of all nodes inside the node tagged [containerTag] (unmerged tree), in tree order. */
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.iconTagsUnder(containerTag: String): List<String> =
+        onAllNodes(
+            SemanticsMatcher("icon node") { it.tag()?.startsWith("icon:") == true }.and(hasAnyAncestor(hasTestTag(containerTag))),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes().map { it.tag()!! }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.iconNodes(name: String): List<SemanticsNode> =
+        onAllNodes(hasTestTag("icon:$name"), useUnmergedTree = true).fetchSemanticsNodes()
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.revealToggle(): SemanticsNodeInteraction =
+        onNode(hasContentDescription(showPassword).or(hasContentDescription(hidePassword)), useUnmergedTree = true)
+
+    private fun SemanticsNode.description(): List<String>? = config.getOrNull(SemanticsProperties.ContentDescription)
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.passwordShown(): String =
+        onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password)).fetchSemanticsNode()
+            .config[SemanticsProperties.EditableText].text
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.typePassword(text: String) {
+        onNodeWithText("Password").performTextInput(text)
+        waitForIdle()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.assertToggle(expectedDescription: String, message: String) {
+        val nodes = onAllNodes(hasContentDescription(showPassword).or(hasContentDescription(hidePassword)), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertEquals(1, nodes.size, "$message: exactly one reveal toggle expected, found ${nodes.size}")
+        assertEquals(listOf(expectedDescription), nodes.single().description(), message)
+    }
+
+    // 1. Reveal toggle
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the password toggle starts masked for a new and for a saved profile`() {
+        listOf(false, true).forEach { saved ->
+            runDesktopComposeUiTest(1280, 880) {
+                setContent { ConnectionsScreen(permissionViewModel(*if (saved) arrayOf(prod) else emptyArray())) }
+                if (saved) selectProfile(0)
+
+                assertToggle(showPassword, "saved=$saved: masked by default")
+                assertEquals(1, iconNodes("visibility").size, "saved=$saved: the eye icon is shown while masked")
+                assertEquals(0, iconNodes("visibility_off").size, "saved=$saved: no crossed-out eye while masked")
+                typePassword("hunter2")
+                assertEquals(bullet.repeat(7), passwordShown(), "saved=$saved: typed text is bullets only")
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `clicking the toggle shows the typed password and Hide password, a second click masks it again`() =
+        runDesktopComposeUiTest(1280, 880) {
+            setContent { ConnectionsScreen(permissionViewModel(prod)) }
+            selectProfile(0)
+            typePassword("hunter2")
+
+            revealToggle().performClick()
+            waitForIdle()
+            assertEquals("hunter2", passwordShown(), "after the click the typed text is shown")
+            assertToggle(hidePassword, "shown state")
+            assertEquals(1, iconNodes("visibility_off").size, "the crossed-out eye is shown while the password is visible")
+            assertEquals(0, iconNodes("visibility").size)
+            onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password)).assertExists("still a password field when shown")
+
+            revealToggle().performClick()
+            waitForIdle()
+            assertEquals(bullet.repeat(7), passwordShown(), "the second click masks it again")
+            assertToggle(showPassword, "masked again")
+            onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password)).assertExists("still a password field when masked")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the toggle is a keyboard focusable click target`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        // The description sits on the Icon inside the IconButton; the merged node is the button with the click action.
+        onNode(hasClickAction().and(hasContentDescription(showPassword))).assertExists("the button carries the description and a click action")
+    }
+
+    // 2. Reset
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `selecting another saved profile after revealing masks the password again`() = runDesktopComposeUiTest(1280, 880) {
+        val a = prod
+        val b = prod.copy(name = "uat-eu", host = "rabbit-uat.example")
+        setContent { ConnectionsScreen(permissionViewModel(a, b)) }
+        selectProfile(0)
+        revealToggle().performClick()
+        waitForIdle()
+        assertToggle(hidePassword, "revealed on the first profile")
+
+        selectProfile(1)
+
+        assertToggle(showPassword, "the second profile starts masked")
+        typePassword("s3cret")
+        assertEquals(bullet.repeat(6), passwordShown(), "typed text on the second profile is masked")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `New connection pressed from a saved profile masks the password again`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        revealToggle().performClick()
+        waitForIdle()
+        assertToggle(hidePassword, "revealed on the saved profile")
+
+        newConnectionButton().performClick()
+        waitForIdle()
+
+        assertToggle(showPassword, "the new form starts masked")
+        typePassword("s3cret")
+        assertEquals(bullet.repeat(6), passwordShown(), "typed text in the new form is masked")
+    }
+
+    // 3. The typed password is never in a node's text while masked
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.allVisibleTexts(): List<String> =
+        onAllNodes(SemanticsMatcher("any node") { true }, useUnmergedTree = true).fetchSemanticsNodes().flatMap { node ->
+            // Not InputText: that test-only property holds the raw typed text on any field.
+            val text = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
+            val editable = node.config.getOrNull(SemanticsProperties.EditableText)?.text
+            text + listOfNotNull(editable)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `while masked the typed password is in no node's text`() = runDesktopComposeUiTest(1280, 880) {
+        val secret = "hunter2-Zq9"
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        typePassword(secret)
+        checkButton()
+
+        allVisibleTexts().forEach { assertFalse(it.contains(secret), "the typed password must not appear in node text: '$it'") }
+
+        revealToggle().performClick()
+        waitForIdle()
+        assertTrue(allVisibleTexts().any { it == secret }, "sanity: once revealed, the text does show it")
+
+        revealToggle().performClick()
+        waitForIdle()
+        allVisibleTexts().forEach { assertFalse(it.contains(secret), "masked again: the password must not appear in node text: '$it'") }
+    }
+
+    // 4. Pill icons, 5. banner icons and the drawer pill
+
+    private class GatedChecker : PermissionChecker {
+        val gate = kotlinx.coroutines.CompletableDeferred<PermissionCheckResult>()
+        override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult = gate.await()
+    }
+
+    private class SettableReachability(var result: ConnectionCheckResult) : BrokerReachabilityChecker {
+        override suspend fun check(profile: ConnectionProfile): ConnectionCheckResult = result
+    }
+
+    private fun viewModelWith(
+        reachability: BrokerReachabilityChecker,
+        checker: PermissionChecker,
+        vararg seeds: ConnectionProfile,
+    ): ConnectionsViewModel {
+        repository = InMemoryRepository()
+        seeds.forEach { repository.add(it) }
+        val secrets = PasswordStore()
+        return ConnectionsViewModel(repository, secrets, reachability, AlwaysValidCertificate(), ConnectionSession(checker, secrets))
+    }
+
+    private data class IconCase(
+        val label: String,
+        val result: PermissionCheckResult?, // null = not checked
+        val declared: DeclaredPermissions?,
+        val expectedIcons: List<String>,
+    )
+
+    private val iconCases = listOf(
+        IconCase("not checked", null, null, emptyList()),
+        IconCase("Checked, unlocked", PermissionCheckResult.Checked(true, true), null, listOf("icon:verified_user")),
+        IconCase("Checked, locked", PermissionCheckResult.Checked(false, true), null, listOf("icon:lock")),
+        IconCase(
+            "Declared, unlocked",
+            PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED),
+            DeclaredPermissions(configure = true, write = true),
+            listOf("icon:help"),
+        ),
+        IconCase(
+            "Declared, locked",
+            PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED),
+            DeclaredPermissions(configure = false, write = true),
+            listOf("icon:help"),
+        ),
+        IconCase("Unreadable", PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED), null, listOf("icon:lock")),
+    )
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the pill, the drawer pill and the banner show the icon of their tone`() {
+        iconCases.forEach { case ->
+            runDesktopComposeUiTest(1280, 880) {
+                fakeChecker.result = case.result ?: PermissionCheckResult.Checked(true, true)
+                val profile = prod.copy(declaredPermissions = case.declared)
+                setContent { ConnectionsScreen(permissionViewModel(profile)) }
+                selectProfile(0)
+                if (case.result != null) checkButton()
+
+                assertEquals(case.expectedIcons, iconTagsUnder("permissionPill:prod-eu"), "${case.label}: list pill icons")
+                assertEquals(case.expectedIcons, iconTagsUnder("drawerPermissionPill"), "${case.label}: drawer pill icons")
+                assertEquals(case.expectedIcons, iconTagsUnder("permissionBanner"), "${case.label}: banner icons")
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Checking shows no icon on the pill, the drawer pill or the banner`() = runDesktopComposeUiTest(1280, 880) {
+        val gated = GatedChecker()
+        setContent { ConnectionsScreen(viewModelWith(AlwaysReachableChecker(), gated, prod)) }
+        selectProfile(0)
+        checkButton()
+
+        assertTagged("permissionPill:prod-eu", "Checking...")
+        assertTagged("permissionBanner", "Checking permissions...")
+        assertEquals(emptyList(), iconTagsUnder("permissionPill:prod-eu"), "Checking: pill has no icon")
+        assertEquals(emptyList(), iconTagsUnder("drawerPermissionPill"), "Checking: drawer pill has no icon")
+        assertEquals(emptyList(), iconTagsUnder("permissionBanner"), "Checking: banner has no icon")
+        gated.gate.complete(PermissionCheckResult.Checked(true, true))
+    }
+
+    // 6. Decorative icons expose no content description
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.describedNodes(): List<SemanticsNode> =
+        onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription), useUnmergedTree = true).fetchSemanticsNodes()
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the only content descriptions on the Connections screen are Show password and Hide password`() =
+        runDesktopComposeUiTest(1280, 880) {
+            setContent { ConnectionsScreen(permissionViewModel(prod)) }
+            selectProfile(0)
+            checkButton()
+
+            assertEquals(
+                listOf(listOf(showPassword)), describedNodes().map { it.description() },
+                "masked: the reveal toggle is the only node with a content description",
+            )
+            revealToggle().performClick()
+            waitForIdle()
+            assertEquals(
+                listOf(listOf(hidePassword)), describedNodes().map { it.description() },
+                "shown: the reveal toggle is the only node with a content description",
+            )
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `every decorative icon has no content description`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        checkButton()
+
+        val icons = onAllNodes(SemanticsMatcher("icon node") { it.tag()?.startsWith("icon:") == true }, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue(icons.size >= 8, "expected the screen's icons to be present, found ${icons.map { it.tag() }}")
+        icons.filter { it.tag() !in setOf("icon:visibility", "icon:visibility_off") }.forEach {
+            assertNull(it.description(), "${it.tag()} is decorative: contentDescription must be null")
+        }
+    }
+
+    // 7. Static icons by tag
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer has the brand icon and the Connections nav icon`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        val inDrawer = iconTagsUnder("connectionsDrawer")
+        assertEquals(1, inDrawer.count { it == "icon:cruelty_free" }, "drawer brand icon, found $inDrawer")
+        assertEquals(1, inDrawer.count { it == "icon:power" }, "drawer Connections nav icon, found $inDrawer")
+        val brand = onNode(hasText("Caerbannog"), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val brandIcon = iconNodes("cruelty_free").single().boundsInRoot
+        assertTrue(brandIcon.right <= brand.left + 0.5f, "the brand icon sits before the text: icon $brandIcon, text $brand")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.assertLeadingIcon(iconName: String, buttonText: String, scrollTo: Boolean = false) {
+        if (scrollTo) onNode(hasClickAction().and(hasText(buttonText))).performScrollTo()
+        val button = onNode(hasClickAction().and(hasText(buttonText))).fetchSemanticsNode().boundsInRoot
+        fun inside(r: Rect) = r.left >= button.left - 0.5f && r.right <= button.right + 0.5f && r.top >= button.top - 0.5f && r.bottom <= button.bottom + 0.5f
+        val icon = iconNodes(iconName).map { it.boundsInRoot }.filter(::inside)
+        assertEquals(1, icon.size, "expected one icon:$iconName inside the '$buttonText' button $button")
+        val text = onAllNodes(hasText(buttonText), useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }.filter(::inside)
+        assertTrue(text.isNotEmpty(), "the '$buttonText' label must be inside its button")
+        assertTrue(icon.single().right <= text.minOf { it.left } + 0.5f, "icon:$iconName must lead the '$buttonText' label: icon ${icon.single()}, text $text")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `New connection in the app bar has a leading add icon`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        assertEquals(listOf("icon:add"), iconTagsUnder("connectionsAppBar"), "the app bar shows exactly the add icon")
+        assertLeadingIcon("add", "New connection")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Delete profile and the check button have leading icons`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        assertLeadingIcon("delete", "Delete profile", scrollTo = true)
+        assertLeadingIcon("wifi_tethering", "Check connection and permissions", scrollTo = true)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the CA field has a trailing upload icon and the Password field a trailing eye, both for new and saved`() {
+        listOf(false, true).forEach { saved ->
+            runDesktopComposeUiTest(1280, 880) {
+                setContent { ConnectionsScreen(permissionViewModel(*if (saved) arrayOf(prod) else emptyArray())) }
+                if (saved) selectProfile(0)
+
+                fun assertTrailing(iconName: String, label: String) {
+                    val field = gridField(label).boundsInRoot
+                    val icons = iconNodes(iconName).map { it.boundsInRoot }
+                        .filter { it.left >= field.left && it.right <= field.right + 0.5f && it.top >= field.top && it.bottom <= field.bottom + 0.5f }
+                    assertEquals(1, icons.size, "saved=$saved: expected one icon:$iconName inside the '$label' field $field")
+                    assertTrue(icons.single().left > field.center.x, "saved=$saved: icon:$iconName is trailing (right half of '$label')")
+                }
+                assertTrailing("upload_file", "CA certificate (optional)")
+                assertTrailing("visibility", "Password")
+                assertEquals(1, iconNodes("upload_file").size, "saved=$saved: the upload icon appears once")
+                onNode(hasClickAction().and(hasAnyDescendant(hasTestTag("icon:upload_file")))).assertDoesNotExist()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the TLS line has a lock icon before the text`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel()) }
+
+        val text = onNode(hasText("TLS is always on", substring = true), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val locks = iconNodes("lock").map { it.boundsInRoot }
+        val beside = locks.filter { it.right <= text.left + 0.5f && it.top < text.bottom && it.bottom > text.top }
+        assertEquals(1, beside.size, "expected one icon:lock before the TLS line $text, locks found: $locks")
+    }
+
+    private fun checkResultCases(): List<Pair<ConnectionCheckResult, Boolean>> = listOf(
+        ConnectionCheckResult.BothReachable to true,
+        ConnectionCheckResult.EndpointUnreachable(Endpoint.STREAM, "connection refused") to false,
+        ConnectionCheckResult.EndpointUnreachable(Endpoint.MANAGEMENT, "timed out") to false,
+        ConnectionCheckResult.ManagementPluginMissing("rabbitmq_stream_management") to false,
+        ConnectionCheckResult.TlsRefused to false,
+    )
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `check_circle shows after a BothReachable check and is absent for every failure`() {
+        checkResultCases().forEach { (result, expectIcon) ->
+            runDesktopComposeUiTest(1280, 880) {
+                setContent { ConnectionsScreen(viewModelWith(SettableReachability(result), fakeChecker, prod)) }
+                selectProfile(0)
+                assertEquals(0, iconNodes("check_circle").size, "$result: no check_circle before any check")
+
+                checkButton()
+
+                assertEquals(if (expectIcon) 1 else 0, iconNodes("check_circle").size, "$result: check_circle count after the check")
+                if (expectIcon) onNodeWithText(passedBanner, substring = true).assertExists()
             }
         }
     }

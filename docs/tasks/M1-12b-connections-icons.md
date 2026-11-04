@@ -156,3 +156,17 @@ installer notes, manual check recorded.
 - 2026-11-04 (architect): brief sharpened against main 28e0bdc (icon table with sizes and artifacts, reveal toggle
   behaviour, test plan, build order with the compile proof as step 0 and the stop rule, accessibility). Ready to start on
   branch `m1-12b-connections-icons` from main. Not started.
+- 2026-11-04 (test developer, step 2, tests first, branch `m1-12b-connections-icons`): two commits, no production code, no
+  dependency, no Gherkin change. Commit 1 (`M1-12b: tests for the shorter Password hint`): `passwordHint` constant is
+  `Blank keeps the saved password`; the keep-password-hint test also asserts `assertFalse(hasVisualOverflow)` at 1280 wide;
+  mutation-proved (with the old string in the constant the new assertion fails: "must not be ellipsized at 1280 wide"; with the
+  new string the test fails on the missing text). Commit 2: 16 new `ConnectionsScreenUiTest` tests (suite 97, 16 red incl. the
+  hint test from commit 1, all on assertions): toggle (default masked new and saved, click shows and `Hide password`, second
+  click masks, merged button has click action plus description), reset on profile switch and on New connection, typed
+  password in no `Text`/`EditableText` while masked, pill/drawer pill/banner icon per status (not checked, Checking, Checked
+  unlocked/locked, Declared unlocked/locked, Unreadable), the only content descriptions are the two toggle strings and
+  every `icon:*` except visibility has none, brand/nav/add/delete/wifi_tethering/upload_file/visibility/lock-in-TLS-line
+  placement by bounds, `icon:check_circle` only after BothReachable (absent for the four failure results). The M1-12a pill
+  and name-ellipsis tests at 640 and 1280 are in the run and pass today. Tag contract: `icon:<mockup name>` on the icon
+  node itself (unmerged tree), toggle description on the same node as `icon:visibility` / `icon:visibility_off` is not
+  required (found by description). Sizes (18/24) are not asserted (no pixel tests).
