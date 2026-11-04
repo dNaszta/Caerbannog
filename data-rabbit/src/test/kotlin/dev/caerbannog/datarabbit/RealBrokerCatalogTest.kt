@@ -38,6 +38,7 @@ import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -399,6 +400,36 @@ class RealBrokerCatalogTest {
             val refused = runCatching { it.read("/", name) }.exceptionOrNull()
             assertTrue(refused != null, "a wrong CA must stop the stream connection, nothing may be read")
             assertEquals(FirstOffset.Unavailable, FirstOffsetMapper.map { it.read("/", name) })
+        }
+    }
+
+    // ---- broker stopped mid-session (M2-03 part 2 verify, exploratory check made permanent) ----
+
+    @Test
+    fun `a broker stopped mid-session gives Unreachable and Unavailable, and the holder closes without hanging`() = runBlocking<Unit> {
+        val own = newContainer("rabbitmq_stream", "rabbitmq_stream_management")
+        own.start()
+        val held = try {
+            val profile = ConnectionProfile(
+                name = "rb-test", host = own.host, virtualHost = "/", username = own.adminUsername,
+                streamPort = own.getMappedPort(STREAM_TLS_PORT), managementPort = own.httpsPort, caCertificatePath = caPath,
+            )
+            val opened = RabbitMqConnectionGateway(Passwords(mapOf("rb-test" to own.adminPassword))).open(profile)
+            assertInstanceOf(OpenResult.Opened::class.java, opened, "$opened")
+            (opened as OpenResult.Opened).connection.also {
+                assertInstanceOf(CatalogResult.Success::class.java, it.catalog.listStreams(StreamListRequest()), "control: the broker is up")
+            }
+        } catch (e: Throwable) {
+            own.stop(); throw e
+        }
+        own.stop()
+        try {
+            assertEquals(CatalogResult.Unreachable, held.catalog.listStreams(StreamListRequest()))
+            assertEquals(CatalogResult.Unreachable, held.catalog.capabilities())
+            assertEquals(FirstOffset.Unavailable, held.offsets.firstOffset("/", "any"), "a dead broker is Unavailable, never an exception")
+        } finally {
+            val closer = CompletableFuture.runAsync { held.close() }
+            closer.get(15, TimeUnit.SECONDS) // a hang here fails the test with a TimeoutException
         }
     }
 

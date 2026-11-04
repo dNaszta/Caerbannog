@@ -136,8 +136,14 @@ class FirstOffsetMapperTest {
             check(System.nanoTime() < deadline) { "only ${inFlight.get()} of $limit parallel calls started" }
             Thread.yield()
         }
+        // Give a missing limit the chance to show: with no limit the other calls start within milliseconds. Bounded
+        // watch (not a sleep for its own sake): ends early the moment one call too many is in flight.
+        val watchUntil = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
+        while (inFlight.get() <= limit && System.nanoTime() < watchUntil) Thread.yield()
+        val seenWhileHeld = inFlight.get()
         release.countDown()
         calls.forEach { assertEquals(FirstOffset.Value(1), it.await()) }
+        assertTrue(seenWhileHeld <= limit, "at most $limit calls may be in flight while all are held, saw $seenWhileHeld")
 
         assertTrue(highest.get() <= limit, "at most $limit calls at once, saw ${highest.get()}")
     }

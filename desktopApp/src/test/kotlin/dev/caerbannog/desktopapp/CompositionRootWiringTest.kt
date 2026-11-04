@@ -22,6 +22,7 @@ import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -135,6 +136,34 @@ class CompositionRootWiringTest {
         handleCloseRequest(composition) { log += "exit" }
 
         assertEquals(listOf("open:uat-eu", "close:uat-eu", "exit"), log.toList())
+    }
+
+    @Test
+    fun `closing the window while a Connect is still running exits and leaves no connection open`() = runBlocking<Unit> {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val slow = object : ConnectionGateway {
+            override suspend fun open(profile: ConnectionProfile): OpenResult {
+                log += "open:${profile.name}"
+                started.countDown()
+                check(release.await(10, java.util.concurrent.TimeUnit.SECONDS)) { "test never released the open" }
+                return OpenResult.Opened(object : HeldConnection {
+                    override val catalog = NoCatalog
+                    override val offsets = NoOffsets
+                    override fun close() { log += "close:${profile.name}" }
+                })
+            }
+        }
+        val composition = compose(slow)
+        val connect = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { composition.viewModel.connect("uat-eu") }
+        check(started.await(10, java.util.concurrent.TimeUnit.SECONDS)) { "the open never started" }
+
+        handleCloseRequest(composition) { log += "exit" }
+        release.countDown()
+        connect.join()
+
+        assertEquals(listOf("open:uat-eu", "exit", "close:uat-eu"), log.toList(), "exit does not wait; what the late open produced is closed")
+        assertIs<LinkState.Disconnected>(composition.active.state.value)
     }
 
     @Test
