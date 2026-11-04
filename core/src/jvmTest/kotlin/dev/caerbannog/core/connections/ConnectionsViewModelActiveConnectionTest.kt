@@ -146,6 +146,16 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
+    fun `changing the topology control level does not disconnect`() = runBlocking {
+        viewModel.connect("uat-eu")
+
+        viewModel.setTopologyControlLevel("uat-eu", TopologyControlLevel.values().first { it != h.uat.topologyControlLevel })
+
+        assertEquals(LinkState.Connected("uat-eu"), h.active.state.value)
+        assertEquals(1, h.gateway.heldNow.size)
+    }
+
+    @Test
     fun `editing the profile while it connects closes the connection the broker opens afterwards`() = runBlocking {
         val gate = h.gateway.holdOpens("uat-eu")
         val connecting = launch { viewModel.connect("uat-eu") }

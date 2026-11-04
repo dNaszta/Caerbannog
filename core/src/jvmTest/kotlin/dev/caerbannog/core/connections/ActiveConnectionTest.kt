@@ -96,6 +96,7 @@ class ActiveConnectionTest {
         assertEquals(LinkState.Disconnected(name = "uat-eu"), h.active.state.value)
         assertEquals(1, held.closeCalls)
         assertTrue(h.gateway.heldNow.isEmpty())
+        assertEquals("uat-eu", h.session.state.value.current?.name, "Disconnect keeps the session's current connection")
 
         h.active.disconnect()
         assertEquals(1, held.closeCalls, "a second disconnect must not close again")
@@ -255,6 +256,43 @@ class ActiveConnectionTest {
             assertTrue(fresh.gateway.heldNow.isEmpty(), "cause $cause: nothing may stay open")
             assertEquals("uat-eu", fresh.session.state.value.current?.name, "cause $cause")
         }
+    }
+
+    @Test
+    fun `a missing password fails Connect without opening the clients`() = runBlocking {
+        h.secrets.delete("uat-eu")
+
+        h.active.connect(h.uat)
+
+        assertEquals(LinkState.Failed("uat-eu", "No password is stored"), h.active.state.value)
+        assertTrue(h.gateway.log.none { it.startsWith("open:") }, "the gateway must not be called: ${h.gateway.log}")
+        assertTrue(h.gateway.heldNow.isEmpty())
+        assertEquals(PermissionCheckResult.Unreadable(UnreadableCause.NO_PASSWORD), h.session.permissions("uat-eu"))
+        assertEquals("uat-eu", h.session.state.value.current?.name)
+    }
+
+    @Test
+    fun `every other Unreadable cause still ends Connected in safest mode`() {
+        for (cause in UnreadableCause.values().filter { it != UnreadableCause.NO_PASSWORD }) {
+            val fresh = Harness()
+            fresh.checker.result = PermissionCheckResult.Unreadable(cause)
+
+            runBlocking { fresh.active.connect(fresh.uat) }
+
+            assertEquals(LinkState.Connected("uat-eu"), fresh.active.state.value, "cause $cause")
+            assertFalse(fresh.session.permissions("uat-eu")!!.topologyUnlocked, "cause $cause")
+        }
+    }
+
+    @Test
+    fun `a password that vanishes between the check and the open still fails through the gateway`() = runBlocking {
+        h.gateway.failWith("uat-eu", Failure.NO_PASSWORD_STORED)
+
+        h.active.connect(h.uat)
+
+        assertEquals(LinkState.Failed("uat-eu", "No password is stored"), h.active.state.value)
+        assertTrue("open:uat-eu" in h.gateway.log)
+        assertTrue(h.gateway.heldNow.isEmpty())
     }
 
     @Test

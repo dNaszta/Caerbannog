@@ -140,6 +140,11 @@ class ConnectionLifecycleSteps {
         checker.refusal = UnreadableCause.NOT_AUTHORIZED
     }
 
+    @Given("no password is stored for {string}")
+    fun noPasswordIsStoredFor(name: String) {
+        secretStore.delete(name)
+    }
+
     @Given("the stream port of {string} does not answer")
     fun theStreamPortDoesNotAnswer(name: String) {
         gateway.streamPortSilent(name)
@@ -247,6 +252,11 @@ class ConnectionLifecycleSteps {
         val held = gateway.heldNow
         assertTrue(held.isEmpty(), "still held: ${held.map { it.profileName }}")
         assertTrue(gateway.everOpened.all { it.closeCalls == 1 }, "every opened connection must be closed exactly once")
+    }
+
+    @Then("the clients were not opened")
+    fun theClientsWereNotOpened() {
+        assertTrue(gateway.log.none { it.startsWith("open:") }, "the gateway was called: ${gateway.log}")
     }
 
     @Then("I can retry")
