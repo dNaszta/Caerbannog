@@ -1,6 +1,17 @@
 package dev.caerbannog.ui.connections
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
@@ -16,6 +27,8 @@ import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.SecretStore
+import dev.caerbannog.core.connections.TopologyControlLevel
+import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 
 /**
@@ -57,8 +70,10 @@ class ConnectionsScreenUiTest {
         override fun validate(filePath: String): CaCertificateValidationResult = CaCertificateValidationResult.Valid
     }
 
+    private var repository = InMemoryRepository()
+
     private fun testViewModel(vararg seeds: ConnectionProfile): ConnectionsViewModel {
-        val repository = InMemoryRepository()
+        repository = InMemoryRepository()
         seeds.forEach { repository.add(it) }
         return ConnectionsViewModel(repository, NoOpSecretStore(), AlwaysReachableChecker(), AlwaysValidCertificate())
     }
@@ -136,5 +151,255 @@ class ConnectionsScreenUiTest {
         waitForIdle()
 
         onNodeWithText(passedBanner, substring = true).assertDoesNotExist()
+    }
+
+    // --- Topology control level (M1-10) -------------------------------------------------------
+    // The three radios are located by role, in display order: Read-only, Declare and edit, Full control.
+
+    private val fullControlTitle = "Allow full control?"
+    private val fullControlBody =
+        "Full control lets this app delete topology (queues, streams, exchanges, bindings, policies) on this " +
+            "connection and run migrations with destructive actions. This is only your own ceiling for this " +
+            "connection: the broker's permissions still apply, and the app never reads, gets or purges queue messages."
+
+    private val readOnly = 0
+    private val declareAndEdit = 1
+    private val fullControl = 2
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.radio(index: Int): SemanticsNodeInteraction =
+        onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))[index]
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.assertSelectedLevel(index: Int) {
+        (0..2).forEach { i ->
+            if (i == index) radio(i).performScrollTo().assertIsSelected() else radio(i).performScrollTo().assertIsNotSelected()
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.pick(index: Int) {
+        radio(index).performScrollTo().performClick()
+        waitForIdle()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.fillNewConnection() {
+        onNodeWithText("Name").performTextInput("new-one")
+        onNodeWithText("Host").performTextInput("new.example.com")
+        onNodeWithText("Username").performTextInput("someone")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.save() {
+        onNodeWithText("Save").performScrollTo().performClick()
+        waitForIdle()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.dialogIsOpen(): Boolean =
+        onAllNodesWithText(fullControlTitle).fetchSemanticsNodes().isNotEmpty()
+
+    private fun saved(level: TopologyControlLevel = TopologyControlLevel.READ_ONLY) = ConnectionProfile(
+        name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer",
+        topologyControlLevel = level,
+    )
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `new connection shows three enabled topology radios with Read-only selected`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+
+        (0..2).forEach { radio(it).performScrollTo().assertIsEnabled() }
+        assertSelectedLevel(readOnly)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `new connection saved with Declare and edit stores DECLARE_AND_EDIT`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        fillNewConnection()
+
+        pick(declareAndEdit)
+        assertEquals(false, dialogIsOpen(), "no confirmation expected for Declare and edit")
+        assertSelectedLevel(declareAndEdit)
+        save()
+
+        assertEquals(TopologyControlLevel.DECLARE_AND_EDIT, repository.list().single().topologyControlLevel)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `new connection saved without touching the radios stores READ_ONLY`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        fillNewConnection()
+        save()
+
+        assertEquals(TopologyControlLevel.READ_ONLY, repository.list().single().topologyControlLevel)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `picking Full control asks first, keeps the previous selection until confirmed, then Save stores FULL_CONTROL`() =
+        runDesktopComposeUiTest {
+            setContent { ConnectionsScreen(testViewModel()) }
+            fillNewConnection()
+
+            pick(fullControl)
+
+            onNodeWithText(fullControlTitle).assertExists()
+            onNodeWithText(fullControlBody).assertExists()
+            onNodeWithText("Use Full control").assertExists()
+            onNodeWithText("Cancel").assertExists()
+            // Nothing selected yet: the dialog is only a question. (Radios sit behind the dialog scrim.)
+            onNodeWithText("Use Full control").performClick()
+            waitForIdle()
+
+            assertEquals(false, dialogIsOpen())
+            assertSelectedLevel(fullControl)
+            save()
+            assertEquals(TopologyControlLevel.FULL_CONTROL, repository.list().single().topologyControlLevel)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `selection is still the previous one while the Full control dialog is open`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        pick(declareAndEdit)
+
+        pick(fullControl)
+
+        assertEquals(true, dialogIsOpen())
+        radio(declareAndEdit).assertIsSelected()
+        radio(fullControl).assertIsNotSelected()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun DesktopComposeUiTest.cancelFromLevel(startIndex: Int, startLevel: TopologyControlLevel) {
+        fillNewConnection()
+        if (startIndex != readOnly) pick(startIndex)
+
+        pick(fullControl)
+        onNodeWithText("Cancel").performClick()
+        waitForIdle()
+
+        assertEquals(false, dialogIsOpen())
+        assertSelectedLevel(startIndex)
+        save()
+        assertEquals(startLevel, repository.list().single().topologyControlLevel)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Cancel on the Full control dialog keeps Read-only`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        cancelFromLevel(readOnly, TopologyControlLevel.READ_ONLY)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Cancel on the Full control dialog keeps Declare and edit`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        cancelFromLevel(declareAndEdit, TopologyControlLevel.DECLARE_AND_EDIT)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Esc on the Full control dialog behaves like Cancel`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+        fillNewConnection()
+        pick(declareAndEdit)
+
+        pick(fullControl)
+        onNodeWithText(fullControlTitle).performKeyInput { pressKey(Key.Escape) }
+        waitForIdle()
+
+        assertEquals(false, dialogIsOpen())
+        assertSelectedLevel(declareAndEdit)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `re-clicking an already selected Full control asks nothing`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel(saved(TopologyControlLevel.FULL_CONTROL))) }
+        onNodeWithText("Select").performClick()
+        waitForIdle()
+        assertSelectedLevel(fullControl)
+
+        pick(fullControl)
+
+        assertEquals(false, dialogIsOpen())
+        assertSelectedLevel(fullControl)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `going from Full control to Read-only asks nothing, and raising again asks again`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel(saved(TopologyControlLevel.FULL_CONTROL))) }
+        onNodeWithText("Select").performClick()
+        waitForIdle()
+
+        pick(declareAndEdit)
+        assertEquals(false, dialogIsOpen())
+        assertSelectedLevel(declareAndEdit)
+
+        pick(fullControl)
+        assertEquals(true, dialogIsOpen(), "each raise to Full control is a fresh act and must ask again")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `edit mode shows the saved level and a click changes nothing until Save`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel(saved(TopologyControlLevel.READ_ONLY))) }
+        onNodeWithText("Select").performClick()
+        waitForIdle()
+        (0..2).forEach { radio(it).performScrollTo().assertIsEnabled() }
+        assertSelectedLevel(readOnly)
+
+        pick(declareAndEdit)
+        assertSelectedLevel(declareAndEdit)
+        assertEquals(TopologyControlLevel.READ_ONLY, repository.list().single().topologyControlLevel,
+            "clicking a radio must not persist anything before Save")
+
+        save()
+        assertEquals(TopologyControlLevel.DECLARE_AND_EDIT, repository.list().single().topologyControlLevel)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `edit mode Full control is persisted only after confirm and Save`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel(saved(TopologyControlLevel.READ_ONLY))) }
+        onNodeWithText("Select").performClick()
+        waitForIdle()
+
+        pick(fullControl)
+        onNodeWithText("Use Full control").performClick()
+        waitForIdle()
+        assertSelectedLevel(fullControl)
+        assertEquals(TopologyControlLevel.READ_ONLY, repository.list().single().topologyControlLevel,
+            "confirming the dialog must not persist anything before Save")
+
+        save()
+        assertEquals(TopologyControlLevel.FULL_CONTROL, repository.list().single().topologyControlLevel)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `selecting another profile resets the radios to that profile's saved level`() = runDesktopComposeUiTest {
+        val a = saved(TopologyControlLevel.READ_ONLY).copy(name = "profile-a")
+        val b = saved(TopologyControlLevel.DECLARE_AND_EDIT).copy(name = "profile-b")
+        setContent { ConnectionsScreen(testViewModel(a, b)) }
+
+        onAllNodesWithText("Select")[0].performClick()
+        waitForIdle()
+        pick(declareAndEdit) // unsaved change on profile-a
+        assertSelectedLevel(declareAndEdit)
+
+        onAllNodesWithText("Select")[1].performClick()
+        waitForIdle()
+        assertSelectedLevel(declareAndEdit) // profile-b's own saved level
+        onAllNodesWithText("Select")[0].performClick()
+        waitForIdle()
+        assertSelectedLevel(readOnly) // profile-a: the unsaved pick is gone
     }
 }

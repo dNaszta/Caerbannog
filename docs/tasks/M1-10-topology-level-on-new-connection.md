@@ -3,12 +3,17 @@
 Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired; branch base), M1-02-connection-profiles    Size: S
 
 ## Status
-- State: briefed, not started. Product decisions taken by the product owner: (1) the level is selectable on the form
+- State: step 2 done (tests written, red); step 3 (implementation) next. Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
   while creating a connection; (2) in edit mode it applies on Save, one rule everywhere; (3) choosing Full control asks
   for a confirmation.
 - Branch (when started): `m1-10-topology-level-on-new-connection`, based on `m1-05-wire-desktopapp-connections`.
 - Merge note: `m1-03-permission-check` also changes `ConnectionProfile` and `ConnectionsViewModel` (reopen after save,
   declared permissions). Expect a conflict in `ConnectionsViewModel.kt`; resolve at merge, whoever merges second.
+- Step 2 (test developer): added 2 BDD scenarios in `01_connections.feature` (+ step `topology control level` row,
+  two new steps in `ConnectionsSteps.kt`), 5 view model tests in `ConnectionsViewModelTest`, 14 UI tests in
+  `ConnectionsScreenUiTest`. Red: core and acceptance-tests fail to compile (no `topologyControlLevel` parameter on
+  `ConnectionProfileInput`); UI tests compile and fail on assertions (11 of 19). The UI tests check the persisted level
+  through the in-memory repository, so they need no production signature.
 - Round: 0
 
 ## Goal
