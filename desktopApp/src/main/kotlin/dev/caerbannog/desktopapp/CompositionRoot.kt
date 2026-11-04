@@ -13,6 +13,16 @@ import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
+import dev.caerbannog.core.streams.AppSettings
+import dev.caerbannog.core.streams.DEFAULT_REFRESH
+import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.RefreshInterval
+import dev.caerbannog.core.streams.StreamListViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import java.io.File
 
 /**
@@ -38,9 +48,26 @@ fun createConnectionsViewModel(
  * What the window needs: the view model and the one [ActiveConnection] it shares with the app (M2-03 part 2).
  * [close] ends the held connection; the window's close request calls it through [handleCloseRequest].
  */
-class AppComposition(val viewModel: ConnectionsViewModel, val active: ActiveConnection) {
-    /** Closes the held connection, if any. Safe to call twice. */
-    fun close() = active.close()
+class AppComposition(
+    val viewModel: ConnectionsViewModel,
+    val active: ActiveConnection,
+    val streamList: StreamListViewModel,
+    private val streamListScope: CoroutineScope,
+) {
+    /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
+    fun close() {
+        try {
+            streamList.close()
+            streamListScope.cancel()
+        } finally {
+            active.close()
+        }
+    }
+}
+
+// The refresh interval lives in memory until the settings file arrives (M2-05).
+private class InMemoryAppSettings : AppSettings {
+    override var streamListRefresh: RefreshInterval = DEFAULT_REFRESH
 }
 
 /**
@@ -53,7 +80,8 @@ fun createAppComposition(
     secretStore: SecretStore = JavaKeyringSecretStore(),
     permissionChecker: PermissionChecker = ManagementApiPermissionChecker(),
     reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
-    gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore),
+    log: (String) -> Unit = { System.err.println(it) },
+    gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -65,7 +93,18 @@ fun createAppComposition(
         session = session,
         active = active,
     )
-    return AppComposition(viewModel, active)
+    // The composition root owns the scope; it ends with the window. The view model needs a serial dispatcher: limitedParallelism(1)
+    // gives that without a new dependency (Dispatchers.Main is not on this classpath). M2-05 may pass the UI dispatcher instead.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val streamListScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
+    val streamList = StreamListViewModel(
+        active = active,
+        settings = InMemoryAppSettings(),
+        scope = streamListScope,
+        clock = RefreshClock { System.currentTimeMillis() },
+        reconnect = viewModel::connect,
+    )
+    return AppComposition(viewModel, active, streamList, streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */
