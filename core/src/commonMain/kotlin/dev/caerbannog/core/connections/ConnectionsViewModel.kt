@@ -17,6 +17,7 @@ class ConnectionsViewModel(
     private val secretStore: SecretStore,
     private val reachabilityChecker: BrokerReachabilityChecker,
     private val caCertificateValidator: CaCertificateValidator,
+    private val session: ConnectionSession? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
     val state: StateFlow<ConnectionsState> = _state.asStateFlow()
@@ -66,6 +67,19 @@ class ConnectionsViewModel(
         }
 
         refreshAfter(result)
+        return result
+    }
+
+    /**
+     * Saves like [updateConnection] and, only when the save succeeded, re-runs the permission check on
+     * the saved profile. A failed save runs no check and keeps the earlier result.
+     */
+    suspend fun saveProfileChanges(originalName: String, input: ConnectionProfileInput): SaveConnectionResult {
+        val result = updateConnection(originalName, input)
+        if (result is SaveConnectionResult.Saved && session != null) {
+            if (result.profile.name != originalName) session.forget(originalName)
+            session.reopen(result.profile)
+        }
         return result
     }
 
@@ -160,7 +174,8 @@ class ConnectionsViewModel(
         }
     }
 
+    // Reads the repository, the source of truth, so a profile saved outside this view model is found too.
     private fun profileNamed(name: String): ConnectionProfile =
-        _state.value.profiles.firstOrNull { it.name == name }
+        repository.list().firstOrNull { it.name == name }
             ?: error("No saved connection named '$name'")
 }

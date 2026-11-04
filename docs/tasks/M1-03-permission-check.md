@@ -230,3 +230,11 @@ declared / no-password / DeclaredByUser / Checked steps), runner filter excludes
 new `ConnectionsViewModelPermissionTest` (saveProfileChanges rules), `RealBrokerPermissionCheckTest` (cause mapping,
 adapter never returns `DeclaredByUser`). Spike test unchanged. Red: missing `declaredPermissions`, `DeclaredPermissions`,
 `UnreadableCause`, `decideDeclared`, `ConnectionSession`, `saveProfileChanges`, `ManagementApiPermissionChecker`.
+
+### Step 3: build (senior developer), green
+Implemented the Final contract: `PermissionCheckResult.kt`, `ConnectionSession.kt` (plus `forget(name)` used on rename),
+`ConnectionProfile.declaredPermissions` (last parameter, not persisted; the JSON repository uses a DTO so the format is
+unchanged), `ConnectionsViewModel.saveProfileChanges`, `data-rabbit` `ManagementApiPermissionChecker` and an internal
+`TlsSupport` extracted from the reachability checker. `ConnectionsViewModel.profileNamed` now reads the repository
+instead of its state copy (the acceptance steps add profiles to the repository directly). Results: core 34, acceptance
+36 (7 skipped by tag), data-rabbit 8 plus `brokerTest` 11, ui 6, all passing.
