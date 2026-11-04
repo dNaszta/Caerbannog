@@ -22,6 +22,15 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   `permissionChecker`/`reachabilityChecker` parameters (red: compile error until the seam exists); UI tests added for
   the New-connection panel without banner/pill and for the saved-but-unchecked case; core test asserts the Unreadable
   banner has null detail and dimNote. Test-only `kotlinx-coroutines-core` in `desktopApp` accepted.
+- Step 3 (build, senior developer): done, green except one test. Core, acceptance (the five scenarios pass, the two
+  `@needs-M2` stay skipped), desktopApp green; `:ui:jvmTest` 56 of 57. The one failing test is
+  `the password field is masked`: it asserts `onNodeWithText("hunter2")` does not exist, but `hasText` also matches the
+  test-only `InputText` property, which holds the raw typed text; the field IS masked (`EditableText` = bullets,
+  `Password` semantics present). Needs a test-developer fix (assert `EditableText` is bullets).
+  Built: `PermissionSummary.kt`, `Unreadable.reason`, view model flows, composition-root seam, pill/banner/scrollbar/
+  layout. `VerticalScrollbar` compiles in commonMain (no expect/actual). No new dependency. The profile card is not
+  `clickable` (it merges children and hides the pill tag from the merged tree): it uses `pointerInput` plus button
+  semantics, so it has no keyboard focus yet (follow-up for M1-12). Manual look still to do.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

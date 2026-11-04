@@ -85,10 +85,26 @@ class ConnectionsViewModel(
     suspend fun saveProfileChanges(originalName: String, input: ConnectionProfileInput): SaveConnectionResult {
         val result = updateConnection(originalName, input)
         if (result is SaveConnectionResult.Saved && session != null) {
-            if (result.profile.name != originalName) session.forget(originalName)
-            session.reopen(result.profile)
+            val name = result.profile.name
+            if (name != originalName) session.forget(originalName)
+            _state.update { it.copy(permissionChecks = it.permissionChecks - originalName + (name to PermissionCheckStatus.Checking)) }
+            val permissions = session.reopen(result.profile)
+            _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Done(permissions))) }
         }
         return result
+    }
+
+    /**
+     * The edit panel's button: reachability first, then the permission check. Both always run, so an
+     * unreachable broker shows up as Unreadable instead of a stale pill.
+     */
+    suspend fun checkConnectionAndPermissions(name: String) {
+        checkConnection(name)
+        val activeSession = session ?: return
+        val profile = profileNamed(name)
+        _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Checking)) }
+        val permissions = activeSession.open(profile)
+        _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Done(permissions))) }
     }
 
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
@@ -143,9 +159,11 @@ class ConnectionsViewModel(
         val name = _state.value.pendingDeleteName ?: return
         repository.delete(name)
         secretStore.delete(name)
+        session?.forget(name)
         _state.update {
             it.copy(
                 profiles = repository.list(),
+                permissionChecks = it.permissionChecks - name,
                 pendingDeleteName = null,
                 selectedProfileName = it.selectedProfileName.takeUnless { selected -> selected == name },
             )

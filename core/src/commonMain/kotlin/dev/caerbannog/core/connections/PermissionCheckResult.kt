@@ -36,7 +36,8 @@ sealed interface PermissionCheckResult {
         override val topologyUnlocked: Boolean get() = false
         override val publishingEnabled: Boolean get() = false
 
-        val userMessage: String
+        /** Why the check failed, in plain language; shown on its own next to a declaration. */
+        val reason: String
             get() = when (cause) {
                 UnreadableCause.NOT_AUTHORIZED ->
                     "Permissions could not be read: the broker refused the request. Either this user is not an " +
@@ -53,7 +54,10 @@ sealed interface PermissionCheckResult {
                     "Permissions could not be read: no password is stored for this connection."
                 UnreadableCause.UNEXPECTED ->
                     "Permissions could not be read: an unexpected error occurred while checking."
-            } + " Topology stays locked and test publishing disabled; streams can still be browsed."
+            }
+
+        val userMessage: String
+            get() = reason + " Topology stays locked and test publishing disabled; streams can still be browsed."
     }
 }
 
