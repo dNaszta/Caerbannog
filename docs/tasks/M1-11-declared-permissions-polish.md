@@ -37,6 +37,7 @@ Tests first (title assertion) and passing, no unrelated changes.
 
 ## Status
 - State: step 3 done (senior developer, 2026-11-04): title string changed, guard comment added, full `./gradlew test --rerun-tasks --continue` green; waiting for step 4 (verify) and review. Branch `m1-11-declared-permissions-polish`.
+- Step 4 (test engineer, 2026-11-04): verified, pass, no findings. Full rerun: core 66, data-rabbit 19, ui 39, acceptance 38 (5 skipped by design tags), desktopApp 3. Mutation (title reverted to "Declared permissions") fails the new test, exit 1; restored, tree clean. Diff scope: one string, one test, comment-only gradle change, docs.
 - Mockup radios done by the architect on main (docs only).
 - Test developer: DONE: `the declared permissions section title says it is the user's own statement` in `ConnectionsScreenUiTest.kt`, red (no node with the exact text). Next: the senior developer changes the one string in `DeclaredPermissionsSection` and adds the guard comment in `acceptance-tests/build.gradle.kts`.
 - Open points: none; no product decision needed.
