@@ -189,3 +189,19 @@ installer notes, manual check recorded.
   three bottom buttons no longer fit one line with their icons (Save was squeezed to one letter wide), so that row is now a
   `FlowRow` (Save wraps below when narrow). Installer size: not measured (`packageDmg` not run); extended jar 37.8 MB.
   Manual user check pending.
+- 2026-11-04 (architect), ruling before verification (screenshot 02 looked at):
+  1. CA label: option (a). The label becomes exactly `CA certificate` (the hint `Blank uses the system trust store` keeps
+     saying it may stay blank; the field is optional by behaviour, and this is a deliberate, small deviation from the
+     mockup's `(optional)`; product impact none: no scenario or spec text uses the label). Production: `ConnectionsScreen.kt`
+     line ~206. Tests to change in `ConnectionsScreenUiTest.kt` (all literal `CA certificate (optional)` to `CA certificate`):
+     lines ~1142, 1210, 1218, 1418-1419 (test name and message too), 1826; keep the old-long-label absence checks
+     (`CA certificate (optional - blank uses the system trust store)`) and add one assertion that no node has the text
+     `CA certificate (optional)`. Keep a test that the CA and Password fields have equal heights / same y at 1280 (line 1218 does the y check; add heights equal).
+     Reject (b) (taller CA field breaks the grid row), (c) (poor), (d) (smaller label text departs from M3). Update the
+     M1-12a note and `docs/ux/Main.dc.html` is left as is (design source); say so in the Status.
+  2. Button row: `FlowRow` accepted (Save must never be squeezed; wrapping below is fine and keeps M3 button text size).
+     `@OptIn(ExperimentalLayoutApi::class)` is accepted for this one use; add a test that at the narrow panel width Save's
+     width is at least its text width (not one letter) if not already present.
+  3. Test defects confirmed: (a) the hint assertion must be `assertFalse(layout.isLineEllipsized(0))`, not
+     `hasVisualOverflow`; (b) the TLS-line test calls `performScrollTo()` on the text before reading bounds, and asserts
+     non-zero bounds. Both are test-only fixes.
