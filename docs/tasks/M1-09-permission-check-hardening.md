@@ -105,5 +105,19 @@ Tests first and failing for the right reason, no unrelated changes, M1-03 brief 
 
 ## Status
 - Round: 0, step 1 done (architect): brief confirmed and sharpened against `main`. Next: step 2 tests (test developer).
+- Round: 0, step 2 done (test developer). Tests written, red as expected; next: step 3 build (senior developer).
+  - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'UNEXPECTED'` (ConnectionSessionTest, PermissionDecisionTest,
+    ConnectionsViewModelPermissionTest). New tests: 7 in ConnectionSessionTest (the secret-store one is a separate, clearly named
+    test pending the senior developer's confirmation; delete it if rejected), 1 in PermissionDecisionTest, 1 in ConnectionsViewModelPermissionTest.
+  - Red, adapter (`PermissionCheckerFailureTest`, default `test`, no Docker): 3 of 5 fail on a thrown exception. Observed types
+    (Ktor 3.0.3, Java engine, probed on the raw `TlsSupport` client):
+    - host with a space: `java.net.URISyntaxException` (checked, NOT an `IllegalArgumentException`, NOT a Ktor type, not an IOException).
+    - port 70000 and port -1: `io.ktor.http.URLParserException` with cause `java.lang.IllegalArgumentException`.
+    - empty host: `java.net.ConnectException` (IOException): already `UNREACHABLE`, green, kept as characterisation.
+    - silent server: `io.ktor.client.plugins.HttpRequestTimeoutException`: already `TIMEOUT`, green, characterisation. Neither Ktor's
+      `ConnectTimeoutException`/`SocketTimeoutException` nor `HttpConnectTimeoutException` arrived. The latter stays covered by the
+      type-based catch only (no test).
+  - Brief problem: the catch list for an invalid URL must include `java.net.URISyntaxException` (a bad host raises it, the brief
+    names only `URLParserException` and `IllegalArgumentException`). `URLParserException` is enough for ports; it extends `IllegalStateException`.
 - Branch: `m1-09-permission-check-hardening`, based on `main`. Not pushed.
 - Must land before `M1-07-permission-state-ui`.

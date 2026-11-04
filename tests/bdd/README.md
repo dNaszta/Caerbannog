@@ -70,6 +70,12 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 11 global search | Goals (global search), Screens | M2, M3 |
 | 12 stream management | Goals (publish and manage), UX rules | M5 |
 
+Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`):
+
+| Task | Tests | Covers |
+| --- | --- | --- |
+| M1-09 permission check hardening | `ConnectionSessionTest`, `PermissionDecisionTest`, `ConnectionsViewModelPermissionTest` (core); `PermissionCheckerFailureTest` (data-rabbit, no Docker) | A failed check never throws: `Unreadable(UNEXPECTED)`, declaration applied except without a password, no secret in the result, overlapping opens, invalid URL and silent server |
+
 ## Open points that affect these tests
 
 - Exact fields of the stream publisher and consumer endpoints (`04`, `@needs-spike`).

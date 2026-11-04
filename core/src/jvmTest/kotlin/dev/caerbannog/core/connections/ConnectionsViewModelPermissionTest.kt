@@ -107,4 +107,22 @@ class ConnectionsViewModelPermissionTest {
         assertTrue(result is SaveConnectionResult.Saved)
         assertTrue(checker.calls.isEmpty())
     }
+
+    @Test
+    fun `a throwing checker does not hide the Saved result`() = runBlocking {
+        val throwing = object : PermissionChecker {
+            override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult =
+                throw IllegalStateException("boom")
+        }
+        val realSession = ConnectionSession(throwing, secrets)
+        val throwingVm = ConnectionsViewModel(repo, secrets, Reach(), Ca(), realSession)
+
+        val result = throwingVm.saveProfileChanges("prod-eu", input(host = "other"))
+
+        assertTrue(result is SaveConnectionResult.Saved, "got $result")
+        assertEquals(
+            PermissionCheckResult.Unreadable(UnreadableCause.UNEXPECTED, "IllegalStateException"),
+            realSession.permissions("prod-eu"),
+        )
+    }
 }
