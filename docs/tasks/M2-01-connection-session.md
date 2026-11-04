@@ -134,3 +134,14 @@ added, spec Risks entry for last-write-wins closed (architect moves it) once mer
   non-atomic-update mutation all caught; 20 repeat runs of the session/view model tests green. Opt-in screenshots added
   (`connections-05-connected.png`, `-06-connect-button.png`).
 
+- Architect step 5 review (2026-11-04): Accepted with follow-ups. Reviewed `git diff main...m2-01-connection-session` (core session, view model, state, drawer, screen, tests list, spec) against the brief and rulings; not run: @broker, the real app, keyboard and narrow window for Connect, rename through the UI.
+  Good: one snapshot updated atomically with tokens; cancellation cleans up Checking; M1-09 rules intact (no throw, UNEXPECTED, declaration rule, class name only); core has no Compose or JVM types; no secrets in session state (names and results only); the ViewModel token map is gone, one source of truth; Connect is marked interim in code; mutation, atomicity and flakiness proofs are strong.
+  | # | Severity | Where | Finding | Ruling |
+  | --- | --- | --- | --- | --- |
+  | 1 | minor | `ProfileCard.kt:89` | Current profile card still says "Not connected" while the drawer shows it current | Leave; M2-05 replaces Connect and owns this wording (added to M2-05 scope) |
+  | 2 | minor | `ConnectionsViewModel.kt` `SessionMirroredState` | Unsupported `StateFlow` inheritance, non-atomic `value` across three sources | Accept with waiver (spec Risks), removed in follow-up `M2-01b-session-single-state`, to be done before M2-03; upgrade consequence: compile error, one private class |
+  | 3 | minor | `ConnectionSession.publish()` | `statuses` and `current` can be briefly inconsistent | Accept now; fixed in M2-01b |
+  | 4 | idea | Connect button | No icon | Leave; it is replaced in M2-05 |
+  | 5 | idea | connect cancelled | `current` stays with status null | Accept (reads as Not checked) |
+  What M2-03 needs from the session: current name via `current`, `permissions(name)`/`isUsable` to gate calls, and (decision D6) the password; today the session never holds it. Nothing else.
+- State: done (Accepted with follow-ups); not merged; merge by the coordinator.
