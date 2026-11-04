@@ -3,7 +3,7 @@
 Milestone: M1    Depends on: none (any branch; touches build files and Taskfile only)    Size: S
 
 ## Status
-- State: step 4 done (verified, pass, no findings); ready for architect review (step 5).
+- State: done. Architect review (step 5): Accepted, no blocker or major findings (2026-11-04).
 - Round: 0
 - Branch: `m1-taskfile-02-test-task-runs-all-modules`, created from `main` (not from the M1-10 branch; see Base branch).
 - Step 2, red evidence (no production code, no Gherkin; acceptance is by command output; no extra script or Taskfile
@@ -38,6 +38,11 @@ Milestone: M1    Depends on: none (any branch; touches build files and Taskfile 
     same for `AppUiTest` -> `:ui:jvmTest FAILED`. Both restored with `git checkout`.
   - Not pulled in: `--dry-run` has 0 `brokerTest` tasks; core/ui tests contain no keyring or `@broker` references
     (only a main-source interface mentions them). Only core and ui `test` were added.
+- Step 5, architect review: Accepted. Diff is two 10-line build blocks, one spec sentence, brief and README row; nothing
+  else. Comment explains why (not what) and names the allTests choice and the later-KMP-module rule. Spec sentence
+  accurate. Minor/idea only: `M1-TASKFILE-01-local-dev-commands.md` line 9 still says `task test` ran the fast suite
+  across all modules, true only since this task; left as history. Merge checklist for the other branches is in the
+  review answer: re-run plain `./gradlew test` on m1-03, m1-05, m1-10 after merging main.
 - Step 4, verification (test developer, independent run on this branch, sandbox off):
   - Dry run: lists `:core:jvmTest`, `:core:test`, `:ui:jvmTest`, `:ui:test` besides acceptance-tests, data-rabbit, desktopApp; 0 `brokerTest`.
   - `rm -rf */build/test-results; ./gradlew test --rerun-tasks --continue`: BUILD SUCCESSFUL, XML totals (tests/fail/err/skip):
