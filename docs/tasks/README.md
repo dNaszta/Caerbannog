@@ -37,19 +37,25 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (optional, needs bump approval); no hurry |
 | M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | input note (`M2-09-gate-stats-match.md`); needs Docker |
 
+## Later milestones (planned)
+
+| ID | Title | Milestone | Status |
+| --- | --- | --- | --- |
+| M5-verify-host-name | Per-profile "Verify host name" switch for the management API and the stream client (default off, product decision D7 (a) of 2026-11-04); note in the connection panel is removed or changed when it lands | M5 | planned (hardening); brief not written |
+
 ## M2 decisions
 
 Raised in the architect's M2 plan (2026-11-04). Spike decisions S1 to S3 live in `M2-02-management-api-spike.md`.
 
 | ID | Decision | Status |
 | --- | --- | --- |
-| D1 | What "connected" means and how a connection is held (checked once, or a held session) | open |
-| D2 | Reconnect behaviour after a lost connection | open |
-| D3 | Stream list refresh (manual, timed, or both) | open |
+| D1 | What "connected" means and how a connection is held (checked once, or a held session) | decided (b) (product owner, 2026-11-04): explicit Connect and Disconnect open and hold the clients; one held connection at a time (architect rule, see `docs/spec.md` "Connection lifecycle") |
+| D2 | Reconnect behaviour after a lost connection | live again under D1 (b); proposed: state Failed("Connection lost") with a Retry button, last data kept and marked stale, no automatic reconnect in M2; awaiting product owner confirmation |
+| D3 | Stream list refresh (manual, timed, or both) | open, needed for M2-04; recommended: load on Connect, manual Refresh, "updated N s ago", no timer in M2 |
 | D4 | Where first and last offset come from (management API or stream protocol `queryStreamStats`) | decided (product owner, 2026-11-04): count = management `messages`, last written offset = first + messages - 1, first offset only from the stream protocol |
 | D5 | When the stream client is used in production (only for browsing, or also for stats) | decided (b) (product owner, 2026-11-04): the M2 list shows first offset, so `stream-client` is a production dependency from M2-03 (version must pass the two-week age rule when added); first offset cell empty ("unavailable") when the stats call fails or is denied |
-| D6 | Password during a session (the session never holds it today) | open |
-| D7 | TLS hostname verification for real data calls | open |
+| D6 | Password during a session (the session never holds it today) | decided (a) (product owner, 2026-11-04): read from `SecretStore` once when the connection's clients are created, kept only in the `data-rabbit` client objects in memory, dropped when the connection is closed; never in `SessionState`, logs or error strings |
+| D7 | TLS hostname verification for real data calls | decided (a) (product owner, 2026-11-04): keep M1 behaviour for M2 (CA honoured, host name NOT verified) with a one-line note in the connection panel; a per-profile "Verify host name" switch is the M5 task `M5-verify-host-name` |
 | S1 | Test dependency `stream-client:1.12.0` for the M2-02 spike | decided (option A) |
 | S2 | Testcontainers: reproduce on 1.21.3, trial 2.0.5 on a scratch branch, no bump without report | decided |
 | S3 | Non-admin visibility of stream data | decided (product owner, 2026-11-04): S3a no management tag = clear message, no lists; S3b `management` tag only = lists with a fixed own-connections notice |

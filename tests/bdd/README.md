@@ -25,6 +25,7 @@ tests/bdd/
     10_topology_migrations.feature
     11_global_search.feature
     12_stream_management.feature
+    13_connection_lifecycle.feature
 ```
 
 ## Tags
@@ -71,6 +72,7 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 10 topology migrations | Topology migrations and permission guardrails | M5 |
 | 11 global search | Goals (global search), Screens | M2, M3 |
 | 12 stream management | Goals (publish and manage), UX rules | M5 |
+| 13 connection lifecycle | Connection lifecycle (decisions D1, D2, D6, D7) | M2 |
 
 Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`):
 
@@ -85,6 +87,7 @@ Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`)
 - `04` keeps `@needs-spike` until M2-06 reviews it; the exact fields of the stream publisher and consumer endpoints were confirmed by the M2-02 spike (`docs/spec.md`, "Management API facts"). What users without the management tag, or with only the `management` tag, see is decided (S3a, S3b) and covered by `03` and `04`.
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
 - Case-sensitivity of the server-side `name` filter (the `11` scenario "Search is case-insensitive for plain text"); not tested by the M2-02 spike.
+- `13`: the lost-connection rule (D2) is proposed and awaits the product owner (`@needs-decision`); D3 (refresh) is open and blocks M2-04.
 - The Size column in `03` and `06` is left blank until M3 (decision N1 (c)).
 - Whether a user without the management tag can call `queryStreamStats` (mini-spike M2-03a): the "first offset unavailable" scenario in `03` is the fallback either way.
 

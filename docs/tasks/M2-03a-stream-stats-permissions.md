@@ -11,7 +11,7 @@ We know, on a real RabbitMQ 4 broker, whether `Environment.queryStreamStats(stre
 Decision D5 (b): the M2 list shows first offset for every visible row. The M2-02 spike only tried admin. `docs/spec.md` open question "Can a user without the management tag...".
 
 ## Scope
-In: `@broker` tests (extend the `StreamManagementApiSpikeTest` setup, or a new class with the same container): for each of the three users with permissions on `^spike-allowed-.*`: `queryStreamStats` on an allowed stream and on a stream without permission; record the exception type and message when denied (needed for the typed `Unavailable` result). Also: after the call, management `messages` and `tracking` of the stream are unchanged (read-only proof). Record whether one `Environment` (one locator connection) serves many calls and how long a call takes (rough).
+In: `@broker` tests (extend the `StreamManagementApiSpikeTest` setup, or a new class with the same container): for each of the three users with permissions on `^spike-allowed-.*`: `queryStreamStats` on an allowed stream and on a stream without permission; record the exception type and message when denied (needed for the typed `Unavailable` result). Also: after the call, management `messages` and `tracking` of the stream are unchanged (read-only proof). Record whether the stream client can connect over TLS with the profile CA and WITHOUT host name verification (decision D7 (a): host name is not verified; if it cannot be disabled, say so and what the options are). Record whether one `Environment` (one locator connection) serves many calls and how long a call takes (rough).
 Out: production code, UI.
 
 ## Acceptance

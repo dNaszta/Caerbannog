@@ -67,6 +67,7 @@ Feature: Permission check before the first connection
 
   @fake-broker
   # M2-01: each connection keeps its own result; the sidebar follows the connection that is current.
+  # M2-05: switching means Connect to the other connection, which disconnects the held one (see 13).
   Scenario: Switching connection shows the permission state of the new current connection
     Given saved connections "uat-eu" and "prod-eu"
     And the user has configure permission on "uat-eu" and no configure permission on "prod-eu"
