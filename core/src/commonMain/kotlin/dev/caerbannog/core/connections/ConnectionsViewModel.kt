@@ -185,8 +185,18 @@ class ConnectionsViewModel(
 
     /** Proves the named profile's stream and management endpoints are reachable over TLS. */
     suspend fun checkConnection(name: String): ConnectionCheckResult {
+        val selectedAtStart = _state.value.selectedProfileName
         val result = reachabilityChecker.check(profileNamed(name))
-        _state.update { it.copy(lastCheckResult = result) }
+        // The banner belongs to one profile: a result that arrives after that profile was deleted, or after the
+        // selection moved, is returned to the caller but never shown.
+        val stillExists = repository.list().any { p -> p.name == name }
+        _state.update {
+            if (it.selectedProfileName == selectedAtStart && stillExists) {
+                it.copy(lastCheckResult = result)
+            } else {
+                it
+            }
+        }
         return result
     }
 

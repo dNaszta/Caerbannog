@@ -2,9 +2,7 @@ package dev.caerbannog.ui.connections
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,16 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,33 +33,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
-import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
 import dev.caerbannog.core.connections.PermissionBanner
-import dev.caerbannog.core.connections.PermissionCheckStatus
-import dev.caerbannog.core.connections.PermissionPill
-import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.permissionBanner
-import dev.caerbannog.core.connections.permissionPill
 import kotlinx.coroutines.launch
 
 /**
@@ -84,30 +70,36 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
 
-    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        SavedProfilesList(
-            state = state,
-            onSelect = viewModel::selectConnection,
-            onNewConnection = viewModel::startNewConnection,
-            modifier = Modifier.width(280.dp),
-        )
-        Spacer(modifier = Modifier.width(24.dp))
-        EditPanel(
-            state = state,
-            onSave = { originalName, input ->
-                if (originalName == null) {
-                    viewModel.addConnection(input)
-                } else {
-                    scope.launch { viewModel.saveProfileChanges(originalName, input) }
-                }
-            },
-            onDeleteRequest = viewModel::requestDelete,
-            onValidateCaCertificate = { name, path ->
-                if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
-            },
-            onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            ConnectionsDrawer(state = state, modifier = Modifier.width(280.dp).fillMaxHeight())
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                ConnectionsAppBar(onNewConnection = viewModel::startNewConnection)
+                ConnectionsContent(
+                    state = state,
+                    onSelect = viewModel::selectConnection,
+                    editPanel = { panelModifier ->
+                        EditPanel(
+                            state = state,
+                            onSave = { originalName, input ->
+                                if (originalName == null) {
+                                    viewModel.addConnection(input)
+                                } else {
+                                    scope.launch { viewModel.saveProfileChanges(originalName, input) }
+                                }
+                            },
+                            onDeleteRequest = viewModel::requestDelete,
+                            onValidateCaCertificate = { name, path ->
+                                if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
+                            },
+                            onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
+                            modifier = panelModifier,
+                        )
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+        }
     }
 
     val pendingDeleteName = state.pendingDeleteName
@@ -116,112 +108,6 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
             name = pendingDeleteName,
             onConfirm = viewModel::confirmDelete,
             onCancel = viewModel::cancelDelete,
-        )
-    }
-}
-
-@Composable
-private fun SavedProfilesList(
-    state: ConnectionsState,
-    onSelect: (String) -> Unit,
-    onNewConnection: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Text("Saved profiles", style = MaterialTheme.typography.labelMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = onNewConnection, modifier = Modifier.fillMaxWidth()) {
-            Text("New connection")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        if (state.profiles.isEmpty()) {
-            Text("No saved connections yet.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            LazyColumn {
-                items(state.profiles, key = { it.name }) { profile ->
-                    ProfileCard(
-                        profile = profile,
-                        selected = profile.name == state.selectedProfileName,
-                        status = state.permissionChecks[profile.name],
-                        onClick = { onSelect(profile.name) },
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: PermissionCheckStatus?, onClick: () -> Unit) {
-    // The whole card is the click target (as in the mockup) and keyboard focusable; the pill is a child of it.
-    Card(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    profile.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                PermissionPillView(permissionPill(status), Modifier.testTag("permissionPill:${profile.name}"))
-            }
-            Text(profile.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            // No "Connected" status in this task's scope: there is no notion yet of an active broker
-            // session (that is M2's stream-list territory) - only whether this profile is the one
-            // currently open in the edit panel.
-            Text(
-                if (selected) "Editing" else "Not connected",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** Tone to colour in one place. OK green is not in the M3 scheme, so it uses the mockup's `ok-container` values. */
-private object PermissionColors {
-    private val okContainer = Color(0xFFD8EBD0)
-    private val onOkContainer = Color(0xFF173A0F)
-    // Amber, from the mockup's --warn-container: a declaration is a claim, not a verified fact and not an error.
-    private val warnContainer = Color(0xFFFFE2B0)
-    private val onWarnContainer = Color(0xFF3B2700)
-
-    @Composable
-    fun container(tone: PillTone): Color = when (tone) {
-        PillTone.OK -> okContainer
-        PillTone.WARNING -> warnContainer
-        PillTone.LOCKED -> MaterialTheme.colorScheme.errorContainer
-        PillTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant
-    }
-
-    @Composable
-    fun content(tone: PillTone): Color = when (tone) {
-        PillTone.OK -> onOkContainer
-        PillTone.WARNING -> onWarnContainer
-        PillTone.LOCKED -> MaterialTheme.colorScheme.onErrorContainer
-        PillTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-@Composable
-private fun PermissionPillView(pill: PermissionPill, modifier: Modifier = Modifier) {
-    val (text, tone) = pill
-    Surface(color = PermissionColors.container(tone), contentColor = PermissionColors.content(tone), shape = RoundedCornerShape(12.dp), modifier = modifier) {
-        Text(
-            text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
 }
@@ -258,38 +144,53 @@ private fun EditPanel(
     Row(modifier = modifier) {
         Column(
             modifier = Modifier.weight(1f).verticalScroll(scrollState).padding(end = 12.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp)).padding(16.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)).padding(16.dp),
         ) {
             Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(20.dp))
 
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = virtualHost, onValueChange = { virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text(if (selected == null) "Password" else "Password (leave blank to keep unchanged)") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth().semantics { password() },
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Stream port (TLS): ${selected?.streamPort ?: 5551}", style = MaterialTheme.typography.bodySmall)
-            Text("Management port (HTTPS): ${selected?.managementPort ?: 15671}", style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = caCertificatePath,
-                onValueChange = { path ->
-                    caCertificatePath = path
-                    if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
-                },
-                label = { Text("CA certificate (optional - blank uses the system trust store)") },
-                modifier = Modifier.fillMaxWidth(),
+            ConnectionFieldGrid(
+                listOf(
+                    {
+                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                    },
+                    {
+                        OutlinedTextField(value = virtualHost, onValueChange = { virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
+                    },
+                    {
+                        OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
+                    },
+                    {
+                        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+                    },
+                    // Read-only in M1: TLS and the standard ports; the profile already stores them.
+                    { ReadOnlyPortField("Stream port (TLS)", selected?.streamPort ?: 5551) },
+                    { ReadOnlyPortField("Management port (HTTPS)", selected?.managementPort ?: 15671) },
+                    {
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            supportingText = if (selected == null) null else {
+                                { Text("Leave blank to keep the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            },
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth().semantics { password() },
+                        )
+                    },
+                    {
+                        OutlinedTextField(
+                            value = caCertificatePath,
+                            onValueChange = { path ->
+                                caCertificatePath = path
+                                if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
+                            },
+                            label = { Text("CA certificate (optional)") },
+                            supportingText = { Text("Blank uses the system trust store", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                ),
             )
             val caResult = state.lastCaCertificateValidationResult
             if (caResult is CaCertificateValidationResult.Invalid) {

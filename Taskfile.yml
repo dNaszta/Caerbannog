@@ -21,6 +21,11 @@ tasks:
     cmds:
       - ./gradlew :data-rabbit:keychainTest
 
+  test:screenshots:
+    desc: Write Connections screen screenshots to ui/build/screenshots/ (compare by eye with docs/ux/Main.dc.html).
+    cmds:
+      - ./gradlew :ui:screenshotTest
+
   run:
     desc: Launch the desktop app.
     cmds:
