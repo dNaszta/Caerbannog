@@ -92,7 +92,7 @@ Feature: Stream list
     Then "orders-events" shows the new last offset 150
     And the list says it was updated a moment ago
 
-  @fake-broker @needs-decision
+  @fake-broker
   Scenario: The list refreshes by itself at the chosen interval
     Given a stream "orders-events" with last offset 100
     And I have the stream list open
@@ -101,7 +101,7 @@ Feature: Stream list
     And 30 seconds pass
     Then "orders-events" shows the new last offset 150
 
-  @fake-broker @needs-decision
+  @fake-broker
   Scenario: With the refresh interval off the list never refreshes by itself
     Given a stream "orders-events" with last offset 100
     And I have the stream list open
@@ -109,6 +109,13 @@ Feature: Stream list
     When messages are published so the last offset becomes 150
     And 10 minutes pass
     Then "orders-events" still shows the last offset 100
+
+  # Product decision on the default is proposed (Off) and awaits the product owner.
+  @fake-broker @needs-decision
+  Scenario: The refresh interval is off on a fresh install
+    Given the app has no saved settings
+    When I look at the refresh interval
+    Then the refresh interval is off
 
   @fake-broker
   Scenario: A broker with no streams
