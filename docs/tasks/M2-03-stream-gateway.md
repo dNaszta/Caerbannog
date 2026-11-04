@@ -288,3 +288,6 @@ Follow-ups (briefs or notes):
 - M2-06 inputs are already in `M2-06-publishers-consumers.md`.
 
 Product decisions: none blocking. To confirm (coordinator's reading, wording only): D9 normalise to the compact form (`7D`), and "copyable" applying to all detail and list values (README D9 and UI1).
+
+### Part 2: merged (2026-11-04)
+`m2-03-stream-catalog` (head 6a1c3d5) merged into local `main` with `--no-ff` (merge commit 718e2c2). Not pushed, branch kept. Re-run on `main` after the merge: `./gradlew test --rerun-tasks --continue` green (core 228, data-rabbit unit 86, desktopApp 12, ui 103, acceptance 66 with 9 skipped, no failures or errors) and `verifyTestDiscovery` green. `brokerTest` not re-run on `main` (57 of 57 on the branch). Follow-ups F1 to F3 remain open.
