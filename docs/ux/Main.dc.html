@@ -81,9 +81,9 @@ body{margin:0}
 <div class="t-ts">Declared permissions (your own statement)</div>
 <div class="t-bs dim">Only used when the broker does not let this user read its own permissions. This is your own statement; the broker still enforces its permissions.</div>
 <div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">toggle_on</span><span class="t-bm">I know what this user may do on the broker</span></div>
-<div style="display:flex;align-items:center;gap:12px;padding-left:36px"><span class="ms" aria-hidden="true">toggle_on</span><span class="t-bm">Can change topology (configure)</span><span class="t-bs dim">Yes</span></div>
-<div style="display:flex;align-items:center;gap:12px;padding-left:36px"><span class="ms" aria-hidden="true">toggle_off</span><span class="t-bm">Can publish (write)</span><span class="t-bs dim">No</span></div>
-<div class="t-bs dim">Switch off means not declared (the default): the app stays in safest mode when permissions cannot be read. The two choices appear only when the switch is on and start at No. Applied when you press Save.</div>
+<div style="display:flex;flex-direction:column;gap:4px;padding-left:36px"><span class="t-bm">Can change topology (configure)</span><div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">radio_button_unchecked</span><span class="t-bm">Yes</span><span class="ms" aria-hidden="true">radio_button_checked</span><span class="t-bm">No</span></div></div>
+<div style="display:flex;flex-direction:column;gap:4px;padding-left:36px"><span class="t-bm">Can publish (write)</span><div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">radio_button_unchecked</span><span class="t-bm">Yes</span><span class="ms" aria-hidden="true">radio_button_checked</span><span class="t-bm">No</span></div></div>
+<div class="t-bs dim">Switch off means not declared (the default): the app stays in safest mode when permissions cannot be read. The two choices appear only when the switch is on and start at No (Yes/No radio pairs, as built). Applied when you press Save.</div>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px">
 <div class="t-ts">Permission check</div>

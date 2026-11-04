@@ -12,14 +12,16 @@ Spec "Declared permissions": a declaration must never look like verified informa
 ## Scope
 In:
 - `ui` `DeclaredPermissionsSection`: title text "Declared permissions (your own statement)" as in `docs/ux/Main.dc.html`
-  (update the UI test that finds the title, if any).
+  (no existing test asserts the title text, so there is nothing to change; a NEW assertion is added tests-first, see Acceptance).
 - `acceptance-tests/build.gradle.kts`: comment next to `project(":data-rabbit")` that steps must not instantiate the
   keychain-backed secret store (keyring and JNA native libs are on the classpath only for the file repository).
-- Architect (docs only, not yet done): update the mockup, which shows toggle icons, so the two yes/no choices appear as Yes/No radio pairs, as built.
+- Architect (docs only, DONE on main): mockup `Main.dc.html` now shows the two yes/no choices as Yes/No radio pairs, as built. The build does not change (the single switch stays a switch).
 Out: CA certificate applies on Save (idea, separate task if wanted); acceptance scenario for Keep.
 
 ## Acceptance
 - BDD: none new. `./gradlew test` stays green.
+- UI test (tests-first, red before the string change): in `ConnectionsScreenUiTest.kt`, new test asserting `onNodeWithText("Declared permissions (your own statement)")` exists (scroll to it), next to `the declaration switch, its label and the fixed helper text are shown`. Pinned strings (switch label, helper, configure/write labels) do NOT change.
+- Guard comment and mockup: not testable, checked in review.
 
 ## Design notes
 No behaviour change.
@@ -32,3 +34,9 @@ None.
 
 ## Definition of done
 Tests first (title assertion) and passing, no unrelated changes.
+
+## Status
+- State: briefed and confirmed against main (architect, 2026-11-04); not started. Branch `m1-11-declared-permissions-polish`.
+- Mockup radios done by the architect on main (docs only).
+- Test developer: add the title assertion first (red), then the senior developer changes the one string in `DeclaredPermissionsSection` and adds the guard comment in `acceptance-tests/build.gradle.kts`.
+- Open points: none; no product decision needed.
