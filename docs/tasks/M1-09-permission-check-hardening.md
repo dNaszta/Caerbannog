@@ -123,5 +123,8 @@ Tests first and failing for the right reason, no unrelated changes, M1-03 brief 
   - Confirmed: a `SecretStore.retrieve` throw gives `Unreadable(UNEXPECTED)` without the declaration; test kept.
   - Adapter catches added: `HttpTimeoutException` (TIMEOUT, replaces the connect-timeout catch), `URISyntaxException`, `URLParserException`, `IllegalArgumentException` (UNREACHABLE, class name). No catch-all in the adapter.
   - Session: `MutableStateFlow<Map>` with `update`; the one broad catch is in `ConnectionSession.check`. M1-03 Final contract has the new cause.
+- Round: 0, step 4 done (test developer): pass with findings, no blocker or major. Independent run: core 48, data-rabbit 13 (default) + 11 (brokerTest, Docker, green), ui 19, acceptance 38 (7 skipped, all by design: @needs-M1-06 x2, @needs-M1-07 x2, @needs-M2 x2, @broker x1), desktopApp 3.
+  - Mutants killed: no checker catch, swallowed cancellation (checker), e.message in detail, declaration on retrieve failure, non-atomic map update (15 of 15 runs), dropped URISyntaxException catch, UNEXPECTED text naming the management API. Survived: (a) HttpTimeoutException mapped to UNREACHABLE (no test, by design in the brief); (b) swallowing CancellationException around `secretStore.retrieve` (minor, no test).
+  - Flakiness: core session and view model tests 20 of 20 green, `PermissionCheckerFailureTest` 10 of 10 green.
 - Branch: `m1-09-permission-check-hardening`, based on `main`. Not pushed.
 - Must land before `M1-07-permission-state-ui`.
