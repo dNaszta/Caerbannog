@@ -18,22 +18,29 @@ body{margin:0}
 <aside class="drawer">
 <div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
 <div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
-<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
-<div class="t-lm dim">Connection</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
-<div class="t-bs dim">rabbit-prod.example.com</div>
-</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
 <div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
 </aside>
 <main class="main">
-<header class="appbar">
+<header class="appbar" style="position:relative">
 <h1>Streams</h1>
 <span class="t-bs dim">Updated 12 s ago</span>
 <button class="iconbtn" type="button" aria-label="Refresh"><span class="ms" aria-hidden="true">refresh</span></button>
 <button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Create stream</button>
+<button class="connchip" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Connection prod-eu, Connected, topology locked. Open connection menu"><span class="ms sm" aria-hidden="true" style="color:var(--ok,#386A20)">link</span><span class="nm">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span><span class="ms" aria-hidden="true">arrow_drop_down</span></button>
+<div class="popup" role="menu" aria-label="Connection">
+<div class="sec">Connections</div>
+<div class="row on" role="menuitem"><span class="ms sm" aria-hidden="true">link</span><div style="flex:1;min-width:0"><div class="t-ts">prod-eu</div><div class="t-bs">Connected</div></div><button class="btn text" type="button">Disconnect</button></div>
+<div class="row" role="menuitem"><span class="ms sm" aria-hidden="true">link_off</span><div style="flex:1;min-width:0"><div class="t-ts">uat-eu</div><div class="t-bs dim">Disconnected</div></div><button class="btn text" type="button">Connect</button></div>
+<div class="row" role="menuitem"><span class="ms sm" aria-hidden="true" style="color:var(--error)">error</span><div style="flex:1;min-width:0"><div class="t-ts">staging-eu</div><div class="t-bs" style="color:var(--error)">Failed: Credentials were refused</div></div><button class="btn text" type="button">Retry</button></div>
+<div class="row" role="menuitem"><span class="ms sm" aria-hidden="true">sync</span><div style="flex:1;min-width:0"><div class="t-ts">local-test</div><div class="t-bs dim">Connecting</div></div></div>
+<div class="div"></div>
+<div class="sec">Stream list refresh</div>
+<div class="row" role="group" aria-label="Refresh every"><span class="t-bs" style="width:96px">Refresh every</span><span class="chip">Off</span><span class="chip">5 s</span><span class="chip">10 s</span><span class="chip on"><span class="ms sm" aria-hidden="true">check</span>30 s</span><span class="chip">60 s</span></div>
+<div class="row"><span class="t-bs dim" style="flex:1">Updated 12 s ago</span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">refresh</span>Refresh now</button></div>
+</div>
 </header>
 <div class="content">
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">

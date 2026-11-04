@@ -18,11 +18,6 @@ body{margin:0}
 <aside class="drawer">
 <div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
 <div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
-<div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;background: var(--sc-high)">
-<div class="t-lm dim">Connection</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-ts">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span></div>
-<div class="t-bs dim">rabbit-prod.example.com</div>
-</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
 <div class="nav-item on"><span class="ms" aria-hidden="true">stream</span>Streams</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
@@ -34,6 +29,7 @@ body{margin:0}
 <h1>orders-events</h1>
 <span class="t-bs dim">48,300 messages · offsets 0 to 48,299</span>
 <button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Publish test message</button>
+<button class="connchip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Connection prod-eu, Connected, topology locked. Open connection menu"><span class="ms sm" aria-hidden="true" style="color:var(--ok,#386A20)">link</span><span class="nm">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span><span class="ms" aria-hidden="true">arrow_drop_down</span></button>
 </header>
 <div class="tabs" style="padding:0 24px;margin-bottom:16px"><span class="tab on">Messages</span><span class="tab">Publishers and consumers</span></div>
 <div class="content" style="flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">

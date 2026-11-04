@@ -87,7 +87,7 @@ Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`)
 - `04` keeps `@needs-spike` until M2-06 reviews it; the exact fields of the stream publisher and consumer endpoints were confirmed by the M2-02 spike (`docs/spec.md`, "Management API facts"). What users without the management tag, or with only the `management` tag, see is decided (S3a, S3b) and covered by `03` and `04`.
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
 - Case-sensitivity of the server-side `name` filter (the `11` scenario "Search is case-insensitive for plain text"); not tested by the M2-02 spike.
-- `13`: the lost-connection rule (D2) is proposed and awaits the product owner (`@needs-decision`); D3 (refresh) is open and blocks M2-04.
+- `13`: the lost-connection rule (D2) is proposed and awaits the product owner (`@needs-decision`); D3 (refresh) is answered in part by the product owner (interval in seconds in the connection control, manual Refresh, "updated N s ago"; default, values and scope are proposed, see `docs/tasks/README.md`), so it no longer blocks M2-04. The last three scenarios in `13` (the app bar connection control) are `@needs-M2` and belong to M2-05, not M2-03.
 - The Size column in `03` and `06` is left blank until M3 (decision N1 (c)).
 - Whether a user without the management tag can call `queryStreamStats` (mini-spike M2-03a): the "first offset unavailable" scenario in `03` is the fallback either way.
 

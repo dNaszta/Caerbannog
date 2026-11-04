@@ -117,3 +117,26 @@ Feature: Connect and disconnect
   Scenario: The connection panel says the host name is not verified
     When I open the edit panel of "uat-eu"
     Then I see the note "Host name is not verified."
+
+  # The connection control in the app bar (task M2-05, docs/ux/Streams.dc.html). The three scenarios
+  # below are for M2-05; they are left pending until then and are not part of M2-03.
+
+  @fake-broker @needs-M2
+  Scenario: The app bar always shows the current connection
+    Given I am connected to "uat-eu"
+    When I open any screen
+    Then the app bar shows "uat-eu" with the state "Connected" and its permission pill
+
+  @fake-broker @needs-M2
+  Scenario: With no connection the app bar says so
+    Given no connection is current
+    When I open any screen
+    Then the app bar shows "No connection"
+    And opening it lists "uat-eu" and "prod-eu" with a Connect action each
+
+  @fake-broker @needs-M2
+  Scenario: I connect to another connection from the app bar
+    Given I am connected to "uat-eu"
+    When I open the connection control and press Connect on "prod-eu"
+    Then the state of "uat-eu" is "Disconnected"
+    And the app bar shows "prod-eu" with the state "Connected"
