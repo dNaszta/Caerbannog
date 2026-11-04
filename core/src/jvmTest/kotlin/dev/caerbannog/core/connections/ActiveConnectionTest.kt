@@ -32,7 +32,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `connect ends Connected, holds one connection and makes the profile the current one`() = runBlocking {
+    fun `connect ends Connected, holds one connection and makes the profile the current one`() = runBlocking<Unit> {
         h.active.connect(h.uat)
 
         assertEquals(LinkState.Connected("uat-eu"), h.active.state.value)
@@ -43,7 +43,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `connect runs in the documented order - select, Connecting, permission check, open clients, Connected`() = runBlocking {
+    fun `connect runs in the documented order - select, Connecting, permission check, open clients, Connected`() = runBlocking<Unit> {
         var linkAtCheck: LinkState? = null
         var currentAtCheck: String? = null
         var checkDoneAtOpen: Boolean? = null
@@ -68,7 +68,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a slow broker shows Connecting until it answered`() = runBlocking {
+    fun `a slow broker shows Connecting until it answered`() = runBlocking<Unit> {
         val gate = h.gateway.holdOpens("uat-eu")
 
         val connecting = launch { h.active.connect(h.uat) }
@@ -87,7 +87,7 @@ class ActiveConnectionTest {
     // --- Disconnect ---
 
     @Test
-    fun `disconnect releases the connection exactly once and is idempotent`() = runBlocking {
+    fun `disconnect releases the connection exactly once and is idempotent`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         val held = h.gateway.heldNow.single()
 
@@ -113,7 +113,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `close, the window close, releases the connection and is idempotent`() = runBlocking {
+    fun `close, the window close, releases the connection and is idempotent`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         val held = h.gateway.heldNow.single()
 
@@ -126,7 +126,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `disconnect while connecting closes what the broker opens afterwards and the state stays Disconnected`() = runBlocking {
+    fun `disconnect while connecting closes what the broker opens afterwards and the state stays Disconnected`() = runBlocking<Unit> {
         val gate = h.gateway.holdOpens("uat-eu")
         val connecting = launch { h.active.connect(h.uat) }
         h.gateway.awaitOpenStarted()
@@ -146,7 +146,7 @@ class ActiveConnectionTest {
     // --- one held connection at a time ---
 
     @Test
-    fun `connect on another profile closes the first before it checks and opens the second`() = runBlocking {
+    fun `connect on another profile closes the first before it checks and opens the second`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         h.gateway.log.clear()
 
@@ -165,7 +165,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `connect on the held profile again closes the old connection first, one stays held`() = runBlocking {
+    fun `connect on the held profile again closes the old connection first, one stays held`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         h.gateway.log.clear()
 
@@ -176,7 +176,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `while the second profile connects the first is already released`() = runBlocking {
+    fun `while the second profile connects the first is already released`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         val gate = h.gateway.holdOpens("prod-eu")
 
@@ -195,7 +195,7 @@ class ActiveConnectionTest {
     // --- latest started wins ---
 
     @Test
-    fun `two connects overlap and the second answers first - the second stays, the late first is closed`() = runBlocking {
+    fun `two connects overlap and the second answers first - the second stays, the late first is closed`() = runBlocking<Unit> {
         val gateUat = h.gateway.holdOpens("uat-eu")
         val first = launch { h.active.connect(h.uat) }
         h.gateway.awaitOpenStarted()
@@ -213,7 +213,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `two connects overlap and the first answers first - its connection is closed, only the second ends Connected`() = runBlocking {
+    fun `two connects overlap and the first answers first - its connection is closed, only the second ends Connected`() = runBlocking<Unit> {
         val gateUat = h.gateway.holdOpens("uat-eu")
         val gateProd = h.gateway.holdOpens("prod-eu")
         val first = launch { h.active.connect(h.uat) }
@@ -232,6 +232,35 @@ class ActiveConnectionTest {
         assertEquals(LinkState.Connected("prod-eu"), h.active.state.value)
         assertEquals(listOf("prod-eu"), h.gateway.heldNow.map { it.profileName })
         assertEquals(1, h.gateway.everOpened.single { it.profileName == "uat-eu" }.closeCalls)
+    }
+
+    @Test
+    fun `an outdated connect that fails writes nothing`() = runBlocking<Unit> {
+        h.gateway.failWith("uat-eu", Failure.BROKER_NOT_REACHABLE)
+        val gateUat = h.gateway.holdOpens("uat-eu")
+        val first = launch { h.active.connect(h.uat) }
+        h.gateway.awaitOpenStarted()
+        h.active.connect(h.prod)
+
+        gateUat.release()
+        withTimeout(5_000) { first.join() }
+
+        assertEquals(LinkState.Connected("prod-eu"), h.active.state.value, "a late failure of the older connect must not show")
+        assertEquals(listOf("prod-eu"), h.gateway.heldNow.map { it.profileName })
+    }
+
+    @Test
+    fun `an outdated connect that is cancelled writes nothing`() = runBlocking<Unit> {
+        h.gateway.holdOpens("uat-eu")
+        val first = launch { h.active.connect(h.uat) }
+        h.gateway.awaitOpenStarted()
+        h.active.connect(h.prod)
+
+        first.cancel()
+        withTimeout(5_000) { first.join() }
+
+        assertEquals(LinkState.Connected("prod-eu"), h.active.state.value, "a cancel of the older connect must not end the newer one")
+        assertEquals(listOf("prod-eu"), h.gateway.heldNow.map { it.profileName })
     }
 
     // --- failures (the reason texts are the contract, see the failure table in the brief and feature 13) ---
@@ -259,7 +288,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a missing password fails Connect without opening the clients`() = runBlocking {
+    fun `a missing password fails Connect without opening the clients`() = runBlocking<Unit> {
         h.secrets.delete("uat-eu")
 
         h.active.connect(h.uat)
@@ -285,7 +314,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a password that vanishes between the check and the open still fails through the gateway`() = runBlocking {
+    fun `a password that vanishes between the check and the open still fails through the gateway`() = runBlocking<Unit> {
         h.gateway.failWith("uat-eu", Failure.NO_PASSWORD_STORED)
 
         h.active.connect(h.uat)
@@ -296,7 +325,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a failed connect can be retried and then ends Connected`() = runBlocking {
+    fun `a failed connect can be retried and then ends Connected`() = runBlocking<Unit> {
         h.gateway.failWith("uat-eu", Failure.BROKER_NOT_REACHABLE)
         h.active.connect(h.uat)
         assertIs<LinkState.Failed>(h.active.state.value)
@@ -309,7 +338,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a failed connect on another profile still released the first connection`() = runBlocking {
+    fun `a failed connect on another profile still released the first connection`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         h.gateway.failWith("prod-eu", Failure.CERTIFICATE_NOT_TRUSTED)
 
@@ -321,7 +350,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a gateway that throws ends Failed without the exception text, holds nothing and never throws out of connect`() = runBlocking {
+    fun `a gateway that throws ends Failed without the exception text, holds nothing and never throws out of connect`() = runBlocking<Unit> {
         val secretInMessage = "boom-$PASSWORD"
         val throwing = ActiveConnection(h.session, object : ConnectionGateway {
             override suspend fun open(profile: ConnectionProfile): OpenResult = throw IllegalStateException(secretInMessage)
@@ -336,7 +365,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `Unreadable permissions still end Connected, in safest mode`() = runBlocking {
+    fun `Unreadable permissions still end Connected, in safest mode`() = runBlocking<Unit> {
         h.checker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
 
         h.active.connect(h.uat)
@@ -349,7 +378,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `a silent stream port still ends Connected, the held connection says its stream port does not answer`() = runBlocking {
+    fun `a silent stream port still ends Connected, the held connection says its stream port does not answer`() = runBlocking<Unit> {
         h.gateway.streamPortSilent("uat-eu")
 
         h.active.connect(h.uat)
@@ -361,7 +390,7 @@ class ActiveConnectionTest {
     // --- cancellation ---
 
     @Test
-    fun `cancelling a connect while the broker is asked leaves nothing open and no Connecting behind`() = runBlocking {
+    fun `cancelling a connect while the broker is asked leaves nothing open and no Connecting behind`() = runBlocking<Unit> {
         h.gateway.holdOpens("uat-eu")
         val connecting = launch { h.active.connect(h.uat) }
         h.gateway.awaitOpenStarted()
@@ -375,7 +404,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `cancelling a connect during the permission check never opens the clients`() = runBlocking {
+    fun `cancelling a connect during the permission check never opens the clients`() = runBlocking<Unit> {
         val gated = GatedPermissionChecker()
         val active = ActiveConnection(ConnectionSession(gated, h.secrets), h.gateway)
         val connecting = launch { active.connect(h.uat) }
@@ -391,7 +420,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `cancelling the connect of a second profile still left the first one released`() = runBlocking {
+    fun `cancelling the connect of a second profile still left the first one released`() = runBlocking<Unit> {
         h.active.connect(h.uat)
         h.gateway.holdOpens("prod-eu")
         val connecting = launch { h.active.connect(h.prod) }
@@ -405,7 +434,7 @@ class ActiveConnectionTest {
     }
 
     @Test
-    fun `window close while connecting closes what is opened afterwards`() = runBlocking {
+    fun `window close while connecting closes what is opened afterwards`() = runBlocking<Unit> {
         val gate = h.gateway.holdOpens("uat-eu")
         val connecting = launch { h.active.connect(h.uat) }
         h.gateway.awaitOpenStarted()

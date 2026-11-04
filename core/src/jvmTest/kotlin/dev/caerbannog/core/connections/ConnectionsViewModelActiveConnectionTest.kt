@@ -60,7 +60,7 @@ class ConnectionsViewModelActiveConnectionTest {
     private val note = "Connection settings changed. Connect again."
 
     @Test
-    fun `the interim Connect opens the clients and mirrors the session`() = runBlocking {
+    fun `the interim Connect opens the clients and mirrors the session`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         assertEquals(LinkState.Connected("uat-eu"), h.active.state.value)
@@ -69,7 +69,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `Connect on an unknown name does nothing`() = runBlocking {
+    fun `Connect on an unknown name does nothing`() = runBlocking<Unit> {
         viewModel.connect("nope")
 
         assertIs<LinkState.Disconnected>(h.active.state.value)
@@ -77,7 +77,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `saving a change to the held profile disconnects it with the note`() = runBlocking {
+    fun `saving a change to the held profile disconnects it with the note`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
         val held = h.gateway.heldNow.single()
 
@@ -90,7 +90,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `saveProfileChanges disconnects, runs the permission check again and does not reconnect by itself`() = runBlocking {
+    fun `saveProfileChanges disconnects, runs the permission check again and does not reconnect by itself`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
         val checksBefore = h.checker.calls.size
 
@@ -103,7 +103,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `renaming the held profile disconnects it with the note`() = runBlocking {
+    fun `renaming the held profile disconnects it with the note`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         val result = viewModel.updateConnection("uat-eu", input(h.uat, name = "uat-eu-2"))
@@ -115,7 +115,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `a rename that fails because the name exists keeps the connection`() = runBlocking {
+    fun `a rename that fails because the name exists keeps the connection`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         val result = viewModel.updateConnection("uat-eu", input(h.uat, name = "prod-eu"))
@@ -126,7 +126,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `editing a profile that is not held leaves the held connection alone`() = runBlocking {
+    fun `editing a profile that is not held leaves the held connection alone`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         viewModel.updateConnection("prod-eu", input(h.prod, host = "other-host.example.com"))
@@ -136,7 +136,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `changing the CA certificate of the held profile disconnects it with the note`() = runBlocking {
+    fun `changing the CA certificate of the held profile disconnects it with the note`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
@@ -146,7 +146,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `changing the topology control level does not disconnect`() = runBlocking {
+    fun `changing the topology control level does not disconnect`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         viewModel.setTopologyControlLevel("uat-eu", TopologyControlLevel.values().first { it != h.uat.topologyControlLevel })
@@ -156,7 +156,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `editing the profile while it connects closes the connection the broker opens afterwards`() = runBlocking {
+    fun `editing the profile while it connects closes the connection the broker opens afterwards`() = runBlocking<Unit> {
         val gate = h.gateway.holdOpens("uat-eu")
         val connecting = launch { viewModel.connect("uat-eu") }
         h.gateway.awaitOpenStarted()
@@ -170,7 +170,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `deleting the held profile releases the connection and clears the current connection`() = runBlocking {
+    fun `deleting the held profile releases the connection and clears the current connection`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
         val held = h.gateway.heldNow.single()
 
@@ -186,7 +186,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `deleting a profile that is not held leaves the held connection alone`() = runBlocking {
+    fun `deleting a profile that is not held leaves the held connection alone`() = runBlocking<Unit> {
         viewModel.connect("uat-eu")
 
         viewModel.requestDelete("prod-eu")
@@ -197,7 +197,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `deleting the profile while it connects closes the connection the broker opens afterwards`() = runBlocking {
+    fun `deleting the profile while it connects closes the connection the broker opens afterwards`() = runBlocking<Unit> {
         val gate = h.gateway.holdOpens("uat-eu")
         val connecting = launch { viewModel.connect("uat-eu") }
         h.gateway.awaitOpenStarted()
@@ -212,7 +212,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `the edit panel check stays a check - it opens no clients and holds nothing`() = runBlocking {
+    fun `the edit panel check stays a check - it opens no clients and holds nothing`() = runBlocking<Unit> {
         viewModel.checkConnectionAndPermissions("uat-eu")
 
         assertTrue(h.gateway.log.none { it.startsWith("open:") })
@@ -221,7 +221,7 @@ class ConnectionsViewModelActiveConnectionTest {
     }
 
     @Test
-    fun `the connection state and the permission pill of the session stay consistent`() = runBlocking {
+    fun `the connection state and the permission pill of the session stay consistent`() = runBlocking<Unit> {
         h.checker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
 
         viewModel.connect("uat-eu")

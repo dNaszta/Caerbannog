@@ -22,7 +22,7 @@ class ActiveConnectionSafetyTest {
     private val h = Harness()
 
     @Test
-    fun `the password never appears in the link state, the session state, the log or the held connections`() = runBlocking {
+    fun `the password never appears in the link state, the session state, the log or the held connections`() = runBlocking<Unit> {
         // Control: the checker received the password, so the test is not vacuous.
         h.active.connect(h.uat)
         assertEquals(PASSWORD, h.checker.calls.single().second, "precondition: the password was read from the store")
@@ -43,7 +43,7 @@ class ActiveConnectionSafetyTest {
     }
 
     @Test
-    fun `the password is not in the state of the view model either`() = runBlocking {
+    fun `the password is not in the state of the view model either`() = runBlocking<Unit> {
         val vm = ConnectionsViewModel(
             repository = object : ConnectionProfileRepository {
                 override fun list() = listOf(h.uat)
@@ -70,7 +70,7 @@ class ActiveConnectionSafetyTest {
     }
 
     @Test
-    fun `concurrent connect and disconnect calls leave one consistent state and no leaked connection`() = runBlocking {
+    fun `concurrent connect and disconnect calls leave one consistent state and no leaked connection`() = runBlocking<Unit> {
         val profiles = listOf(h.uat, h.prod)
         val random = Random(20261104)
         val operations = List(400) { random.nextInt(3) }
