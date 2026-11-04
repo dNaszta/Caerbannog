@@ -306,7 +306,7 @@ private fun DeclaredPermissionsSection(
     onWriteChange: (Boolean) -> Unit,
 ) {
     Column {
-        Text("Declared permissions", style = MaterialTheme.typography.titleSmall)
+        Text("Declared permissions (your own statement)", style = MaterialTheme.typography.titleSmall)
         Row {
             Switch(checked = declares, onCheckedChange = onDeclaresChange)
             Text("I know what this user may do on the broker", modifier = Modifier.padding(start = 8.dp, top = 12.dp))
