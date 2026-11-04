@@ -10,3 +10,6 @@ Status: input note; the full brief is written when M2-03 is accepted.
 - Capabilities (S3a, S3b): visibility NONE gives the state "cannot read stream statistics, ask for the monitoring tag" and no rows; the other levels list rows.
 - Scenarios to make pass (all `@fake-broker`): in `03_stream_list.feature` the statistics scenario, "The message count and the offsets agree", "The first offset cannot be read for one stream", "A user without the management tag", filter, sort, refresh, empty, paging. The refresh policy is decision D3.
 - Server-side paging with name filter; the app filters `type == "stream"` client side, so a page can hold fewer streams than `page_size`.
+
+## Session API (after M2-01b)
+Read `session.state` (`SessionState`: `statuses`, `current`); the old `statuses` and `current` flows are gone. A derived view model follows the session with `session.observe { }` (returns the unregister function; call it on close). Follow-up F1 from the M2-01b review: add to the KDoc of `observe` that observers must not throw, before adding a second observer.
