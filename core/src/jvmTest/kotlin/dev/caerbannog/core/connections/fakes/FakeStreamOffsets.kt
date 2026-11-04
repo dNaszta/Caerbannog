@@ -3,6 +3,7 @@ package dev.caerbannog.core.connections.fakes
 import dev.caerbannog.core.streams.FirstOffset
 import dev.caerbannog.core.streams.StreamOffsets
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * M2-03 part 2 test double for [StreamOffsets] (same sharing as [FakeStreamCatalog]). Three outcomes, as the
@@ -19,6 +20,12 @@ class FakeStreamOffsets : StreamOffsets {
     /** "vhost/stream" of every call, in order. */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
+    private val holds = ConcurrentHashMap<String, CallGate>()
+
+    /** The next call for [stream] records itself, computes its answer, then waits until the gate is released. One-shot (M2-04). */
+    fun hold(stream: String, vhost: String = "/", ignoreCancellation: Boolean = false): CallGate =
+        CallGate(ignoreCancellation).also { holds["$vhost/$stream"] = it }
+
     fun setFirst(vhost: String, stream: String, offset: Long) {
         values[vhost to stream] = FirstOffset.Value(offset)
     }
@@ -33,7 +40,8 @@ class FakeStreamOffsets : StreamOffsets {
 
     override suspend fun firstOffset(vhost: String, stream: String): FirstOffset {
         calls += "$vhost/$stream"
-        if (silent) return FirstOffset.Unavailable
-        return values[vhost to stream] ?: FirstOffset.Unavailable
+        val answer = if (silent) FirstOffset.Unavailable else values[vhost to stream] ?: FirstOffset.Unavailable
+        holds.remove("$vhost/$stream")?.await()
+        return answer
     }
 }

@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-01b, M2-03 (both merged into local `main`)    Size: L (split in two commits-groups, see Plan; if it passes three days, cut after step C and make the rest M2-04b)
 
-Status: briefed and confirmed 2026-11-04 (architect), branch `m2-04-stream-list-core`. Next: test developer, step 2 (tests first). Default refresh 5 s is a trial: record calls per tick here.
+Status: briefed and confirmed 2026-11-04 (architect), branch `m2-04-stream-list-core`. Step 2 (tests first) done by the test developer, red as listed in `## Status`; next: senior developer, step A (core-testing move, then B to E). Default refresh 5 s is a trial: record calls per tick here.
 
 ## Goal
 `core` has a stream list view model that, for the held connection, loads every stream (all pages of the management queue list, streams only), shows rows with counts, first and last offset, publishers and consumers as display strings, filters, sorts and pages them in memory, refreshes on a timer under the D3 rules, and reacts to the connection state. No Compose code. All `@fake-broker` scenarios of `03` that do not need super streams pass.
@@ -58,6 +58,25 @@ Screen `docs/ux/Streams.dc.html` is built in M2-05. Here: the state names and di
 
 ## Definition of done
 Tests written first and failing for the right reason, then passing: `./gradlew test --rerun-tasks --continue` green including `verifyTestDiscovery`; `brokerTest` for `publisherCounts` green on a real broker; no unrelated changes; Status records calls per tick and the page size constant; README row and spec updated if behaviour changed.
+
+## Status
+
+Step 2, tests first (test developer, 2026-11-04). Red at COMPILE level on purpose: the production types do not exist yet. To prove the tests can be satisfied (and are not contradictory), a throwaway view model and accessor were written outside the commit; with them all new core unit tests (333 core tests) and all 20 selected `03` scenario runs (14 scenarios and 6 outline examples) passed. That code is NOT delivered and is not a design to copy.
+
+Contract the tests use (the developer may rename with the test developer's agreement; semantics are what the tests pin). Package `dev.caerbannog.core.streams` (commonMain) unless noted:
+- `enum RefreshInterval(seconds)`: Off 0, Every5, Every10, Every30, Every60, `fromSeconds(Int): RefreshInterval?`; top-level `DEFAULT_REFRESH` (5 s); `interface AppSettings { var streamListRefresh: RefreshInterval }`; `fun interface RefreshClock { fun nowMillis(): Long }`; `DEFAULT_PAGE_SIZE = 50`.
+- `Retention.displayMaxAge(): String` (D9, table in `RetentionDisplayTest`).
+- `StreamCatalog.publisherCounts(vhost): CatalogResult<Map<String, Int>>` (D8, streams without a publisher absent); `ManagementRequests.publisherCounts(vhost)` = `/api/stream/publishers/{vhost}`; `ManagementJson.parsePublisherCounts(body)`.
+- `StreamListViewModel(active, settings, scope, clock, reconnect: suspend (String) -> Unit, pageSize)` with `state: StateFlow<StreamListState>`, `setShown`, `refreshNow`, `retry`, `setFilter`, `setSort`, `setPage/nextPage/previousPage/setPageSize`, `setRefreshInterval`, `updatedSecondsAgo()`, `close()`. State, screens, row model and texts: see the KDoc of `core/src/jvmTest/.../streams/StreamListHarness.kt`. No `RefreshPolicy` class is required by the tests (time is the injected clock plus `delay` on the injected scope, virtual in tests); the developer may add one.
+- `dev.caerbannog.core.connections`: `class StreamSource(catalog, offsets, vhost)` (not AutoCloseable), `ActiveConnection.source: StreamSource?` (only while Connected), `ActiveConnection.connectionLost(source)` (D2: current source only, link becomes `Failed("Connection lost")`, held connection closed once), public `ConnectionFailureReason.CONNECTION_LOST`.
+- data-rabbit: `ManagementErrors.map(status, on404)`; `StreamEnvironments(profile, password, trust, environmentFactory = <real builder>)` as new last parameter. desktopApp: `createAppComposition(..., log: (String) -> Unit, gateway = RabbitMqConnectionGateway(secretStore, log))`.
+- Every other implementer of `StreamCatalog` in tests already has a `publisherCounts` override (`StubCatalog`, `NoCatalog`); the three main-code ones need it.
+
+Decisions pinned by the tests that go beyond the brief text (architect to confirm or overrule): (1) nothing is called while the list is not shown; the first load waits for `setShown(true)`. (2) Page, filter and sort changes do not call the broker list (paging is in memory); they ask the first offsets of newly visible rows at once and restart the timer (the brief says "reloads at once": that cannot mean a list call per keystroke). (3) Capabilities are read once per connection, not per tick. (4) Messages are grouped with commas ("48,300"), offsets are plain digits ("2083999"); an Empty first offset gives blank first and last offsets. (5) Default sort is name ascending. (6) The filter is a case-insensitive literal substring. (7) The load ends the timer wait: the next tick is one interval after the last load finished, a skipped tick is not caught up. (8) A failed list call with NotAuthorised is `CannotReadStatistics` and not a lost connection.
+
+Brief points that could not be tested as written: "`NotFound` on a row means reload the list": in M2-04 no per-row call can return `NotFound` (`firstOffset` has only Value, Empty, Unavailable; an unknown stream reads Unavailable), so the test pins "reads unavailable, no error". The Size cell is pinned as "the row model has no size member". "RefreshPolicy ... injected ticker": see above. `core-testing`: tried in a scratch worktree on the committed state: a plain JVM module with `api(project(":core"))`, the three fakes moved with `git mv`, `testImplementation(project(":core-testing"))` in core and acceptance-tests, srcDir hack removed: `:core:jvmTest`, `:acceptance-tests:test` and `verifyTestDiscovery` pass, no copy needed. The new fakes (`FakeAppSettings`, `CallGate`) sit in the same fakes directory and move with it.
+
+Not run: `@broker` tests (Docker is available but the production code does not exist, so they cannot pass or fail for the right reason yet); `verifyTestDiscovery` on the final tree (it needs the production code to compile). Calls per tick on a real broker: to be recorded by the developer (list `ceil(entries/500)`, `capabilities` once per connection, `publisherCounts` 1 for FULL, first offsets one per visible row).
 
 ## Decisions log (input note, kept as written)
 

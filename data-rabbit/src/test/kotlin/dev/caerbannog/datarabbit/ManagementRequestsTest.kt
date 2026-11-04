@@ -18,6 +18,7 @@ import java.net.URLDecoder
  *   listStreams(request: StreamListRequest): String   GET /api/queues?page=&page_size=[&name=&use_regex=]&columns=...
  *   streamDetail(vhost, name): String                 GET /api/queues/{vhost}/{name}
  *   publishers(vhost, stream): String                 GET /api/stream/publishers/{vhost}/{stream}
+ *   publisherCounts(vhost): String                    GET /api/stream/publishers/{vhost}   (M2-04 D8: every publisher of the vhost in ONE call; the caller groups by stream)
  *   consumers(vhost): String                          GET /api/stream/consumers/{vhost}   (no per-stream path exists, it answers 400)
  *   pluginProbe(): String                             GET /api/stream/publishers          (the top-level path; per-stream paths cannot detect the plugin)
  *   whoami(): String                                  GET /api/whoami
@@ -105,5 +106,12 @@ class ManagementRequestsTest {
     fun `a name with unicode is percent-encoded as UTF-8`() {
         val url = requests.streamDetail("/", "ordérs")
         assertTrue(url.endsWith("/ord%C3%A9rs"), url)
+    }
+
+    @Test
+    fun `the publishers of a whole vhost are one call to the vhost path`() {
+        assertEquals("https://rabbit.example.com:15671/api/stream/publishers/%2F", requests.publisherCounts("/"))
+        assertEquals("https://rabbit.example.com:15671/api/stream/publishers/my%20vhost", requests.publisherCounts("my vhost"))
+        assertFalse(requests.publisherCounts("/").contains("?"), "no paging or filter: the stream publishers path has none")
     }
 }

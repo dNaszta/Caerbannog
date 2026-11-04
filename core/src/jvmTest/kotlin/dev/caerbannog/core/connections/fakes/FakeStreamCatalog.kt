@@ -12,6 +12,7 @@ import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.Visibility
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * M2-03 part 2 test double for [StreamCatalog]. Same file in `core` jvmTest and, through an extra srcDir, in
@@ -27,7 +28,10 @@ import java.util.Collections
  *  - no management tag: everything is [CatalogResult.NotAuthorised], and capabilities say visibility NONE and plugin UNKNOWN;
  *  - plugin missing: publishers and consumers are [CatalogResult.PluginMissing];
  *  - a missing stream is [CatalogResult.NotFound].
- * Every call is counted in [calls], so a test can show that something did NOT call the broker.
+ *  - M2-04: a name is unique in a vhost, so adding a stream or queue again REPLACES the old one (a test updates statistics that way);
+ *    `publisherCounts` groups the publisher rows of the vhost by stream, streams without a publisher are absent.
+ * Every call is counted in [calls], so a test can show that something did NOT call the broker. A test can hold the next call
+ * of a name ([holdNext]) to complete it late, and make one page of the list fail ([failListPage]).
  */
 class FakeStreamCatalog : StreamCatalog {
 
@@ -46,16 +50,42 @@ class FakeStreamCatalog : StreamCatalog {
     /** True: every call answers [CatalogResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
-    /** Names of the calls in order: "listStreams", "streamDetail", "publishers", "consumers", "capabilities". */
+    /** Names of the calls in order: "listStreams", "streamDetail", "publishers", "publisherCounts", "consumers", "capabilities". */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
+    private val holds = ConcurrentHashMap<String, CallGate>()
+    private val pageFailures = ConcurrentHashMap<Int, CatalogResult.Failure>()
+
+    /** The next call named [call] (see [calls]) records itself, computes its answer, then waits until the gate is released. One-shot. */
+    fun holdNext(call: String, ignoreCancellation: Boolean = false): CallGate =
+        CallGate(ignoreCancellation).also { holds[call] = it }
+
+    /** `listStreams` for page [page] answers [failure] (until [clearFailures]); other pages work. */
+    fun failListPage(page: Int, failure: CatalogResult.Failure) {
+        pageFailures[page] = failure
+    }
+
+    fun clearFailures() = pageFailures.clear()
+
+    private suspend fun <T> late(call: String, answer: T): T {
+        holds.remove(call)?.await()
+        return answer
+    }
+
+    private fun put(entry: Entry) {
+        synchronized(entries) {
+            entries.removeAll { it.vhost == entry.vhost && it.name == entry.name }
+            entries += entry
+        }
+    }
+
     fun addStream(summary: StreamSummary): FakeStreamCatalog = apply {
-        entries += Entry(summary.name, summary.vhost, "stream", summary)
+        put(Entry(summary.name, summary.vhost, "stream", summary))
     }
 
     /** A queue that is not a stream (quorum, classic): listed by the broker, never returned by the catalog. */
     fun addQueue(name: String, vhost: String = "/", type: String = "quorum"): FakeStreamCatalog = apply {
-        entries += Entry(name, vhost, type, null)
+        put(Entry(name, vhost, type, null))
     }
 
     fun setPublishers(vhost: String, stream: String, rows: List<PublisherRow>) {
@@ -75,8 +105,12 @@ class FakeStreamCatalog : StreamCatalog {
         }
     }
 
-    override suspend fun listStreams(request: StreamListRequest): CatalogResult<StreamPage> {
+    override suspend fun listStreams(request: StreamListRequest): CatalogResult<StreamPage> =
+        late("listStreams", computeList(request))
+
+    private fun computeList(request: StreamListRequest): CatalogResult<StreamPage> {
         refusal("listStreams")?.let { return it }
+        pageFailures[request.page]?.let { return it }
         if (request.pageSize !in 1..MAX_PAGE_SIZE || request.page < 1) return CatalogResult.BadPaging
         val matcher = nameMatcher(request)
         val matching = synchronized(entries) { entries.filter { matcher(it.name) } }
@@ -117,6 +151,17 @@ class FakeStreamCatalog : StreamCatalog {
         refusal("publishers")?.let { return it }
         if (!pluginPresent) return CatalogResult.PluginMissing
         return CatalogResult.Success(publisherRows[vhost to stream].orEmpty())
+    }
+
+    override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> {
+        val answer: CatalogResult<Map<String, Int>> = refusal("publisherCounts")
+            ?: if (!pluginPresent) {
+                CatalogResult.PluginMissing
+            } else {
+                val rows = synchronized(publisherRows) { publisherRows.entries.toList() }
+                CatalogResult.Success(rows.filter { it.key.first == vhost && it.value.isNotEmpty() }.associate { it.key.second to it.value.size })
+            }
+        return late("publisherCounts", answer)
     }
 
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> {

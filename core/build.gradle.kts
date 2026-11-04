@@ -21,6 +21,8 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(kotlin("test"))
+            // M2-04: virtual time for the refresh timer tests (no sleeps).
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             implementation("org.junit.jupiter:junit-jupiter:5.11.4")
             runtimeOnly("org.junit.platform:junit-platform-launcher")
         }

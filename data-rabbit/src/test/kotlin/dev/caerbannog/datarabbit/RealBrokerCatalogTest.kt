@@ -290,6 +290,32 @@ class RealBrokerCatalogTest {
         assertEquals(listOf("cons-$name"), consumers.map { it.name })
     }
 
+    // M2-04 D8: one call per vhost, grouped by stream, never one call per row. Written test-first; the stats can lag
+    // up to 5 s, so bounded polling on the value.
+    @Test
+    fun `publisherCounts groups the publishers of the vhost by stream in one call`() = runBlocking<Unit> {
+        val busy = unique("pc-busy-")
+        val quiet = unique("pc-quiet-")
+        val e = createStream(busy)
+        createStream(quiet)
+        publish(e, busy, 3, reference = "pub-a-$busy")
+        // a second publisher on the same stream, kept open so that its row exists
+        val second = e.producerBuilder().stream(busy).name("pub-b-$busy").build()
+        closeables += second
+        val held = connection()
+
+        val counts = awaitUntil("2 publishers on $busy", fetch = { success(runBlocking { held.catalog.publisherCounts("/") }) }, done = { it[busy] == 2 })
+
+        assertEquals(2, counts[busy])
+        assertEquals(null, counts[quiet], "a stream without a publisher is absent, the view model shows 0")
+    }
+
+    @Test
+    fun `publisherCounts of a vhost without publishers is an empty map`() = runBlocking<Unit> {
+        val held = connection(vhost = OTHER_VHOST)
+        assertEquals(CatalogResult.Success(emptyMap<String, Int>()), held.catalog.publisherCounts(OTHER_VHOST))
+    }
+
     @Test
     fun `a stream with nothing attached has empty lists, not errors`() = runBlocking<Unit> {
         val name = unique("quiet-")
@@ -450,6 +476,7 @@ class RealBrokerCatalogTest {
             try {
                 assertEquals(CatalogResult.PluginMissing, held.catalog.publishers("/", "any"))
                 assertEquals(CatalogResult.PluginMissing, held.catalog.consumers("/", "any"))
+                assertEquals(CatalogResult.PluginMissing, held.catalog.publisherCounts("/"), "M2-04 D8: the vhost path without the plugin")
                 assertEquals(CatalogResult.Success(Capabilities(PluginStatus.MISSING, Visibility.FULL)), held.catalog.capabilities())
                 assertInstanceOf(CatalogResult.Success::class.java, held.catalog.listStreams(StreamListRequest()), "the queue list still works")
             } finally {

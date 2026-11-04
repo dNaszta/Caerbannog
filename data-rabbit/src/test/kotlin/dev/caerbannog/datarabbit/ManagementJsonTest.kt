@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
  *   parseStreamPage(body: String): CatalogResult<StreamPage>       (keeps only `type` "stream")
  *   parseStreamDetail(body: String): CatalogResult<StreamSummary>
  *   parsePublishers(body: String): CatalogResult<List<PublisherRow>>
+ *   parsePublisherCounts(body: String): CatalogResult<Map<String, Int>>   (M2-04 D8: publisher rows of a vhost grouped by `queue.name`, streams without a row are absent)
  *   parseConsumers(body: String, stream: String): CatalogResult<List<ConsumerRow>>   (keeps rows whose `queue.name` is [stream])
  *   parseWhoamiTags(body: String): CatalogResult<List<String>>
  * A body that cannot be parsed is `CatalogResult.Unexpected`, never an exception. `ignoreUnknownKeys`; `messages` optional.
@@ -157,6 +158,32 @@ class ManagementJsonTest {
     @Test
     fun `no publishers is an empty list, not an error`() {
         assertEquals(emptyList<PublisherRow>(), success(ManagementJson.parsePublishers(FixtureFiles.text("m2-02/stream-publishers-empty.json"))))
+    }
+
+    @Test
+    fun `the recorded publishers body groups to one publisher for its stream`() {
+        assertEquals(mapOf("<name>" to 1), success(ManagementJson.parsePublisherCounts(FixtureFiles.text("m2-02/stream-publishers.json"))))
+    }
+
+    @Test
+    fun `no publishers is an empty map`() {
+        assertEquals(emptyMap<String, Int>(), success(ManagementJson.parsePublisherCounts(FixtureFiles.text("m2-02/stream-publishers-empty.json"))))
+        assertEquals(emptyMap<String, Int>(), success(ManagementJson.parsePublisherCounts("[]")))
+    }
+
+    @Test
+    fun `publisher rows are counted per stream, several publishers and several streams`() {
+        fun row(stream: String, id: Int) = """{"publisher_id":$id,"published":1,"confirmed":1,"errored":0,"queue":{"name":"$stream","vhost":"/"},"connection_details":{"name":"c$id","user":"u"}}"""
+        val body = "[" + listOf(row("a", 0), row("a", 1), row("b", 0), row("a", 2)).joinToString(",") + "]"
+
+        assertEquals(mapOf("a" to 3, "b" to 1), success(ManagementJson.parsePublisherCounts(body)))
+    }
+
+    @Test
+    fun `publisher counts of a malformed body are Unexpected, never an exception`() {
+        for (body in listOf("", "not json", "{}", "[{\"publisher_id\":1}]", "[1,2]", "null")) {
+            assertEquals(CatalogResult.Unexpected, ManagementJson.parsePublisherCounts(body), "body <$body>")
+        }
     }
 
     @Test

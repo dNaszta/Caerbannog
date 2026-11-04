@@ -2,7 +2,9 @@ package dev.caerbannog.core.streams
 
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -159,5 +161,76 @@ class FakeStreamCatalogTest {
     fun `a stream whose message count is not known yet keeps null, not zero`() = runBlocking<Unit> {
         val catalog = FakeStreamCatalog().addStream(stream("new", messages = null))
         assertEquals(null, page(catalog, StreamListRequest()).rows.single().messages)
+    }
+
+    // --- M2-04: D8 publisherCounts and the test helpers ------------------------------------------------------
+
+    private fun rows(count: Int) = List(count) { PublisherRow("c$it", "svc", it, null, 1, 1, 0) }
+
+    @Test
+    fun `publisherCounts groups the publishers of a vhost by stream, streams without any are absent`() = runBlocking<Unit> {
+        val catalog = FakeStreamCatalog().addStream(stream("a")).addStream(stream("b")).addStream(stream("c", vhost = "other"))
+        catalog.setPublishers("/", "a", rows(2))
+        catalog.setPublishers("/", "b", emptyList())
+        catalog.setPublishers("other", "c", rows(5))
+
+        assertEquals(CatalogResult.Success(mapOf("a" to 2)), catalog.publisherCounts("/"))
+        assertEquals(CatalogResult.Success(mapOf("c" to 5)), catalog.publisherCounts("other"))
+        assertEquals(CatalogResult.Success(emptyMap<String, Int>()), catalog.publisherCounts("nowhere"))
+    }
+
+    @Test
+    fun `publisherCounts is counted as one call named publisherCounts`() = runBlocking<Unit> {
+        val catalog = FakeStreamCatalog()
+        catalog.publisherCounts("/")
+        assertEquals(listOf("publisherCounts"), catalog.calls.toList())
+    }
+
+    @Test
+    fun `publisherCounts follows the same refusals as the other calls`() = runBlocking<Unit> {
+        val catalog = FakeStreamCatalog().addStream(stream("a"))
+        catalog.pluginPresent = false
+        assertEquals(CatalogResult.PluginMissing, catalog.publisherCounts("/"))
+        catalog.pluginPresent = true
+        catalog.visibility = Visibility.NONE
+        assertEquals(CatalogResult.NotAuthorised, catalog.publisherCounts("/"))
+        catalog.visibility = Visibility.FULL
+        catalog.unreachable = true
+        assertEquals(CatalogResult.Unreachable, catalog.publisherCounts("/"))
+    }
+
+    @Test
+    fun `adding a stream again replaces it, a name is unique in a vhost`() = runBlocking<Unit> {
+        val catalog = FakeStreamCatalog().addStream(stream("a", messages = 1)).addStream(stream("a", messages = 9)).addStream(stream("a", vhost = "v"))
+        val list = page(catalog, StreamListRequest())
+        assertEquals(listOf(9L), list.rows.filter { it.vhost == "/" }.map { it.messages })
+        assertEquals(2, list.totalCount)
+    }
+
+    @Test
+    fun `one list page can be made to fail and the others still work`() = runBlocking<Unit> {
+        val catalog = mixed(streams = 1, queues = 9)
+        catalog.failListPage(2, CatalogResult.Unexpected)
+        assertEquals(CatalogResult.Unexpected, catalog.listStreams(StreamListRequest(page = 2, pageSize = 5)))
+        assertIs<CatalogResult.Success<StreamPage>>(catalog.listStreams(StreamListRequest(page = 1, pageSize = 5)))
+        catalog.clearFailures()
+        assertIs<CatalogResult.Success<StreamPage>>(catalog.listStreams(StreamListRequest(page = 2, pageSize = 5)))
+    }
+
+    @Test
+    fun `a held call answers only after the gate is released, with the answer it computed when it started`() = runBlocking<Unit> {
+        val catalog = FakeStreamCatalog().addStream(stream("a"))
+        val gate = catalog.holdNext("listStreams")
+        val late = async { catalog.listStreams(StreamListRequest()) }
+        yield()
+        assertEquals(false, late.isCompleted)
+        assertEquals(listOf("listStreams"), catalog.calls.toList(), "the call is counted when it starts")
+        catalog.addStream(stream("b")) // changes after the call started
+
+        gate.release()
+
+        assertEquals(listOf("a"), (late.await() as CatalogResult.Success<StreamPage>).value.rows.map { it.name })
+        // one-shot: the next call is not held
+        assertEquals(2, page(catalog, StreamListRequest()).rows.size)
     }
 }

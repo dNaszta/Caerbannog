@@ -37,6 +37,8 @@ dependencies {
     // The real-keychain tests run only via :data-rabbit:keychainTest.
     testImplementation(project(":data-rabbit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    // M2-04: the stream list steps run the view model in virtual time ("30 seconds pass" advances a test scheduler).
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
     testImplementation("io.cucumber:cucumber-junit-platform-engine:$cucumberVersion")
     testImplementation("org.junit.platform:junit-platform-suite:1.11.4")
