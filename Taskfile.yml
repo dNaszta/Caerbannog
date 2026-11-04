@@ -16,6 +16,11 @@ tasks:
     cmds:
       - ./gradlew :data-rabbit:brokerTest
 
+  test:keychain:
+    desc: Run the real OS keychain tests (touches the real keychain and may prompt; run on demand).
+    cmds:
+      - ./gradlew :data-rabbit:keychainTest
+
   run:
     desc: Launch the desktop app.
     cmds:

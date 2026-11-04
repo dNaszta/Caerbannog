@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
 /**
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test
  * SecretStore implementation this task adds) does not exist yet, and neither does
  * dev.caerbannog.core.connections.SecretStore in `core`.
  */
+@Tag("keychain")
 class KeyringSecretStoreTest {
 
     private val throwawayProfileName = "m1-02-test-developer-throwaway-profile"
