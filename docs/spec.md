@@ -78,7 +78,7 @@ The `data-rabbit` module sits behind repository interfaces in `core`, so a futur
 
 ## Paging model
 
-Streams have no random-access API, so each page is a short-lived read: open an unnamed consumer at a start offset, collect up to the page size, then close it. An unnamed consumer stores no offset, so browsing never affects real consumers.
+Streams have no random-access API, so each page is a short-lived read: open an unnamed consumer at a start offset, collect up to the page size, then close it. An unnamed consumer stores no offset, so browsing never affects real consumers. **Safety rule (M2-02c):** the browsing consumer must be unnamed, or named with `noTrackingStrategy()`. A named consumer with the client's default or manual tracking makes the client write an offset tracking chunk into the stream (the manual strategy's safety net stores a default offset about 1 s after consuming): that changes the stream's `messages`, takes an offset, and can reset a real consumer's resume point if the reference is reused. That would break "browsing never changes anything on the broker". A test must assert `tracking.offsets` stays empty and `messages` unchanged after a browse. `queryStreamStats` is a read query; the M2-03 test must confirm it writes nothing.
 
 1. Ask the broker for the stream's bounds (`queryStreamStats`: first offset and committed offset).
 2. Resolve the start: `first`, `last page`, a typed offset, or a timestamp (`OffsetSpecification.timestamp`).
@@ -91,7 +91,7 @@ Streams have no random-access API, so each page is a short-lived read: open an u
 
 - Delivery is chunk-based, so a read may begin before the requested offset; the app drops messages below the start offset.
 - Retention can move the first offset while a user is paging; the app re-reads the bounds and shows a notice instead of failing.
-- Message count is the management API's `messages` (exact for the stream's offsets, M2-02 spike), not committed minus first plus one: `committedChunkId` is the start offset of the last chunk, so that formula undercounts when messages were published in batches. The count can exceed the number of user messages, because offset tracking entries occupy offsets in the stream; RabbitMQ's own Management UI shows the same number. The app still labels it approximate (statistics refresh about every 5 s).
+- Message count is the management API's `messages` (exact for the stream's offsets, M2-02 spike; it includes the tracking entries of other applications' named consumers, which is the cause of the `@gate-M2` tolerance), not committed minus first plus one: `committedChunkId` is the start offset of the last chunk, so that formula undercounts when messages were published in batches. The count can exceed the number of user messages, because offset tracking entries occupy offsets in the stream; RabbitMQ's own Management UI shows the same number. The app still labels it approximate (statistics refresh about every 5 s).
 - Search and filter run client-side over a bounded scan (for example the next 10,000 messages) with a visible scan limit and a Cancel button; v1 does not rely on broker-side filtering.
 - Super streams: each partition is a regular stream, so the browser reads one partition at a time. Order exists only within a partition, so v1 does not merge partitions into one sequence.
 
