@@ -39,6 +39,7 @@ Feature: Connect and disconnect
     Then the state of "uat-eu" is "Disconnected"
     And the state of "prod-eu" is "Connected"
     And "prod-eu" is the current connection
+    And the app holds one connection
 
   @negative @fake-broker
   Scenario Outline: A connection that cannot be used says why
@@ -70,8 +71,8 @@ Feature: Connect and disconnect
     Then its state is "Connected"
     And topology is locked (see 02, safest mode)
 
-  # Needs Capabilities.visibility and the list message: M2-03 part 2 (catalog) and M2-04/M2-05. Not part 1.
-  @fake-broker @needs-M2-03b
+  # Checked at the catalog level (Capabilities.visibility NONE, every list not authorised); the screen is M2-04/M2-06.
+  @fake-broker
   Scenario: A user without the management tag is connected but sees no lists
     Given the broker answers "Not management user" for the user of "uat-eu"
     When I connect to "uat-eu"

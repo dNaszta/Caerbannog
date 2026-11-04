@@ -5,6 +5,9 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.connections.OpenResult
+import dev.caerbannog.core.streams.StreamCatalog
+import dev.caerbannog.core.streams.StreamOffsets
+import dev.caerbannog.core.streams.Visibility
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeout
@@ -43,6 +46,8 @@ class FakeConnectionGateway(
         /** False when the stream port of the profile did not answer: the connection is still usable (offsets unavailable). */
         val streamPortAnswers: Boolean,
         private val log: MutableList<String>,
+        override val catalog: StreamCatalog,
+        override val offsets: StreamOffsets,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -65,6 +70,8 @@ class FakeConnectionGateway(
     private val failures = ConcurrentHashMap<String, Failure>()
     private val silentStreamPort = ConcurrentHashMap.newKeySet<String>()
     private val gates = ConcurrentHashMap<String, Gate>()
+    private val catalogs = ConcurrentHashMap<String, FakeStreamCatalog>()
+    private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -90,9 +97,21 @@ class FakeConnectionGateway(
         failures.remove(profileName)
     }
 
-    /** The stream port of [profileName] does not answer: open still succeeds, [Held.streamPortAnswers] is false. */
+    /** The stream port of [profileName] does not answer: open still succeeds, its offsets read Unavailable. */
     fun streamPortSilent(profileName: String) {
         silentStreamPort += profileName
+        offsetsOf(profileName).silent = true
+    }
+
+    /** The catalog every connection opened for [profileName] exposes; configure it before Connect. */
+    fun catalogOf(profileName: String): FakeStreamCatalog = catalogs.getOrPut(profileName) { FakeStreamCatalog() }
+
+    /** The first-offset source every connection opened for [profileName] exposes. */
+    fun offsetsOf(profileName: String): FakeStreamOffsets = offsetSources.getOrPut(profileName) { FakeStreamOffsets() }
+
+    /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
+    fun noManagementTag(profileName: String) {
+        catalogOf(profileName).visibility = Visibility.NONE
     }
 
     /** The broker of [profileName] answers only after [Gate.release]. Overlap and progress tests need no sleeps. */
@@ -118,7 +137,7 @@ class FakeConnectionGateway(
             log += "failed:$name"
             return OpenResult.Failed(it.reason)
         }
-        val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log)
+        val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log, catalogOf(name), offsetsOf(name))
         opened += held
         log += "opened:$name#${held.number}"
         return OpenResult.Opened(held)
