@@ -63,3 +63,105 @@ None here. Data feeds `docs/ux/Streams.dc.html` (columns decided by N1 and D5).
 
 ## Definition of done
 Tests written first and failing for the right reason, then passing; `./gradlew test` and `task test:broker` green; no unrelated changes; spec "Management API facts" updated if a fixture disagrees; task index row updated.
+
+## Status
+
+### Part 1 (`m2-03-connection-lifecycle`), step 2: tests first (test developer, 2026-11-04)
+Red: written, not passing, because `ActiveConnection`, `LinkState`, `ConnectionGateway`, `HeldConnection`, `OpenResult`, `ConnectionFailureReason`, `ConnectionNotes` and the new `ConnectionsViewModel` parameter do not exist (compile failure in `:core:compileTestKotlinJvm` and `:acceptance-tests:compileTestKotlin`; every unresolved name is one of these). Also red at runtime: `:ui:jvmTest` `ConnectionsScreenUiTest` "the edit panel says the host name is not verified". As a check on the tests themselves (not committed, no production code in this repo) they were run against a throwaway implementation in the scratchpad: core 34 of 34 and the feature 13 run 11 of 11 selected scenarios passed there.
+
+Written:
+- core `jvmTest`: `ActiveConnectionTest` (lifecycle, order, progress, failures, cancel, overlap in both answer orders), `ConnectionsViewModelActiveConnectionTest` (edit, rename, CA change, delete, Connect, check stays a check, pill consistency), `ActiveConnectionSafetyTest` (no password in exposed values, 400 concurrent connect/disconnect calls with fixed seed: at most one held, closed at most once, Connected means that connection is held), `ActiveConnectionHarness`, `fakes/FakeConnectionGateway`.
+- `FakeConnectionGateway` is one file in core `jvmTest` (`core/src/jvmTest/kotlin/dev/caerbannog/core/connections/fakes/`) that `acceptance-tests` compiles through an extra `srcDir` (see its build file): one fake, no copy. Part 2's `FakeStreamCatalog` can follow the same way.
+- acceptance-tests: glue package `dev.caerbannog.acceptance.lifecycle` (`ConnectionLifecycleSteps`, `RunConnectionLifecycleAcceptanceTest`, tag filter `not @needs-M2 and not @needs-decision and not @broker and not @needs-M2-03b`). 11 scenarios run (4 of them the outline examples).
+- ui: one test in `ConnectionsScreenUiTest`.
+- Feature 13: one tag added, `@needs-M2-03b`, on "A user without the management tag ..." (needs `Capabilities` from part 2; no steps). Nothing else in the feature changed.
+
+Contract the developer must follow (the brief left these open; each is a brief gap, change only with the test developer):
+- core, package `dev.caerbannog.core.connections`:
+  - `interface ConnectionGateway { suspend fun open(profile: ConnectionProfile): OpenResult }`
+  - `sealed interface OpenResult { data class Opened(val connection: HeldConnection); data class Failed(val reason: String) }`
+  - `interface HeldConnection : AutoCloseable` (part 1 has only `close()`; `catalog` and `offsets` come with part 2)
+  - `sealed interface LinkState { val name: String? }` with `Disconnected(name: String? = null, note: String? = null)`, `Connecting(name)`, `Connected(name)`, `Failed(name, reason: String)`. One flow, the name is part of the value (the brief says "name and phase").
+  - `class ActiveConnection(session: ConnectionSession, gateway: ConnectionGateway)` with `val state: StateFlow<LinkState>`, `fun stateOf(name: String): LinkState` (the state if it names that profile, else `Disconnected(name)`), `suspend fun connect(profile)`, `fun disconnect()`, `fun close()`, `fun profileChanged(name: String)`, `fun profileDeleted(name: String)`. Both profile functions do nothing unless `name` is the held (or connecting) profile. `connect` never throws except cancellation (a throwing gateway becomes `Failed` with a generic reason, never the exception text).
+  - `ConnectionsViewModel(..., session, active: ActiveConnection? = null)`: with `active`, `connect(name)` calls `active.connect(profile)`; a successful `updateConnection` (also through `saveProfileChanges`) and `setCaCertificate` call `active.profileChanged(originalName)`; `confirmDelete` calls `active.profileDeleted(name)`. A failed save (name exists) changes nothing. `checkConnectionAndPermissions` stays a check only.
+  - `object ConnectionFailureReason` consts `BROKER_NOT_REACHABLE = "The broker could not be reached"`, `CERTIFICATE_NOT_TRUSTED = "The certificate was not trusted"`, `NO_PASSWORD_STORED = "No password is stored"`, `CREDENTIALS_REFUSED = "Credentials were refused"` (texts from feature 13, pinned as literals in the unit tests).
+  - `object ConnectionNotes` consts `SETTINGS_CHANGED = "Connection settings changed. Connect again."` and `HOST_NAME_NOT_VERIFIED = "Host name is not verified."`.
+- Rules the tests pin that the brief only implies: Connect closes the held connection first, then selects, sets Connecting, runs the check, then opens (log order `close`, `check`, `open`, `opened`); a connect that is superseded (by connect, disconnect, edit, delete, close) closes what the broker opens afterwards and never writes state; a cancelled connect ends `Disconnected` (never stuck in Connecting); Disconnect keeps the session's current connection (not asserted either way, a gap); delete clears the current connection; the note is only for edit, rename and CA change, not delete or Disconnect.
+- ui: the edit panel must show the text "Host name is not verified." (substring match); use `ConnectionNotes.HOST_NAME_NOT_VERIFIED` so core and screen cannot drift.
+
+Brief gaps and problems for the architect:
+1. "State per connection" versus "one StateFlow<LinkState>": resolved as above (name inside `LinkState`, `stateOf` for the per-name reading the scenarios use).
+2. Two steps are thinner than their words until part 2 and M2-05: "first offsets will read unavailable" only checks the connection is held and the stream port was silent (no `StreamOffsets` yet); "I see the note" compares the core constant with the scenario text, the screen is pinned by the ui test. Part 2 must replace the first with the real `StreamOffsets` result.
+3. "A user without the management tag ..." cannot be served by the part 1 interface (needs `Capabilities`); tagged `@needs-M2-03b`, to run in part 2. Please confirm the tag.
+4. The "no stored password" failure comes from the gateway (the real holder reads the store), not from `ActiveConnection`; a permission check that says `Unreadable(NO_PASSWORD)` alone does not fail Connect. Confirm.
+5. CA change (`setCaCertificate`) disconnecting the held profile is derived from "the holder has the old CA", not stated in the spec list ("edited or renamed"). Topology level change is not asserted either way.
+6. The lost-connection scenario has no steps, as asked.
+
+Not tested in step 2: real clients, TLS, timeouts (part 2); the app bar (M2-05).
+
+
+### Part 1: architect rulings and final contract (2026-11-04, before the build)
+Contract (package `dev.caerbannog.core.connections`, core `commonMain`; as proposed by the test developer, accepted):
+- `interface ConnectionGateway { suspend fun open(profile: ConnectionProfile): OpenResult }`; `sealed interface OpenResult { Opened(connection: HeldConnection); Failed(reason: String) }`; `interface HeldConnection : AutoCloseable` (`close()` only in part 1; `catalog` and `offsets` are added in part 2).
+- `sealed interface LinkState { val name: String? }` with `Disconnected(name = null, note = null)`, `Connecting(name)`, `Connected(name)`, `Failed(name, reason)`.
+- `class ActiveConnection(session, gateway)`: `state: StateFlow<LinkState>`, `stateOf(name)`, `suspend connect(profile)` (never throws except cancellation; a throwing gateway becomes Failed with a generic reason, never the exception text), `disconnect()`, `close()`, `profileChanged(name)`, `profileDeleted(name)` (no-ops unless the name is the held or connecting profile).
+- `ConnectionsViewModel(..., session, active: ActiveConnection? = null)` as proposed (connect calls `active.connect`; successful update, `saveProfileChanges` and `setCaCertificate` call `profileChanged(originalName)`; `confirmDelete` calls `profileDeleted(name)`; the check stays check-only). `ConnectionFailureReason` and `ConnectionNotes` constants as proposed.
+- Connect order: close held, check, open, opened; Connecting during check and open; a superseded connect closes what the broker opens afterwards and never writes state; a cancelled connect ends Disconnected; the note appears only for edit, rename and CA change.
+
+Rulings:
+1. One `StateFlow<LinkState>` with the name inside plus `stateOf(name)`: accepted. It matches "one immutable state, one StateFlow" (M2-01b); "state per connection" in the brief means this derived view. The chip reads `state`; profile cards read `stateOf(name)`.
+2. Thin steps accepted ("first offsets will read unavailable" only checks held plus silent stream port; "I see the note" compares the core constant, the ui test pins the screen). Part 2 MUST replace the first with a real `StreamOffsets` assertion. Recorded as a part 2 acceptance item.
+3. `@needs-M2-03b` on "A user without the management tag ..." confirmed (needs `Capabilities`, part 2). Add the tag to `tests/bdd/README.md` tag table; the part 2 task removes it.
+4. No stored password: Connect ends `Failed("No password is stored")` BEFORE the gateway is called, detected by `ActiveConnection` from the session's check result `Unreadable(NO_PASSWORD)` (the session already reads the store and returns it without calling the broker; asking the gateway to open clients that cannot authenticate is pointless). Every other Unreadable cause still ends Connected (safest mode). The gateway also returns `Failed(NO_PASSWORD_STORED)` as a backstop (store changed between check and open); both paths give the same text. Tests that change or are added: the Connect test where the session returns NO_PASSWORD must expect Failed and `gateway.open` not called (add: "a missing password fails Connect without opening the clients"); the test "an Unreadable permission result still ends Connected" must not use NO_PASSWORD (use NOT_AUTHORIZED or similar; check each Unreadable-is-Connected test); the Outline row "no password is stored" in `13` may stay gateway driven (backstop) but add a second example or step variant driven by the session so the primary path has a scenario; the fake gateway's call log must show no `open` in that case. Test developer names the exact tests; the architect reviews them in step 5.
+5. A CA change on the held profile disconnects it (accepted, the holder has the old CA). A topology-level change does NOT disconnect (client-side ceiling only); add one test asserting the state stays Connected. Disconnect keeps the session's current connection: current stays, state `Disconnected(name)`. Delete clears the current connection (as pinned).
+6. Shared fake through an extra `srcDir` in `acceptance-tests`: accepted for now, no new Gradle module and no product question. Reason: one file, no `testFixtures` plugin configured, and a module is a build structure change not justified by one consumer pair. Revisit when part 2 adds `FakeStreamCatalog` (two or more shared fakes): then decide between `testFixtures` and a `core-testing` module in the part 2 brief.
+
+Part 1 acceptance: `core` jvmTest, feature 13 (the scenarios not tagged `@needs-decision`, `@needs-M2` or `@needs-M2-03b`) and the ui edit panel note pass; `./gradlew test` green; no Docker; no production `data-rabbit` change. Done for part 1 means architect review accepted and merged into local `main` (not pushed) before part 2 starts; the stream-client dependency change is not in part 1.
+
+### Part 1, step 2 follow-up after the rulings (test developer, 2026-11-04)
+Tests adjusted first (still red: compile failure on the contract names only):
+- `ActiveConnectionTest`: new "a missing password fails Connect without opening the clients" (Failed("No password is stored"), no `open:` in the gateway log, session result `Unreadable(NO_PASSWORD)`); new "every other Unreadable cause still ends Connected in safest mode" (loops all causes except NO_PASSWORD; no Unreadable-still-Connected test uses NO_PASSWORD); new "a password that vanishes between the check and the open still fails through the gateway" (backstop); the Disconnect test now also asserts the session's current connection is kept.
+- `ConnectionsViewModelActiveConnectionTest`: "changing the topology control level does not disconnect". CA change and delete were already pinned.
+- Feature 13, wording edit: added one scenario before "A user who cannot read permissions is still connected": `@negative @fake-broker` "Connecting without a stored password does not open the clients" (Given no password is stored for "uat-eu"; When I connect to "uat-eu"; Then the state of "uat-eu" is "Failed" with the reason "No password is stored"; And the clients were not opened; And the app holds no connection to the broker). The outline row "no password is stored" is unchanged and stays gateway-driven (the backstop). Steps added in `ConnectionLifecycleSteps`. Feature 13 now has 12 selected scenarios (4 are outline examples counted separately).
+- Cross-check against the throwaway implementation (scratchpad, not committed) passed.
+
+
+### Part 1, step 3: build (developer, 2026-11-04)
+Status: ready for test and review. All tests of the step 2 contract pass without any test change; no scenario was weakened.
+- core `commonMain` (`dev.caerbannog.core.connections`): `ConnectionGateway.kt` (gateway, `OpenResult`, `HeldConnection`), `LinkState.kt` (`LinkState`, `ConnectionFailureReason`, `ConnectionNotes`), `ActiveConnection.kt`, `ConnectionsViewModel` (new `active` parameter, hooks in `updateConnection`, `setCaCertificate`, `confirmDelete`, `connect`).
+- Design: one `MutableStateFlow<LinkState>`; a generation counter, the held connection and the state change together under a short non-suspending lock (same pattern as `ConnectionSession`). Every connect, disconnect, edit, delete and close takes the next generation; an outdated connect closes what the broker opened and writes nothing. `session.select` runs inside that lock so the newest connect also owns the session's current connection. No custom StateFlow, no `@OptIn`.
+- ui: the edit panel shows `ConnectionNotes.HOST_NAME_NOT_VERIFIED` under the CA field.
+- Composition root decision: `desktopApp` is NOT changed and `ActiveConnection` is NOT wired. There is no production gateway until part 2, and a placeholder gateway would either fake a held connection or fail every Connect. With `active = null` the interim Connect stays exactly M2-01 (select + permission check), claims no held connection, and there is nothing for `onCloseRequest` to close. Part 2 creates the `ActiveConnection` with the real gateway in the composition root, passes it to the view model, and calls `close()` on window close.
+- Unlisted choices: a failing `HeldConnection.close()` is swallowed at the boundary (the connection is dropped from our side either way); a gateway exception becomes `Failed("The connection could not be opened")` (internal constant, not in the pinned list); `disconnect()` on an idle `Disconnected` keeps the state and its note.
+- Result: `./gradlew test --rerun-tasks --continue` green; core 188, ui 103, acceptance-tests 66 (10 skipped; feature 13: 12 scenarios run plus 4 outline examples, 5 skipped for `@needs-M2-03b`, `@needs-decision` and three `@needs-M2`; features 01 and 02 skip their existing `@needs-M2` scenarios), data-rabbit 17, desktopApp 5. `ActiveConnection*` tests ran 10 times more, no failure.
+
+### Part 1, step 4: verification (test developer, 2026-11-04, commit after c5b8303)
+Verdict: pass with findings (no blocker, no major open). Clean rerun `./gradlew test --rerun-tasks --continue`: core 196, data-rabbit 17, ui 103, desktopApp 5, acceptance-tests 66 (10 skipped), 0 failures. Skips, all by design: 01 "Switch between connections", 02 "The topology screen explains why it is locked", "Browsing streams does not need the configure permission", "The topology screen says declared permissions are not confirmed" (all `@needs-M2`), 02 "The broker has the final say" (`@broker`), 13 "A user without the management tag ..." (`@needs-M2-03b`), 13 lost connection (`@needs-decision`), 13 three app bar scenarios (`@needs-M2`). Feature 13: 12 scenarios and 4 outline examples ran and passed. Flakiness: the ActiveConnection, ConnectionSession and ConnectionsViewModel core classes 20 runs, 0 failures.
+
+My own bug found and fixed: 6 of my core tests (3 in `ActiveConnectionTest`, 3 in `ConnectionsViewModelActiveConnectionTest`) were never executed, because a `@Test` written as `= runBlocking { ... assertIs<...>() }` returns a non-Unit value and JUnit 5 silently does not discover it. All three files now use `runBlocking<Unit>`; every `@Test` in core now matches the XML count (checked for every class). Two tests added (outdated connect that fails or is cancelled writes nothing).
+
+Mutations (core and acceptance run separately; tree restored with git checkout): 16 of 17 killed by core tests, 5 also by Cucumber (open on NO_PASSWORD, delete keeps current, open before check, password in session state; a step expectation changed in the feature failed the run). Survivor: `session.select` outside the lock: caught in 2 of 20 runs of the concurrency test only (nondeterministic, see finding 2). Acceptance does not catch: Disconnect clearing current, topology level, CA change, notes, second held connection, close twice, cancel; they are unit-covered.
+
+
+### Part 1, step 5: architect review (2026-11-04)
+Verdict: **Accepted with follow-ups.** Part 1 is done (not merged; merge into local `main` with `--no-ff`, then branch part 2 from `main`). Reviewed: `git diff main...m2-03-connection-lifecycle` (core `ActiveConnection`, `LinkState`, `ConnectionGateway`, view model hooks, ui note, fake, tests, feature 13 steps) against the brief, spec "Connection lifecycle" and the rulings of eb56f39. Not reviewed: every test body line by line (relied on the verify report: 17 mutations, 16 killed, 20 repeated runs, count check). Rule checks: no non-TLS path, no queue message access, no data-rabbit change, password never in state or logs (a test and mutation cover it), no `!!`, one documented broad catch at the boundary.
+
+| # | Severity | File | Finding | Ruling |
+| --- | --- | --- | --- | --- |
+| 1 | minor (good) | `ActiveConnection.kt` | Same generation-plus-short-lock pattern as `ConnectionSession`, immutable sealed state, one flow, typed results, NO_PASSWORD before open, a throwing gateway or close never leaks text | none |
+| 2 | minor | `ActiveConnection.kt` `connect` | `session.select` inside the lock is only probabilistically tested (survivor caught 2 of 20 runs) | Accept. The placement is right (the newest connect owns the current connection); a deterministic test needs a hook in the session and is not worth it. Do not move it out of the lock |
+| 3 | minor, latent | `ActiveConnection.kt` `locked` | `select` runs under a non-reentrant spin lock while the session calls observers synchronously: an observer that calls an `ActiveConnection` method would spin forever | Decided now: document it, do not restructure. KDoc on `ActiveConnection` and `ConnectionSession.observe` (part 2, with the F1 text): "observers must not throw and must not call ActiveConnection or the session". The chip and view models collect `StateFlow`s, they are not synchronous observers. Revisit if a synchronous observer is ever added |
+| 4 | minor | `closeQuietly` | A throwing `close()` leaves no trace | Part 2: the real holder logs the exception class name only (no message, no secrets) |
+| 5 | idea | feature 13 scenario 4 | Checks state only | Optional: add "And the app holds one connection" (steps exist through the fake's log); do it in part 2 if touched |
+| 6 | idea | test style | `runBlocking<Unit>` | Mandatory style from now on; see `M2-TESTHYGIENE-01` |
+
+Follow-ups, all in part 2 (`m2-03-stream-catalog`), listed in its section below.
+
+### Part 2 checklist (added at the part 1 review)
+- Composition root: wire `ActiveConnection(session, realGateway)` into `desktopApp` and the view model (`active = ...`), and call `close()` in `onCloseRequest`. Until then the interim edit-panel Connect keeps the M2-01 behaviour (part 1 does not wire it).
+- Real holder: log the class name only when a `close()` throws; never a message or password.
+- Replace the thin step "first offsets will read unavailable" with a real `StreamOffsets` assertion; remove `@needs-M2-03b` from "A user without the management tag ..." and make it pass with `Capabilities`.
+- KDoc: "observers must not throw and must not call ActiveConnection or the session" on `ActiveConnection` and `ConnectionSession.observe` (same text as F1 of M2-01b).
+- Decide `testFixtures` versus a `core-testing` module when `FakeStreamCatalog` is added (ruling 6).
+- Tests: `runBlocking<Unit>` (or `runTest`) always; the test engineer checks that the `@Test` count equals the XML count for every new class.
+- Optional: "And the app holds one connection" in scenario 4 of `13`.

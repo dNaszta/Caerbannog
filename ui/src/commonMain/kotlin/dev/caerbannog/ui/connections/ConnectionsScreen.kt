@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
+import dev.caerbannog.core.connections.ConnectionNotes
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
@@ -212,6 +213,12 @@ private fun EditPanel(
                         )
                     },
                 ),
+            )
+            // Product decision D7: TLS is checked against the CA, the host name is not. Said where the user sets the CA.
+            Text(
+                ConnectionNotes.HOST_NAME_NOT_VERIFIED,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
             val caResult = state.lastCaCertificateValidationResult
             if (caResult is CaCertificateValidationResult.Invalid) {

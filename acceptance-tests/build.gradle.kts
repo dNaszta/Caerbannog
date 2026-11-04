@@ -55,6 +55,16 @@ sourceSets {
     }
 }
 
+// M2-03 part 1: FakeConnectionGateway is written once, in core's jvmTest (the unit tests need it too), and compiled
+// into this module from the same file: one fake, no copy. Only this directory is shared, not core's other tests.
+kotlin {
+    sourceSets {
+        named("test") {
+            kotlin.srcDir(rootProject.projectDir.resolve("core/src/jvmTest/kotlin/dev/caerbannog/core/connections/fakes"))
+        }
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }

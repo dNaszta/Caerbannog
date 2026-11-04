@@ -55,6 +55,14 @@ Feature: Connect and disconnect
       | no password is stored          | No password is stored           |
       | the credentials are refused    | Credentials were refused        |
 
+  @negative @fake-broker
+  Scenario: Connecting without a stored password does not open the clients
+    Given no password is stored for "uat-eu"
+    When I connect to "uat-eu"
+    Then the state of "uat-eu" is "Failed" with the reason "No password is stored"
+    And the clients were not opened
+    And the app holds no connection to the broker
+
   @fake-broker
   Scenario: A user who cannot read permissions is still connected
     Given the broker does not let the user of "uat-eu" read permissions
@@ -62,7 +70,8 @@ Feature: Connect and disconnect
     Then its state is "Connected"
     And topology is locked (see 02, safest mode)
 
-  @fake-broker
+  # Needs Capabilities.visibility and the list message: M2-03 part 2 (catalog) and M2-04/M2-05. Not part 1.
+  @fake-broker @needs-M2-03b
   Scenario: A user without the management tag is connected but sees no lists
     Given the broker answers "Not management user" for the user of "uat-eu"
     When I connect to "uat-eu"
