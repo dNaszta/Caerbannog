@@ -1,0 +1,85 @@
+{
+    "filtered_count": 13,
+    "item_count": 5,
+    "items": [
+        {
+            "arguments": {
+                "x-queue-type": "classic"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "name": "<name>c1",
+            "node": "rabbit@node1",
+            "state": "running",
+            "type": "classic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-type": "classic"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "name": "<name>c2",
+            "node": "rabbit@node1",
+            "state": "running",
+            "type": "classic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-type": "classic"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "name": "<name>c3",
+            "node": "rabbit@node1",
+            "state": "running",
+            "type": "classic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-type": "classic"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "name": "<name>c4",
+            "node": "rabbit@node1",
+            "state": "running",
+            "type": "classic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-type": "classic"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "name": "<name>c5",
+            "node": "rabbit@node1",
+            "state": "running",
+            "type": "classic",
+            "vhost": "/"
+        }
+    ],
+    "page": 1,
+    "page_count": 3,
+    "page_size": 5,
+    "total_count": 13
+}

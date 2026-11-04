@@ -17,7 +17,7 @@ Feature: Super streams
     Then "orders" is listed once, as a "Super stream" with 3 partitions
     And "orders-0", "orders-1" and "orders-2" are not listed as separate top-level entries
 
-  @fake-broker
+  @fake-broker @needs-decision
   Scenario: Expand a super stream to see its partitions
     Given the partitions hold 31200, 32900 and 32000 messages
     When I open the stream list

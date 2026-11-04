@@ -1,0 +1,25 @@
+[
+    {
+        "connection_details": {
+            "name": "192.168.65.1:49661 -> 172.17.0.4:5551",
+            "node": "rabbit@node1",
+            "peer_host": "192.168.65.1",
+            "peer_port": 49661,
+            "user": "guest"
+        },
+        "active": true,
+        "activity_status": "up",
+        "consumed": 10,
+        "credits": 10,
+        "offset": 9,
+        "offset_lag": 1,
+        "properties": {
+            "name": "spike-cons"
+        },
+        "queue": {
+            "name": "<name>",
+            "vhost": "/"
+        },
+        "subscription_id": 0
+    }
+]

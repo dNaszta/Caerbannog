@@ -1,0 +1,67 @@
+{
+    "garbage_collection": {
+        "max_heap_size": -1,
+        "min_bin_vheap_size": -1,
+        "min_heap_size": -1,
+        "fullsweep_after": -1,
+        "minor_gcs": -1
+    },
+    "consumer_details": [],
+    "arguments": {
+        "x-max-age": "7D",
+        "x-max-length-bytes": 1000000000,
+        "x-queue-type": "stream",
+        "x-stream-max-segment-size-bytes": 50000000
+    },
+    "auto_delete": false,
+    "consumers": 0,
+    "deliveries": [],
+    "durable": true,
+    "effective_policy_definition": {},
+    "exclusive": false,
+    "first_timestamp": 1793799283656,
+    "incoming": [],
+    "internal": false,
+    "internal_owner": false,
+    "leader": "rabbit@node1",
+    "members": [
+        "rabbit@node1"
+    ],
+    "memory": 230760,
+    "message_stats": {
+        "publish": 1000,
+        "publish_details": {
+            "rate": 0.0
+        }
+    },
+    "messages": 1000,
+    "messages_details": {
+        "rate": 0.0
+    },
+    "messages_ready": 1000,
+    "messages_ready_details": {
+        "rate": 0.0
+    },
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+        "rate": 0.0
+    },
+    "name": "<name>",
+    "node": "rabbit@node1",
+    "online": [
+        "rabbit@node1"
+    ],
+    "operator_policy": null,
+    "policy": null,
+    "readers": {
+        "rabbit@node1": 0
+    },
+    "reductions": 0,
+    "reductions_details": {
+        "rate": 0.0
+    },
+    "segments": 1,
+    "state": "running",
+    "type": "stream",
+    "vhost": "/"
+}

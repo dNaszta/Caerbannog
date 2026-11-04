@@ -1,0 +1,14 @@
+{
+    "arguments": {
+        "x-super-stream": true
+    },
+    "auto_delete": false,
+    "durable": true,
+    "incoming": [],
+    "internal": false,
+    "name": "<name>",
+    "outgoing": [],
+    "type": "direct",
+    "user_who_performed_action": "rmq-cli",
+    "vhost": "/"
+}

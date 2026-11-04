@@ -8,7 +8,7 @@ Caerbannog ("behind the rabbit") is a free, desktop-only "Kafka UI for RabbitMQ 
 
 **v1 features**
 
-- Stream list with stats: size, first/last offset, message count (derived), retention, publishers and consumers; super streams appear as one entry with their partitions.
+- Stream list with stats: message count, first/last offset, retention, publishers and consumers; super streams appear as one entry with their partitions. Size in bytes is not available from the broker (M2-02 spike); the Size column is pending a product decision (see "Management API facts").
 - Publishers and consumers per stream: who is connected, consumer offsets and how far behind they are, and publisher message counters, read from the management API.
 - Message browser with paging: start from first, last, a numeric offset or a timestamp; page size; next, previous and jump to offset.
 - Search and filter plus payload viewer: text, JSON (pretty-printed) and hex views; filter by properties and application properties.
@@ -45,7 +45,7 @@ flowchart LR
   MC -- "TLS 15671" --> MP
 ```
 
-The stream protocol over TLS (default port 5551) carries message reads, publishes and stream create/delete. The management HTTP API over HTTPS (default port 15671) supplies the stream list, sizes, publishers and consumers, plus all quorum queue topology and statistics.
+The stream protocol over TLS (default port 5551) carries message reads, publishes and stream create/delete. The management HTTP API over HTTPS (default port 15671) supplies the stream list, message counts, publishers and consumers, plus all quorum queue topology and statistics. First offsets come only from the stream protocol (`queryStreamStats`); there is no byte size per stream anywhere (see "Management API facts").
 
 **Why JVM-only:** the official RabbitMQ stream client is a Java library, so it runs on desktop JVM (and Android) but not on iOS or in a browser. Adding those later means a small Ktor gateway that holds the stream connection and exposes a paged REST API; the UI and view models stay shared.
 
@@ -91,9 +91,34 @@ Streams have no random-access API, so each page is a short-lived read: open an u
 
 - Delivery is chunk-based, so a read may begin before the requested offset; the app drops messages below the start offset.
 - Retention can move the first offset while a user is paging; the app re-reads the bounds and shows a notice instead of failing.
-- Message count is approximate (committed minus first offset, plus one); RabbitMQ's own Management UI can also show a slightly higher count, because offset tracking data is stored in the stream.
+- Message count is the management API's `messages` (exact for the stream's offsets, M2-02 spike), not committed minus first plus one: `committedChunkId` is the start offset of the last chunk, so that formula undercounts when messages were published in batches. The count can exceed the number of user messages, because offset tracking entries occupy offsets in the stream; RabbitMQ's own Management UI shows the same number. The app still labels it approximate (statistics refresh about every 5 s).
 - Search and filter run client-side over a bounded scan (for example the next 10,000 messages) with a visible scan limit and a Cancel button; v1 does not rely on broker-side filtering.
 - Super streams: each partition is a regular stream, so the browser reads one partition at a time. Order exists only within a partition, so v1 does not merge partitions into one sequence.
+
+## Management API facts (M2-02 spike)
+
+Measured on RabbitMQ 4.4.0 (single node, TLS fixture, `rabbitmq_stream` and `rabbitmq_stream_management` enabled) by `StreamManagementApiSpikeTest` (tag `broker`). Full detail, field tables and the unanswered items are in `docs/tasks/M2-02-management-api-spike.md` (Status). Real bodies for fakes and parser tests are in `data-rabbit/src/test/resources/fixtures/m2-02/`. Everything here was measured on one node and one version; it is not verified on clusters, other 4.x versions or 3.x.
+
+| Need | Source | Notes |
+| --- | --- | --- |
+| Stream list | `GET /api/queues` (also `/api/queues/{vhost}`, `/api/queues/{vhost}/{name}`) | No stream-specific listing (`/api/streams` is 404). A stream is a queue with `type` `stream`. Without paging parameters the body is a bare array; with `page` it is an object `{items, page, page_size, page_count, item_count, filtered_count, total_count}` |
+| Fields per stream | `name`, `vhost`, `type`, `state` (strings); `messages`, `messages_ready`, `consumers`, `segments`, `first_timestamp` (ms), `memory` (numbers); `arguments`, `leader`, `node`, `members`, `online` | `messages` may be missing for about 5 s after creation. `arguments.x-max-age` is a string ("7D"); `x-max-length-bytes` and `x-stream-max-segment-size-bytes` are numbers. `policy` only in the single-queue call or with `columns=policy` (null when none) |
+| Absent for streams | `message_bytes`, `publishers`, any first, last or committed offset, any last-message timestamp | There is no size in bytes. `memory` is Erlang process memory, not disk size |
+| Message count | management `messages` | Exact; includes offset tracking entries |
+| First offset | stream protocol `queryStreamStats` only (`firstOffset`) | Management has none. Last written offset = first offset + `messages` - 1 (next offset to be written = first + `messages`). Never use `committedChunkId` as the last offset |
+| Publishers | `GET /api/stream/publishers[/{vhost}[/{stream}]]` | Row: `reference`, `publisher_id`, `published`, `confirmed`, `errored`, `queue{name,vhost}`, `connection_details{name,node,user,peer_host,peer_port}`. 200 `[]` when none. The queue object has no publisher count |
+| Consumers | `GET /api/stream/consumers[/{vhost}]` | Row: `subscription_id`, `consumed`, `credits`, `offset`, `offset_lag`, `active`, `activity_status`, `properties` (consumer reference in `properties.name`), `queue`, `connection_details`. No per-stream path (400): filter on `queue.name`. `offset_lag` counted one tracking entry in the measured case |
+| Tracking | `GET /api/stream/{vhost}/{stream}/tracking` | `{writers:{ref:n}, offsets:{ref:n}}` |
+| Plugin missing | `GET /api/stream/publishers` (or consumers, connections) | 404 `{"error":"not_found","reason":"Not Found"}`. Per-stream paths give 400 with an empty body, so use only the top-level paths as the detection call. `/api/extensions` lists `stream_management` when on |
+| Search | `GET /api/queues?name=..&use_regex=true\|false&page=..&page_size=..&sort=..&columns=..` | Name only, server side. Max `page_size` 500 (501, 0 and `page=0` give 400; a page past `page_count` gives 400 `page_out_of_range`); an invalid regex gives 200 and no match; `type=stream` is ignored, so a page can hold fewer streams than `page_size`. Case-sensitivity of `name` not tested |
+| Super stream | exchange of type `direct` with `arguments.x-super-stream` = true; bindings from `GET /api/exchanges/{vhost}/{name}/bindings/source` | Partitions are the binding destinations (`<name>-0..` or `<name>-<binding key>`), ordered by `arguments.x-stream-partition-order`. The partition queues carry no marker, so grouping a flat queue list needs one extra call; do not infer from names |
+| Statistics lag | management stats interval, default 5 s | Observed 0.8 s to 4.7 s after a publish. Tests poll on the value (bounded), never sleep |
+
+**Visibility by user tag (S3, measured with throwaway users that have permissions on one vhost).** No tag: HTTP 401 `Not management user` on everything, including `/api/overview`. `monitoring`: all queues and streams of the vhosts where the user has any permission (name patterns do not hide anything), stream publishers, consumers and connections of the whole broker; `/tracking` needs permission on the stream (401 otherwise); a stream in a vhost without permission looks like 404. `management`: the same queue visibility, but stream publishers, consumers and connections only on the user's own connections. Not tested: whether a user without a management tag can use the stream protocol (`queryStreamStats`, browsing). What the app does for the no-tag and `management` cases is a product decision, still open (task index, "M2 decisions", S3).
+
+**Stream client in production.** `com.rabbitmq:stream-client:1.12.0` is in `data-rabbit` test scope only. Its transitive tree is about 14.8 MB of jars (zstd-jni 7 MB, snappy 2.4 MB, lz4, Netty 4.2.19, proton-j, gson); licences Apache 2.0, MPL 2.0 (dual), BSD 2-Clause. No clash with Ktor 3.0.3, coroutines 1.9.0 or serialization 1.7.3. Moving it to `implementation` is needed for browsing (M3); whether it is needed already in M2 depends on decision D5 (first offset in the list).
+
+**Testcontainers.** The warning is the Kotlin compiler's "'fun withPluginsEnabled(vararg p0: String!): RabbitMQContainer!' is deprecated. Deprecated in Java." (compile time, not runtime; the Javadoc says use `execInContainer`). Trial of 2.0.5 (scratch, discarded): artifacts renamed, all then-existing broker tests passed and the `api.version` pin was unnecessary, but 2.x deprecates the class we use too (more warnings, not fewer). Conclusion: no bump now; a 2.x move is its own small optional task (`docs/tasks/M2-10-testcontainers-2x-migration.md`).
 
 ## Screens and UX
 
@@ -102,12 +127,12 @@ Four screens cover v1's core flow, laid out like Kafka UI: a left sidebar for co
 | Screen | What the user does |
 | --- | --- |
 | Connections | Add, edit and test broker profiles: host, stream port, management port, vhost, user, TLS settings (TLS is always on), and a permission check that runs before the first connection |
-| Stream list | Sort and filter streams; see size, first and last offset, approximate message count, publishers, consumers; create or delete a stream |
+| Stream list | Sort and filter streams; see first and last offset, approximate message count, publishers, consumers (size column pending a product decision, no data source); create or delete a stream |
 | Message browser | Pick start (first, last page, offset, timestamp) and page size; use next, previous and jump; filter within a bounded scan |
 | Message detail and publish | Side panel with offset, timestamp, properties, application properties and the body as text, pretty JSON or hex; a dialog to publish a test message to any stream, exchange or queue |
 | Topology and queues | List quorum queues, exchanges and bindings with statistics (messages, consumers, leader, members); declare and delete them, edit policies and bindings; apply migrations to the broker, or export and import them as JSON files |
 | Publishers and consumers | Tab on the stream detail screen: publishers with connection and message counters; consumers with connection, offset and messages behind; jump the browser to a consumer's offset |
-| Global search | Search box at the top of the sidebar opens a search view: results grouped as streams, queues and exchanges, filter chips with counts, a regex toggle, Enter opens the first result. Queue and exchange lookups use the management API's server-side name filter with paging (default 100 per page, maximum 500) |
+| Global search | Search box at the top of the sidebar opens a search view: results grouped as streams, queues and exchanges, filter chips with counts, a regex toggle, Enter opens the first result. Queue and exchange lookups use the management API's server-side name filter with paging (default 100 per page, maximum 500, confirmed on RabbitMQ 4.4.0 by the M2-02 spike: 501 gives HTTP 400). Streams are queues with `type` `stream`, so the same call finds them; the server has no streams-only filter, so the app filters on `type` itself |
 
 **UX rules**
 
@@ -226,7 +251,7 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 **Milestone status**
 
 - M1 Skeleton and connection: accepted by the product owner on 2026-11-04 ("merge, accept, start M2"), after the team's task reports and architect reviews (tasks `M1-01` to `M1-12b`, `M1-TASKFILE-01/02`, index in `docs/tasks/README.md`). The acceptance rests on those reports and the automated tests; it does not mean the items below were checked. Carried forward, never run by the team and not reported run by the product owner, so still open and unverified: (1) a manual `:desktopApp:run` against a real broker and the real OS keychain (the Connections screen, the permission pill and the save flow have only been exercised by automated tests and the opt-in screenshot task); (2) the Windows keychain (Credential Manager) and `:desktopApp:packageMsi`, which cannot be built from macOS; (3) the `:desktopApp:packageDmg` installer size check after the icon library was added (about 38 MB jar, see `docs/tasks/M1-12b-connections-icons.md`). They are to be done before the M5 gate (installers run on macOS and Windows); item (1) should be done as early as M2 has a screen worth looking at.
-- M2 Stream list and stats: in progress, started 2026-11-04. Tasks in `docs/tasks/README.md`.
+- M2 Stream list and stats: in progress, started 2026-11-04. Tasks in `docs/tasks/README.md`. M2-02 spike accepted with follow-ups on 2026-11-04 (not merged); its findings are in "Management API facts".
 
 **Risks**
 
@@ -235,14 +260,20 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 - Very large or compressed messages can make pages slow; the body viewer caps display size.
 - Secret storage differs per OS; `java-keyring`'s write/read/delete round trip passed on macOS in the M1 spike. Windows (Credential Manager) and Linux (libsecret, not a v1 packaging target) are still unverified until run on that hardware or in CI.
 - Kotlin Toolchain was evaluated in the M1 spike and ruled out: the installed CLI (Homebrew, v2.4.21) has no `new`, `run` or `package` subcommands at all, so there is nothing resembling the project/run/installer workflow the spec originally described (see `docs/tasks/M1-01-skeleton-and-spike.md`'s Status section for the captured command output). The project uses Gradle with the Compose Multiplatform Gradle plugin instead; `:desktopApp:packageDmg` already produces a working dmg on macOS (`:desktopApp:packageMsi` is unverified — cannot be cross-built from macOS).
-- Testcontainers' RabbitMQ module (`RabbitMQContainer.withPluginsEnabled`, used in the M1 spike's container-start proof) emits a deprecation warning on the version pinned in M1-01 (1.21.3); harmless today but worth resolving — or re-checking against whatever version M1-02 pins — before `data-rabbit`'s real `@broker` integration tests are built on top of it, so the warning is not inherited silently.
+- Testcontainers' RabbitMQ module (`RabbitMQContainer.withPluginsEnabled`, used in the M1 spike's container-start proof) emits a deprecation warning on the version pinned in M1-01 (1.21.3); harmless today. Checked in the M2-02 spike (2026-11-04): it is a Kotlin compile warning on the Java-deprecated method; Testcontainers 2.0.5 deprecates the whole class as well, so bumping does not fix it. Decision: stay on 1.21.3 for now; the 2.x move is the optional task `M2-10-testcontainers-2x-migration`.
 - Testcontainers' own Docker connectivity probe (`org.testcontainers.dockerclient.DockerClientProviderStrategy`) falls back to a hardcoded Docker API version (1.32) when none is otherwise configured; very new Docker Desktop engines (confirmed here: 29.8.2, API 1.56, `MinAPIVersion` 1.40) reject that version with HTTP 400, so every provider strategy fails even though Docker is installed and working. Worked around locally by pinning a supported API version on the test JVM (`data-rabbit/build.gradle.kts`, `brokerTest` task); worth re-checking whenever Testcontainers or Docker Desktop is upgraded. Re-confirmed 2026-11-03 (`M1-TASKFILE-01-local-dev-commands`, wiring `task test:broker`): Docker Desktop still 29.8.2 on this machine, the `api.version=1.43` pin still resolves and `brokerTest` still starts a real RabbitMQ container. The project is local-development-only for now (no CI pipeline), so there is no CI runner Docker Desktop version to separately confirm.
 - Resolved in `M2-01-connection-session` (architect review 2026-11-04): `ConnectionSession` now keeps only the result of the latest started check per profile name (token), `forget` invalidates a running check, and the session holds the current connection. `open` returns its own check's result even when superseded, so callers must read session state, never the return value, for what is current. Accepted waiver: `ConnectionsViewModel` exposes its state through a private `StateFlow` implementation marked `@OptIn(ExperimentalForInheritanceCoroutinesApi)`; kotlinx.coroutines may add members to `StateFlow`, which would fail compilation on an upgrade (caught at build time, one private class to fix). To be removed by follow-up `M2-01b-session-single-state`.
+- The stream client brings about 10 MB of compression libraries (zstd-jni, snappy, lz4) into the installer when it moves from test to production scope (M2-02 spike); check the installer size when it does (decision D5, task M3).
 - Migration history is kept per machine, so two people can apply the same migration to one broker; every action must be idempotent (declaring something that already exists with the same settings is a no-op).
 
 **Open questions**
 
-- [ ] Confirm the exact fields returned by the stream publisher and consumer endpoints (offset, messages behind, counters) on a real broker; the API reference does not list them.
+- [ ] S3: what the app does for a user with no management tag (every management call is 401) and for a `management`-tag user (stream publishers and consumers only on their own connections). Options and recommendation in `docs/tasks/M2-02-management-api-spike.md`; blocks M2-06 and the capability handling in M2-03.
+- [ ] D5: does the M2 stream list show first offset (then the stream client comes into production in M2-03, about 10 MB of compression jars) or only counts until M3.
+- [ ] The Size column of `docs/ux/Streams.dc.html` and the `size` mentions in `03` and `06` have no data source; product decision: drop, or replace with segments.
+- [ ] Not answered by the spike: stream protocol access for a user without a management tag; unnamed-producer and super-stream-producer publisher rows; cluster fields; `first_timestamp` after retention; case-sensitivity of `name`; what `offset_lag` means for a caught-up named consumer (measured lag 1 from a tracking entry; the `04` scenario "Caught up" expects 0).
+
+Resolved (M2-02 spike, 2026-11-04): the exact fields of the stream publisher and consumer endpoints, where first offset and message count come from, whether streams are found by name through the queue list, and the maximum page size (500). See "Management API facts (M2-02 spike)".
 
 Resolved: how the app reads the user's own permissions. Only administrators can read them through the management API (M1-03 spike, real RabbitMQ 4); the default for everyone else is safest mode, and the user may declare their rights on the profile (decision D, see Broker-read permission). Rejected: a separate admin credential (more secrets) and probing by attempting an operation (changes broker state).
 

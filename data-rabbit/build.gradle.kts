@@ -56,6 +56,10 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
+
+    // M2-02 spike, decision S1 (docs/tasks/M2-02-management-api-spike.md): stream client in TEST scope only,
+    // to create stream-protocol publishers/consumers and call queryStreamStats against a real broker.
+    testImplementation("com.rabbitmq:stream-client:1.12.0")
 }
 
 tasks.test {

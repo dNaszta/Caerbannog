@@ -1,0 +1,35 @@
+[
+    {
+        "source": "<name>",
+        "vhost": "/",
+        "destination": "<name>-0",
+        "destination_type": "queue",
+        "routing_key": "0",
+        "arguments": {
+            "x-stream-partition-order": 0
+        },
+        "properties_key": "0~iKEaZQ"
+    },
+    {
+        "source": "<name>",
+        "vhost": "/",
+        "destination": "<name>-1",
+        "destination_type": "queue",
+        "routing_key": "1",
+        "arguments": {
+            "x-stream-partition-order": 1
+        },
+        "properties_key": "1~1jlUUQ"
+    },
+    {
+        "source": "<name>",
+        "vhost": "/",
+        "destination": "<name>-2",
+        "destination_type": "queue",
+        "routing_key": "2",
+        "arguments": {
+            "x-stream-partition-order": 2
+        },
+        "properties_key": "2~eQ_kzA"
+    }
+]

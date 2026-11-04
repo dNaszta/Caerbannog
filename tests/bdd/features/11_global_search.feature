@@ -86,8 +86,7 @@ Feature: Global search
     When I search globally for "ORDERS"
     Then the same results are shown as for "orders"
 
-  @needs-spike
-  # To confirm on a real broker: streams can be found by name through the same API call as queues.
+  # Confirmed by the M2-02 spike: streams are queues with type "stream", so the same server-side name filter finds them.
   @broker
   Scenario: Streams are found by name on a real broker
     Given a real broker with the stream "orders-events"

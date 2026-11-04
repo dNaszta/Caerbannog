@@ -1,0 +1,62 @@
+{
+    "filtered_count": 1,
+    "item_count": 1,
+    "items": [
+        {
+            "arguments": {
+                "x-queue-type": "stream"
+            },
+            "auto_delete": false,
+            "consumers": 0,
+            "durable": true,
+            "effective_policy_definition": {},
+            "exclusive": false,
+            "first_timestamp": 1793799253178,
+            "internal": false,
+            "internal_owner": false,
+            "leader": "rabbit@node1",
+            "members": [
+                "rabbit@node1"
+            ],
+            "memory": 9136,
+            "message_stats": {
+                "publish": 3,
+                "publish_details": {
+                    "rate": 0.0
+                }
+            },
+            "messages": 3,
+            "messages_details": {
+                "rate": 0.0
+            },
+            "messages_ready": 3,
+            "messages_ready_details": {
+                "rate": 0.0
+            },
+            "messages_unacknowledged": 0,
+            "messages_unacknowledged_details": {
+                "rate": 0.0
+            },
+            "name": "<name>",
+            "node": "rabbit@node1",
+            "online": [
+                "rabbit@node1"
+            ],
+            "readers": {
+                "rabbit@node1": 0
+            },
+            "reductions": 0,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "segments": 1,
+            "state": "running",
+            "type": "stream",
+            "vhost": "/"
+        }
+    ],
+    "page": 1,
+    "page_count": 1,
+    "page_size": 100,
+    "total_count": 2
+}
