@@ -111,6 +111,10 @@ No product decision and no new dependency or build-tool choice is needed. Nothin
   Test-side build change only: `desktopApp/build.gradle.kts` got `testImplementation` for `:core`, kotlin test,
   JUnit 5, launcher, and `tasks.test { useJUnitPlatform() }`. Next: step 3, senior developer adds the function,
   `implementation(project(":core"))` and `(":data-rabbit")`, and `Main.kt` wiring.
+- Step: 3 done (senior developer). `createConnectionsViewModel` in `desktopApp/.../CompositionRoot.kt`;
+  `Main.kt` renders `ConnectionsScreen` via `remember`; `desktopApp` now has `implementation` of `:core` and
+  `:data-rabbit`. `./gradlew test`: desktopApp 3/3, core 6, ui 6, data-rabbit 10 (non-@broker), acceptance-tests
+  17 run, 0 failed, 1 skipped. Manual `:desktopApp:run` NOT done (touches real ~/.caerbannog and keychain; human step).
 - Round: 1
 - Branch: `m1-05-wire-desktopapp-connections`
 - Base branch: `m1-04-connections-screen-feedback-gaps` (accepted, not merged), so the first human run of
