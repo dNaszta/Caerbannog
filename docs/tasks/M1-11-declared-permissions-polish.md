@@ -36,7 +36,7 @@ None.
 Tests first (title assertion) and passing, no unrelated changes.
 
 ## Status
-- State: step 2 done (test developer, 2026-11-04): title assertion added, red; waiting for the senior developer (step 3). Branch `m1-11-declared-permissions-polish`.
+- State: step 3 done (senior developer, 2026-11-04): title string changed, guard comment added, full `./gradlew test --rerun-tasks --continue` green; waiting for step 4 (verify) and review. Branch `m1-11-declared-permissions-polish`.
 - Mockup radios done by the architect on main (docs only).
 - Test developer: DONE: `the declared permissions section title says it is the user's own statement` in `ConnectionsScreenUiTest.kt`, red (no node with the exact text). Next: the senior developer changes the one string in `DeclaredPermissionsSection` and adds the guard comment in `acceptance-tests/build.gradle.kts`.
 - Open points: none; no product decision needed.
