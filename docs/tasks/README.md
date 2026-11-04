@@ -27,14 +27,15 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M2-01-connection-session | Connection session as the single source of truth: latest-started check wins, current connection, drawer card from the session | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04); merged into local `main` (not pushed); branch `m2-01-connection-session` kept; follow-up `M2-01b-session-single-state`; no Docker |
 | M2-01b-session-single-state | One atomic public session state flow; remove the `StateFlow` inheritance waiver and the publish loop | M2 | briefed (2026-11-04); do before M2-03 and M2-04; no Docker |
 | M2-02-management-api-spike | Spike on a real broker (Testcontainers, TLS fixture): stream list fields, publisher and consumer fields, first/last offset source, stream search by name, super stream shape, non-admin view, Testcontainers deprecation; deliverable is knowledge in the brief Status and `docs/spec.md`, asserted by `@broker` spike tests | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04; branch `m2-02-management-api-spike`, not merged); findings in the brief Status and `docs/spec.md` "Management API facts"; S1 and S2 done, S3 open; needs Docker |
-| M2-03-stream-gateway | Core `StreamCatalog` interface, fake, real management client for the stream list and stats (and stream client if the spike says offsets need it) | M2 | planned, depends on M2-02 and decisions D3 to D5 (see "M2 decisions"); brief not written yet |
-| M2-04-stream-list-core | Stream list view model: derive counts, sort, filter by name and kind, page, refresh, empty state (scenarios in `03`) | M2 | planned, depends on M2-01 and M2-03 |
-| M2-05-stream-list-screen | Stream list screen per `docs/ux/Streams.dc.html`, drawer navigation, un-skip `Switch between connections` | M2 | planned, depends on M2-04 |
+| M2-03-stream-gateway | Core `StreamCatalog` interface, fake, real management client for the stream list and stats (and stream client if the spike says offsets need it) | M2 | briefed (2026-11-04, `M2-03-stream-gateway.md`, updated for D5 (b)); first step is the mini-spike `M2-03a-stream-stats-permissions.md`; depends on M2-01b, M2-02 (merged) and D3 |
+| M2-03a-stream-stats-permissions | Mini-spike: can monitoring, management and no-tag users call `queryStreamStats`; does it write nothing | M2 | briefed (2026-11-04); first step of M2-03; needs Docker |
+| M2-04-stream-list-core | Stream list view model: derive counts, sort, filter by name and kind, page, refresh, empty state (scenarios in `03`) | M2 | briefed as an input note (`M2-04-stream-list-core.md`), full brief after M2-03 |
+| M2-05-stream-list-screen | Stream list screen per `docs/ux/Streams.dc.html`, drawer navigation, un-skip `Switch between connections` | M2 | input note (`M2-05-stream-list-screen.md`), full brief after M2-04 |
 | M2-06-publishers-consumers | Publishers and consumers tab (`04`), counts match the list | M2 | input note written (`M2-06-publishers-consumers.md`); full brief after M2-03, depends on M2-02 and M2-05 |
 | M2-07-super-streams-in-list | Super streams as one entry with partitions (M2 part of `06`) | M2 | planned, depends on M2-04 |
 | M2-08-topology-read-only | Topology screen (queues, exchanges, bindings, stats; M2 part of `09`) and the three `@needs-M2` text scenarios in `02`; may be split | M2 | planned, depends on M2-01 and M2-03 |
 | M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (optional, needs bump approval); no hurry |
-| M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | planned, last; needs Docker |
+| M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | input note (`M2-09-gate-stats-match.md`); needs Docker |
 
 ## M2 decisions
 
@@ -45,11 +46,12 @@ Raised in the architect's M2 plan (2026-11-04). Spike decisions S1 to S3 live in
 | D1 | What "connected" means and how a connection is held (checked once, or a held session) | open |
 | D2 | Reconnect behaviour after a lost connection | open |
 | D3 | Stream list refresh (manual, timed, or both) | open |
-| D4 | Where first and last offset come from (management API or stream protocol `queryStreamStats`) | answered by the M2-02 spike, pending product owner confirmation: count from management `messages`, first offset from the stream protocol only, last written offset = first + messages - 1 |
-| D5 | When the stream client is used in production (only for browsing, or also for stats) | open; recommended: browsing only (M3), the M2 list shows counts, no first offset |
+| D4 | Where first and last offset come from (management API or stream protocol `queryStreamStats`) | decided (product owner, 2026-11-04): count = management `messages`, last written offset = first + messages - 1, first offset only from the stream protocol |
+| D5 | When the stream client is used in production (only for browsing, or also for stats) | decided (b) (product owner, 2026-11-04): the M2 list shows first offset, so `stream-client` is a production dependency from M2-03 (version must pass the two-week age rule when added); first offset cell empty ("unavailable") when the stats call fails or is denied |
 | D6 | Password during a session (the session never holds it today) | open |
 | D7 | TLS hostname verification for real data calls | open |
 | S1 | Test dependency `stream-client:1.12.0` for the M2-02 spike | decided (option A) |
 | S2 | Testcontainers: reproduce on 1.21.3, trial 2.0.5 on a scratch branch, no bump without report | decided |
-| S3 | Non-admin visibility of stream data | open; findings in; decision needed: no-tag users (recommend message) and `management`-tag users (recommend lists with a notice) |
-| N1 | Size column in the stream list has no data source | open; recommend drop |
+| S3 | Non-admin visibility of stream data | decided (product owner, 2026-11-04): S3a no management tag = clear message, no lists; S3b `management` tag only = lists with a fixed own-connections notice |
+| N1 | Size column in the stream list has no data source | decided (c) (product owner, 2026-11-04): left blank until M3 |
+| T1 | Testcontainers bump | no decision given; default stays "no bump now" (M2-10 optional) |
