@@ -143,6 +143,8 @@ Each connection profile carries its own `topologyControlLevel`, a ceiling the us
 | Declare and edit | Declare new topology (streams, super streams, queues, exchanges, bindings, policies) and edit existing items (policies, bindings); deleting is still blocked. |
 | Full control | Everything Declare and edit allows, plus delete; migrations may include destructive actions. |
 
+The level is chosen on the connection form, both when the profile is created and when it is edited, and applies when the form is saved. Choosing Full control asks for a confirmation first (a dialog stating that this is the user's own ceiling and that the broker's permissions still apply); cancelling keeps the previous selection. The confirmation is a UI step only and is not part of the stored profile.
+
 This is the app's own rule, layered on top of the broker's. It resolves what was previously an open question: RabbitMQ's configure permission covers both creating and deleting, so a broker-only check cannot allow one without the other — the self-constraint level is where the app draws that line instead, by reserving delete for Full control specifically.
 
 ### Broker-read permission

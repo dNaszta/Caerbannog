@@ -3,8 +3,9 @@
 Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired; branch base), M1-02-connection-profiles    Size: S
 
 ## Status
-- State: briefed, not started. Product decision taken by the product owner: the level must be selectable on the form
-  while creating a connection.
+- State: briefed, not started. Product decisions taken by the product owner: (1) the level is selectable on the form
+  while creating a connection; (2) in edit mode it applies on Save, one rule everywhere; (3) choosing Full control asks
+  for a confirmation.
 - Branch (when started): `m1-10-topology-level-on-new-connection`, based on `m1-05-wire-desktopapp-connections`.
 - Merge note: `m1-03-permission-check` also changes `ConnectionProfile` and `ConnectionsViewModel` (reopen after save,
   declared permissions). Expect a conflict in `ConnectionsViewModel.kt`; resolve at merge, whoever merges second.
@@ -31,15 +32,33 @@ In:
   existing scenario, it is not removed).
 - `ui` `ConnectionsScreen.kt` `EditPanel`: hold the level as form state (`remember(selected?.name)`, initial value
   `selected?.topologyControlLevel ?: READ_ONLY`), enable the selector in both modes, pass the value in
-  `ConnectionProfileInput` on Save. Clicking a radio changes form state only, nothing is persisted until Save. Remove
+  `ConnectionProfileInput` on Save. Clicking a radio changes form state only, nothing is persisted until Save. Choosing Full control first shows a
+  confirmation (see Confirmation below). Remove
   the `onTopologyControlChange` parameter if nothing else uses it.
 - Short helper text under the selector, fixed wording: "The most this app will do to topology on this connection.
   The broker's own permissions still apply." (Wording is new: see Open points, UX.)
+- Confirmation for Full control, UI-only (see below), including its text and the two buttons.
 Out:
 - Any enforcement of the level (effective permission, M1-03/M2+).
 - Persistence: unchanged, `topologyControlLevel` is already stored by `JsonFileConnectionProfileRepository`.
 - Declared permissions UI (`M1-06-profile-declared-permissions` on the m1-03 branch), sidebar pill (`M1-07`).
-- A confirmation dialog for Full control (see Open points).
+- Any core or BDD-visible confirmation: the confirmation is UI-only state.
+
+## Confirmation (decision: at pick time, UI only)
+- When: the moment the user selects "Full control" in the form, in both New and Edit mode, when the form's current
+  selection is not already Full control. Not at Save. Why: the click is the deliberate act; asking at Save would
+  also fire on unrelated edits of a profile that already is Full control, or be forgotten behind a long form. Picking
+  Full control when it is already selected, or going Full -> Read-only, asks nothing; Full -> Declare and edit -> Full
+  asks again (each raise is a fresh act).
+- Form: a Material 3 `AlertDialog`. Title: "Allow full control?". Text, fixed: "Full control lets this app delete
+  topology (queues, streams, exchanges, bindings, policies) on this connection and run migrations with destructive
+  actions. This is only your own ceiling for this connection: the broker's permissions still apply, and the app never
+  reads, gets or purges queue messages." Buttons: "Use Full control" (confirm) and "Cancel".
+- Cancel (or dismissing the dialog with Esc or a click outside) leaves the previous selection untouched. Confirm sets
+  the form selection to Full control; it is still persisted only on Save.
+- State: a local `remember` boolean/pending-level in `EditPanel`; no core change, no new state in the view model, no
+  new BDD scenario (nothing core-observable). Do not use a boolean that switches behaviour: model the pending choice
+  as `pendingLevel: TopologyControlLevel?` (non-null means the dialog is open).
 
 ## Acceptance
 - BDD, extend `tests/bdd/features/01_connections.feature` (all plain, no tag, run by `:acceptance-tests`):
@@ -55,6 +74,11 @@ Out:
 - UI tests in `ui` (`ConnectionsScreenUi`, same style as the existing five):
   - New connection mode: all three radios are enabled and Read-only is selected.
   - New connection: pick "Declare and edit", fill the fields, Save: the view model receives `DECLARE_AND_EDIT`.
+  - Confirm path: in New mode, click "Full control": the dialog with the fixed text appears and the selection is still
+    Read-only; press "Use Full control": the selection is Full control and Save sends `FULL_CONTROL`.
+  - Cancel path: click "Full control", press "Cancel": no dialog, selection is the previous one (test from Read-only
+    and from Declare and edit); Save sends the previous level. Dismiss by Esc behaves like Cancel.
+  - No dialog for Read-only, Declare and edit, or re-clicking an already selected Full control.
   - Edit mode: picking "Full control" does not change the saved profile until Save is pressed; after Save it is
     saved. Selecting a different profile resets the radios to that profile's saved level.
 - View model unit tests (`ConnectionsViewModelTest`): add with a level stores it; add with null stores READ_ONLY;
@@ -78,21 +102,16 @@ Out:
 `docs/ux/Main.dc.html`, connection edit panel. Mismatch: the mockup has no Topology control selector at all (it shows
 only the permission check banner and its note). The Compose screen has had the selector since M1-02. The architect
 asks for a small addition to the mockup (three radios under the CA certificate field, default Read-only, helper text
-above) before or alongside this task; this does not block the code. States to build: new (default Read-only,
-enabled), edit (saved level, enabled), no locked or disabled state any more.
+above) and the Full control confirmation dialog (text above) before or alongside this task; this does not block the
+code. States to build: new (default Read-only, enabled), edit (saved level, enabled), confirm dialog open (selection
+unchanged underneath), no locked or disabled state any more.
 
 ## Open points
-- Decision needed, not blocking: apply-on-Save (recommended, above) versus keeping immediate apply in edit mode.
-  Immediate apply keeps today's behaviour but makes new and edit behave differently. If the product owner prefers
-  immediate apply for edit, only the edit-mode UI tests and the "Out" of this brief change.
-- Decision needed, not blocking: should choosing Full control ask for a confirmation? Recommendation: no for now;
-  the level is only a ceiling, the broker's permissions and the later effective-permission rule still apply, and the
-  default stays Read-only. Revisit in M5 when delete exists.
-- Spec: `docs/spec.md` "Self-constraint level" does not say where the level is set. Add one sentence after the table
-  once decided: "The level is chosen on the connection form, when the profile is created or edited, and applies when
-  the form is saved." Architect does this on acceptance, not before.
+- Closed by the product owner: apply on Save in edit mode; Full control asks for confirmation.
+- Open, minor, no decision needed unless the owner objects: the dialog's wording above is the architect's proposal;
+  confirmation also fires on a New form (default Read-only to Full control), which is intended.
+- Spec: sentences added to `docs/spec.md` "Self-constraint level" by the architect (done with this update).
 
 ## Definition of done
 Tests first and passing (`./gradlew test`), no unrelated changes, `docs/tasks/README.md` updated, the new scenarios
-in `01_connections.feature`, the `ConnectionProfileInput` KDoc corrected, the spec sentence and the mockup addition
-done by the architect.
+in `01_connections.feature`, the `ConnectionProfileInput` KDoc corrected, the mockup addition done by the architect.
