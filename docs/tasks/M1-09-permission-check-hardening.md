@@ -119,5 +119,9 @@ Tests first and failing for the right reason, no unrelated changes, M1-03 brief 
       type-based catch only (no test).
   - Brief problem: the catch list for an invalid URL must include `java.net.URISyntaxException` (a bad host raises it, the brief
     names only `URLParserException` and `IllegalArgumentException`). `URLParserException` is enough for ports; it extends `IllegalStateException`.
+- Round: 0, step 3 done (senior developer). Green: `test --rerun-tasks --continue` core 48, data-rabbit 24, ui 19, acceptance 38 (7 skipped), desktopApp 3, 0 failures; `:data-rabbit:brokerTest` green (Docker).
+  - Confirmed: a `SecretStore.retrieve` throw gives `Unreadable(UNEXPECTED)` without the declaration; test kept.
+  - Adapter catches added: `HttpTimeoutException` (TIMEOUT, replaces the connect-timeout catch), `URISyntaxException`, `URLParserException`, `IllegalArgumentException` (UNREACHABLE, class name). No catch-all in the adapter.
+  - Session: `MutableStateFlow<Map>` with `update`; the one broad catch is in `ConnectionSession.check`. M1-03 Final contract has the new cause.
 - Branch: `m1-09-permission-check-hardening`, based on `main`. Not pushed.
 - Must land before `M1-07-permission-state-ui`.

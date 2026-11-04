@@ -11,6 +11,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLParserException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -18,7 +19,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import java.io.IOException
 import java.net.URLEncoder
-import java.net.http.HttpConnectTimeoutException
+import java.net.URISyntaxException
+import java.net.http.HttpTimeoutException
 import java.net.SocketTimeoutException
 import javax.net.ssl.SSLException
 
@@ -53,13 +55,22 @@ class ManagementApiPermissionChecker(
             }
         } catch (e: HttpRequestTimeoutException) {
             return unreadable(UnreadableCause.TIMEOUT, e.javaClass.simpleName)
-        } catch (e: HttpConnectTimeoutException) {
+        } catch (e: HttpTimeoutException) {
+            // Parent of HttpConnectTimeoutException; must come before IOException.
             return unreadable(UnreadableCause.TIMEOUT, e.javaClass.simpleName)
         } catch (e: SocketTimeoutException) {
             return unreadable(UnreadableCause.TIMEOUT, e.javaClass.simpleName)
         } catch (e: SSLException) {
             return unreadable(UnreadableCause.UNREACHABLE, "TLS failure (${e.javaClass.simpleName})")
         } catch (e: IOException) {
+            return unreadable(UnreadableCause.UNREACHABLE, e.javaClass.simpleName)
+        } catch (e: URISyntaxException) {
+            // Observed (Ktor 3.0.3, Java engine): a host with a space.
+            return unreadable(UnreadableCause.UNREACHABLE, e.javaClass.simpleName)
+        } catch (e: URLParserException) {
+            // Observed: port out of range (70000, -1). Extends IllegalStateException.
+            return unreadable(UnreadableCause.UNREACHABLE, e.javaClass.simpleName)
+        } catch (e: IllegalArgumentException) {
             return unreadable(UnreadableCause.UNREACHABLE, e.javaClass.simpleName)
         } finally {
             client.close()

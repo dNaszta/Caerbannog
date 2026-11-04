@@ -146,7 +146,7 @@ data class DeclaredPermissions(val configure: Boolean, val write: Boolean)
 // ConnectionProfile gains, last parameter, default keeps old callers compiling:
 //   val declaredPermissions: DeclaredPermissions? = null
 
-enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BAD_RESPONSE, NO_PASSWORD }
+enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BAD_RESPONSE, NO_PASSWORD, UNEXPECTED }
 
 sealed interface PermissionCheckResult {
     val topologyUnlocked: Boolean
