@@ -54,6 +54,16 @@ Out: other nav items, radio and switch icons (keep Material `RadioButton` and `S
 The reveal toggle state is local UI state (`remember`, reset per selected profile like the other form fields); not in
 the view model. Never log or persist the visibility state.
 
+## First commit of M1-12b (carry-over from M1-12a round 2, architect 2026-11-04)
+Before any icon work, as its own commit on the same files: the Password hint on a saved profile is ellipsized at 1280x880
+('Leave blank to keep the saved pass...'; the grid cell is about 192 to 244dp). Change the text to exactly
+`Blank keeps the saved password` (about 30 characters, fits; same style as the CA hint 'Blank uses the system trust
+store'). Test developer first: `ConnectionsScreenUiTest.kt` line 1399, `passwordHint` becomes
+`"Blank keeps the saved password"` (it is the only string to change; the tests that use `passwordHint` follow it);
+also add one assertion that the hint node is not truncated (`TextLayoutResult.hasVisualOverflow` false, or hint width
+within the cell) at the 1280 wide test size. Senior developer: `ConnectionsScreen.kt` line 175, same string. Then look at
+`:ui:screenshotTest` PNG 02 to confirm no ellipsis. No other change in that commit.
+
 ## Open points
 Compatibility of 1.7.3 with Compose Multiplatform 1.9.3 is expected but unproven (see above).
 
