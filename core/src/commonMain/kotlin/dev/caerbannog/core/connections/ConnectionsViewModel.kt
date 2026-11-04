@@ -189,8 +189,9 @@ class ConnectionsViewModel(
         val result = reachabilityChecker.check(profileNamed(name))
         // The banner belongs to one profile: a result that arrives after that profile was deleted, or after the
         // selection moved, is returned to the caller but never shown.
+        val stillExists = repository.list().any { p -> p.name == name }
         _state.update {
-            if (it.selectedProfileName == selectedAtStart && repository.list().any { p -> p.name == name }) {
+            if (it.selectedProfileName == selectedAtStart && stillExists) {
                 it.copy(lastCheckResult = result)
             } else {
                 it

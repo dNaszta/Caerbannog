@@ -2,9 +2,7 @@ package dev.caerbannog.ui.connections
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,16 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,33 +33,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
-import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
 import dev.caerbannog.core.connections.PermissionBanner
-import dev.caerbannog.core.connections.PermissionCheckStatus
-import dev.caerbannog.core.connections.PermissionPill
-import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.permissionBanner
-import dev.caerbannog.core.connections.permissionPill
 import kotlinx.coroutines.launch
 
 /**
@@ -184,7 +170,10 @@ private fun EditPanel(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text(if (selected == null) "Password" else "Password (leave blank to keep unchanged)", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            label = { Text("Password") },
+                            supportingText = if (selected == null) null else {
+                                { Text("Leave blank to keep the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            },
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth().semantics { password() },
                         )
@@ -196,7 +185,8 @@ private fun EditPanel(
                                 caCertificatePath = path
                                 if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
                             },
-                            label = { Text("CA certificate (optional - blank uses the system trust store)", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            label = { Text("CA certificate (optional)") },
+                            supportingText = { Text("Blank uses the system trust store", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     },
