@@ -172,7 +172,7 @@ private fun EditPanel(
                             onValueChange = { password = it },
                             label = { Text("Password") },
                             supportingText = if (selected == null) null else {
-                                { Text("Leave blank to keep the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                { Text("Blank keeps the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                             },
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth().semantics { password() },
