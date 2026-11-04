@@ -2,7 +2,9 @@ package dev.caerbannog.ui.connections
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.CaCertificateValidationResult
@@ -54,9 +56,9 @@ class ConnectionsScreenUiTest {
         override fun validate(filePath: String): CaCertificateValidationResult = CaCertificateValidationResult.Valid
     }
 
-    private fun testViewModel(seed: ConnectionProfile? = null): ConnectionsViewModel {
+    private fun testViewModel(vararg seeds: ConnectionProfile): ConnectionsViewModel {
         val repository = InMemoryRepository()
-        seed?.let { repository.add(it) }
+        seeds.forEach { repository.add(it) }
         return ConnectionsViewModel(repository, NoOpSecretStore(), AlwaysReachableChecker(), AlwaysValidCertificate())
     }
 
@@ -73,11 +75,65 @@ class ConnectionsScreenUiTest {
     @Test
     fun `selecting a saved profile shows its fields in the editing panel`() = runDesktopComposeUiTest {
         val profile = ConnectionProfile(name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer")
-        setContent { ConnectionsScreen(testViewModel(seed = profile)) }
+        setContent { ConnectionsScreen(testViewModel(profile)) }
 
         onNodeWithText("Select").performClick()
 
         onNodeWithText("Edit connection").assertExists()
         onNodeWithText("Delete profile").assertExists()
+    }
+
+    private val passedBanner = "Connection test passed"
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `saving a new connection under an existing name shows an inline error naming it`() = runDesktopComposeUiTest {
+        val existing = ConnectionProfile(name = "uat-eu", host = "rabbit-uat.example.com", virtualHost = "/", username = "svc-explorer")
+        setContent { ConnectionsScreen(testViewModel(existing)) }
+
+        onNodeWithText("New connection").performClick()
+        onNodeWithText("Name").performTextInput("uat-eu")
+        onNodeWithText("Host").performTextInput("other.example.com")
+        onNodeWithText("Username").performTextInput("someone")
+        onNodeWithText("Save").performClick()
+        waitForIdle()
+
+        onNodeWithText("A connection named 'uat-eu' already exists.").assertExists()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `selecting another profile clears the previous profile's check-connection banner`() = runDesktopComposeUiTest {
+        val a = ConnectionProfile(name = "profile-a", host = "a.example.com", virtualHost = "/", username = "u")
+        val b = ConnectionProfile(name = "profile-b", host = "b.example.com", virtualHost = "/", username = "u")
+        setContent { ConnectionsScreen(testViewModel(a, b)) }
+
+        onAllNodesWithText("Select")[0].performClick()
+        onNodeWithText("Check connection").performClick()
+        waitForIdle()
+        onNodeWithText(passedBanner, substring = true).assertExists()
+
+        onAllNodesWithText("Select")[1].performClick()
+        waitForIdle()
+
+        onNodeWithText("Edit connection").assertExists()
+        onNodeWithText(passedBanner, substring = true).assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `clicking New connection clears the previous profile's check-connection banner`() = runDesktopComposeUiTest {
+        val a = ConnectionProfile(name = "profile-a", host = "a.example.com", virtualHost = "/", username = "u")
+        setContent { ConnectionsScreen(testViewModel(a)) }
+
+        onNodeWithText("Select").performClick()
+        onNodeWithText("Check connection").performClick()
+        waitForIdle()
+        onNodeWithText(passedBanner, substring = true).assertExists()
+
+        onNodeWithText("New connection").performClick()
+        waitForIdle()
+
+        onNodeWithText(passedBanner, substring = true).assertDoesNotExist()
     }
 }

@@ -80,3 +80,20 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
 - Tests written first and passing (the three cases above).
 - No unrelated changes.
 - `docs/tasks/README.md` updated.
+
+## Status
+
+- Step: 2 (tests written and committed; red run NOT yet observed - see note; ready for senior developer once red is confirmed)
+- Round: 1
+- Branch: `m1-04-connections-screen-feedback-gaps`
+- Order note (architect, 2026-11-04): picked before `M1-05` because it is corrective to already-accepted
+  `M1-02` and changes only `ui`/`core`; `M1-05` is independent and lands after it so the first human run
+  of the real screen already has both fixes. `M1-03` (permission check) is still unbriefed and is not a
+  dependency of either.
+- Tests first: the three `ConnectionsScreenUiTest` cases must fail for the right reason (no error shown;
+  stale banner shown) before any production change.
+- Tests (test developer, step 2): three cases added to `ConnectionsScreenUiTest` (name collision error naming
+  `uat-eu`; select-another-profile clears banner; New connection clears banner). They compile. The red run
+  could not be executed in the test developer's sandbox (Gradle test-executor process spawn blocked), so
+  failing-for-the-right-reason is unconfirmed; expected failures are "node with text ... does not exist"
+  (collision) and "expected no node, found banner" (the two stale-banner cases).
