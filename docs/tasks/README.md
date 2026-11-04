@@ -24,7 +24,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
-| M2-01-connection-session | Connection session as the single source of truth: latest-started check wins, current connection, drawer card from the session | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04); not merged; branch `m2-01-connection-session`; follow-up `M2-01b-session-single-state`; no Docker |
+| M2-01-connection-session | Connection session as the single source of truth: latest-started check wins, current connection, drawer card from the session | M2 | done (architect: Accepted with follow-ups, step 5, 2026-11-04); merged into local `main` (not pushed); branch `m2-01-connection-session` kept; follow-up `M2-01b-session-single-state`; no Docker |
 | M2-01b-session-single-state | One atomic public session state flow; remove the `StateFlow` inheritance waiver and the publish loop | M2 | briefed (2026-11-04); do before M2-03 and M2-04; no Docker |
 | M2-02-management-api-spike | Spike on a real broker (Testcontainers): stream, publisher and consumer fields, first/last offset source, stream search by name, Testcontainers deprecation | M2 | planned, can run in parallel with M2-01; needs Docker; brief not written yet |
 | M2-03-stream-gateway | Core `StreamCatalog` interface, fake, real management client for the stream list and stats (and stream client if the spike says offsets need it) | M2 | planned, depends on M2-02 and open decisions D3 to D5; brief not written yet |
