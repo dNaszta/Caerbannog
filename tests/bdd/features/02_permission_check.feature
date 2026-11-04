@@ -57,6 +57,24 @@ Feature: Permission check before the first connection
     Then the sidebar shows "Can change topology" next to "prod-eu"
     And the edit panel says the broker confirmed that "svc-explorer" can change topology on virtual host "/"
 
+  @fake-broker
+  # M2-01: the session keeps the result of the latest started check, not the latest finished one.
+  Scenario: The latest check wins when two checks of one connection overlap
+    Given the first check of "prod-eu" is still running and would say the user can change topology
+    And the connection "prod-eu" is checked again and that check says the user has no configure permission
+    When the first check finishes
+    Then the sidebar shows "Topology locked" next to "prod-eu"
+
+  @fake-broker
+  # M2-01: each connection keeps its own result; the sidebar follows the connection that is current.
+  Scenario: Switching connection shows the permission state of the new current connection
+    Given saved connections "uat-eu" and "prod-eu"
+    And the user has configure permission on "uat-eu" and no configure permission on "prod-eu"
+    And I am connected to "uat-eu"
+    When I switch to "prod-eu"
+    Then the sidebar shows "prod-eu" as the current connection
+    And the sidebar shows "Topology locked" next to "prod-eu"
+
   @fake-broker @needs-M2
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
