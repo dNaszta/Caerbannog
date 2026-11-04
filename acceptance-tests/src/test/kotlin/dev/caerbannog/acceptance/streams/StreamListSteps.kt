@@ -57,6 +57,7 @@ class StreamListSteps {
     private companion object {
         const val PASSWORD = "S3cret-PW-4711"
         const val NAME = "uat-eu"
+        const val OTHER_VHOST = "other-vhost"
     }
 
     private lateinit var gateway: FakeConnectionGateway
@@ -184,6 +185,16 @@ class StreamListSteps {
     fun theBrokerHasStreamsAndQueues(streams: Int, queues: Int) {
         repeat(queues) { catalog.addQueue("quorum-$it") }
         repeat(streams) { addStream("stream-%02d".format(it), 0, 10) }
+    }
+
+    @Given("the broker has {int} streams in the connection's virtual host")
+    fun theBrokerHasStreamsInTheConnectionsVhost(count: Int) {
+        repeat(count) { addStream("here-%02d".format(it), 0, 10) }
+    }
+
+    @Given("the broker has {int} streams in another virtual host")
+    fun theBrokerHasStreamsInAnotherVhost(count: Int) {
+        repeat(count) { catalog.addStream(stream("elsewhere-%02d".format(it), messages = 10, vhost = OTHER_VHOST)) }
     }
 
     @Given("the app has no saved settings")
@@ -363,6 +374,10 @@ class StreamListSteps {
 
     @Then("I can move to the next page")
     fun iCanMoveToTheNextPage() = assertTrue(state.hasNextPage, "no next page, range <${state.rangeText}>")
+
+    @Then("no stream of the other virtual host is listed")
+    fun noStreamOfTheOtherVhostIsListed() =
+        assertFalse(state.rows.any { it.name.startsWith("elsewhere-") }, "rows: ${state.rows.map { it.name }}")
 
     @Then("no quorum queue is listed")
     fun noQuorumQueueIsListed() = assertFalse(state.rows.any { it.name.startsWith("quorum-") }, "rows: ${state.rows.map { it.name }}")

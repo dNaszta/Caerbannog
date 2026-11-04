@@ -45,8 +45,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * Docker, no network, no keychain, no ~/.caerbannog). The whole app side is real core code
  * (ConnectionsViewModel, ConnectionSession, ActiveConnection); only the broker is fake.
  *
- * No steps on purpose: the lost-connection scenario (@needs-decision, D2) and the three app bar scenarios
- * (@needs-M2, M2-05).
+ * No steps on purpose: the lost-connection scenario (D2 is decided, the scenario is tagged @needs-M2) and the three
+ * app bar scenarios (@needs-M2, M2-05).
  *
  * Part 2 (M2-03b): "A user without the management tag ..." asserts through the held connection's catalog
  * (`Capabilities.visibility` NONE, every list NotAuthorised, the message text from core); "first offsets will

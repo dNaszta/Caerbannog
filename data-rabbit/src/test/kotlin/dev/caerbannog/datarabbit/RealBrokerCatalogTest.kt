@@ -146,6 +146,12 @@ class RealBrokerCatalogTest {
         return http.send(b.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString()).statusCode()
     }
 
+    private fun userCall(user: String, password: String, path: String): String {
+        val auth = Base64.getEncoder().encodeToString("$user:$password".toByteArray())
+        val r = http.send(HttpRequest.newBuilder(URI("https://${rabbit.host}:${rabbit.httpsPort}$path")).header("Authorization", "Basic $auth").GET().build(), HttpResponse.BodyHandlers.ofString())
+        return "${r.statusCode()} ${r.body().take(120)}"
+    }
+
     private fun declareQueue(name: String, type: String) {
         assertEquals(201, adminCall("PUT", "/api/queues/%2F/$name", """{"durable":true,"arguments":{"x-queue-type":"$type"}}"""), "declare $type $name")
         streamsToDelete += "%2F" to name
@@ -409,6 +415,66 @@ class RealBrokerCatalogTest {
         held.close()
         held.close()
         assertTrue(held.catalog.listStreams(StreamListRequest(vhost = "/")) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
+    }
+
+    // ---- M2-04 F-1 re-verify: the list is per vhost on a real broker ----
+
+    private fun withVhost(vhost: String, body: () -> Unit) {
+        ctl("add_vhost", vhost)
+        try {
+            ctl("set_permissions", "-p", vhost, rabbit.adminUsername, ".*", ".*", ".*")
+            body()
+        } finally {
+            environments.forEach { runCatching { it.close() } }; environments.clear()
+            runCatching { ctl("delete_vhost", vhost) }
+        }
+    }
+
+    private fun listed(held: HeldConnection, vhost: String, prefix: String, count: Int): StreamPage =
+        success(awaitUntil("$count streams of $prefix in $vhost", fetch = { runBlocking { held.catalog.listStreams(StreamListRequest(vhost = vhost, pageSize = 100, nameFilter = prefix)) } }, done = { it is CatalogResult.Success && it.value.rows.size == count }))
+
+    @Test
+    fun `the same stream name in two vhosts is listed once per vhost, each with its own counts`() = runBlocking<Unit> {
+        val name = unique("twin-")
+        publish(createStream(name), name, 3)
+        publish(createStream(name, OTHER_VHOST), name, 7)
+        val here = listed(connection(vhost = "/"), "/", name, 1)
+        val there = listed(connection(vhost = OTHER_VHOST), OTHER_VHOST, name, 1)
+        assertEquals(listOf("/"), here.rows.map { it.vhost })
+        assertEquals(listOf(OTHER_VHOST), there.rows.map { it.vhost })
+        val admin = connection()
+        val counts = awaitUntil("messages 3 and 7", fetch = { listed(admin, "/", name, 1).rows.single().messages to listed(admin, OTHER_VHOST, name, 1).rows.single().messages }, done = { it == Pair<Long?, Long?>(3L, 7L) })
+        assertEquals(Pair<Long?, Long?>(3L, 7L), counts)
+    }
+
+    @Test
+    fun `a vhost name with a space or a slash is encoded and lists only its own streams`() = runBlocking<Unit> {
+        for (vhost in listOf("m204 spaced", "m204/slashed")) {
+            withVhost(vhost) {
+                val name = unique("enc-")
+                createStream(name, vhost)
+                val own = createStream("$name-home") // in "/", must not leak into the other vhost's list
+                val held = connection(vhost = vhost)
+                val page = listed(held, vhost, "enc-", 1)
+                assertEquals(listOf(name), page.rows.map { it.name }, "vhost <$vhost>")
+                assertEquals(1, page.totalCount, "vhost <$vhost>")
+                assertEquals(CatalogResult.Success(emptyMap<String, Int>()), runBlocking { held.catalog.publisherCounts(vhost) })
+                own.close()
+            }
+        }
+    }
+
+    @Test
+    fun `a management user without permission on the vhost gets no list and no leak`() = runBlocking<Unit> {
+        val name = unique("noperm-")
+        publish(createStream(name, OTHER_VHOST), name, 1)
+        val held = connection("m203-mgmt", "pw-mgmt")
+        val result = held.catalog.listStreams(StreamListRequest(vhost = OTHER_VHOST, pageSize = 100, nameFilter = name))
+        val rows = (result as? CatalogResult.Success)?.value?.rows.orEmpty()
+        assertTrue(rows.isEmpty(), "no permission on $OTHER_VHOST, got $result")
+        // Measured on RabbitMQ 4: the broker answers 404 for a vhost the user has no permission on (not 401/403), which maps to Unexpected.
+        assertTrue(userCall("m203-mgmt", "pw-mgmt", "/api/queues/$OTHER_VHOST").startsWith("404"), "broker behaviour changed")
+        assertEquals(CatalogResult.Unexpected, result)
     }
 
     // ---- stream side TLS (added by the developer at the build, brief part 2 step 2 note 3) ----

@@ -164,7 +164,7 @@ class StreamListViewModelRowsTest {
     fun `streams of another virtual host are not listed, counted or paged`() = runTest {
         val s = StreamListHarness(this)
         s.addStream("orders")
-        // The fake, like the broker's GET /api/queues, answers for all vhosts; the list is the one of the profile's vhost.
+        // The fake answers per vhost, like GET /api/queues/{vhost}; the list is the one of the profile's vhost.
         s.catalog.addStream(stream("orders-elsewhere", vhost = "other"))
         s.catalog.addStream(stream("orders", vhost = "other")) // same name in another vhost
         s.open()
