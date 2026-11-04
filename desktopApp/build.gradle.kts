@@ -19,11 +19,21 @@ kotlin {
 // with the Compose Multiplatform Gradle plugin (`org.jetbrains.compose`) for build, run and
 // packaging, per the spec's own fallback rule.
 //
-// `main()` renders `App()` from `ui`'s commonMain (the task brief's Design notes: a placeholder
-// screen only, app name and version text, proving the window opens end to end).
+// M1-05: `main()` renders the real `ConnectionsScreen`; `createConnectionsViewModel` is the
+// composition root (`core` for the view model, `data-rabbit` for the real implementations).
 dependencies {
     implementation(project(":ui"))
+    implementation(project(":core"))
+    implementation(project(":data-rabbit"))
     implementation(compose.desktop.currentOs)
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 compose.desktop {

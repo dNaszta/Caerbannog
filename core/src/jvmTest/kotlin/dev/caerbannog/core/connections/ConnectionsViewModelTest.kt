@@ -187,4 +187,79 @@ class ConnectionsViewModelTest {
         assertEquals("us-secret", secretStore.retrieve("prod-us"))
         assertEquals(setOf("prod-eu", "prod-us"), viewModel.state.value.profiles.map { it.name }.toSet())
     }
+
+    // --- topology control level on the input (M1-10): null on add = READ_ONLY, null on update = keep ---
+
+    private fun inputWithLevel(name: String, host: String, level: TopologyControlLevel?) = ConnectionProfileInput(
+        name = name,
+        host = host,
+        virtualHost = "/",
+        username = "svc-explorer",
+        password = "pw",
+        topologyControlLevel = level,
+    )
+
+    @Test
+    fun `adding with a level stores that level`() {
+        val repository = InMemoryRepository()
+        val viewModel = viewModel(repository, InMemorySecretStore())
+
+        val result = viewModel.addConnection(inputWithLevel("uat-eu", "h.example.com", TopologyControlLevel.DECLARE_AND_EDIT))
+
+        assertTrue(result is SaveConnectionResult.Saved, "expected Saved, got $result")
+        assertEquals(TopologyControlLevel.DECLARE_AND_EDIT, repository.list().single().topologyControlLevel)
+    }
+
+    @Test
+    fun `adding with a null level stores READ_ONLY`() {
+        val repository = InMemoryRepository()
+        val viewModel = viewModel(repository, InMemorySecretStore())
+
+        viewModel.addConnection(inputWithLevel("uat-eu", "h.example.com", null))
+
+        assertEquals(TopologyControlLevel.READ_ONLY, repository.list().single().topologyControlLevel)
+    }
+
+    @Test
+    fun `updating with a null level keeps the saved level`() {
+        val repository = InMemoryRepository()
+        repository.add(profile("uat-eu").copy(topologyControlLevel = TopologyControlLevel.FULL_CONTROL))
+        val viewModel = viewModel(repository, InMemorySecretStore())
+
+        viewModel.updateConnection("uat-eu", inputWithLevel("uat-eu", "changed.example.com", null))
+
+        val saved = repository.list().single()
+        assertEquals("changed.example.com", saved.host)
+        assertEquals(TopologyControlLevel.FULL_CONTROL, saved.topologyControlLevel)
+    }
+
+    @Test
+    fun `renaming with a null level keeps the saved level`() {
+        val repository = InMemoryRepository()
+        repository.add(profile("uat-eu").copy(topologyControlLevel = TopologyControlLevel.FULL_CONTROL))
+        val secretStore = InMemorySecretStore()
+        secretStore.store("uat-eu", "pw")
+        val viewModel = viewModel(repository, secretStore)
+
+        viewModel.updateConnection("uat-eu", inputWithLevel("uat-eu-2", "rabbit-uat-eu.example.com", null))
+
+        val saved = repository.list().single()
+        assertEquals("uat-eu-2", saved.name)
+        assertEquals(TopologyControlLevel.FULL_CONTROL, saved.topologyControlLevel)
+    }
+
+    @Test
+    fun `updating with a value changes the level, also together with a rename`() {
+        val repository = InMemoryRepository()
+        repository.add(profile("uat-eu").copy(topologyControlLevel = TopologyControlLevel.FULL_CONTROL))
+        repository.add(profile("uat-us"))
+        val viewModel = viewModel(repository, InMemorySecretStore())
+
+        viewModel.updateConnection("uat-eu", inputWithLevel("uat-eu", "rabbit-uat-eu.example.com", TopologyControlLevel.READ_ONLY))
+        assertEquals(TopologyControlLevel.READ_ONLY, repository.list().first { it.name == "uat-eu" }.topologyControlLevel)
+
+        viewModel.updateConnection("uat-us", inputWithLevel("uat-us-2", "rabbit-uat-us.example.com", TopologyControlLevel.DECLARE_AND_EDIT))
+        val renamed = repository.list().single { it.name == "uat-us-2" }
+        assertEquals(TopologyControlLevel.DECLARE_AND_EDIT, renamed.topologyControlLevel)
+    }
 }

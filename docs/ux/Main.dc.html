@@ -70,6 +70,14 @@ body{margin:0}
 <div class="tf"><span class="l">CA certificate (optional)</span><div class="v"><span>Use system trust store</span><span class="ms" aria-hidden="true">upload_file</span></div></div>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">Topology control</div>
+<div class="t-bs dim">The most this app will do to topology on this connection. The broker's own permissions still apply.</div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">radio_button_checked</span><span class="t-bm">Read-only</span></div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">radio_button_unchecked</span><span class="t-bm">Declare and edit</span></div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">radio_button_unchecked</span><span class="t-bm">Full control</span></div>
+<div class="t-bs dim">Enabled on New connection and Edit connection. Read-only is the default. A choice is applied when you press Save. Picking Full control opens the confirmation below first.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
 <div class="t-ts">Permission check</div>
 <div class="banner ok"><span class="ms" aria-hidden="true">verified_user</span><div><b>svc-explorer can change topology on virtual host /.</b> It has configure, write and read permissions there, so topology screens and migrations are unlocked for this connection.</div></div>
 <div class="t-bs dim">The check runs before the first connection and again whenever you edit this profile. If the user cannot change topology, the topology screens open read-only.</div>
@@ -82,6 +90,12 @@ body{margin:0}
 <button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">wifi_tethering</span>Check connection and permissions</button>
 <button class="btn filled" type="button">Save</button>
 </div>
+</section>
+<section class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px;background:var(--surface-container-high)">
+<div class="t-tl">Allow full control?</div>
+<div class="t-bm">Full control lets this app delete topology (queues, streams, exchanges, bindings, policies) on this connection and run migrations with destructive actions. This is only your own ceiling for this connection: the broker's permissions still apply, and the app never reads, gets or purges queue messages.</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn text" type="button">Use Full control</button></div>
+<div class="t-bs dim">Dialog shown when Full control is picked and was not already selected. Cancel, Esc or a click outside keep the previous choice. The choice is saved only on Save.</div>
 </section>
 </div>
 </main>

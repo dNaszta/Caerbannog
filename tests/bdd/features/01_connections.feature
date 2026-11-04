@@ -31,6 +31,21 @@ Feature: Connection profiles
       | password      | s3cret                 |
     Then its topology control level is "Read-only"
 
+  Scenario: A new connection can be created with a chosen topology control level
+    When I add a connection with these settings
+      | name                   | uat-eu                 |
+      | host                   | rabbit-uat.example.com |
+      | virtual host           | /                      |
+      | username               | svc-explorer           |
+      | password               | s3cret                 |
+      | topology control level | Full control           |
+    Then its topology control level is "Full control"
+
+  Scenario: Editing a connection without touching the level keeps it
+    Given a saved connection "uat-eu" at topology control level "Full control"
+    When I change the host of "uat-eu" to "rabbit-new.example.com" and save
+    Then its topology control level is "Full control"
+
   Scenario: Raise a connection's topology control level
     Given a saved connection "uat-eu"
     When I set the topology control level of "uat-eu" to "Full control"

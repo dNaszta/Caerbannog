@@ -75,6 +75,8 @@ class ConnectionsSteps {
             virtualHost = fields.getValue("virtual host"),
             username = fields.getValue("username"),
             password = fields["password"],
+            // Optional row: absent means "no level given" (null), which on add must become Read-only.
+            topologyControlLevel = fields["topology control level"]?.let(::topologyControlLevelFromLabel),
         )
         lastProfileName = input.name
         lastPassword = input.password
@@ -174,6 +176,39 @@ class ConnectionsSteps {
     fun iSetTheTopologyControlLevelOfTo(name: String, levelLabel: String) {
         lastProfileName = name
         lastSaveResult = viewModel.setTopologyControlLevel(name, topologyControlLevelFromLabel(levelLabel))
+    }
+
+    @Given("a saved connection {string} at topology control level {string}")
+    fun aSavedConnectionAtTopologyControlLevel(name: String, levelLabel: String) {
+        lastProfileName = name
+        val result = viewModel.addConnection(
+            ConnectionProfileInput(
+                name = name,
+                host = "rabbit-$name.example.com",
+                virtualHost = "/",
+                username = "svc-explorer",
+                password = "s3cret",
+                topologyControlLevel = topologyControlLevelFromLabel(levelLabel),
+            ),
+        )
+        check(result is SaveConnectionResult.Saved) { "Test setup failed: could not save '$name': $result" }
+    }
+
+    @When("I change the host of {string} to {string} and save")
+    fun iChangeTheHostOfToAndSave(name: String, newHost: String) {
+        val saved = viewModel.state.value.profiles.first { it.name == name }
+        lastProfileName = name
+        // Like the edit panel for an untouched level and password: the level is not given (null = keep).
+        lastSaveResult = viewModel.updateConnection(
+            originalName = name,
+            input = ConnectionProfileInput(
+                name = saved.name,
+                host = newHost,
+                virtualHost = saved.virtualHost,
+                username = saved.username,
+                password = null,
+            ),
+        )
     }
 
     @Then("its topology control level is {string}")

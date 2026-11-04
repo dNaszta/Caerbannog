@@ -80,3 +80,39 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
 - Tests written first and passing (the three cases above).
 - No unrelated changes.
 - `docs/tasks/README.md` updated.
+
+## Status
+
+- Step: 5 done - ACCEPTED (architect, round 1). Task done; merge pending (human).
+- Round: 1
+- Branch: `m1-04-connections-screen-feedback-gaps`
+- Order note (architect, 2026-11-04): picked before `M1-05` because it is corrective to already-accepted
+  `M1-02` and changes only `ui`/`core`; `M1-05` is independent and lands after it so the first human run
+  of the real screen already has both fixes. `M1-03` (permission check) is still unbriefed and is not a
+  dependency of either.
+- Tests first: the three `ConnectionsScreenUiTest` cases must fail for the right reason (no error shown;
+  stale banner shown) before any production change.
+- Tests (test developer, step 2): three cases added to `ConnectionsScreenUiTest` (name collision error naming
+  `uat-eu`; select-another-profile clears banner; New connection clears banner). They compile. The red run
+  could not be executed in the test developer's sandbox (Gradle test-executor process spawn blocked), so
+  failing-for-the-right-reason is unconfirmed; expected failures are "node with text ... does not exist"
+  (collision) and "expected no node, found banner" (the two stale-banner cases).
+- Build (senior developer, step 3): red confirmed (assertion errors). Production done: `EditPanel` renders
+  `NameAlreadyExists` as an error banner (`ErrorBanner`, shared with the check-connection error);
+  `selectConnection`/`startNewConnection` clear check, save and CA results; `refreshAfter` already sets
+  `lastSaveResult` for add, update and rename. Also made the edit panel `verticalScroll`: at the test
+  window (1024x768) it is taller than the window, so the banner and buttons were off-screen.
+  The three tests still fail for TEST reasons, not production: (1) `onNodeWithText("New connection")` matches
+  two nodes (sidebar button and panel title) in the collision test; (2) clicks on "Check connection" and
+  "Save" land off-screen, so need `performScrollTo()` first. With those test edits (patch kept at
+  scratchpad `test-fix.patch`) all 6 tests pass. Test developer to apply.
+- Verification (test developer, step 4): test defects fixed (patch applied, commit after 777192d). Mutation check: with the
+  production behaviour reverted (scroll kept) the 3 new tests fail on the assertions (collision banner node missing; stale
+  banner node still present). Restored: ConnectionsScreenUiTest 5/5 (the new 3 plus 2 existing), core jvmTest 6/6, ui jvmTest
+  6/6, acceptance-tests (Cucumber, `not @needs-M2`; includes @smoke and @fake-broker of 01_connections) 17 run, 1 skipped, 0 failed.
+  @broker not run: Docker unavailable here and no @broker scenario exists for this task. No blocker or major findings.
+- Review (architect, step 5): Accepted. Scope held; the `verticalScroll` on `EditPanel` is accepted as a necessary
+  enabler (without it the banner and Save are unreachable at 1024x768), no follow-up brief. Minor, optional notes: the
+  collision banner stays until the next save or selection switch (not cleared on editing the name); the
+  `lastCaCertificateValidationResult` clearing has no dedicated UI test; no visible scrollbar on the panel; the
+  `ErrorBanner` has no accessibility role. Revisit these when the real screen gets its first human run.

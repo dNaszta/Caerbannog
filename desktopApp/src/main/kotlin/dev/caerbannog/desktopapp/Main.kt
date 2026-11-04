@@ -1,19 +1,17 @@
 package dev.caerbannog.desktopapp
 
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import dev.caerbannog.ui.App
+import dev.caerbannog.ui.connections.ConnectionsScreen
 
 /**
- * M1-01 skeleton spike, Acceptance item 2: "desktopApp launches an empty window via the chosen
- * tool's run command."
- *
- * Renders the placeholder `App()` composable from `ui`'s commonMain. No view model, no broker code
- * here - `desktopApp` only holds `main()`, the window and (later) menus and packaging, per
- * docs/spec.md's Module layout table.
+ * M1-05: renders the real Connections screen. All wiring lives in [createConnectionsViewModel]; the
+ * view model is created once via `remember` so recomposition does not rebuild it.
  */
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, title = "Caerbannog") {
-        App()
+        val viewModel = remember { createConnectionsViewModel() }
+        ConnectionsScreen(viewModel)
     }
 }

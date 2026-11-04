@@ -22,7 +22,7 @@ class ConnectionsViewModel(
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
     val state: StateFlow<ConnectionsState> = _state.asStateFlow()
 
-    /** Adds a brand-new profile; every new profile starts at [TopologyControlLevel.READ_ONLY]. */
+    /** Adds a brand-new profile; without an explicit level it starts at [TopologyControlLevel.READ_ONLY]. */
     fun addConnection(input: ConnectionProfileInput): SaveConnectionResult {
         val profile = ConnectionProfile(
             name = input.name,
@@ -31,6 +31,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
         )
         val result = repository.add(profile)
         if (result is SaveConnectionResult.Saved) {
@@ -56,6 +57,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
         )
 
         val result = if (input.name == originalName) {
@@ -153,12 +155,19 @@ class ConnectionsViewModel(
     // rest of this view model - see docs/tasks/M1-02-connection-profiles.md's Design notes, decision 4.
 
     fun selectConnection(name: String) {
-        _state.update { it.copy(selectedProfileName = name) }
+        _state.update { it.copy(selectedProfileName = name).withoutResultBanners() }
     }
 
     fun startNewConnection() {
-        _state.update { it.copy(selectedProfileName = null) }
+        _state.update { it.copy(selectedProfileName = null).withoutResultBanners() }
     }
+
+    // Banners belong to the profile they were produced for; a switch must not carry them over.
+    private fun ConnectionsState.withoutResultBanners(): ConnectionsState = copy(
+        lastCheckResult = null,
+        lastSaveResult = null,
+        lastCaCertificateValidationResult = null,
+    )
 
     private fun storePasswordIfPresent(name: String, password: String?) {
         if (!password.isNullOrBlank()) secretStore.store(name, password)
