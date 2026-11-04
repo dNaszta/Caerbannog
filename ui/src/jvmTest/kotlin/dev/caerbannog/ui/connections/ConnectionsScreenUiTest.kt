@@ -494,6 +494,15 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun `the declared permissions section title says it is the user's own statement`() = runDesktopComposeUiTest {
+        setContent { ConnectionsScreen(testViewModel()) }
+
+        // Exact full-text match (substring = false is the default): the old title "Declared permissions" must not satisfy it.
+        onNodeWithText("Declared permissions (your own statement)").performScrollTo().assertExists()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun `new connection starts with the switch off and no choices shown`() = runDesktopComposeUiTest {
         setContent { ConnectionsScreen(testViewModel()) }
         assertNotDeclared()

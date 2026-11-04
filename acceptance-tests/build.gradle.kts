@@ -32,6 +32,8 @@ val cucumberVersion = "7.20.1"
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(project(":core"))
+    // Guard: acceptance steps must not instantiate the keychain-backed JavaKeyringSecretStore.
+    // Keyring and JNA native libs are on the classpath only because the file repository needs data-rabbit.
     testImplementation(project(":data-rabbit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
