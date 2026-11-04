@@ -31,6 +31,15 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   layout. `VerticalScrollbar` compiles in commonMain (no expect/actual). No new dependency. The profile card is not
   `clickable` (it merges children and hides the pill tag from the merged tree): it uses `pointerInput` plus button
   semantics, so it has no keyboard focus yet (follow-up for M1-12). Manual look still to do.
+- Step 4 (verify, test developer, 2026-11-04): pass with findings, no blocker or major. Full `./gradlew test
+  --rerun-tasks --continue` green: core 100, acceptance 43 (5 skipped by design: 3 `@needs-M2`, 1 `@broker`, 1
+  deferred "Switch between connections"; the five former `@needs-M1-07` scenarios run and pass), data-rabbit 19,
+  desktopApp 5, ui 57. Test fix: `the password field is masked` now asserts `EditableText` is the bullet mask (the
+  senior developer was right: `hasText` also reads the test-only `InputText`); mutation (remove
+  `PasswordVisualTransformation`) makes it fail. `selectProfile` now uses the unmerged tree. 27 production mutations
+  killed (pill text/tone per row, dim note, declaration over Checked, userMessage, Save path, rename key, delete,
+  Select/start-up check, reachability skipped or guarding, New-connection banner, scrollbar tag, Checking/Done). Open
+  minor findings in the report (banner layout versus mockup, card focus). Manual look by the user still pending.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

@@ -43,6 +43,7 @@ import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.TopologyControlLevel
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import org.junit.jupiter.api.Test
 
@@ -94,6 +95,9 @@ class ConnectionsScreenUiTest {
             SemanticsMatcher("permission pill") {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("permissionPill:") == true
             },
+            // Unmerged tree: the pill tag stays findable whether the card is `clickable` (merges children) or not;
+            // the click lands on the pill, which sits inside the card, so it reaches the card either way.
+            useUnmergedTree = true,
         )[index].performClick()
         waitForIdle()
     }
@@ -960,9 +964,16 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
 
-        onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password)).assertExists("expected a password-masked field")
+        val passwordField = onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+        passwordField.assertExists("expected a password-masked field")
         onNodeWithText("Password (leave blank to keep unchanged)").performTextInput("hunter2")
-        onNodeWithText("hunter2").assertDoesNotExist()
+
+        // Not onNodeWithText("hunter2"): hasText also reads the test-only InputText property, which holds the raw
+        // typed text on any field. EditableText is what the screen shows (and what accessibility sees): it must be
+        // the bullet mask, same length as the input, and must not contain the typed text.
+        val shown = passwordField.fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+        assertEquals("\u2022".repeat("hunter2".length), shown, "the field must show bullets, not the typed password")
+        assertFalse(shown.contains("hunter2"), "the typed password must not be visible in the field")
     }
 
     @OptIn(ExperimentalTestApi::class)
