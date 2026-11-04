@@ -115,6 +115,18 @@ No product decision and no new dependency or build-tool choice is needed. Nothin
   `Main.kt` renders `ConnectionsScreen` via `remember`; `desktopApp` now has `implementation` of `:core` and
   `:data-rabbit`. `./gradlew test`: desktopApp 3/3, core 6, ui 6, data-rabbit 10 (non-@broker), acceptance-tests
   17 run, 0 failed, 1 skipped. Manual `:desktopApp:run` NOT done (touches real ~/.caerbannog and keychain; human step).
+- Step: 4 done (test developer, verify): PASS, no blocker or major. `./gradlew test --rerun-tasks` green:
+  desktopApp 3/3, core 6 (SpikeSanity 1, ConnectionsViewModel 5), ui 6 (ConnectionsScreenUi 5, AppUi 1), data-rabbit 10
+  non-broker, acceptance-tests 17 run, 0 failed, 1 skipped = "Switch between connections" (`@needs-M2`, by design).
+  `@broker` (`:data-rabbit:brokerTest`) ran but both tests were skipped by `disabledWithoutDocker` (Testcontainers
+  could not reach Docker here), so not proven this round (unchanged by M1-05). Mutation checks on
+  `createConnectionsViewModel`: ignore profilesFile -> 2 tests fail; ignore secretStore -> password test fails;
+  repository on a different temp file -> all 3 fail; tree restored clean. Review by reading: no M1-05 test or build
+  step uses `defaultFile()`, the default parameters or `~/.caerbannog`. Not done: `:desktopApp:run` (human step).
+  Minor: reachability checker and CA validator wiring are not asserted by any test (swapping them would stay green);
+  accepted as out of the brief's stated test. Note: pre-existing M1-02 `KeyringSecretStoreTest` uses the real
+  `JavaKeyringSecretStore` with a throwaway profile name (touches the real keychain on every `test` run), outside
+  this brief's rule but worth the architect's attention.
 - Round: 1
 - Branch: `m1-05-wire-desktopapp-connections`
 - Base branch: `m1-04-connections-screen-feedback-gaps` (accepted, not merged), so the first human run of
