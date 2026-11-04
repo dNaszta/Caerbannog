@@ -38,7 +38,7 @@ Feature: Permission check before the first connection
     Then the permission check runs again
     And topology changes are locked
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: A locked connection says so in the sidebar
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
@@ -50,7 +50,7 @@ Feature: Permission check before the first connection
     When I connect to "prod-eu"
     Then the topology screen explains that the user has no configure permission on virtual host "/"
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: A verified connection says so in the sidebar and in the edit panel
     Given the user has these permissions on "/": configure ".*", write ".*", read ".*"
     When I connect to "prod-eu"
@@ -125,7 +125,7 @@ Feature: Permission check before the first connection
     Then "prod-eu" declares nothing
     And the permission check, if it cannot read permissions, uses the safest mode
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: Declared permissions are shown as the user's own claim
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the management API refuses to return the user's permissions
@@ -133,7 +133,7 @@ Feature: Permission check before the first connection
     Then the sidebar shows "Can change topology (declared)" next to "prod-eu"
     And the edit panel says the broker could not confirm the permissions and still enforces its own
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: A declaration is not used when the broker answers
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the user has no configure permission on "/"
@@ -141,7 +141,7 @@ Feature: Permission check before the first connection
     Then the sidebar shows "Topology locked" next to "prod-eu"
     And the edit panel says "Your declaration is not used, because the broker answered."
 
-  @fake-broker
+  @fake-broker @needs-M1-07
   Scenario: Permissions that could not be read are shown as locked with the reason
     Given the management API refuses to return the user's permissions
     When I connect to "prod-eu"
