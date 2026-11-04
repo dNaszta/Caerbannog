@@ -22,6 +22,8 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.runtime)
+            // M1-12b: Material icons (frozen last release; see docs/tasks/M1-12b-connections-icons.md). Import confined to ConnectionsIcons.kt.
+            implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
             // M1-02: the Connections screen calls core's ConnectionsViewModel/ConnectionProfile etc.
             // - interfaces and a view model only, no RabbitMQ/network import ever reaches `ui` through
             // this (see docs/tasks/M1-02-connection-profiles.md's Design notes, module boundaries).
