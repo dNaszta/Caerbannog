@@ -146,6 +146,12 @@ class RealBrokerCatalogTest {
         return http.send(b.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString()).statusCode()
     }
 
+    private fun userCall(user: String, password: String, path: String): String {
+        val auth = Base64.getEncoder().encodeToString("$user:$password".toByteArray())
+        val r = http.send(HttpRequest.newBuilder(URI("https://${rabbit.host}:${rabbit.httpsPort}$path")).header("Authorization", "Basic $auth").GET().build(), HttpResponse.BodyHandlers.ofString())
+        return "${r.statusCode()} ${r.body().take(120)}"
+    }
+
     private fun declareQueue(name: String, type: String) {
         assertEquals(201, adminCall("PUT", "/api/queues/%2F/$name", """{"durable":true,"arguments":{"x-queue-type":"$type"}}"""), "declare $type $name")
         streamsToDelete += "%2F" to name
@@ -229,7 +235,7 @@ class RealBrokerCatalogTest {
 
         val page: StreamPage = awaitUntil(
             "13 queues and streams listed for $prefix",
-            fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(pageSize = 100, nameFilter = prefix)) }) },
+            fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(vhost = "/", pageSize = 100, nameFilter = prefix)) }) },
             done = { it.filteredCount == 13 },
         )
 
@@ -246,12 +252,12 @@ class RealBrokerCatalogTest {
         repeat(2) { createStream("$prefix-s$it") }
         val held = connection()
 
-        val first = awaitUntil("5 entries for $prefix", fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(page = 1, pageSize = 2, nameFilter = prefix)) }) }, done = { it.filteredCount == 5 })
+        val first = awaitUntil("5 entries for $prefix", fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(vhost = "/", page = 1, pageSize = 2, nameFilter = prefix)) }) }, done = { it.filteredCount == 5 })
 
         assertEquals(3, first.pageCount)
         assertTrue(first.rows.size <= 2, "a page never holds more entries than the page size")
-        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(pageSize = 501)))
-        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(page = 99, pageSize = 2, nameFilter = prefix)))
+        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(vhost = "/", pageSize = 501)))
+        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(vhost = "/", page = 99, pageSize = 2, nameFilter = prefix)))
     }
 
     @Test
@@ -290,6 +296,32 @@ class RealBrokerCatalogTest {
         assertEquals(listOf("cons-$name"), consumers.map { it.name })
     }
 
+    // M2-04 D8: one call per vhost, grouped by stream, never one call per row. Written test-first; the stats can lag
+    // up to 5 s, so bounded polling on the value.
+    @Test
+    fun `publisherCounts groups the publishers of the vhost by stream in one call`() = runBlocking<Unit> {
+        val busy = unique("pc-busy-")
+        val quiet = unique("pc-quiet-")
+        val e = createStream(busy)
+        createStream(quiet)
+        publish(e, busy, 3, reference = "pub-a-$busy")
+        // a second publisher on the same stream, kept open so that its row exists
+        val second = e.producerBuilder().stream(busy).name("pub-b-$busy").build()
+        closeables += second
+        val held = connection()
+
+        val counts = awaitUntil("2 publishers on $busy", fetch = { success(runBlocking { held.catalog.publisherCounts("/") }) }, done = { it[busy] == 2 })
+
+        assertEquals(2, counts[busy])
+        assertEquals(null, counts[quiet], "a stream without a publisher is absent, the view model shows 0")
+    }
+
+    @Test
+    fun `publisherCounts of a vhost without publishers is an empty map`() = runBlocking<Unit> {
+        val held = connection(vhost = OTHER_VHOST)
+        assertEquals(CatalogResult.Success(emptyMap<String, Int>()), held.catalog.publisherCounts(OTHER_VHOST))
+    }
+
     @Test
     fun `a stream with nothing attached has empty lists, not errors`() = runBlocking<Unit> {
         val name = unique("quiet-")
@@ -309,7 +341,7 @@ class RealBrokerCatalogTest {
     fun `a user without the management tag is connected, visibility none, lists not authorised`() = runBlocking<Unit> {
         val held = connection("m203-plain", "pw-plain")
         assertEquals(Visibility.NONE, success(held.catalog.capabilities()).visibility)
-        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertEquals(CatalogResult.NotAuthorised, held.catalog.publishers("/", "x"))
         assertEquals(CatalogResult.NotAuthorised, held.catalog.consumers("/", "x"))
     }
@@ -382,7 +414,67 @@ class RealBrokerCatalogTest {
         val held = connection()
         held.close()
         held.close()
-        assertTrue(held.catalog.listStreams(StreamListRequest()) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
+        assertTrue(held.catalog.listStreams(StreamListRequest(vhost = "/")) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
+    }
+
+    // ---- M2-04 F-1 re-verify: the list is per vhost on a real broker ----
+
+    private fun withVhost(vhost: String, body: () -> Unit) {
+        ctl("add_vhost", vhost)
+        try {
+            ctl("set_permissions", "-p", vhost, rabbit.adminUsername, ".*", ".*", ".*")
+            body()
+        } finally {
+            environments.forEach { runCatching { it.close() } }; environments.clear()
+            runCatching { ctl("delete_vhost", vhost) }
+        }
+    }
+
+    private fun listed(held: HeldConnection, vhost: String, prefix: String, count: Int): StreamPage =
+        success(awaitUntil("$count streams of $prefix in $vhost", fetch = { runBlocking { held.catalog.listStreams(StreamListRequest(vhost = vhost, pageSize = 100, nameFilter = prefix)) } }, done = { it is CatalogResult.Success && it.value.rows.size == count }))
+
+    @Test
+    fun `the same stream name in two vhosts is listed once per vhost, each with its own counts`() = runBlocking<Unit> {
+        val name = unique("twin-")
+        publish(createStream(name), name, 3)
+        publish(createStream(name, OTHER_VHOST), name, 7)
+        val here = listed(connection(vhost = "/"), "/", name, 1)
+        val there = listed(connection(vhost = OTHER_VHOST), OTHER_VHOST, name, 1)
+        assertEquals(listOf("/"), here.rows.map { it.vhost })
+        assertEquals(listOf(OTHER_VHOST), there.rows.map { it.vhost })
+        val admin = connection()
+        val counts = awaitUntil("messages 3 and 7", fetch = { listed(admin, "/", name, 1).rows.single().messages to listed(admin, OTHER_VHOST, name, 1).rows.single().messages }, done = { it == Pair<Long?, Long?>(3L, 7L) })
+        assertEquals(Pair<Long?, Long?>(3L, 7L), counts)
+    }
+
+    @Test
+    fun `a vhost name with a space or a slash is encoded and lists only its own streams`() = runBlocking<Unit> {
+        for (vhost in listOf("m204 spaced", "m204/slashed")) {
+            withVhost(vhost) {
+                val name = unique("enc-")
+                createStream(name, vhost)
+                val own = createStream("$name-home") // in "/", must not leak into the other vhost's list
+                val held = connection(vhost = vhost)
+                val page = listed(held, vhost, "enc-", 1)
+                assertEquals(listOf(name), page.rows.map { it.name }, "vhost <$vhost>")
+                assertEquals(1, page.totalCount, "vhost <$vhost>")
+                assertEquals(CatalogResult.Success(emptyMap<String, Int>()), runBlocking { held.catalog.publisherCounts(vhost) })
+                own.close()
+            }
+        }
+    }
+
+    @Test
+    fun `a management user without permission on the vhost gets no list and no leak`() = runBlocking<Unit> {
+        val name = unique("noperm-")
+        publish(createStream(name, OTHER_VHOST), name, 1)
+        val held = connection("m203-mgmt", "pw-mgmt")
+        val result = held.catalog.listStreams(StreamListRequest(vhost = OTHER_VHOST, pageSize = 100, nameFilter = name))
+        val rows = (result as? CatalogResult.Success)?.value?.rows.orEmpty()
+        assertTrue(rows.isEmpty(), "no permission on $OTHER_VHOST, got $result")
+        // Measured on RabbitMQ 4: the broker answers 404 for a vhost the user has no permission on (not 401/403), which maps to Unexpected.
+        assertTrue(userCall("m203-mgmt", "pw-mgmt", "/api/queues/$OTHER_VHOST").startsWith("404"), "broker behaviour changed")
+        assertEquals(CatalogResult.Unexpected, result)
     }
 
     // ---- stream side TLS (added by the developer at the build, brief part 2 step 2 note 3) ----
@@ -417,14 +509,14 @@ class RealBrokerCatalogTest {
             val opened = RabbitMqConnectionGateway(Passwords(mapOf("rb-test" to own.adminPassword))).open(profile)
             assertInstanceOf(OpenResult.Opened::class.java, opened, "$opened")
             (opened as OpenResult.Opened).connection.also {
-                assertInstanceOf(CatalogResult.Success::class.java, it.catalog.listStreams(StreamListRequest()), "control: the broker is up")
+                assertInstanceOf(CatalogResult.Success::class.java, it.catalog.listStreams(StreamListRequest(vhost = "/")), "control: the broker is up")
             }
         } catch (e: Throwable) {
             own.stop(); throw e
         }
         own.stop()
         try {
-            assertEquals(CatalogResult.Unreachable, held.catalog.listStreams(StreamListRequest()))
+            assertEquals(CatalogResult.Unreachable, held.catalog.listStreams(StreamListRequest(vhost = "/")))
             assertEquals(CatalogResult.Unreachable, held.catalog.capabilities())
             assertEquals(FirstOffset.Unavailable, held.offsets.firstOffset("/", "any"), "a dead broker is Unavailable, never an exception")
         } finally {
@@ -450,8 +542,9 @@ class RealBrokerCatalogTest {
             try {
                 assertEquals(CatalogResult.PluginMissing, held.catalog.publishers("/", "any"))
                 assertEquals(CatalogResult.PluginMissing, held.catalog.consumers("/", "any"))
+                assertEquals(CatalogResult.PluginMissing, held.catalog.publisherCounts("/"), "M2-04 D8: the vhost path without the plugin")
                 assertEquals(CatalogResult.Success(Capabilities(PluginStatus.MISSING, Visibility.FULL)), held.catalog.capabilities())
-                assertInstanceOf(CatalogResult.Success::class.java, held.catalog.listStreams(StreamListRequest()), "the queue list still works")
+                assertInstanceOf(CatalogResult.Success::class.java, held.catalog.listStreams(StreamListRequest(vhost = "/")), "the queue list still works")
             } finally {
                 held.close()
             }

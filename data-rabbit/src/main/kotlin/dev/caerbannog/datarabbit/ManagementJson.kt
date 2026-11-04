@@ -80,6 +80,13 @@ internal object ManagementJson {
         )
     }
 
+    /** D8: publisher rows of a whole vhost counted per stream (`queue.name`); streams without a row are absent. */
+    fun parsePublisherCounts(body: String): CatalogResult<Map<String, Int>> = guarded(body) { root ->
+        CatalogResult.Success(
+            root.asArray().map { it.asObject()["queue"].asObject().requiredString("name") }.groupingBy { it }.eachCount(),
+        )
+    }
+
     /** The broker has no per-stream consumers path, so the rows are kept by the exact name of their queue. */
     fun parseConsumers(body: String, stream: String): CatalogResult<List<ConsumerRow>> = guarded(body) { root ->
         val rows = root.asArray().map { it.asObject() }

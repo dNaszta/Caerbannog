@@ -28,4 +28,5 @@ include(
     ":ui",
     ":desktopApp",
     ":acceptance-tests",
+    ":core-testing",
 )

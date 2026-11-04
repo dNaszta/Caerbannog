@@ -5,12 +5,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Maps a management API error status to a typed failure. The body never changes the class and is never copied. */
+/** Maps a management API error status to a typed failure. The status alone decides; a body is never looked at or copied. */
 internal object ManagementErrors {
 
     /** [on404] says what a 404 means for this call (the plugin probe: PluginMissing; a single stream: NotFound). */
-    @Suppress("UNUSED_PARAMETER") // the body is part of the contract so a future status can look at it; today none does
-    fun map(status: Int, body: String, on404: CatalogResult.Failure): CatalogResult.Failure = when (status) {
+    fun map(status: Int, on404: CatalogResult.Failure): CatalogResult.Failure = when (status) {
         400 -> CatalogResult.BadPaging
         401, 403 -> CatalogResult.NotAuthorised
         404 -> on404

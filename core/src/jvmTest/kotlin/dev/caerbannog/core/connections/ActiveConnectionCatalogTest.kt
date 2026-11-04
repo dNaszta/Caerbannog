@@ -32,7 +32,7 @@ class ActiveConnectionCatalogTest {
         assertEquals(
             CatalogResult.Success(Capabilities(PluginStatus.UNKNOWN, Visibility.NONE)), held.catalog.capabilities(),
         )
-        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest(vhost = "/")))
     }
 
     @Test

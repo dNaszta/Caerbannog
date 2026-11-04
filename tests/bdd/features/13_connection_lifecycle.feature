@@ -106,8 +106,8 @@ Feature: Connect and disconnect
     When the window is closed
     Then the app holds no connection to the broker
 
-  # Product decision D2 is proposed and awaits confirmation: no automatic reconnect in M2.
-  @fake-broker @needs-decision
+  # Product decision D2 (confirmed 2026-11-04): no automatic reconnect in M2. Runs when M2-05 builds the screen.
+  @fake-broker @needs-M2
   Scenario: A lost connection offers a retry, not a silent reconnect
     Given I am connected to "uat-eu"
     When the broker stops answering

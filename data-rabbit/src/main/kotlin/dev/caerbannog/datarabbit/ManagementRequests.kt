@@ -19,12 +19,15 @@ internal class ManagementRequests(baseUrl: String) {
             parameters += "use_regex=${request.useRegex}"
         }
         parameters += "columns=${encode(LIST_COLUMNS)}"
-        return "$base/api/queues?${parameters.joinToString("&")}"
+        return "$base/api/queues/${encode(request.vhost)}?${parameters.joinToString("&")}"
     }
 
     fun streamDetail(vhost: String, name: String): String = "$base/api/queues/${encode(vhost)}/${encode(name)}"
 
     fun publishers(vhost: String, stream: String): String = "$base/api/stream/publishers/${encode(vhost)}/${encode(stream)}"
+
+    /** D8: every publisher of the vhost in one call; the caller counts them per stream. */
+    fun publisherCounts(vhost: String): String = "$base/api/stream/publishers/${encode(vhost)}"
 
     /** The broker has no per-stream consumers path (it answers 400), so the rows of the whole vhost are read. */
     fun consumers(vhost: String): String = "$base/api/stream/consumers/${encode(vhost)}"

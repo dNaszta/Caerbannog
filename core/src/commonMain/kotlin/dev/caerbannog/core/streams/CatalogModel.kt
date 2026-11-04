@@ -1,7 +1,9 @@
 package dev.caerbannog.core.streams
 
-/** Page request for [StreamCatalog.listStreams]. [nameFilter] is a substring, or a regex with [useRegex]; page is 1-based. */
+/** Page request for [StreamCatalog.listStreams]. [nameFilter] is a substring, or a regex with [useRegex]; page is 1-based.
+ * [vhost] has no default: the broker answers for the one vhost asked, and a forgotten vhost would list other vhosts' streams. */
 data class StreamListRequest(
+    val vhost: String,
     val page: Int = 1,
     val pageSize: Int = 100,
     val nameFilter: String? = null,

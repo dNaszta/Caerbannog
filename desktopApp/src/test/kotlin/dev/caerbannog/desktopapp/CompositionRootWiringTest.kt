@@ -30,6 +30,7 @@ import java.io.File
 import java.net.ServerSocket
 import java.util.Collections
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 /**
@@ -73,6 +74,7 @@ class CompositionRootWiringTest {
         override suspend fun listStreams(request: StreamListRequest): CatalogResult<StreamPage> = CatalogResult.Unexpected
         override suspend fun streamDetail(vhost: String, name: String): CatalogResult<StreamSummary> = CatalogResult.Unexpected
         override suspend fun publishers(vhost: String, stream: String): CatalogResult<List<PublisherRow>> = CatalogResult.Unexpected
+        override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> = CatalogResult.Unexpected
         override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> = CatalogResult.Unexpected
         override suspend fun capabilities(): CatalogResult<Capabilities> = CatalogResult.Unexpected
     }
@@ -188,6 +190,34 @@ class CompositionRootWiringTest {
 
         // The real gateway tried the closed port: a fake would have answered Opened. The password came from `secrets`.
         assertEquals(LinkState.Failed("uat-eu", ConnectionFailureReason.BROKER_NOT_REACHABLE), composition.active.state.value)
+        composition.close()
+    }
+
+    // --- M2-04 F1: the composition root passes a logger -----------------------------------------------------------
+
+    /**
+     * Contract: `createAppComposition(..., log: (String) -> Unit = <a stderr line writer>, gateway = RabbitMqConnectionGateway(secretStore, log))`.
+     * Before this, the default gateway got no logger and a failed close of a held connection vanished. What is covered here: the
+     * parameter exists, the default gateway still works with it, and nothing a failed Connect writes to it carries the password
+     * or the host. What is NOT covered: that a failed close reaches this sink (it needs a held real connection whose close throws;
+     * the holder side is pinned by data-rabbit RabbitMqHeldConnectionTest "a throwing close logs the class name only", the
+     * wiring by reading CompositionRoot.kt, see the step 2 report).
+     */
+    @Test
+    fun `the composition root takes a logger and a failed connect writes no secret to it`() = runBlocking<Unit> {
+        val lines: MutableList<String> = Collections.synchronizedList(ArrayList())
+        val closed = ServerSocket(0).use { it.localPort }
+        val composition = createAppComposition(
+            File(dir, "connections.json"), MapSecrets(), permissionChecker = Permissive, reachabilityChecker = Reachable,
+            log = { lines += it },
+        )
+        composition.viewModel.addConnection(input.copy(host = "127.0.0.1", managementPort = closed, streamPort = closed))
+
+        composition.viewModel.connect("uat-eu")
+
+        assertEquals(LinkState.Failed("uat-eu", ConnectionFailureReason.BROKER_NOT_REACHABLE), composition.active.state.value)
+        val text = lines.joinToString("\n")
+        assertFalse(text.contains("not-a-real-secret"), "the password is in the log: <$text>")
         composition.close()
     }
 }
