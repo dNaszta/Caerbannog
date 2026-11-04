@@ -21,7 +21,7 @@ class ConnectionsViewModel(
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
     val state: StateFlow<ConnectionsState> = _state.asStateFlow()
 
-    /** Adds a brand-new profile; every new profile starts at [TopologyControlLevel.READ_ONLY]. */
+    /** Adds a brand-new profile; without an explicit level it starts at [TopologyControlLevel.READ_ONLY]. */
     fun addConnection(input: ConnectionProfileInput): SaveConnectionResult {
         val profile = ConnectionProfile(
             name = input.name,
@@ -30,6 +30,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
         )
         val result = repository.add(profile)
         if (result is SaveConnectionResult.Saved) {
@@ -55,6 +56,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
         )
 
         val result = if (input.name == originalName) {

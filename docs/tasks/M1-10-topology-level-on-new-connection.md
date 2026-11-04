@@ -3,7 +3,7 @@
 Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired; branch base), M1-02-connection-profiles    Size: S
 
 ## Status
-- State: step 2 done (tests written, red); step 3 (implementation) next. Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
+- State: step 3 done (implemented, all green; ready for verification and review). Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
   while creating a connection; (2) in edit mode it applies on Save, one rule everywhere; (3) choosing Full control asks
   for a confirmation.
 - Branch (when started): `m1-10-topology-level-on-new-connection`, based on `m1-05-wire-desktopapp-connections`.
@@ -14,6 +14,10 @@ Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired;
   `ConnectionsScreenUiTest`. Red: core and acceptance-tests fail to compile (no `topologyControlLevel` parameter on
   `ConnectionProfileInput`); UI tests compile and fail on assertions (11 of 19). The UI tests check the persisted level
   through the in-memory repository, so they need no production signature.
+- Step 3 (developer): `ConnectionProfileInput.topologyControlLevel` (null: add = READ_ONLY, update = keep, incl. rename);
+  `EditPanel` holds level + `pendingLevel` as form state, `FullControlConfirmDialog`, helper text; dead
+  `onTopologyControlChange` removed. Green: core 11, ui 19, acceptance 19 (1 skipped, @broker), data-rabbit fast, desktopApp.
+  Note: `./gradlew test` does not run core/ui `jvmTest`; run `:core:jvmTest :ui:jvmTest` too.
 - Round: 0
 
 ## Goal

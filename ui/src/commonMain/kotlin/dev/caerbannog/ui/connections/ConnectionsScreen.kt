@@ -72,7 +72,6 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
                 if (originalName == null) viewModel.addConnection(input) else viewModel.updateConnection(originalName, input)
             },
             onDeleteRequest = viewModel::requestDelete,
-            onTopologyControlChange = viewModel::setTopologyControlLevel,
             onValidateCaCertificate = { name, path ->
                 if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
             },
@@ -143,7 +142,6 @@ private fun EditPanel(
     state: ConnectionsState,
     onSave: (originalName: String?, input: ConnectionProfileInput) -> Unit,
     onDeleteRequest: (String) -> Unit,
-    onTopologyControlChange: (name: String, level: TopologyControlLevel) -> Unit,
     onValidateCaCertificate: (name: String?, path: String) -> Unit,
     onCheckConnection: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -156,6 +154,9 @@ private fun EditPanel(
     var username by remember(selected?.name) { mutableStateOf(selected?.username.orEmpty()) }
     var password by remember(selected?.name) { mutableStateOf("") }
     var caCertificatePath by remember(selected?.name) { mutableStateOf(selected?.caCertificatePath.orEmpty()) }
+    // Form state like every other field: applied on Save only. pendingLevel non-null = confirmation open.
+    var level by remember(selected?.name) { mutableStateOf(selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY) }
+    var pendingLevel by remember(selected?.name) { mutableStateOf<TopologyControlLevel?>(null) }
 
     // Scrollable: the panel is taller than a small window, which would push the banners and Save off-screen.
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
@@ -196,10 +197,24 @@ private fun EditPanel(
 
         Spacer(modifier = Modifier.height(16.dp))
         TopologyControlSelector(
-            level = selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
-            enabled = selected != null,
-            onChange = { level -> selected?.let { onTopologyControlChange(it.name, level) } },
+            level = level,
+            onChange = { picked ->
+                if (picked == TopologyControlLevel.FULL_CONTROL && level != TopologyControlLevel.FULL_CONTROL) {
+                    pendingLevel = picked
+                } else {
+                    level = picked
+                }
+            },
         )
+        pendingLevel?.let { pending ->
+            FullControlConfirmDialog(
+                onConfirm = {
+                    level = pending
+                    pendingLevel = null
+                },
+                onCancel = { pendingLevel = null },
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
         PermissionCheckPanel()
@@ -235,6 +250,7 @@ private fun EditPanel(
                     password = password.ifBlank { null },
                     streamPort = selected?.streamPort ?: 5551,
                     managementPort = selected?.managementPort ?: 15671,
+                    topologyControlLevel = level,
                 )
                 onSave(selected?.name, input)
             }) {
@@ -245,19 +261,41 @@ private fun EditPanel(
 }
 
 @Composable
-private fun TopologyControlSelector(level: TopologyControlLevel, enabled: Boolean, onChange: (TopologyControlLevel) -> Unit) {
+private fun TopologyControlSelector(level: TopologyControlLevel, onChange: (TopologyControlLevel) -> Unit) {
     Column {
         Text("Topology control", style = MaterialTheme.typography.titleSmall)
-        TopologyOption("Read-only", level == TopologyControlLevel.READ_ONLY, enabled) { onChange(TopologyControlLevel.READ_ONLY) }
-        TopologyOption("Declare and edit", level == TopologyControlLevel.DECLARE_AND_EDIT, enabled) { onChange(TopologyControlLevel.DECLARE_AND_EDIT) }
-        TopologyOption("Full control", level == TopologyControlLevel.FULL_CONTROL, enabled) { onChange(TopologyControlLevel.FULL_CONTROL) }
+        Text(
+            "The most this app will do to topology on this connection. The broker's own permissions still apply.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        TopologyOption("Read-only", level == TopologyControlLevel.READ_ONLY) { onChange(TopologyControlLevel.READ_ONLY) }
+        TopologyOption("Declare and edit", level == TopologyControlLevel.DECLARE_AND_EDIT) { onChange(TopologyControlLevel.DECLARE_AND_EDIT) }
+        TopologyOption("Full control", level == TopologyControlLevel.FULL_CONTROL) { onChange(TopologyControlLevel.FULL_CONTROL) }
     }
 }
 
 @Composable
-private fun TopologyOption(label: String, selected: Boolean, enabled: Boolean, onSelect: () -> Unit) {
+private fun FullControlConfirmDialog(onConfirm: () -> Unit, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Allow full control?") },
+        text = {
+            Text(
+                "Full control lets this app delete topology (queues, streams, exchanges, bindings, policies) " +
+                    "on this connection and run migrations with destructive actions. This is only your own " +
+                    "ceiling for this connection: the broker's permissions still apply, and the app never " +
+                    "reads, gets or purges queue messages.",
+            )
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Use Full control") } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun TopologyOption(label: String, selected: Boolean, onSelect: () -> Unit) {
     Row {
-        RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
+        RadioButton(selected = selected, onClick = onSelect)
         Text(label, modifier = Modifier.padding(top = 12.dp))
     }
 }
