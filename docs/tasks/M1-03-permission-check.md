@@ -100,8 +100,7 @@ Tests written first and failing for the right reason; all scenarios above pass; 
 brief and `docs/spec.md` (open question moved); no unrelated changes; `docs/tasks/README.md` updated.
 
 ## Status
-- Round: 1, architect decisions done (spike resolved, decision D, contract below). Next: step 2b, test developer adjusts
-  the red tests to the final contract (list below); then step 3, senior developer.
+- Round: 1, step 4 done (test developer): pass with findings, no blocker or major. Next: architect review and verdict.
 - Branch: `m1-03-permission-check`
 - Base branch: `main` (needs only M1-02, already in main; does not need M1-04 or M1-05)
 - New siblings: `M1-06-profile-declared-permissions`, `M1-07-permission-state-ui` (not started; both start after this task).
@@ -238,3 +237,13 @@ unchanged), `ConnectionsViewModel.saveProfileChanges`, `data-rabbit` `Management
 `TlsSupport` extracted from the reachability checker. `ConnectionsViewModel.profileNamed` now reads the repository
 instead of its state copy (the acceptance steps add profiles to the repository directly). Results: core 34, acceptance
 36 (7 skipped by tag), data-rabbit 8 plus `brokerTest` 11, ui 6, all passing.
+
+### Step 4: verification (test developer), pass with findings (no blocker, no major)
+Independent run: `./gradlew test --rerun-tasks --continue` green (core 34, acceptance 36 run / 0 failed / 7 skipped, data-rabbit 8,
+ui 6); `:data-rabbit:brokerTest --rerun-tasks` green (11, real Testcontainers broker, Docker available).
+Skips are all by design tag: `@needs-M1-07` (2), `@needs-M1-06` (2), `@needs-M2` (2: browsing streams; Switch between connections),
+`@broker` (1: "The broker has the final say", M5). Mutation-checked 15 rules (override over Checked, declaration for NO_PASSWORD,
+Unreadable unlocked / publishing, read pattern, `^$`, result kept while checking, no forget on rename, check on failed save,
+401 to Checked, 401 to NOT_FOUND, 404 to Checked, password in detail, refused to unlocked, http instead of https): each failed the
+expected tests, all restored. JSON persistence unchanged (no `declaredPermissions` in data-rabbit main, repository untouched).
+Minor findings for the architect are in the test report (adapter mapping gaps, session not thread-safe, profileNamed deviation accepted by tests).
