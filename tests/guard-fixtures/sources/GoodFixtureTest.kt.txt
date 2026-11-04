@@ -1,0 +1,21 @@
+package fixture
+
+// Kept outside the normal test sources: read only by verifyTestDiscoveryFixtures. None of these may be flagged.
+class GoodFixtureTest {
+    @Test
+    fun `a fine test returns Unit`() {
+        assertEquals(1, 1)
+    }
+
+    @Test
+    fun `runBlocking Unit is accepted`() = runBlocking<Unit> {
+        assertIs<String>(value())
+    }
+
+    @Test
+    fun `block body is accepted`() {
+        runBlocking {
+            assertFailsWith<IllegalStateException> { error("x") }
+        }
+    }
+}

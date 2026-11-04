@@ -1,0 +1,22 @@
+package fixture
+
+// Kept outside the normal test sources: read only by verifyTestDiscoveryFixtures. Each bad test must be rejected.
+class BadNonUnitFixtureTest {
+    @Test
+    fun `declared return type is rejected`(): String {
+        return "x"
+    }
+
+    @Test
+    fun `runBlocking ending in assertIs is rejected`() = runBlocking {
+        val x = value()
+        assertIs<String>(x)
+    }
+
+    @Test
+    fun `runBlocking ending in assertFailsWith is rejected`() = runBlocking {
+        assertFailsWith<IllegalStateException> {
+            error("x")
+        }
+    }
+}
