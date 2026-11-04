@@ -7,7 +7,7 @@ data class BrokerPermissions(val configure: String, val write: String, val read:
 data class DeclaredPermissions(val configure: Boolean, val write: Boolean)
 
 /** Why the permission check could not produce a [PermissionCheckResult.Checked]. */
-enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BAD_RESPONSE, NO_PASSWORD }
+enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BAD_RESPONSE, NO_PASSWORD, UNEXPECTED }
 
 /**
  * Outcome of the broker permission check. Reading streams never depends on it, so [canBrowseStreams]
@@ -51,6 +51,8 @@ sealed interface PermissionCheckResult {
                     "Permissions could not be read: the management API answered in a form the app does not understand."
                 UnreadableCause.NO_PASSWORD ->
                     "Permissions could not be read: no password is stored for this connection."
+                UnreadableCause.UNEXPECTED ->
+                    "Permissions could not be read: an unexpected error occurred while checking."
             } + " Topology stays locked and test publishing disabled; streams can still be browsed."
     }
 }

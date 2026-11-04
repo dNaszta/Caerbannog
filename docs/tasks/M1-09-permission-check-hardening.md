@@ -105,5 +105,30 @@ Tests first and failing for the right reason, no unrelated changes, M1-03 brief 
 
 ## Status
 - Round: 0, step 1 done (architect): brief confirmed and sharpened against `main`. Next: step 2 tests (test developer).
+- Round: 0, step 2 done (test developer). Tests written, red as expected; next: step 3 build (senior developer).
+  - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'UNEXPECTED'` (ConnectionSessionTest, PermissionDecisionTest,
+    ConnectionsViewModelPermissionTest). New tests: 7 in ConnectionSessionTest (the secret-store one is a separate, clearly named
+    test pending the senior developer's confirmation; delete it if rejected), 1 in PermissionDecisionTest, 1 in ConnectionsViewModelPermissionTest.
+  - Red, adapter (`PermissionCheckerFailureTest`, default `test`, no Docker): 3 of 5 fail on a thrown exception. Observed types
+    (Ktor 3.0.3, Java engine, probed on the raw `TlsSupport` client):
+    - host with a space: `java.net.URISyntaxException` (checked, NOT an `IllegalArgumentException`, NOT a Ktor type, not an IOException).
+    - port 70000 and port -1: `io.ktor.http.URLParserException` with cause `java.lang.IllegalArgumentException`.
+    - empty host: `java.net.ConnectException` (IOException): already `UNREACHABLE`, green, kept as characterisation.
+    - silent server: `io.ktor.client.plugins.HttpRequestTimeoutException`: already `TIMEOUT`, green, characterisation. Neither Ktor's
+      `ConnectTimeoutException`/`SocketTimeoutException` nor `HttpConnectTimeoutException` arrived. The latter stays covered by the
+      type-based catch only (no test).
+  - Brief problem: the catch list for an invalid URL must include `java.net.URISyntaxException` (a bad host raises it, the brief
+    names only `URLParserException` and `IllegalArgumentException`). `URLParserException` is enough for ports; it extends `IllegalStateException`.
+- Round: 0, step 3 done (senior developer). Green: `test --rerun-tasks --continue` core 48, data-rabbit 24, ui 19, acceptance 38 (7 skipped), desktopApp 3, 0 failures; `:data-rabbit:brokerTest` green (Docker).
+  - Confirmed: a `SecretStore.retrieve` throw gives `Unreadable(UNEXPECTED)` without the declaration; test kept.
+  - Adapter catches added: `HttpTimeoutException` (TIMEOUT, replaces the connect-timeout catch), `URISyntaxException`, `URLParserException`, `IllegalArgumentException` (UNREACHABLE, class name). No catch-all in the adapter.
+  - Session: `MutableStateFlow<Map>` with `update`; the one broad catch is in `ConnectionSession.check`. M1-03 Final contract has the new cause.
+- Round: 0, step 4 done (test developer): pass with findings, no blocker or major. Independent run: core 48, data-rabbit 13 (default) + 11 (brokerTest, Docker, green), ui 19, acceptance 38 (7 skipped, all by design: @needs-M1-06 x2, @needs-M1-07 x2, @needs-M2 x2, @broker x1), desktopApp 3.
+  - Mutants killed: no checker catch, swallowed cancellation (checker), e.message in detail, declaration on retrieve failure, non-atomic map update (15 of 15 runs), dropped URISyntaxException catch, UNEXPECTED text naming the management API. Survived: (a) HttpTimeoutException mapped to UNREACHABLE (no test, by design in the brief); (b) swallowing CancellationException around `secretStore.retrieve` (minor, no test).
+  - Flakiness: core session and view model tests 20 of 20 green, `PermissionCheckerFailureTest` 10 of 10 green.
+- Round: 0, step 5 done (architect): **Accepted with follow-ups.** Done.
+  - Follow-up (minor, test-only, do in the M1-07 test step or any later commit): add `a secret store that throws CancellationException makes open throw and leaves isUsable false` in `ConnectionSessionTest`. Code is already correct; the mutant survives only for lack of a test.
+  - Idea, not a task: `forget(name)` during an in-flight `open` is overwritten when the check finishes (same last-wins rule). Revisit if rename-while-checking shows up in M1-07.
+  - Unverified, stays open: real connect timeout to a blackhole (`HttpConnectTimeoutException` is covered by the type catch only).
 - Branch: `m1-09-permission-check-hardening`, based on `main`. Not pushed.
 - Must land before `M1-07-permission-state-ui`.

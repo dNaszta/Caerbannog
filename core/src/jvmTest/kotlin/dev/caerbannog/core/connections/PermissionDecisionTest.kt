@@ -98,4 +98,15 @@ class PermissionDecisionTest {
     fun `a declaration never lets browsing depend on it`() {
         assertTrue(declared(false, false).canBrowseStreams)
     }
+
+    @Test
+    fun `the UNEXPECTED message does not blame the management API`() {
+        val message = PermissionCheckResult.Unreadable(UnreadableCause.UNEXPECTED).userMessage
+        assertEquals(
+            "Permissions could not be read: an unexpected error occurred while checking. " +
+                "Topology stays locked and test publishing disabled; streams can still be browsed.",
+            message,
+        )
+        assertFalse(message.contains("management API"), "the app failed, not the management API's answer: '$message'")
+    }
 }

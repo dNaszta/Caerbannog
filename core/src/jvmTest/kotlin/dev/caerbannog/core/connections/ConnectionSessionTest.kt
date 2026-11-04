@@ -1,11 +1,20 @@
 package dev.caerbannog.core.connections
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.cancellation.CancellationException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * M1-03: `ConnectionSession` is the gate that runs the permission check before a connection is usable.
@@ -161,5 +170,137 @@ class ConnectionSessionTest {
         session.reopen(profile)
         assertEquals(false, usableDuring, "reopen must clear the stored result before asking the broker")
         assertNull(permissionsDuring)
+    }
+
+    // --- M1-09: no exception leaves open, except CancellationException ---
+
+    private class ThrowingChecker(private val failure: Throwable) : PermissionChecker {
+        override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult = throw failure
+    }
+
+    private val unexpected = PermissionCheckResult.Unreadable(UnreadableCause.UNEXPECTED, "IllegalStateException")
+
+    @Test
+    fun `a throwing checker leaves the connection usable and Unreadable UNEXPECTED`() = runBlocking {
+        val session = ConnectionSession(ThrowingChecker(IllegalStateException("boom")), secrets)
+
+        assertEquals(unexpected, session.open(profile))
+
+        assertTrue(session.isUsable("prod-eu"))
+        assertEquals(unexpected, session.permissions("prod-eu"))
+        assertFalse(session.permissions("prod-eu")!!.topologyUnlocked)
+        assertFalse(session.permissions("prod-eu")!!.publishingEnabled)
+    }
+
+    @Test
+    fun `a throwing checker with a declaration gives DeclaredByUser carrying the UNEXPECTED reason`() = runBlocking {
+        val session = ConnectionSession(ThrowingChecker(IllegalStateException("boom")), secrets)
+
+        val expected = PermissionCheckResult.DeclaredByUser(true, false, unexpected)
+        assertEquals(expected, session.open(declaring))
+        assertEquals(expected, session.permissions("prod-eu"))
+        assertTrue(session.isUsable("prod-eu"))
+    }
+
+    @Test
+    fun `the exception message is not kept in the result`() = runBlocking {
+        val password = "s3cr3t-pw-Zq9"
+        val store = MapSecretStore(mapOf("prod-eu" to password))
+        val session = ConnectionSession(ThrowingChecker(IllegalStateException("auth failed for svc:$password")), store)
+
+        val result = session.open(profile) as PermissionCheckResult.Unreadable
+
+        assertEquals("IllegalStateException", result.detail, "detail is the class simple name only")
+        assertFalse(result.detail!!.contains(password), "password in detail: ${result.detail}")
+        assertFalse(result.userMessage.contains(password), "password in userMessage: ${result.userMessage}")
+        assertFalse(result.userMessage.contains("auth failed"), "exception text in userMessage: ${result.userMessage}")
+    }
+
+    @Test
+    fun `a cancelled check propagates the cancellation and leaves the connection not usable`() = runBlocking {
+        val session = ConnectionSession(ThrowingChecker(CancellationException("cancelled")), secrets)
+
+        assertFailsWith<CancellationException> { session.open(profile) }
+
+        assertFalse(session.isUsable("prod-eu"))
+        assertNull(session.permissions("prod-eu"))
+    }
+
+    // Pending senior developer confirmation (brief Open points): if rejected, delete this test and say so in the Status.
+    @Test
+    fun `a failing secret store is Unreadable UNEXPECTED even with a declaration`() = runBlocking {
+        val failingStore = object : SecretStore {
+            override fun store(profileName: String, password: String) = error("not used")
+            override fun retrieve(profileName: String): String? = throw IllegalStateException("keychain locked")
+            override fun delete(profileName: String) = error("not used")
+        }
+        val checker = RecordingChecker(unlocked)
+        val session = ConnectionSession(checker, failingStore)
+
+        val result = session.open(declaring)
+
+        assertEquals(unexpected, result, "the declaration must not be applied: without a password nothing can connect")
+        assertTrue(session.isUsable("prod-eu"))
+        assertEquals(unexpected, session.permissions("prod-eu"))
+        assertTrue(checker.calls.isEmpty(), "must not call the broker without a password")
+    }
+
+    @Test
+    fun `overlapping opens of different profiles all end usable with their own result`() = runBlocking {
+        val names = (1..64).map { "profile-$it" }
+        val perName = names.associateWith { name ->
+            PermissionCheckResult.Checked(topologyUnlocked = name.hashCode() % 2 == 0, publishingEnabled = name.hashCode() % 3 == 0)
+        }
+        val checker = object : PermissionChecker {
+            override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
+                kotlinx.coroutines.yield()
+                return perName.getValue(profile.name)
+            }
+        }
+        val session = ConnectionSession(checker, MapSecretStore(names.associateWith { "pw" }))
+
+        val returned = names.map { name ->
+            async(Dispatchers.Default) { session.open(profile.copy(name = name)) }
+        }.awaitAll()
+
+        names.forEachIndexed { i, name ->
+            assertTrue(session.isUsable(name), "$name not usable")
+            assertEquals(perName.getValue(name), session.permissions(name), "$name has the wrong result")
+            assertEquals(perName.getValue(name), returned[i])
+        }
+    }
+
+    @Test
+    fun `for the same profile the check that finishes last wins`() = runBlocking {
+        val first = PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true)
+        val second = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = false)
+        val started = listOf(CompletableDeferred<Unit>(), CompletableDeferred())
+        val gates = listOf(CompletableDeferred<Unit>(), CompletableDeferred())
+        val results = listOf(first, second)
+        val calls = AtomicInteger()
+        val checker = object : PermissionChecker {
+            override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
+                val n = calls.getAndIncrement()
+                started[n].complete(Unit)
+                gates[n].await()
+                return results[n]
+            }
+        }
+        val session = ConnectionSession(checker, secrets)
+
+        withTimeout(10_000) {
+            val a = async(Dispatchers.Default) { session.open(profile) }
+            started[0].await()
+            val b = async(Dispatchers.Default) { session.open(profile) }
+            started[1].await()
+
+            gates[1].complete(Unit) // the later start finishes first
+            assertEquals(second, b.await())
+            gates[0].complete(Unit) // the earlier start finishes last: it wins
+            assertEquals(first, a.await())
+        }
+
+        assertEquals(first, session.permissions("prod-eu"), "the check that finished last must win")
+        assertTrue(session.isUsable("prod-eu"))
     }
 }
