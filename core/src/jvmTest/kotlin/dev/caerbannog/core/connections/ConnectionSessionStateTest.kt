@@ -142,7 +142,7 @@ class ConnectionSessionStateTest {
     }
 
     @Test
-    fun `the code base has no ExperimentalForInheritanceCoroutinesApi opt-in left`() {
+    fun `the code base has no for-inheritance coroutines API opt-in left`() {
         var dir: File? = File("").absoluteFile
         while (dir != null && !File(dir, "settings.gradle.kts").exists()) dir = dir.parentFile
         val root = dir ?: fail("settings.gradle.kts not found above ${File("").absoluteFile}")
