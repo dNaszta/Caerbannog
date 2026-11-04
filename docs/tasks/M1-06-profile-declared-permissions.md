@@ -3,7 +3,17 @@
 Milestone: M1    Depends on: M1-03-permission-check (core `DeclaredPermissions`, session rule)    Size: S
 
 ## Status
-- State: step 4 done (test developer): verdict pass, no blocker or major; next: architect review (judge the extra 'Declared permissions' title against the mockup).
+- State: done. Architect step 5: Accepted with follow-ups (2026-11-04), no blocker or major. Not pushed; merge by the coordinator.
+  - Decisions for the user to see: the UX deviation from the earlier three-state-per-right idea (one switch plus two yes/no
+    choices) was the architect's recommendation, adopted by the coordinator without asking the user. Reason: `DeclaredPermissions`
+    is a pair of required booleans, a per-right "not declared" would create half declarations the model and M1-03 do not define.
+    The user can reverse it (per-right `Boolean?`, touching spec and M1-03).
+  - Extra 'Declared permissions' title above the switch: kept; the mockup has it too (as "Declared permissions (your own
+    statement)"). The build shows the shorter text; follow-up `M1-11` aligns the wording.
+  - Known gaps: Keep-clears-declaration mutation is caught by core tests only (acceptance scenarios only use Set), accepted.
+    The screen still calls `updateConnection` until M1-07, so a UI save does not reopen the session yet.
+  - `acceptance-tests` -> `:data-rabbit` (test scope, project-internal) accepted; the comment guard is in `M1-11`.
+- Earlier: step 4 done (test developer): verdict pass, no blocker or major.
   - Step 3: `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38, acceptance-tests 38 with 5 skipped by tag filter, desktopApp 3); `:data-rabbit:brokerTest` green. No test edited.
   - Step 4 (test developer, independent): `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38,
     acceptance 38 with 5 skipped by design, desktopApp 3); `:data-rabbit:brokerTest` 11 green. Both former @needs-M1-06
