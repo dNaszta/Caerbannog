@@ -26,6 +26,9 @@ internal class ManagementRequests(baseUrl: String) {
 
     fun publishers(vhost: String, stream: String): String = "$base/api/stream/publishers/${encode(vhost)}/${encode(stream)}"
 
+    /** D8: every publisher of the vhost in one call; the caller counts them per stream. */
+    fun publisherCounts(vhost: String): String = "$base/api/stream/publishers/${encode(vhost)}"
+
     /** The broker has no per-stream consumers path (it answers 400), so the rows of the whole vhost are read. */
     fun consumers(vhost: String): String = "$base/api/stream/consumers/${encode(vhost)}"
 
