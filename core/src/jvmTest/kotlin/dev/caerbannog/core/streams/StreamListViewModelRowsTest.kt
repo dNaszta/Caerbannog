@@ -158,6 +158,22 @@ class StreamListViewModelRowsTest {
         assertTrue(s.state.approximateNote.contains("approximate", ignoreCase = true), "note: <${s.state.approximateNote}>")
     }
 
+    // --- found at verify time (real broker): GET /api/queues answers for EVERY vhost the user may see ------------------
+
+    @Test
+    fun `streams of another virtual host are not listed, counted or paged`() = runTest {
+        val s = StreamListHarness(this)
+        s.addStream("orders")
+        // The fake, like the broker's GET /api/queues, answers for all vhosts; the list is the one of the profile's vhost.
+        s.catalog.addStream(stream("orders-elsewhere", vhost = "other"))
+        s.catalog.addStream(stream("orders", vhost = "other")) // same name in another vhost
+        s.open()
+
+        assertEquals(listOf("orders"), s.names(), "only the profile's vhost")
+        assertEquals(1, s.state.totalStreams)
+        assertEquals("1 to 1 of 1", s.state.rangeText)
+    }
+
     // --- D8: publishers ----------------------------------------------------------------------------------
 
     @Test
