@@ -179,3 +179,12 @@ Handoff to the senior developer (round 1, on `m2-04-stream-list-core`):
 **Other verify findings.** F-2 (UI dispatcher) goes into the M2-05 note ("Other inputs"); not a core change. F-3 optional: take it only if cheap, no blocking. F-4: none. The 5 mutation survivors are accepted as equivalent or defence in depth; I see no reason to add tests for them. The one real gap (publisherCounts without the plugin) is already fixed.
 
 Housekeeping: lines 5 and 11 of this brief are garbled by an earlier edit (a heading and a status sentence merged). Content is in `## Status` and `## Rulings and build handoff`; the test developer or I can repair on the next touch.
+
+## Status, round 1 step 3 (developer): F-1 fixed
+
+`StreamListRequest.vhost` is required (no default). The view model passes `source.vhost`; `ManagementRequests.listStreams` builds `/api/queues/{encoded vhost}?...` (`/` is `%2F`, same encoder as `streamDetail`); `FakeStreamCatalog.listStreams` lists, counts (`totalCount`, `filteredCount`, page count) only the request's vhost. No filter in the view model. Calls per tick are unchanged (the vhost is in the path, not an extra call): list `ceil(queues of the vhost / 500)`, `publisherCounts` 1 for FULL, first offsets one per visible row; with the earlier 1000-queue measurement vhost that is still 53 calls per tick. It can only be fewer when the broker has other vhosts. The red tests `StreamListViewModelRowsTest` "streams of another virtual host ..." and `RealBrokerStreamListTest` "switching profile (vhost) ..." are green.
+
+Test-file edits (call sites compile-forced by the required field, plus two legitimate expectation changes): every `StreamListRequest(...)` in tests got `vhost = "/"` (core, data-rabbit, acceptance `ConnectionLifecycleSteps`). `ManagementRequestsTest`: the path assertion `assertEquals("/api/queues", uri.path)` became `assertEquals("/api/queues/%2F", uri.rawPath, ...)` (the only URL contract change), plus a new test for vhost encoding (`orders v2`, `a/b`). `FakeStreamCatalogTest`: new test "the list answers for the requested vhost only, counts included"; in "adding a stream again replaces it" `assertEquals(2, list.totalCount)` became `1` (the count is per vhost now) plus an assertion that vhost `v` counts 1 (test developer please confirm).
+
+Open: the scenario "Another vhost's streams are not listed" has no step definitions yet (test developer); until then `:acceptance-tests:test` fails only on it (UndefinedStepException), and `verifyTestDiscovery` depends on that task, so it cannot be green yet.
+

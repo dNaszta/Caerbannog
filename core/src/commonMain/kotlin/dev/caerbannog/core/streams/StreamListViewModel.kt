@@ -287,7 +287,7 @@ class StreamListViewModel(
         val all = mutableListOf<StreamSummary>()
         var next = 1
         while (true) {
-            val result = ask(src) { src.catalog.listStreams(StreamListRequest(page = next, pageSize = BROKER_PAGE_SIZE)) } ?: return null
+            val result = ask(src) { src.catalog.listStreams(StreamListRequest(vhost = src.vhost, page = next, pageSize = BROKER_PAGE_SIZE)) } ?: return null
             if (result !is CatalogResult.Success) {
                 loadFailed(result)
                 return null

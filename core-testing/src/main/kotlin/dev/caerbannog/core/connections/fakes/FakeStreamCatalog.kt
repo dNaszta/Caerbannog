@@ -21,7 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
  * tests (ManagementJsonTest) into the very values [RecordedStreams] uses here.
  *
  * Honest by design, each rule is a measured fact of the real management API (spec "Management API facts"):
- *  - the broker pages over ALL queues, then the client keeps the streams: a page can hold fewer streams than
+ *  - the list is per vhost like `GET /api/queues/{vhost}`: other vhosts' queues are neither listed nor counted;
+ *  - the broker pages over ALL queues of the vhost, then the client keeps the streams: a page can hold fewer streams than
  *    `pageSize`, and the pagination numbers describe the broker's pages, not the streams;
  *  - `pageSize` 1..500 and a page inside 1..pageCount (an empty broker allows page 1); anything else is [CatalogResult.BadPaging];
  *  - the `name` filter is a substring, or a regex with `useRegex`; an invalid regex is no error and matches nothing;
@@ -113,7 +114,7 @@ class FakeStreamCatalog : StreamCatalog {
         pageFailures[request.page]?.let { return it }
         if (request.pageSize !in 1..MAX_PAGE_SIZE || request.page < 1) return CatalogResult.BadPaging
         val matcher = nameMatcher(request)
-        val matching = synchronized(entries) { entries.filter { matcher(it.name) } }
+        val matching = synchronized(entries) { entries.filter { it.vhost == request.vhost && matcher(it.name) } }
         val pageCount = (matching.size + request.pageSize - 1) / request.pageSize
         if (request.page > maxOf(pageCount, 1)) return CatalogResult.BadPaging
         val items = matching.drop((request.page - 1) * request.pageSize).take(request.pageSize)
@@ -125,7 +126,7 @@ class FakeStreamCatalog : StreamCatalog {
                 pageSize = request.pageSize,
                 filteredCount = matching.size,
                 itemCount = items.size,
-                totalCount = entries.size,
+                totalCount = synchronized(entries) { entries.count { it.vhost == request.vhost } },
             ),
         )
     }

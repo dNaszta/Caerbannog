@@ -81,7 +81,7 @@ class StreamSourceTest {
         h.active.connect(h.uat)
         val source = h.active.source!!
 
-        assertIs<CatalogResult.Success<*>>(source.catalog.listStreams(StreamListRequest()))
+        assertIs<CatalogResult.Success<*>>(source.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertEquals(FirstOffset.Value(5), source.offsets.firstOffset("/", "s"))
         assertEquals(listOf("listStreams"), h.gateway.catalogOf("uat-eu").calls.toList())
         assertEquals(listOf("//s"), h.gateway.offsetsOf("uat-eu").calls.toList())
@@ -111,7 +111,7 @@ class StreamSourceTest {
 
         assertNotSame(old, fresh)
         assertOldSourceIsDead(old, h.gateway.catalogOf("uat-eu").calls, h.gateway.offsetsOf("uat-eu").calls)
-        assertIs<CatalogResult.Success<*>>(fresh.catalog.listStreams(StreamListRequest()))
+        assertIs<CatalogResult.Success<*>>(fresh.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertEquals(listOf("listStreams"), h.gateway.catalogOf("prod-eu").calls.toList())
     }
 
@@ -125,7 +125,7 @@ class StreamSourceTest {
         h.active.connect(h.uat)
 
         assertOldSourceIsDead(old, h.gateway.catalogOf("uat-eu").calls, h.gateway.offsetsOf("uat-eu").calls, expectedCatalogCalls = before)
-        assertIs<CatalogResult.Success<*>>(h.active.source!!.catalog.listStreams(StreamListRequest()))
+        assertIs<CatalogResult.Success<*>>(h.active.source!!.catalog.listStreams(StreamListRequest(vhost = "/")))
     }
 
     @Test
@@ -136,7 +136,7 @@ class StreamSourceTest {
 
         h.active.profileChanged("uat-eu")
 
-        assertEquals(CatalogResult.Unreachable, old.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.Unreachable, old.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertNull(h.active.source)
     }
 
@@ -146,7 +146,7 @@ class StreamSourceTest {
         offsetCalls: List<String>,
         expectedCatalogCalls: Int = 0,
     ) = runBlocking<Unit> {
-        assertEquals(CatalogResult.Unreachable, old.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.Unreachable, old.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertEquals(CatalogResult.Unreachable, old.catalog.streamDetail("/", "s"))
         assertEquals(CatalogResult.Unreachable, old.catalog.publishers("/", "s"))
         assertEquals(CatalogResult.Unreachable, old.catalog.publisherCounts("/"))
@@ -172,7 +172,7 @@ class StreamSourceTest {
         assertEquals(ConnectionFailureReason.CONNECTION_LOST, "Connection lost")
         assertEquals(1, h.gateway.everOpened.single().closeCalls, "closed exactly once, however often it is reported")
         assertNull(h.active.source)
-        assertEquals(CatalogResult.Unreachable, source.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.Unreachable, source.catalog.listStreams(StreamListRequest(vhost = "/")))
     }
 
     @Test

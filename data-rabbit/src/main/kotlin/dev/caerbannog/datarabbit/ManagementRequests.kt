@@ -19,7 +19,7 @@ internal class ManagementRequests(baseUrl: String) {
             parameters += "use_regex=${request.useRegex}"
         }
         parameters += "columns=${encode(LIST_COLUMNS)}"
-        return "$base/api/queues?${parameters.joinToString("&")}"
+        return "$base/api/queues/${encode(request.vhost)}?${parameters.joinToString("&")}"
     }
 
     fun streamDetail(vhost: String, name: String): String = "$base/api/queues/${encode(vhost)}/${encode(name)}"

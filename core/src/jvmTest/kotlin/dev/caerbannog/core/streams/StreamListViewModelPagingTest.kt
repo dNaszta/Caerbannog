@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * M2-04 step 2: the paging strategy over ALL queues (the broker ignores `type=stream` and pages over every queue, so a page
  * of the broker can hold fewer streams than asked, even none, and its counts are queue counts) and the in-memory page, filter
  * and sort. Contract: see [StreamListHarness]. Rules pinned here:
- *  - the view model reads broker pages of 500 (`StreamListRequest(page = n, pageSize = 500)`, no name filter) until the last page,
+ *  - the view model reads broker pages of 500 (`StreamListRequest(vhost = "/", page = n, pageSize = 500)`, no name filter) until the last page,
  *    keeps what the catalog returns (streams only) and pages the streams in memory; the displayed total is the stream count;
  *  - one list call per 500 queues per load; a failure on any page fails the load as a whole (no half list);
  *  - first offsets are asked only for the streams of the visible page.

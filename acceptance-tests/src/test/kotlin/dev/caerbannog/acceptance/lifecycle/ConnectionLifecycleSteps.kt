@@ -309,7 +309,7 @@ class ConnectionLifecycleSteps {
                 val capabilities = held!!.catalog.capabilities()
                 assertInstanceOf(CatalogResult.Success::class.java, capabilities, "capabilities: $capabilities")
                 assertEquals(Visibility.NONE, (capabilities as CatalogResult.Success).value.visibility)
-                assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest()), "stream list")
+                assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest(vhost = "/")), "stream list")
                 assertEquals(CatalogResult.NotAuthorised, held.catalog.publishers("/", "orders-events"), "publishers")
                 assertEquals(CatalogResult.NotAuthorised, held.catalog.consumers("/", "orders-events"), "consumers")
             }

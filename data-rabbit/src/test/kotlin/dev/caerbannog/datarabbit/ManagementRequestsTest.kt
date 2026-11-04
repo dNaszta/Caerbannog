@@ -48,13 +48,19 @@ class ManagementRequestsTest {
     }
 
     @Test
+    fun `the list asks for the vhost of the request, path-encoded`() {
+        assertEquals("/api/queues/orders%20v2", URI(requests.listStreams(StreamListRequest(vhost = "orders v2"))).rawPath)
+        assertEquals("/api/queues/a%2Fb", URI(requests.listStreams(StreamListRequest(vhost = "a/b"))).rawPath)
+    }
+
+    @Test
     fun `the list asks for the page, the page size and the columns the rows need`() {
-        val url = requests.listStreams(StreamListRequest(page = 2, pageSize = 50))
+        val url = requests.listStreams(StreamListRequest(vhost = "/", page = 2, pageSize = 50))
         val uri = URI(url)
         assertEquals("https", uri.scheme)
         assertEquals("rabbit.example.com", uri.host)
         assertEquals(15671, uri.port)
-        assertEquals("/api/queues", uri.path)
+        assertEquals("/api/queues/%2F", uri.rawPath, "the default vhost / is %2F in the path")
         val q = query(url)
         assertEquals("2", q["page"])
         assertEquals("50", q["page_size"])
@@ -69,24 +75,24 @@ class ManagementRequestsTest {
 
     @Test
     fun `no name filter means no name and no use_regex parameter`() {
-        val q = query(requests.listStreams(StreamListRequest()))
+        val q = query(requests.listStreams(StreamListRequest(vhost = "/")))
         assertFalse("name" in q || "use_regex" in q, "$q")
     }
 
     @Test
     fun `a name filter is sent encoded with use_regex false or true`() {
-        val plain = query(requests.listStreams(StreamListRequest(nameFilter = "orders events&x=1#frag")))
+        val plain = query(requests.listStreams(StreamListRequest(vhost = "/", nameFilter = "orders events&x=1#frag")))
         assertEquals("orders events&x=1#frag", plain["name"])
         assertEquals("false", plain["use_regex"])
-        val regex = query(requests.listStreams(StreamListRequest(nameFilter = "^orders-.*$", useRegex = true)))
+        val regex = query(requests.listStreams(StreamListRequest(vhost = "/", nameFilter = "^orders-.*$", useRegex = true)))
         assertEquals("^orders-.*$", regex["name"])
         assertEquals("true", regex["use_regex"])
-        assertFalse(requests.listStreams(StreamListRequest(nameFilter = "a&b")).contains("a&b"), "an ampersand in the filter must not split the query")
+        assertFalse(requests.listStreams(StreamListRequest(vhost = "/", nameFilter = "a&b")).contains("a&b"), "an ampersand in the filter must not split the query")
     }
 
     @Test
     fun `an empty name filter is not sent`() {
-        assertFalse("name" in query(requests.listStreams(StreamListRequest(nameFilter = ""))))
+        assertFalse("name" in query(requests.listStreams(StreamListRequest(vhost = "/", nameFilter = ""))))
     }
 
     @Test

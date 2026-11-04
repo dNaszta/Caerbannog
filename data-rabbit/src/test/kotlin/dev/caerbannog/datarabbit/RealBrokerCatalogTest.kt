@@ -229,7 +229,7 @@ class RealBrokerCatalogTest {
 
         val page: StreamPage = awaitUntil(
             "13 queues and streams listed for $prefix",
-            fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(pageSize = 100, nameFilter = prefix)) }) },
+            fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(vhost = "/", pageSize = 100, nameFilter = prefix)) }) },
             done = { it.filteredCount == 13 },
         )
 
@@ -246,12 +246,12 @@ class RealBrokerCatalogTest {
         repeat(2) { createStream("$prefix-s$it") }
         val held = connection()
 
-        val first = awaitUntil("5 entries for $prefix", fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(page = 1, pageSize = 2, nameFilter = prefix)) }) }, done = { it.filteredCount == 5 })
+        val first = awaitUntil("5 entries for $prefix", fetch = { success(runBlocking { held.catalog.listStreams(StreamListRequest(vhost = "/", page = 1, pageSize = 2, nameFilter = prefix)) }) }, done = { it.filteredCount == 5 })
 
         assertEquals(3, first.pageCount)
         assertTrue(first.rows.size <= 2, "a page never holds more entries than the page size")
-        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(pageSize = 501)))
-        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(page = 99, pageSize = 2, nameFilter = prefix)))
+        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(vhost = "/", pageSize = 501)))
+        assertEquals(CatalogResult.BadPaging, held.catalog.listStreams(StreamListRequest(vhost = "/", page = 99, pageSize = 2, nameFilter = prefix)))
     }
 
     @Test
@@ -335,7 +335,7 @@ class RealBrokerCatalogTest {
     fun `a user without the management tag is connected, visibility none, lists not authorised`() = runBlocking<Unit> {
         val held = connection("m203-plain", "pw-plain")
         assertEquals(Visibility.NONE, success(held.catalog.capabilities()).visibility)
-        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest()))
+        assertEquals(CatalogResult.NotAuthorised, held.catalog.listStreams(StreamListRequest(vhost = "/")))
         assertEquals(CatalogResult.NotAuthorised, held.catalog.publishers("/", "x"))
         assertEquals(CatalogResult.NotAuthorised, held.catalog.consumers("/", "x"))
     }
@@ -408,7 +408,7 @@ class RealBrokerCatalogTest {
         val held = connection()
         held.close()
         held.close()
-        assertTrue(held.catalog.listStreams(StreamListRequest()) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
+        assertTrue(held.catalog.listStreams(StreamListRequest(vhost = "/")) !is CatalogResult.Success, "a closed holder must not answer from a closed client")
     }
 
     // ---- stream side TLS (added by the developer at the build, brief part 2 step 2 note 3) ----
@@ -443,14 +443,14 @@ class RealBrokerCatalogTest {
             val opened = RabbitMqConnectionGateway(Passwords(mapOf("rb-test" to own.adminPassword))).open(profile)
             assertInstanceOf(OpenResult.Opened::class.java, opened, "$opened")
             (opened as OpenResult.Opened).connection.also {
-                assertInstanceOf(CatalogResult.Success::class.java, it.catalog.listStreams(StreamListRequest()), "control: the broker is up")
+                assertInstanceOf(CatalogResult.Success::class.java, it.catalog.listStreams(StreamListRequest(vhost = "/")), "control: the broker is up")
             }
         } catch (e: Throwable) {
             own.stop(); throw e
         }
         own.stop()
         try {
-            assertEquals(CatalogResult.Unreachable, held.catalog.listStreams(StreamListRequest()))
+            assertEquals(CatalogResult.Unreachable, held.catalog.listStreams(StreamListRequest(vhost = "/")))
             assertEquals(CatalogResult.Unreachable, held.catalog.capabilities())
             assertEquals(FirstOffset.Unavailable, held.offsets.firstOffset("/", "any"), "a dead broker is Unavailable, never an exception")
         } finally {
@@ -478,7 +478,7 @@ class RealBrokerCatalogTest {
                 assertEquals(CatalogResult.PluginMissing, held.catalog.consumers("/", "any"))
                 assertEquals(CatalogResult.PluginMissing, held.catalog.publisherCounts("/"), "M2-04 D8: the vhost path without the plugin")
                 assertEquals(CatalogResult.Success(Capabilities(PluginStatus.MISSING, Visibility.FULL)), held.catalog.capabilities())
-                assertInstanceOf(CatalogResult.Success::class.java, held.catalog.listStreams(StreamListRequest()), "the queue list still works")
+                assertInstanceOf(CatalogResult.Success::class.java, held.catalog.listStreams(StreamListRequest(vhost = "/")), "the queue list still works")
             } finally {
                 held.close()
             }
