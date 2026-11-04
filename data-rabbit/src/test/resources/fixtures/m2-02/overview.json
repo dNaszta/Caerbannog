@@ -1,0 +1,294 @@
+{
+    "crypto_lib_version": "OpenSSL 3.5.9 29 Sep 2026",
+    "product_name": "RabbitMQ",
+    "product_version": "4.4.0",
+    "rabbitmq_version": "4.4.0",
+    "management_version": "4.4.0",
+    "erlang_version": "29.1.2",
+    "erlang_full_version": "Erlang/OTP 29 [erts-17.1.1] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [jit]",
+    "cluster_name": "rabbit@node1",
+    "rates_mode": "basic",
+    "sample_retention_policies": {
+        "global": [
+            600,
+            3600,
+            28800,
+            86400
+        ],
+        "basic": [
+            600,
+            3600
+        ],
+        "detailed": [
+            600
+        ]
+    },
+    "exchange_types": [
+        {
+            "name": "direct",
+            "description": "AMQP direct exchange, as per the AMQP specification",
+            "enabled": true
+        },
+        {
+            "name": "fanout",
+            "description": "AMQP fanout exchange, as per the AMQP specification",
+            "enabled": true
+        },
+        {
+            "name": "headers",
+            "description": "AMQP headers exchange, as per the AMQP specification",
+            "enabled": true
+        },
+        {
+            "name": "topic",
+            "description": "AMQP topic exchange, as per the AMQP specification",
+            "enabled": true
+        },
+        {
+            "name": "x-local-random",
+            "description": "Picks one random local binding (queue) to route via (to).",
+            "enabled": true
+        },
+        {
+            "name": "x-modulus-hash",
+            "description": "Modulus Hashing Exchange",
+            "enabled": true
+        }
+    ],
+    "cluster_tags": {},
+    "node_tags": {},
+    "disable_stats": false,
+    "default_queue_type": "classic",
+    "is_op_policy_updating_enabled": true,
+    "enable_queue_totals": false,
+    "definitions": {
+        "require_definition_json_extension": false
+    },
+    "require_definition_json_extension": false,
+    "message_stats": {
+        "confirm": 2003,
+        "publish": 2003,
+        "disk_reads": 0,
+        "disk_writes": 0,
+        "drop_unroutable": 0,
+        "return_unroutable": 0,
+        "drop_unroutable_details": {
+            "rate": 0.0
+        },
+        "return_unroutable_details": {
+            "rate": 0.0
+        },
+        "confirm_details": {
+            "rate": 200.0
+        },
+        "publish_details": {
+            "rate": 200.0
+        },
+        "disk_writes_details": {
+            "rate": 0.0
+        },
+        "disk_reads_details": {
+            "rate": 0.0
+        }
+    },
+    "churn_rates": {
+        "connection_closed": 2013,
+        "queue_declared": 8,
+        "queue_created": 8,
+        "connection_created": 2013,
+        "queue_deleted": 9,
+        "channel_created": 2003,
+        "channel_closed": 2003,
+        "queue_deleted_details": {
+            "rate": 0.2
+        },
+        "queue_created_details": {
+            "rate": 0.2
+        },
+        "queue_declared_details": {
+            "rate": 0.2
+        },
+        "channel_closed_details": {
+            "rate": 200.0
+        },
+        "channel_created_details": {
+            "rate": 200.0
+        },
+        "connection_closed_details": {
+            "rate": 200.4
+        },
+        "connection_created_details": {
+            "rate": 200.0
+        }
+    },
+    "queue_totals": {
+        "messages": 1000,
+        "messages_ready": 1000,
+        "messages_unacknowledged": 0,
+        "messages_details": {
+            "rate": 197.6
+        },
+        "messages_unacknowledged_details": {
+            "rate": 0.0
+        },
+        "messages_ready_details": {
+            "rate": 197.6
+        }
+    },
+    "object_totals": {
+        "channels": 0,
+        "consumers": 0,
+        "exchanges": 15,
+        "queues": 0,
+        "connections": 0
+    },
+    "statistics_db_event_queue": 0,
+    "node": "rabbit@node1",
+    "listeners": [
+        {
+            "node": "rabbit@node1",
+            "protocol": "amqp",
+            "ip_address": "::",
+            "port": 5672,
+            "socket_opts": {
+                "backlog": 128,
+                "nodelay": true,
+                "linger": [
+                    true,
+                    0
+                ],
+                "exit_on_close": false
+            },
+            "tls": false
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "amqp/ssl",
+            "ip_address": "::",
+            "port": 5671,
+            "socket_opts": {
+                "backlog": 128,
+                "nodelay": true,
+                "linger": [
+                    true,
+                    0
+                ],
+                "exit_on_close": false,
+                "versions": [
+                    "tlsv1.3",
+                    "tlsv1.2",
+                    "tlsv1.1",
+                    "tlsv1"
+                ],
+                "log_level": "warning",
+                "hibernate_after": 6000,
+                "keyfile": "/etc/rabbitmq/tls/server.key",
+                "certfile": "/etc/rabbitmq/tls/server.pem",
+                "cacertfile": "/etc/rabbitmq/tls/ca.pem",
+                "fail_if_no_peer_cert": false,
+                "verify": "verify_none"
+            },
+            "tls": true
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "clustering",
+            "ip_address": "::",
+            "port": 25672,
+            "socket_opts": [],
+            "tls": false
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "http/prometheus",
+            "ip_address": "::",
+            "port": 15692,
+            "socket_opts": {
+                "port": 15692,
+                "protocol": "http/prometheus",
+                "cowboy_opts": {
+                    "sendfile": false
+                }
+            },
+            "tls": false
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "https",
+            "ip_address": "::",
+            "port": 15671,
+            "socket_opts": {
+                "cowboy_opts": {
+                    "sendfile": false
+                },
+                "port": 15671,
+                "ssl": true,
+                "ssl_opts": {
+                    "cacertfile": "/etc/rabbitmq/tls/ca.pem",
+                    "certfile": "/etc/rabbitmq/tls/server.pem",
+                    "keyfile": "/etc/rabbitmq/tls/server.key",
+                    "port": 15671
+                }
+            },
+            "tls": true
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "stream",
+            "ip_address": "::",
+            "port": 5552,
+            "socket_opts": {
+                "backlog": 128,
+                "nodelay": true
+            },
+            "tls": false
+        },
+        {
+            "node": "rabbit@node1",
+            "protocol": "stream/ssl",
+            "ip_address": "::",
+            "port": 5551,
+            "socket_opts": {
+                "versions": [
+                    "tlsv1.3",
+                    "tlsv1.2",
+                    "tlsv1.1",
+                    "tlsv1"
+                ],
+                "log_level": "warning",
+                "hibernate_after": 6000,
+                "keyfile": "/etc/rabbitmq/tls/server.key",
+                "certfile": "/etc/rabbitmq/tls/server.pem",
+                "cacertfile": "/etc/rabbitmq/tls/ca.pem",
+                "fail_if_no_peer_cert": false,
+                "verify": "verify_none"
+            },
+            "tls": true
+        }
+    ],
+    "contexts": [
+        {
+            "ssl_opts": {
+                "cacertfile": "/etc/rabbitmq/tls/ca.pem",
+                "certfile": "/etc/rabbitmq/tls/server.pem",
+                "keyfile": "/etc/rabbitmq/tls/server.key",
+                "port": "15671"
+            },
+            "node": "rabbit@node1",
+            "description": "RabbitMQ Management",
+            "path": "/",
+            "cowboy_opts": "[{sendfile,false}]",
+            "port": "15671",
+            "ssl": "true"
+        },
+        {
+            "ssl_opts": [],
+            "node": "rabbit@node1",
+            "description": "RabbitMQ Prometheus",
+            "path": "/",
+            "port": "15692",
+            "protocol": "'http/prometheus'",
+            "cowboy_opts": "[{sendfile,false}]"
+        }
+    ]
+}

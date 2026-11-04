@@ -1,0 +1,79 @@
+{
+    "filtered_count": 3,
+    "item_count": 3,
+    "items": [
+        {
+            "arguments": {
+                "x-queue-leader-locator": "balanced",
+                "x-queue-type": "stream"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "leader": "rabbit@node1",
+            "members": [
+                "rabbit@node1"
+            ],
+            "name": "<name>-0",
+            "node": "rabbit@node1",
+            "online": [
+                "rabbit@node1"
+            ],
+            "state": "running",
+            "type": "stream",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-leader-locator": "balanced",
+                "x-queue-type": "stream"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "leader": "rabbit@node1",
+            "members": [
+                "rabbit@node1"
+            ],
+            "name": "<name>-1",
+            "node": "rabbit@node1",
+            "online": [
+                "rabbit@node1"
+            ],
+            "state": "running",
+            "type": "stream",
+            "vhost": "/"
+        },
+        {
+            "arguments": {
+                "x-queue-leader-locator": "balanced",
+                "x-queue-type": "stream"
+            },
+            "auto_delete": false,
+            "durable": true,
+            "exclusive": false,
+            "internal": false,
+            "internal_owner": false,
+            "leader": "rabbit@node1",
+            "members": [
+                "rabbit@node1"
+            ],
+            "name": "<name>-2",
+            "node": "rabbit@node1",
+            "online": [
+                "rabbit@node1"
+            ],
+            "state": "running",
+            "type": "stream",
+            "vhost": "/"
+        }
+    ],
+    "page": 1,
+    "page_count": 1,
+    "page_size": 100,
+    "total_count": 3
+}

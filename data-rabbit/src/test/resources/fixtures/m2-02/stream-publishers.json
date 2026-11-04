@@ -1,0 +1,20 @@
+[
+    {
+        "connection_details": {
+            "name": "192.168.65.1:42769 -> 172.17.0.4:5551",
+            "node": "rabbit@node1",
+            "peer_host": "192.168.65.1",
+            "peer_port": 42769,
+            "user": "guest"
+        },
+        "confirmed": 10,
+        "errored": 0,
+        "published": 10,
+        "publisher_id": 0,
+        "queue": {
+            "name": "<name>",
+            "vhost": "/"
+        },
+        "reference": "spike-pub"
+    }
+]
