@@ -18,6 +18,11 @@ Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired;
   `EditPanel` holds level + `pendingLevel` as form state, `FullControlConfirmDialog`, helper text; dead
   `onTopologyControlChange` removed. Green: core 11, ui 19, acceptance 19 (1 skipped, @broker), data-rabbit fast, desktopApp.
   Note: `./gradlew test` does not run core/ui `jvmTest`; run `:core:jvmTest :ui:jvmTest` too.
+- Step 4 (test developer, verify): PASS, no blocker or major. `./gradlew test :core:jvmTest :ui:jvmTest --rerun-tasks
+  --continue` green: core 11, ui 19, acceptance 19 run / 1 skipped ("Switch between connections", @needs-M2, by design),
+  desktopApp 3, data-rabbit fast green. 7 mutations of the key rules each fail the right tests; tree restored.
+  Plain `./gradlew test` (= `task test`) does NOT run core/ui `jvmTest` (dry-run lists only acceptance-tests,
+  data-rabbit, desktopApp): the documented command misses two modules. Open for the architect.
 - Round: 0
 
 ## Goal
