@@ -40,6 +40,23 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   killed (pill text/tone per row, dim note, declaration over Checked, userMessage, Save path, rename key, delete,
   Select/start-up check, reachability skipped or guarding, New-connection banner, scrollbar tag, Checking/Done). Open
   minor findings in the report (banner layout versus mockup, card focus). Manual look by the user still pending.
+- Step 5 (architect review, 2026-11-04): **Changes required** (small). Items:
+  - Senior developer: (a) `ProfileCard` must be keyboard focusable again: use `Modifier.clickable` (focus, Enter/Space,
+    indication) instead of `pointerInput` plus hand-made button semantics; (b) the WARNING tone is a new amber
+    `warn-container` (`#FFE2B0` on `#3B2700`, now in `docs/ux/m3.css` as `--warn-container`/`--on-warn-container`) in
+    `PermissionColors`, not `tertiaryContainer` (pink, reads as staging/error, not as a warning); (c) banner: bold
+    headline, detail in 12sp, and the dim note drawn BELOW the banner as its own dim line (as in the mockup); (d) pill
+    12sp / weight 500, `maxLines = 1`, name `maxLines = 1` with ellipsis; (e) stale-write guard: a check result is
+    stored only if the profile it was started for still exists under that name (and for a save, the new name); same
+    for the `Checking` entry.
+  - Test developer: (f) pill and banner lookups in `ConnectionsScreenUiTest` use `useUnmergedTree = true` where the
+    card is now `clickable` (merged); add a test that the card takes keyboard focus and Enter/Space selects it; (g) a
+    core test for (e): delete or rename while a gated check is in flight leaves no map entry, and a new profile with
+    the reused name shows "Not checked".
+  - Product owner decision 1 (open point 1) was taken by the coordinator, not the user: the check runs only on the
+    button "Check connection and permissions" and after a successful Save of an existing profile. After launch every
+    pill reads "Not checked". The user should confirm or change this before M2.
+  - Moved to `M1-12`: column widths and card colours (item 5), icons in pill and banner.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)
@@ -176,7 +193,7 @@ never touched by tests.
 - `ProfileCard` shows `permissionPill(state.permissionChecks[profile.name])`; `EditPanel` shows
   `permissionBanner(...)` for the selected profile in place of `PermissionCheckPanel`, plus `dimNote` when present.
   Tone to colour: OK `primaryContainer`-free green is not in the M3 scheme, so use the mockup's `ok-container` colours
-  as constants in one place (a small `PermissionColors` object in `ui`), WARNING `tertiaryContainer`/`onTertiaryContainer`,
+  as constants in one place (a small `PermissionColors` object in `ui`), WARNING amber `warn-container` (step 5; was tertiary, which is pink),
   LOCKED `errorContainer`/`onErrorContainer`, NEUTRAL `surfaceVariant`.
 - Test tags: pill `permissionPill:<profileName>`, banner `permissionBanner`, scrollbar `editPanelScrollbar`.
 - The ignored-declaration rule needs no new state: `dimNote` is computed from the saved profile.

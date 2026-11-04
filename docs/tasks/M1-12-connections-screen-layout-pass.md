@@ -22,6 +22,11 @@ icon set, password reveal toggle. Out: any behaviour change.
 Decide first: `compose.materialIconsExtended` (large) versus a few vector assets. Recommend a few vector assets (lock,
 verified_user, visibility, visibility_off, wifi_tethering, delete, add): no new dependency.
 
+## Carried over from the M1-07 review
+- Sidebar width and profile card colours/proportions versus the mockup (`.pcard`: surface background with outline-variant border, `secondary-container` when selected; now `surfaceVariant`).
+- Lock / verified_user / help icons inside the pill and banner.
+- Pill and banner type sizes if any difference remains after M1-07 step 5.
+
 ## UX
 `docs/ux/Main.dc.html`.
 
