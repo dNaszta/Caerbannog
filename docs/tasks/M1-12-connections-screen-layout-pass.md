@@ -22,6 +22,17 @@ icon set, password reveal toggle. Out: any behaviour change.
 Decide first: `compose.materialIconsExtended` (large) versus a few vector assets. Recommend a few vector assets (lock,
 verified_user, visibility, visibility_off, wifi_tethering, delete, add): no new dependency.
 
+## Carried over from the M1-07 review
+- Sidebar width and profile card colours/proportions versus the mockup (`.pcard`: surface background with outline-variant border, `secondary-container` when selected; now `surfaceVariant`).
+- Lock / verified_user / help icons inside the pill and banner.
+- Pill and banner type sizes if any difference remains after M1-07 step 5.
+- Profile card padding (12dp versus the mockup's 16px), border and background; NEUTRAL and LOCKED pill colours as
+  mockup constants instead of `surfaceVariant` / `errorContainer`.
+- Test cleanup: remove or replace the single-line pill UI test (it cannot fail; the Row measures the pill unweighted).
+- Minor fix: a late reachability result (`lastCheckResult`) must not set the banner for a profile that was deleted
+  (same token guard as the permission check). Add a core test first.
+- Accepted, no action: headline SemiBold (600) versus bold (700).
+
 ## UX
 `docs/ux/Main.dc.html`.
 

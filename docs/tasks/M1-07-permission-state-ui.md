@@ -12,7 +12,99 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
      (`.banner.warn`) updated.
   3. New request: a visible cue that the edit panel scrolls (scrollbar), and the panel should look like the design
      again. Verdict in "Layout verdict" below.
+- Step 2 (tests first, test developer): done, red. Written: core `PermissionSummaryTest`,
+  `ConnectionsViewModelPermissionChecksTest`; BDD steps in `PermissionCheckSteps` (five scenarios untagged, runner
+  filter `not @needs-M2 and not @broker`); UI tests in `ConnectionsScreenUiTest` (existing tests use a
+  `selectProfile(i)` helper that clicks the card via its `permissionPill:<name>` tag); `CompositionRootTest`
+  (closed loopback port, no network); `desktopApp` got a test-only coroutines dependency. Red: core, acceptance and
+  desktopApp tests do not compile (missing contract types); `:ui:jvmTest` compiles and fails (32 of 54).
+- Step 2 follow-up (architect rulings): `CompositionRootTest` now passes fake checkers through the new
+  `permissionChecker`/`reachabilityChecker` parameters (red: compile error until the seam exists); UI tests added for
+  the New-connection panel without banner/pill and for the saved-but-unchecked case; core test asserts the Unreadable
+  banner has null detail and dimNote. Test-only `kotlinx-coroutines-core` in `desktopApp` accepted.
+- Step 3 (build, senior developer): done, green except one test. Core, acceptance (the five scenarios pass, the two
+  `@needs-M2` stay skipped), desktopApp green; `:ui:jvmTest` 56 of 57. The one failing test is
+  `the password field is masked`: it asserts `onNodeWithText("hunter2")` does not exist, but `hasText` also matches the
+  test-only `InputText` property, which holds the raw typed text; the field IS masked (`EditableText` = bullets,
+  `Password` semantics present). Needs a test-developer fix (assert `EditableText` is bullets).
+  Built: `PermissionSummary.kt`, `Unreadable.reason`, view model flows, composition-root seam, pill/banner/scrollbar/
+  layout. `VerticalScrollbar` compiles in commonMain (no expect/actual). No new dependency. The profile card is not
+  `clickable` (it merges children and hides the pill tag from the merged tree): it uses `pointerInput` plus button
+  semantics, so it has no keyboard focus yet (follow-up for M1-12). Manual look still to do.
+- Step 4 (verify, test developer, 2026-11-04): pass with findings, no blocker or major. Full `./gradlew test
+  --rerun-tasks --continue` green: core 100, acceptance 43 (5 skipped by design: 3 `@needs-M2`, 1 `@broker`, 1
+  deferred "Switch between connections"; the five former `@needs-M1-07` scenarios run and pass), data-rabbit 19,
+  desktopApp 5, ui 57. Test fix: `the password field is masked` now asserts `EditableText` is the bullet mask (the
+  senior developer was right: `hasText` also reads the test-only `InputText`); mutation (remove
+  `PasswordVisualTransformation`) makes it fail. `selectProfile` now uses the unmerged tree. 27 production mutations
+  killed (pill text/tone per row, dim note, declaration over Checked, userMessage, Save path, rename key, delete,
+  Select/start-up check, reachability skipped or guarding, New-connection banner, scrollbar tag, Checking/Done). Open
+  minor findings in the report (banner layout versus mockup, card focus). Manual look by the user still pending.
+- Step 5 (architect review, 2026-11-04): **Changes required** (small). Items:
+  - Senior developer: (a) `ProfileCard` must be keyboard focusable again: use `Modifier.clickable` (focus, Enter/Space,
+    indication) instead of `pointerInput` plus hand-made button semantics; (b) the WARNING tone is a new amber
+    `warn-container` (`#FFE2B0` on `#3B2700`, now in `docs/ux/m3.css` as `--warn-container`/`--on-warn-container`) in
+    `PermissionColors`, not `tertiaryContainer` (pink, reads as staging/error, not as a warning); (c) banner: bold
+    headline, detail in 12sp, and the dim note drawn BELOW the banner as its own dim line (as in the mockup); (d) pill
+    12sp / weight 500, `maxLines = 1`, name `maxLines = 1` with ellipsis; (e) stale-write guard: a check result is
+    stored only if the profile it was started for still exists under that name (and for a save, the new name); same
+    for the `Checking` entry.
+  - Test developer: (f) pill and banner lookups in `ConnectionsScreenUiTest` use `useUnmergedTree = true` where the
+    card is now `clickable` (merged); add a test that the card takes keyboard focus and Enter/Space selects it; (g) a
+    core test for (e): delete or rename while a gated check is in flight leaves no map entry, and a new profile with
+    the reused name shows "Not checked".
+  - Product owner decision 1 (open point 1) was taken by the coordinator, not the user: the check runs only on the
+    button "Check connection and permissions" and after a successful Save of an existing profile. After launch every
+    pill reads "Not checked". The user should confirm or change this before M2.
+  - Moved to `M1-12`: column widths and card colours (item 5), icons in pill and banner.
+- Round 2, step 2 (tests first, test developer): red as expected, 8 failing tests. Core (4): delete or rename while a
+  gated check is in flight leaves no entry; reuse of the old name reads 'Not checked' (one test after the late result,
+  one strict test with the late result arriving after the reuse). UI (4): card takes focus and Enter / Space selects
+  it; dim note under tag `permissionDimNote`, not inside `permissionBanner` (two tests, incl. the updated old one).
+  Also added: dim note absent without declaration, before a check, when the declaration is used; single-line pill via
+  `GetTextLayoutResult` (already green); unmerged-tree lookups everywhere. Colours stay manual:
+  `PermissionColors` is a private composable-only object, not testable as data.
+- Round 2, step 3 (senior developer): done. Card is `Modifier.clickable` again (focus, Enter/Space); WARNING uses the
+  amber constants; banner headline SemiBold, detail bodySmall, dim note below the banner under tag
+  `permissionDimNote`; pill 12sp Medium single line, name ellipsis; stale-write guard in the view model with a
+  per-name token (bumped on every check start, invalidated on delete and rename; a late result is written only while
+  its token is current, and a late `session.open` result for a removed name is forgotten). Colours remain manual.
+- Round 2, step 4 (test developer): pass with findings (no blocker, no major). Clean `./gradlew test --rerun-tasks
+  --continue`: core 104 (+2 added now = 106), data-rabbit 19, acceptance 43 (5 skipped by design: `@needs-M2`), desktopApp
+  5, ui 64, all green; the five former `@needs-M1-07` scenarios pass. Mutations all caught except: pill without
+  `maxLines`/`softWrap=false` (the single-line test cannot fail: the Row measures the unweighted pill first, so the guard
+  is defensive only), WARNING pill using the OK colour (pixels, manual). The late `session.open` not calling `forget` was
+  NOT caught by any test; added two core tests (deleted and renamed while in flight: session must not stay usable),
+  green now and red under that mutation. Open minors: late reachability result can set the banner for a deleted
+  profile; two overlapping checks of the same name can leave the session with the older result while the state shows the
+  newer (session is last-write-wins, the token guards only the state); token check and state write are not one atomic
+  step across the two flows (tiny window, UI runs on one thread). Mockup deviations (manual look): card padding 12 vs
+  16dp and no 1dp outline-variant border, banner headline SemiBold vs bold, no icons (M1-12).
 - Branch: `m1-07-permission-state-ui` from `main`.
+
+## Architect rulings (2026-11-04, after step 2)
+1. **Composition root seam: yes.** `createConnectionsViewModel` gets `permissionChecker: PermissionChecker =
+   ManagementApiPermissionChecker()` and `reachabilityChecker: BrokerReachabilityChecker =
+   StreamAndManagementReachabilityChecker()`, real defaults, next to the existing `profilesFile` and `secretStore`. The
+   session is built from `permissionChecker` and the same `secretStore`. Test change: `CompositionRootTest` should pass fake
+   checkers instead of using a closed loopback port (deterministic, no socket); a fake that returns a known result is
+   enough to prove the session is wired (pill/state shows it).
+2. **New connection panel (no saved profile): the Permission check section is absent** (no banner, no pill). There is
+   nothing to check before a profile is saved. A saved profile that was never checked shows the neutral banner
+   "Permission check has not run yet." and the pill "Not checked". The removed assertion in the empty-state test is
+   therefore correct for New connection; keep a test for the saved-but-unchecked case.
+3. **Detail texts.** Confirmed: unlocked without write: headline "<user> can change topology on virtual host <vhost>."
+   detail "The broker confirmed it, so topology screens and migrations are unlocked for this connection. Test publishing
+   is disabled: no write permission." Declared detail is two lines joined by a single "\n": "The broker could not confirm
+   it and still enforces its own permissions." then `Unreadable.reason`. Unreadable banner: headline
+   `Unreadable.userMessage`, `detail` = null, `dimNote` = null.
+4. **Pill inside the clickable card: yes.** The whole profile card is the click target and the pill (tag
+   `permissionPill:<name>`) is a child of it.
+5. **Password masking:** `PasswordVisualTransformation` on `OutlinedTextField` makes Compose emit
+   `SemanticsProperties.Password`, so the test assumption stands. If it does not on this Compose version, add
+   `Modifier.semantics { password() }` on the field; the test stays unchanged.
+6. **`kotlinx-coroutines-core` as `testImplementation` in `desktopApp`: accepted** (already used in core, not a new
+   library, test scope only). Record it in the Status.
 
 ## Goal
 The user can always see what the permission check found for each connection (broker-read, declared by the user, could
@@ -124,7 +216,7 @@ never touched by tests.
 - `ProfileCard` shows `permissionPill(state.permissionChecks[profile.name])`; `EditPanel` shows
   `permissionBanner(...)` for the selected profile in place of `PermissionCheckPanel`, plus `dimNote` when present.
   Tone to colour: OK `primaryContainer`-free green is not in the M3 scheme, so use the mockup's `ok-container` colours
-  as constants in one place (a small `PermissionColors` object in `ui`), WARNING `tertiaryContainer`/`onTertiaryContainer`,
+  as constants in one place (a small `PermissionColors` object in `ui`), WARNING amber `warn-container` (step 5; was tertiary, which is pink),
   LOCKED `errorContainer`/`onErrorContainer`, NEUTRAL `surfaceVariant`.
 - Test tags: pill `permissionPill:<profileName>`, banner `permissionBanner`, scrollbar `editPanelScrollbar`.
 - The ignored-declaration rule needs no new state: `dimNote` is computed from the saved profile.
@@ -192,3 +284,17 @@ note, `.banner.warn` in `m3.css`). `docs/ux/Topology.dc.html` is out of scope.
 ## Definition of done
 Tests first and passing (core, ui, acceptance-tests, desktopApp), no unrelated changes, the Status block updated, the
 manual look by the user recorded, `tests/bdd/README.md` and `docs/tasks/README.md` in sync.
+
+- Round 2, step 5 (architect review, 2026-11-04): **Accepted with follow-ups**. M1-07 is done (not merged). All round-1
+  items (a) to (g) verified against `git diff 9992f53..HEAD` and the test report. Rulings on the remaining findings:
+  - (A) The single-line pill UI test cannot fail: follow-up, test developer removes it or replaces it with a check that
+    can fail (done inside `M1-12`). `maxLines = 1` stays as defensive code.
+  - (B) `ConnectionSession.open` is last-write-wins: carried to M2 as a prerequisite (see spec, Risks): before any M2
+    action reads the session to enable publishing or topology changes, `open` must keep the result of the latest
+    started check per profile name, not the latest finished one. Safe in M1: nothing acts on the session yet, and the
+    older result only matters if it was more permissive.
+  - (C) Late reachability result can set the banner for a deleted profile: minor, carried to `M1-12`.
+  - (D) Token check and state write not atomic across flows: accepted. The UI runs on one thread; note it in the
+    code if the view model ever moves off the main dispatcher.
+  - (E) Mockup deviations: card padding, border and background, and NEUTRAL/LOCKED pill colours move to `M1-12`
+    (theme colours are acceptable meanwhile). SemiBold 600 versus bold 700 is accepted, no action.

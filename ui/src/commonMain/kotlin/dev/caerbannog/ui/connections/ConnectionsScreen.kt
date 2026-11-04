@@ -1,9 +1,14 @@
 package dev.caerbannog.ui.connections
 
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,10 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,7 +39,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.password
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
@@ -41,8 +58,14 @@ import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
+import dev.caerbannog.core.connections.PermissionBanner
+import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.connections.PermissionPill
+import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.connections.permissionBanner
+import dev.caerbannog.core.connections.permissionPill
 import kotlinx.coroutines.launch
 
 /**
@@ -72,13 +95,17 @@ fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
         EditPanel(
             state = state,
             onSave = { originalName, input ->
-                if (originalName == null) viewModel.addConnection(input) else viewModel.updateConnection(originalName, input)
+                if (originalName == null) {
+                    viewModel.addConnection(input)
+                } else {
+                    scope.launch { viewModel.saveProfileChanges(originalName, input) }
+                }
             },
             onDeleteRequest = viewModel::requestDelete,
             onValidateCaCertificate = { name, path ->
                 if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
             },
-            onCheckConnection = { name -> scope.launch { viewModel.checkConnection(name) } },
+            onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -115,6 +142,7 @@ private fun SavedProfilesList(
                     ProfileCard(
                         profile = profile,
                         selected = profile.name == state.selectedProfileName,
+                        status = state.permissionChecks[profile.name],
                         onClick = { onSelect(profile.name) },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -125,18 +153,77 @@ private fun SavedProfilesList(
 }
 
 @Composable
-private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: PermissionCheckStatus?, onClick: () -> Unit) {
+    // The whole card is the click target (as in the mockup) and keyboard focusable; the pill is a child of it.
+    Card(
+        modifier = Modifier.fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(profile.name, style = MaterialTheme.typography.titleSmall)
-            Text(profile.host, style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    profile.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                PermissionPillView(permissionPill(status), Modifier.testTag("permissionPill:${profile.name}"))
+            }
+            Text(profile.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // No "Connected" status in this task's scope: there is no notion yet of an active broker
             // session (that is M2's stream-list territory) - only whether this profile is the one
             // currently open in the edit panel.
-            Text(if (selected) "Editing" else "Not connected", style = MaterialTheme.typography.bodySmall)
+            Text(
+                if (selected) "Editing" else "Not connected",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
-    TextButton(onClick = onClick) { Text("Select") }
+}
+
+/** Tone to colour in one place. OK green is not in the M3 scheme, so it uses the mockup's `ok-container` values. */
+private object PermissionColors {
+    private val okContainer = Color(0xFFD8EBD0)
+    private val onOkContainer = Color(0xFF173A0F)
+    // Amber, from the mockup's --warn-container: a declaration is a claim, not a verified fact and not an error.
+    private val warnContainer = Color(0xFFFFE2B0)
+    private val onWarnContainer = Color(0xFF3B2700)
+
+    @Composable
+    fun container(tone: PillTone): Color = when (tone) {
+        PillTone.OK -> okContainer
+        PillTone.WARNING -> warnContainer
+        PillTone.LOCKED -> MaterialTheme.colorScheme.errorContainer
+        PillTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    @Composable
+    fun content(tone: PillTone): Color = when (tone) {
+        PillTone.OK -> onOkContainer
+        PillTone.WARNING -> onWarnContainer
+        PillTone.LOCKED -> MaterialTheme.colorScheme.onErrorContainer
+        PillTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+@Composable
+private fun PermissionPillView(pill: PermissionPill, modifier: Modifier = Modifier) {
+    val (text, tone) = pill
+    Surface(color = PermissionColors.container(tone), contentColor = PermissionColors.content(tone), shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Text(
+            text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
 }
 
 /** `null` for [originalName] means "New connection" - [onSave] adds rather than updates. */
@@ -166,119 +253,130 @@ private fun EditPanel(
     var declaredWrite by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions?.write ?: false) }
 
     // Scrollable: the panel is taller than a small window, which would push the banners and Save off-screen.
-    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
-        Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+    // The bar is always visible so the user can see that it scrolls.
+    val scrollState = rememberScrollState()
+    Row(modifier = modifier) {
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(scrollState).padding(end = 12.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp)).padding(16.dp),
+        ) {
+            Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
+            Spacer(modifier = Modifier.height(20.dp))
 
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = virtualHost, onValueChange = { virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text(if (selected == null) "Password" else "Password (leave blank to keep unchanged)") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Stream port (TLS): ${selected?.streamPort ?: 5551}", style = MaterialTheme.typography.bodySmall)
-        Text("Management port (HTTPS): ${selected?.managementPort ?: 15671}", style = MaterialTheme.typography.bodySmall)
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = caCertificatePath,
-            onValueChange = { path ->
-                caCertificatePath = path
-                if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
-            },
-            label = { Text("CA certificate (optional - blank uses the system trust store)") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        val caResult = state.lastCaCertificateValidationResult
-        if (caResult is CaCertificateValidationResult.Invalid) {
-            Text(caResult.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        TopologyControlSelector(
-            level = level,
-            onChange = { picked ->
-                if (picked == TopologyControlLevel.FULL_CONTROL && level != TopologyControlLevel.FULL_CONTROL) {
-                    pendingLevel = picked
-                } else {
-                    level = picked
-                }
-            },
-        )
-        pendingLevel?.let { pending ->
-            FullControlConfirmDialog(
-                onConfirm = {
-                    level = pending
-                    pendingLevel = null
-                },
-                onCancel = { pendingLevel = null },
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(value = virtualHost, onValueChange = { virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text(if (selected == null) "Password" else "Password (leave blank to keep unchanged)") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth().semantics { password() },
             )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        DeclaredPermissionsSection(
-            declares = declares,
-            configure = declaredConfigure,
-            write = declaredWrite,
-            onDeclaresChange = { declares = it },
-            onConfigureChange = { declaredConfigure = it },
-            onWriteChange = { declaredWrite = it },
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        PermissionCheckPanel()
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("TLS is always on. The app does not connect without it.", style = MaterialTheme.typography.bodySmall)
-
-        state.lastCheckResult?.let { result ->
             Spacer(modifier = Modifier.height(8.dp))
-            CheckConnectionBanner(result)
-        }
-
-        (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
+            Text("Stream port (TLS): ${selected?.streamPort ?: 5551}", style = MaterialTheme.typography.bodySmall)
+            Text("Management port (HTTPS): ${selected?.managementPort ?: 15671}", style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(8.dp))
-            ErrorBanner("A connection named '${collision.name}' already exists.")
-        }
+            OutlinedTextField(
+                value = caCertificatePath,
+                onValueChange = { path ->
+                    caCertificatePath = path
+                    if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
+                },
+                label = { Text("CA certificate (optional - blank uses the system trust store)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val caResult = state.lastCaCertificateValidationResult
+            if (caResult is CaCertificateValidationResult.Invalid) {
+                Text(caResult.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (selected != null) {
-                TextButton(onClick = { onDeleteRequest(selected.name) }) { Text("Delete profile") }
-            }
-            Spacer(modifier = Modifier.width(1.dp))
-            if (selected != null) {
-                OutlinedButton(onClick = { onCheckConnection(selected.name) }) { Text("Check connection") }
-            }
-            Button(onClick = {
-                val input = ConnectionProfileInput(
-                    name = name,
-                    host = host,
-                    virtualHost = virtualHost,
-                    username = username,
-                    password = password.ifBlank { null },
-                    streamPort = selected?.streamPort ?: 5551,
-                    managementPort = selected?.managementPort ?: 15671,
-                    topologyControlLevel = level,
-                    declaredPermissions = if (declares) {
-                        DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
+            Spacer(modifier = Modifier.height(20.dp))
+            TopologyControlSelector(
+                level = level,
+                onChange = { picked ->
+                    if (picked == TopologyControlLevel.FULL_CONTROL && level != TopologyControlLevel.FULL_CONTROL) {
+                        pendingLevel = picked
                     } else {
-                        DeclaredPermissionsEdit.Clear
+                        level = picked
+                    }
+                },
+            )
+            pendingLevel?.let { pending ->
+                FullControlConfirmDialog(
+                    onConfirm = {
+                        level = pending
+                        pendingLevel = null
                     },
+                    onCancel = { pendingLevel = null },
                 )
-                onSave(selected?.name, input)
-            }) {
-                Text("Save")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            DeclaredPermissionsSection(
+                declares = declares,
+                configure = declaredConfigure,
+                write = declaredWrite,
+                onDeclaresChange = { declares = it },
+                onConfigureChange = { declaredConfigure = it },
+                onWriteChange = { declaredWrite = it },
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            if (selected != null) {
+                PermissionCheckSection(permissionBanner(selected, state.permissionChecks[selected.name]))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("TLS is always on. The app does not connect without it.", style = MaterialTheme.typography.bodySmall)
+
+            state.lastCheckResult?.let { result ->
+                Spacer(modifier = Modifier.height(8.dp))
+                CheckConnectionBanner(result)
+            }
+
+            (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
+                Spacer(modifier = Modifier.height(8.dp))
+                ErrorBanner("A connection named '${collision.name}' already exists.")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (selected != null) {
+                    TextButton(onClick = { onDeleteRequest(selected.name) }) { Text("Delete profile") }
+                }
+                Spacer(modifier = Modifier.width(1.dp))
+                if (selected != null) {
+                    OutlinedButton(onClick = { onCheckConnection(selected.name) }) { Text("Check connection and permissions") }
+                }
+                Button(onClick = {
+                    val input = ConnectionProfileInput(
+                        name = name,
+                        host = host,
+                        virtualHost = virtualHost,
+                        username = username,
+                        password = password.ifBlank { null },
+                        streamPort = selected?.streamPort ?: 5551,
+                        managementPort = selected?.managementPort ?: 15671,
+                        topologyControlLevel = level,
+                        declaredPermissions = if (declares) {
+                            DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
+                        } else {
+                            DeclaredPermissionsEdit.Clear
+                        },
+                    )
+                    onSave(selected?.name, input)
+                }) {
+                    Text("Save")
+                }
             }
         }
+        VerticalScrollbar(rememberScrollbarAdapter(scrollState), modifier = Modifier.fillMaxHeight().testTag("editPanelScrollbar"))
     }
 }
 
@@ -289,6 +387,7 @@ private fun TopologyControlSelector(level: TopologyControlLevel, onChange: (Topo
         Text(
             "The most this app will do to topology on this connection. The broker's own permissions still apply.",
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TopologyOption("Read-only", level == TopologyControlLevel.READ_ONLY) { onChange(TopologyControlLevel.READ_ONLY) }
         TopologyOption("Declare and edit", level == TopologyControlLevel.DECLARE_AND_EDIT) { onChange(TopologyControlLevel.DECLARE_AND_EDIT) }
@@ -315,6 +414,7 @@ private fun DeclaredPermissionsSection(
             "Only used when the broker does not let this user read its own permissions. " +
                 "This is your own statement; the broker still enforces its permissions.",
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (declares) {
             YesNoChoice("Can change topology (configure)", configure, onConfigureChange)
@@ -361,16 +461,33 @@ private fun TopologyOption(label: String, selected: Boolean, onSelect: () -> Uni
     }
 }
 
-/**
- * The broker-read half of the self-constraint picture (`docs/ux/Main.dc.html`'s "svc-explorer can
- * change topology..." box) is M1-03's job - rendered here in a neutral, inert state per this task's
- * UX section, not a fabricated locked/unlocked verdict.
- */
+/** The "Permission check" group: a toned banner for what the broker (or the user's declaration) says. */
 @Composable
-private fun PermissionCheckPanel() {
+private fun PermissionCheckSection(banner: PermissionBanner) {
     Column {
         Text("Permission check", style = MaterialTheme.typography.titleSmall)
-        Text("Permission check has not run yet.", style = MaterialTheme.typography.bodySmall)
+        Spacer(modifier = Modifier.height(8.dp))
+        Surface(
+            color = PermissionColors.container(banner.tone),
+            contentColor = PermissionColors.content(banner.tone),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().testTag("permissionBanner"),
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(banner.headline, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                banner.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+        // Outside the banner Surface on purpose: it is a note about the banner, not part of the verdict.
+        banner.dimNote?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("permissionDimNote"),
+            )
+        }
     }
 }
 

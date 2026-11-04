@@ -28,6 +28,8 @@ dependencies {
     implementation(compose.desktop.currentOs)
 
     testImplementation(kotlin("test"))
+    // M1-07: CompositionRootTest runs the suspend check with runBlocking.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

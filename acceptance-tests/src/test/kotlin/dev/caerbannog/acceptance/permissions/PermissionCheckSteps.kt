@@ -11,9 +11,14 @@ import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
+import dev.caerbannog.core.connections.PermissionBanner
 import dev.caerbannog.core.connections.PermissionCheckResult
+import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.UnreadableCause
+import dev.caerbannog.core.connections.permissionBanner
+import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
 import io.cucumber.java.After
 import io.cucumber.java.Before
@@ -30,7 +35,9 @@ import java.nio.file.Files
 
 /**
  * Steps for tests/bdd/features/02_permission_check.feature (M1-03, declared-permission persistence M1-06).
- * No step exists for the scenarios tagged @needs-M1-07 or @needs-M2 on purpose.
+ * No step exists for the scenarios tagged @needs-M2 on purpose. M1-07: the sidebar and edit panel steps run in
+ * core (no Compose): they feed what the session found into permissionPill / permissionBanner and compare the
+ * strings from docs/tasks/M1-07-permission-state-ui.md. Fakes only: no real broker, keychain or ~/.caerbannog.
  *
  * M1-06: "Declared permissions are saved with the profile" runs in memory through saveProfileChanges with a
  * DeclaredPermissionsEdit.Set. "A profile saved before declarations existed has none" needs a real file: the
@@ -209,6 +216,68 @@ class PermissionCheckSteps {
     @Then("streams can still be listed and browsed")
     fun streamsCanStillBeBrowsed() {
         assertTrue(checkNotNull(result).canBrowseStreams, "reading streams must never depend on the permission check")
+    }
+
+    // --- M1-07: what the sidebar pill and the edit panel banner say (core level) --------------------
+
+    @Given("the user has no configure permission on {string}")
+    fun theUserHasNoConfigurePermission(vhost: String) {
+        assertEquals(profile.virtualHost, vhost, "the permissions must be for the connection's virtual host")
+        broker.permissions = BrokerPermissions(configure = "", write = ".*", read = ".*")
+    }
+
+    @When("I connect to {string}")
+    fun iConnectTo(name: String) {
+        assertEquals(profile.name, name, "the connection being opened must be the saved one")
+        result = runBlocking { session.open(profile) }
+    }
+
+    private fun statusOf(name: String): PermissionCheckStatus.Done {
+        assertEquals(profile.name, name, "the profile shown must be the saved one")
+        return PermissionCheckStatus.Done(checkNotNull(session.permissions(name)) { "no permission check result for '$name'" })
+    }
+
+    private fun bannerOf(): PermissionBanner = permissionBanner(profile, statusOf(profile.name))
+
+    @Then("the sidebar shows {string} next to {string}")
+    fun theSidebarShows(text: String, name: String) {
+        assertEquals(text, permissionPill(statusOf(name)).text, "pill text next to '$name'")
+    }
+
+    @Then("the edit panel says the broker confirmed that {string} can change topology on virtual host {string}")
+    fun theEditPanelSaysConfirmed(user: String, vhost: String) {
+        val banner = bannerOf()
+        assertEquals(PillTone.OK, banner.tone, "a broker-confirmed result is the ok tone, got $banner")
+        assertEquals("$user can change topology on virtual host $vhost.", banner.headline)
+        assertTrue(
+            banner.detail.orEmpty().startsWith("The broker confirmed it"),
+            "the detail must say the broker confirmed it, got '${banner.detail}'",
+        )
+    }
+
+    @Then("the edit panel says the broker could not confirm the permissions and still enforces its own")
+    fun theEditPanelSaysNotConfirmed() {
+        val banner = bannerOf()
+        assertEquals(PillTone.WARNING, banner.tone, "a declared result is the warning tone, never ok, got $banner")
+        assertTrue(
+            banner.detail.orEmpty().contains("The broker could not confirm it and still enforces its own permissions."),
+            "the detail must say the broker could not confirm it, got '${banner.detail}'",
+        )
+    }
+
+    @Then("the edit panel says {string}")
+    fun theEditPanelSays(text: String) {
+        val banner = bannerOf()
+        assertEquals(text, banner.dimNote, "the dim note of $banner")
+    }
+
+    @Then("the edit panel tells me that permissions could not be read")
+    fun theEditPanelTellsUnreadable() {
+        val unreadable = checkNotNull(result as? PermissionCheckResult.Unreadable) { "expected Unreadable, got $result" }
+        val banner = bannerOf()
+        assertEquals(PillTone.LOCKED, banner.tone, "an unreadable result is locked, got $banner")
+        assertEquals(unreadable.userMessage, banner.headline, "the banner must show the reason the broker gave")
+        assertTrue(banner.headline.startsWith("Permissions could not be read"), "got '${banner.headline}'")
     }
 
     // --- M1-06 ---------------------------------------------------------------------------------
