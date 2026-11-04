@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileRepository
+import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import kotlinx.serialization.Serializable
@@ -38,7 +39,14 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         val managementPort: Int,
         val caCertificatePath: String? = null,
         val topologyControlLevel: TopologyControlLevelDto = TopologyControlLevelDto.READ_ONLY,
+        // Optional and additive: no key is written when null (Json does not encode defaults), and old files
+        // load as none. Json rejects unknown keys, so an older build cannot read a file that has this key:
+        // downgrade is unsupported (local-only app).
+        val declaredPermissions: DeclaredPermissionsDto? = null,
     )
+
+    @Serializable
+    private data class DeclaredPermissionsDto(val configure: Boolean, val write: Boolean)
 
     @Serializable
     private enum class TopologyControlLevelDto {
@@ -98,6 +106,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
             TopologyControlLevelDto.DECLARE_AND_EDIT -> TopologyControlLevel.DECLARE_AND_EDIT
             TopologyControlLevelDto.FULL_CONTROL -> TopologyControlLevel.FULL_CONTROL
         },
+        declaredPermissions = declaredPermissions?.let { DeclaredPermissions(configure = it.configure, write = it.write) },
     )
 
     private fun ConnectionProfile.toDto() = ConnectionProfileDto(
@@ -113,6 +122,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
             TopologyControlLevel.DECLARE_AND_EDIT -> TopologyControlLevelDto.DECLARE_AND_EDIT
             TopologyControlLevel.FULL_CONTROL -> TopologyControlLevelDto.FULL_CONTROL
         },
+        declaredPermissions = declaredPermissions?.let { DeclaredPermissionsDto(configure = it.configure, write = it.write) },
     )
 
     companion object {

@@ -24,4 +24,20 @@ data class ConnectionProfileInput(
     val streamPort: Int = 5551,
     val managementPort: Int = 15671,
     val topologyControlLevel: TopologyControlLevel? = null,
+    val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
 )
+
+/**
+ * What a save does with the profile's declared permissions. A sentinel and not a nullable field,
+ * because null cannot mean both "keep the saved declaration" and "not declared".
+ */
+sealed interface DeclaredPermissionsEdit {
+    /** Add: no declaration. Update: leave the saved declaration as it is (also on rename). */
+    data object Keep : DeclaredPermissionsEdit
+
+    /** Remove the declaration. */
+    data object Clear : DeclaredPermissionsEdit
+
+    /** Store [permissions], replacing any saved declaration. */
+    data class Set(val permissions: DeclaredPermissions) : DeclaredPermissionsEdit
+}

@@ -3,7 +3,8 @@
 Milestone: M1    Depends on: M1-03-permission-check (core `DeclaredPermissions`, session rule)    Size: S
 
 ## Status
-- State: step 2 done (test developer): tests written, red as expected; next: step 3 build (senior developer).
+- State: step 3 done (senior developer): build green; next: test developer verify, architect review.
+  - Step 3: `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38, acceptance-tests 38 with 5 skipped by tag filter, desktopApp 3); `:data-rabbit:brokerTest` green. No test edited.
 - Branch (when started): `m1-06-profile-declared-permissions`, based on `main`.
 - Round: 0, step 2 done (test developer), branch `m1-06-profile-declared-permissions`.
   - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'DeclaredPermissionsEdit'` (ConnectionsViewModelTest: 12 new

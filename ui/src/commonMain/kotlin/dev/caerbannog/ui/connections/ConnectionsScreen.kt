@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +39,8 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.DeclaredPermissions
+import dev.caerbannog.core.connections.DeclaredPermissionsEdit
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import kotlinx.coroutines.launch
@@ -157,6 +160,10 @@ private fun EditPanel(
     // Form state like every other field: applied on Save only. pendingLevel non-null = confirmation open.
     var level by remember(selected?.name) { mutableStateOf(selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY) }
     var pendingLevel by remember(selected?.name) { mutableStateOf<TopologyControlLevel?>(null) }
+    // Declaration form state, applied on Save only: switch off sends Clear, on sends Set.
+    var declares by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions != null) }
+    var declaredConfigure by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions?.configure ?: false) }
+    var declaredWrite by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions?.write ?: false) }
 
     // Scrollable: the panel is taller than a small window, which would push the banners and Save off-screen.
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
@@ -217,6 +224,16 @@ private fun EditPanel(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        DeclaredPermissionsSection(
+            declares = declares,
+            configure = declaredConfigure,
+            write = declaredWrite,
+            onDeclaresChange = { declares = it },
+            onConfigureChange = { declaredConfigure = it },
+            onWriteChange = { declaredWrite = it },
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         PermissionCheckPanel()
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -251,6 +268,11 @@ private fun EditPanel(
                     streamPort = selected?.streamPort ?: 5551,
                     managementPort = selected?.managementPort ?: 15671,
                     topologyControlLevel = level,
+                    declaredPermissions = if (declares) {
+                        DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
+                    } else {
+                        DeclaredPermissionsEdit.Clear
+                    },
                 )
                 onSave(selected?.name, input)
             }) {
@@ -271,6 +293,45 @@ private fun TopologyControlSelector(level: TopologyControlLevel, onChange: (Topo
         TopologyOption("Read-only", level == TopologyControlLevel.READ_ONLY) { onChange(TopologyControlLevel.READ_ONLY) }
         TopologyOption("Declare and edit", level == TopologyControlLevel.DECLARE_AND_EDIT) { onChange(TopologyControlLevel.DECLARE_AND_EDIT) }
         TopologyOption("Full control", level == TopologyControlLevel.FULL_CONTROL) { onChange(TopologyControlLevel.FULL_CONTROL) }
+    }
+}
+
+@Composable
+private fun DeclaredPermissionsSection(
+    declares: Boolean,
+    configure: Boolean,
+    write: Boolean,
+    onDeclaresChange: (Boolean) -> Unit,
+    onConfigureChange: (Boolean) -> Unit,
+    onWriteChange: (Boolean) -> Unit,
+) {
+    Column {
+        Text("Declared permissions", style = MaterialTheme.typography.titleSmall)
+        Row {
+            Switch(checked = declares, onCheckedChange = onDeclaresChange)
+            Text("I know what this user may do on the broker", modifier = Modifier.padding(start = 8.dp, top = 12.dp))
+        }
+        Text(
+            "Only used when the broker does not let this user read its own permissions. " +
+                "This is your own statement; the broker still enforces its permissions.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (declares) {
+            YesNoChoice("Can change topology (configure)", configure, onConfigureChange)
+            YesNoChoice("Can publish (write)", write, onWriteChange)
+        }
+    }
+}
+
+@Composable
+private fun YesNoChoice(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Column {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Row {
+            TopologyOption("Yes", value) { onChange(true) }
+            Spacer(modifier = Modifier.width(16.dp))
+            TopologyOption("No", !value) { onChange(false) }
+        }
     }
 }
 
