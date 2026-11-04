@@ -2,7 +2,7 @@ package dev.caerbannog.ui.connections
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,13 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.password
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
@@ -155,22 +154,23 @@ private fun SavedProfilesList(
 
 @Composable
 private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: PermissionCheckStatus?, onClick: () -> Unit) {
-    // The whole card is the click target (as in the mockup); the pill is a child of it. Not `clickable`:
-    // that merges the children into one semantics node and the pill's own tag would vanish from the tree.
+    // The whole card is the click target (as in the mockup) and keyboard focusable; the pill is a child of it.
     Card(
         modifier = Modifier.fillMaxWidth()
-            .semantics(mergeDescendants = false) {
-                role = Role.Button
-                this.onClick { onClick(); true }
-            }
-            .pointerInput(onClick) { detectTapGestures { onClick() } },
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(profile.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text(
+                    profile.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
                 PermissionPillView(permissionPill(status), Modifier.testTag("permissionPill:${profile.name}"))
             }
             Text(profile.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -190,11 +190,14 @@ private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: P
 private object PermissionColors {
     private val okContainer = Color(0xFFD8EBD0)
     private val onOkContainer = Color(0xFF173A0F)
+    // Amber, from the mockup's --warn-container: a declaration is a claim, not a verified fact and not an error.
+    private val warnContainer = Color(0xFFFFE2B0)
+    private val onWarnContainer = Color(0xFF3B2700)
 
     @Composable
     fun container(tone: PillTone): Color = when (tone) {
         PillTone.OK -> okContainer
-        PillTone.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
+        PillTone.WARNING -> warnContainer
         PillTone.LOCKED -> MaterialTheme.colorScheme.errorContainer
         PillTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant
     }
@@ -202,7 +205,7 @@ private object PermissionColors {
     @Composable
     fun content(tone: PillTone): Color = when (tone) {
         PillTone.OK -> onOkContainer
-        PillTone.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
+        PillTone.WARNING -> onWarnContainer
         PillTone.LOCKED -> MaterialTheme.colorScheme.onErrorContainer
         PillTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -212,7 +215,14 @@ private object PermissionColors {
 private fun PermissionPillView(pill: PermissionPill, modifier: Modifier = Modifier) {
     val (text, tone) = pill
     Surface(color = PermissionColors.container(tone), contentColor = PermissionColors.content(tone), shape = RoundedCornerShape(12.dp), modifier = modifier) {
-        Text(text, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+        Text(
+            text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -464,12 +474,19 @@ private fun PermissionCheckSection(banner: PermissionBanner) {
             modifier = Modifier.fillMaxWidth().testTag("permissionBanner"),
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(banner.headline, style = MaterialTheme.typography.bodyMedium)
-                banner.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                banner.dimNote?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text(banner.headline, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                banner.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
+        }
+        // Outside the banner Surface on purpose: it is a note about the banner, not part of the verdict.
+        banner.dimNote?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("permissionDimNote"),
+            )
         }
     }
 }

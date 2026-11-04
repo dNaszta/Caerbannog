@@ -64,6 +64,11 @@ Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)
   Also added: dim note absent without declaration, before a check, when the declaration is used; single-line pill via
   `GetTextLayoutResult` (already green); unmerged-tree lookups everywhere. Colours stay manual:
   `PermissionColors` is a private composable-only object, not testable as data.
+- Round 2, step 3 (senior developer): done. Card is `Modifier.clickable` again (focus, Enter/Space); WARNING uses the
+  amber constants; banner headline SemiBold, detail bodySmall, dim note below the banner under tag
+  `permissionDimNote`; pill 12sp Medium single line, name ellipsis; stale-write guard in the view model with a
+  per-name token (bumped on every check start, invalidated on delete and rename; a late result is written only while
+  its token is current, and a late `session.open` result for a removed name is forgotten). Colours remain manual.
 - Branch: `m1-07-permission-state-ui` from `main`.
 
 ## Architect rulings (2026-11-04, after step 2)

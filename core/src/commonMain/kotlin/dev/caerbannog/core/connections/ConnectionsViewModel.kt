@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * State holder for the Connections screen: [state] flows in, these methods are the events that flow
@@ -86,10 +87,11 @@ class ConnectionsViewModel(
         val result = updateConnection(originalName, input)
         if (result is SaveConnectionResult.Saved && session != null) {
             val name = result.profile.name
-            if (name != originalName) session.forget(originalName)
-            _state.update { it.copy(permissionChecks = it.permissionChecks - originalName + (name to PermissionCheckStatus.Checking)) }
-            val permissions = session.reopen(result.profile)
-            _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Done(permissions))) }
+            if (name != originalName) {
+                invalidateChecks(originalName)
+                session.forget(originalName)
+            }
+            runCheck(session, result.profile, replacing = originalName)
         }
         return result
     }
@@ -99,12 +101,49 @@ class ConnectionsViewModel(
      * unreachable broker shows up as Unreadable instead of a stale pill.
      */
     suspend fun checkConnectionAndPermissions(name: String) {
+        if (repository.list().none { it.name == name }) return
         checkConnection(name)
         val activeSession = session ?: return
-        val profile = profileNamed(name)
-        _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Checking)) }
+        // The profile can be deleted or renamed while the reachability check was running.
+        val profile = repository.list().firstOrNull { it.name == name } ?: return
+        runCheck(activeSession, profile, replacing = name)
+    }
+
+    // Every check gets a token; its Checking and Done entries are written only while that token is still the
+    // current one for the name. Delete, rename and a newer check make it stale, so a late result can never
+    // resurrect a removed profile or show up on a new profile that reused the name.
+    private suspend fun runCheck(activeSession: ConnectionSession, profile: ConnectionProfile, replacing: String) {
+        val name = profile.name
+        val token = beginCheck(name)
+        writeIfCurrent(name, token) { it - replacing + (name to PermissionCheckStatus.Checking) }
         val permissions = activeSession.open(profile)
-        _state.update { it.copy(permissionChecks = it.permissionChecks + (name to PermissionCheckStatus.Done(permissions))) }
+        if (!writeIfCurrent(name, token) { it + (name to PermissionCheckStatus.Done(permissions)) } && tokens.value.byName[name] == null) {
+            activeSession.forget(name)
+        }
+    }
+
+    private data class Tokens(val last: Long = 0, val byName: Map<String, Long> = emptyMap())
+
+    private val tokens = MutableStateFlow(Tokens())
+
+    private fun beginCheck(name: String): Long =
+        tokens.updateAndGet { it.copy(last = it.last + 1, byName = it.byName + (name to it.last + 1)) }.last
+
+    private fun invalidateChecks(name: String) {
+        tokens.update { it.copy(byName = it.byName - name) }
+    }
+
+    private fun writeIfCurrent(
+        name: String,
+        token: Long,
+        change: (Map<String, PermissionCheckStatus>) -> Map<String, PermissionCheckStatus>,
+    ): Boolean {
+        var written = false
+        _state.update {
+            written = tokens.value.byName[name] == token
+            if (written) it.copy(permissionChecks = change(it.permissionChecks)) else it
+        }
+        return written
     }
 
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
@@ -159,6 +198,7 @@ class ConnectionsViewModel(
         val name = _state.value.pendingDeleteName ?: return
         repository.delete(name)
         secretStore.delete(name)
+        invalidateChecks(name)
         session?.forget(name)
         _state.update {
             it.copy(
