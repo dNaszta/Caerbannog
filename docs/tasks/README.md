@@ -11,3 +11,4 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M1-05-wire-desktopapp-connections | Wire desktopApp to the real Connections screen | M1 | done (accepted with follow-ups, round 1; not yet merged; manual `:desktopApp:run` by human still pending) |
 | M1-06-keychain-test-opt-in | Move real-keychain tests out of the default `test` task | M1 | not started (briefed) |
 | M1-03-permission-check | Permission check: read the user's vhost permissions, lock topology and test publishing, safe fallback | M1 | not started (briefed) |
+| M1-10-topology-level-on-new-connection | Choose the topology control level while creating a connection (apply on Save when editing) | M1 | not started (briefed) |
