@@ -284,3 +284,17 @@ note, `.banner.warn` in `m3.css`). `docs/ux/Topology.dc.html` is out of scope.
 ## Definition of done
 Tests first and passing (core, ui, acceptance-tests, desktopApp), no unrelated changes, the Status block updated, the
 manual look by the user recorded, `tests/bdd/README.md` and `docs/tasks/README.md` in sync.
+
+- Round 2, step 5 (architect review, 2026-11-04): **Accepted with follow-ups**. M1-07 is done (not merged). All round-1
+  items (a) to (g) verified against `git diff 9992f53..HEAD` and the test report. Rulings on the remaining findings:
+  - (A) The single-line pill UI test cannot fail: follow-up, test developer removes it or replaces it with a check that
+    can fail (done inside `M1-12`). `maxLines = 1` stays as defensive code.
+  - (B) `ConnectionSession.open` is last-write-wins: carried to M2 as a prerequisite (see spec, Risks): before any M2
+    action reads the session to enable publishing or topology changes, `open` must keep the result of the latest
+    started check per profile name, not the latest finished one. Safe in M1: nothing acts on the session yet, and the
+    older result only matters if it was more permissive.
+  - (C) Late reachability result can set the banner for a deleted profile: minor, carried to `M1-12`.
+  - (D) Token check and state write not atomic across flows: accepted. The UI runs on one thread; note it in the
+    code if the view model ever moves off the main dispatcher.
+  - (E) Mockup deviations: card padding, border and background, and NEUTRAL/LOCKED pill colours move to `M1-12`
+    (theme colours are acceptable meanwhile). SemiBold 600 versus bold 700 is accepted, no action.
