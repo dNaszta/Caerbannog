@@ -4,7 +4,7 @@ Milestone: M2    Depends on: none (runs beside M2-03 part 2)    Size: S to M
 
 Owner: test developer. Branch: `m2-testhygiene-01-undiscovered-tests` from `main` (410a9b1 or later; part 1 is merged). Confirmed by the architect 2026-11-04: start now.
 
-Status: steps A to E done (2026-11-04), awaiting architect review. Audit on `main` 410a9b1 plus docs commit 6d102c3: no hidden test found; step B had nothing to fix, step C nothing to report; guard built and proven. No production code and no assertion changed.
+Status: DONE: architect review 2026-11-04 = Accepted with follow-ups (F1 to F3 below); not merged yet (merge into local `main` with --no-ff by the coordinator, not pushed). Steps A to E done (2026-11-04). Audit on `main` 410a9b1 plus docs commit 6d102c3: no hidden test found; step B had nothing to fix, step C nothing to report; guard built and proven. No production code and no assertion changed.
 
 ### Audit result (A1 + A2, 2026-11-04)
 Method: `./gradlew clean test --continue` (XML kept), `:data-rabbit:brokerTest --rerun-tasks` (Docker available, run), `:ui:screenshotTest` (opt-in, writes PNGs to `ui/build` only); source scan of `@Test`, `@ParameterizedTest`, `@RepeatedTest`, `@TestFactory` (JUnit 5 and `kotlin.test`) in `core` jvmTest/commonTest, `ui` jvmTest, `data-rabbit` test, `desktopApp` test and `acceptance-tests` test, compared per class with the `testcase` count of the XML. `keychainTest` was NOT run (real keychain): the two keychain classes are marked unchecked (source 1 + 1, equal to the earlier known 1 + 1).
@@ -105,3 +105,18 @@ Build-only change under `docs/`, test source and Gradle files; keep the guard in
 
 ## Definition of done
 Audit table recorded, every undiscovered test fixed or listed with an owner, the guard merged and proven by the bad fixture, `tests/bdd/README.md` rule added, task index row updated, architect review.
+
+## Architect review (step 5, 2026-11-04): Accepted with follow-ups
+Reviewed: `git diff main...m2-testhygiene-01-undiscovered-tests` (buildSrc `TestDiscoveryGuard.kt`, `gradle/test-discovery-guard.gradle.kts`, root `build.gradle.kts`, `tests/guard-fixtures/`, docs). Not run by me: the builds (the author's results are taken as reported), keychainTest.
+- Good: counts as the real guard, style rule only for the clear message, a proof that the guard can fail (fixtures outside every test source set, exactly 5 rejected and 3 accepted), manual mutation proof, configuration cache, no production change, no third-party dependency.
+- Fail-fast: `./gradlew test` matches the module `test` tasks as before, so behaviour and time are unchanged apart from the guard. With `--continue` all module failures are reported; the guard is then skipped because its dependencies failed, which is correct (a failing run has no complete XML to count). Document this in the guard header.
+- buildSrc: acceptable. It is build structure, not a module and not a third-party dependency (Gradle's own `kotlin-dsl`). Costs: a change in buildSrc invalidates the build cache of every task and adds configuration time; a convention plugin in an included build is the modern alternative and a later migration is cheap. A plain script without typed tasks is not robust under the configuration cache. The product owner is informed, not asked to choose (see the question in the review note to the coordinator).
+
+| # | Severity | File | Finding | Suggested fix |
+| --- | --- | --- | --- | --- |
+| F1 | minor | `TestDiscoveryGuard.kt` (verdict for tagged classes) | "unchecked" is decided by XML older than the source file; a fresh git checkout touches sources, so tagged classes silently become "unchecked", and the staleness branch was never exercised (only inspected). | Print one summary line "N classes unchecked (run brokerTest, keychainTest, screenshotTest)"; add a fixture with a stale tagged XML to the self-test. |
+| F2 | minor | `TestDiscoveryGuard.kt` `scanClass` | Only the first class per file is taken, and any `@Tag` anywhere in the file tags the class; two test classes in one file give a loud false FAIL, a method-level `@Tag` a wrong "unchecked". Loud, so acceptable now. | Note it in the header comment; fix only when it bites. |
+| F3 | minor | Cucumber runners | `FILTER_TAGS` does not remove excluded-tag scenarios: they appear as skipped and are still counted as testcases, so "passed" counts must be read with that in mind. The guard is not affected (it does not count Cucumber classes). | Add one line to `tests/bdd/README.md` ("excluded tags show as skipped, not absent"); check later whether the filter property name is right for the engine version. No task needed unless skipped scenarios turn out to be run. |
+| F4 | idea | `build.gradle.kts`, `buildSrc` | Possible later move to an included-build convention plugin. | Only if buildSrc cache invalidation hurts. |
+
+Rejected as unnecessary: the extra JUnit source-scan test in `core` (a duplicate of the Gradle scanner that runs in the same test run).
