@@ -3,8 +3,12 @@
 Milestone: M1    Depends on: M1-03-permission-check (core `DeclaredPermissions`, session rule)    Size: S
 
 ## Status
-- State: step 3 done (senior developer): build green; next: test developer verify, architect review.
+- State: step 4 done (test developer): verdict pass, no blocker or major; next: architect review (judge the extra 'Declared permissions' title against the mockup).
   - Step 3: `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38, acceptance-tests 38 with 5 skipped by tag filter, desktopApp 3); `:data-rabbit:brokerTest` green. No test edited.
+  - Step 4 (test developer, independent): `./gradlew test --rerun-tasks --continue` green (core 66, data-rabbit 30, ui 38,
+    acceptance 38 with 5 skipped by design, desktopApp 3); `:data-rabbit:brokerTest` 11 green. Both former @needs-M1-06
+    scenarios run and pass. 17 mutations (view model, DTO, UI, acceptance) all caught; one (Keep clears) is caught by core only,
+    not by acceptance, because the BDD scenarios only use Set. Findings: 2 minor/idea, none open as blocker or major.
 - Branch (when started): `m1-06-profile-declared-permissions`, based on `main`.
 - Round: 0, step 2 done (test developer), branch `m1-06-profile-declared-permissions`.
   - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'DeclaredPermissionsEdit'` (ConnectionsViewModelTest: 12 new
