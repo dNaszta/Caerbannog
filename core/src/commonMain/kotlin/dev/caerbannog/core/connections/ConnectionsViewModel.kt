@@ -18,6 +18,7 @@ class ConnectionsViewModel(
     private val reachabilityChecker: BrokerReachabilityChecker,
     private val caCertificateValidator: CaCertificateValidator,
     private val session: ConnectionSession? = null,
+    private val active: ActiveConnection? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 
@@ -105,6 +106,8 @@ class ConnectionsViewModel(
         }
 
         refreshAfter(result)
+        // The held connection was made with the old settings (spec: closed on edit or rename).
+        if (result is SaveConnectionResult.Saved) active?.profileChanged(originalName)
         return result
     }
 
@@ -124,11 +127,16 @@ class ConnectionsViewModel(
     }
 
     /**
-     * Makes the saved profile [name] the current connection and checks its permissions. An unknown name does
-     * nothing. Interim entry point until the sidebar connection picker (M2-05).
+     * Makes the saved profile [name] the current connection and checks its permissions; with an
+     * [ActiveConnection] it also opens the clients and holds the connection. An unknown name does nothing.
+     * Interim entry point until the sidebar connection picker (M2-05).
      */
     suspend fun connect(name: String) {
         val profile = repository.list().firstOrNull { it.name == name } ?: return
+        if (active != null) {
+            active.connect(profile)
+            return
+        }
         val activeSession = session ?: return
         activeSession.select(name)
         activeSession.open(profile)
@@ -171,6 +179,8 @@ class ConnectionsViewModel(
         if (validation is CaCertificateValidationResult.Valid) {
             repository.update(profileNamed(name).copy(caCertificatePath = filePath))
             _state.update { it.copy(profiles = repository.list(), lastCaCertificateValidationResult = validation) }
+            // The held connection trusts the old CA.
+            active?.profileChanged(name)
         } else {
             _state.update { it.copy(lastCaCertificateValidationResult = validation) }
         }
@@ -210,6 +220,7 @@ class ConnectionsViewModel(
         repository.delete(name)
         secretStore.delete(name)
         session?.forget(name)
+        active?.profileDeleted(name)
         _state.update {
             it.copy(
                 profiles = repository.list(),
