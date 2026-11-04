@@ -83,7 +83,7 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
 
 ## Status
 
-- Step: 3 (production fixes done; 3 UI tests still red because of test defects, see Build note; blocked on test developer)
+- Step: 4 (verification passed; awaiting architect verdict)
 - Round: 1
 - Branch: `m1-04-connections-screen-feedback-gaps`
 - Order note (architect, 2026-11-04): picked before `M1-05` because it is corrective to already-accepted
@@ -106,3 +106,8 @@ None. This is a corrective, tightly scoped brief; no open design questions remai
   two nodes (sidebar button and panel title) in the collision test; (2) clicks on "Check connection" and
   "Save" land off-screen, so need `performScrollTo()` first. With those test edits (patch kept at
   scratchpad `test-fix.patch`) all 6 tests pass. Test developer to apply.
+- Verification (test developer, step 4): test defects fixed (patch applied, commit after 777192d). Mutation check: with the
+  production behaviour reverted (scroll kept) the 3 new tests fail on the assertions (collision banner node missing; stale
+  banner node still present). Restored: ConnectionsScreenUiTest 5/5 (the new 3 plus 2 existing), core jvmTest 6/6, ui jvmTest
+  6/6, acceptance-tests (Cucumber, `not @needs-M2`; includes @smoke and @fake-broker of 01_connections) 17 run, 1 skipped, 0 failed.
+  @broker not run: Docker unavailable here and no @broker scenario exists for this task. No blocker or major findings.
