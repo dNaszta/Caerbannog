@@ -441,4 +441,26 @@ class StreamListViewModelRefreshTest {
         assertEquals(2, s.h.gateway.everOpened.size)
         assertEquals(1, s.h.gateway.heldNow.size)
     }
+
+    @Test
+    fun `a late result of a tick of the old source is dropped after a same-profile reconnect`() = runTest {
+        val s = StreamListHarness(this)
+        s.addStream("a")
+        s.open()
+        // The tick computes its answer (only "a") and then waits; the new connection is for the SAME profile, so
+        // LinkState.Connected("uat-eu") equals the old state: only the source identity tells old from new (ruling 4).
+        val gate = s.catalog.holdNext("listStreams", ignoreCancellation = true)
+        s.pass(5)
+        s.addStream("b")
+
+        s.h.active.connect(s.h.uat)
+        s.settle()
+        assertEquals(listOf("a", "b"), s.names())
+        gate.release()
+        s.settle()
+
+        assertEquals(listOf("a", "b"), s.names(), "the old source's answer must not replace the rows of the new one")
+        assertFalse(s.state.stale)
+        assertNull(s.state.banner)
+    }
 }

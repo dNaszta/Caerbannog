@@ -50,10 +50,6 @@ import java.util.Locale
  *  - "the Size cell of each stream is blank": the row model has no size member at all (N1), checked by name; the blank cell is
  *    drawn by M2-05.
  *  - "I can move to the next page" and "I see streams 1 to 5 of 12" read the state (`hasNextPage`, `rangeText`), not a screen.
- *  - "the refresh interval is {int} seconds" is ONE step for both the Given (set) and the Then (check) of the scenarios: Cucumber
- *    matches by text, not by keyword, so two definitions of the same text would be ambiguous. After "When I look at the refresh
- *    interval" it checks, before that it sets. Suggestion to the architect: reword the Then as "the refresh interval shown is
- *    5 seconds" and split the step.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StreamListSteps {
@@ -70,7 +66,6 @@ class StreamListSteps {
     private lateinit var vm: StreamListViewModel
     private val catalog: FakeStreamCatalog get() = gateway.catalogOf(NAME)
     private var pageSize = 5
-    private var lookedAtInterval = false
 
     private val state: StreamListState get() = vm.state.value
     private fun row(name: String): StreamRow = state.rows.firstOrNull { it.name == name }
@@ -84,7 +79,6 @@ class StreamListSteps {
         settings = FakeAppSettings()
         test = TestScope()
         pageSize = 5
-        lookedAtInterval = false
         vm = StreamListViewModel(
             active = active,
             settings = settings,
@@ -206,13 +200,8 @@ class StreamListSteps {
         settle()
     }
 
-    // One step for the Given and the Then of the same text, see the class comment.
     @Given("the refresh interval is {int} seconds")
     fun theRefreshIntervalIsSeconds(seconds: Int) {
-        if (lookedAtInterval) {
-            assertEquals(seconds, state.refreshInterval.seconds, "refresh interval shown: ${state.refreshInterval}")
-            return
-        }
         vm.setRefreshInterval(checkNotNull(RefreshInterval.fromSeconds(seconds)) { "$seconds is not an allowed interval" })
         settle()
     }
@@ -262,7 +251,12 @@ class StreamListSteps {
 
     @When("I look at the refresh interval")
     fun iLookAtTheRefreshInterval() {
-        lookedAtInterval = true
+        // Nothing to do: the interval is state, read by the Then.
+    }
+
+    @Then("the refresh interval shown is {int} seconds")
+    fun theRefreshIntervalShownIsSeconds(seconds: Int) {
+        assertEquals(seconds, state.refreshInterval.seconds, "refresh interval shown: ${state.refreshInterval}")
     }
 
     // --- Then ---
