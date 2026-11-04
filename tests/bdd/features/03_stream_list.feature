@@ -162,6 +162,15 @@ Feature: Stream list
     Then I see streams 1 to 5 of 12
     And no quorum queue is listed
 
+  # The management API lists the queues of every vhost the user may see; the list is the one of the profile's vhost only.
+  @fake-broker
+  Scenario: Another vhost's streams are not listed
+    Given the broker has 3 streams in the connection's virtual host
+    And the broker has 4 streams in another virtual host
+    When I open the stream list
+    Then I see streams 1 to 3 of 3
+    And no stream of the other virtual host is listed
+
   @broker @gate-M2
   Scenario: Statistics agree with the Management UI
     Given a real broker with a stream "orders-events" containing 1000 messages
