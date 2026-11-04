@@ -100,7 +100,7 @@ Tests written first and failing for the right reason; all scenarios above pass; 
 brief and `docs/spec.md` (open question moved); no unrelated changes; `docs/tasks/README.md` updated.
 
 ## Status
-- Round: 1, step 4 done (test developer): pass with findings, no blocker or major. Next: architect review and verdict.
+- Round: 1, step 5 done (architect): ACCEPTED WITH FOLLOW-UPS. Done. Not pushed or merged. Follow-up: `M1-09-permission-check-hardening` (before M1-07).
 - Branch: `m1-03-permission-check`
 - Base branch: `main` (needs only M1-02, already in main; does not need M1-04 or M1-05)
 - New siblings: `M1-06-profile-declared-permissions`, `M1-07-permission-state-ui` (not started; both start after this task).
@@ -247,3 +247,15 @@ Unreadable unlocked / publishing, read pattern, `^$`, result kept while checking
 401 to Checked, 401 to NOT_FOUND, 404 to Checked, password in detail, refused to unlocked, http instead of https): each failed the
 expected tests, all restored. JSON persistence unchanged (no `declaredPermissions` in data-rabbit main, repository untouched).
 Minor findings for the architect are in the test report (adapter mapping gaps, session not thread-safe, profileNamed deviation accepted by tests).
+
+### Step 5: architect review, verdict Accepted with follow-ups
+Reviewed `git diff main...HEAD` against the Final contract, spec, scenarios and the test report. Contract matches; `core` has no
+dependency on `data-rabbit`; no password in `detail`, `userMessage` or any log (no logging in the new code); HTTPS only; no queue
+message access. Never-default-to-unlocked holds on every path: `Unreadable` is locked, `NO_PASSWORD` skips the checker, and
+`open` clears the old result first, so a checker exception leaves the connection not usable (fail closed), not unlocked.
+Rulings: (1) adapter invalid URL throws and `HttpTimeoutException` reads as UNREACHABLE: both fail closed, no caller exists yet,
+so deferred to `M1-09`, which must land before `M1-07`. (2) session propagates a checker exception: deferred to `M1-09`, same
+reason (also keeps the `Saved` result visible). (3) thread-safety of the results map: deferred to `M1-09`. (4) non-admin
+always NOT_AUTHORIZED: known, recorded. Deviation `profileNamed` reads the repository: accepted, the repository is the source of
+truth (the state copy is a view of it); a missing name still raises the same error as before.
+ID clash: see README note; the keychain brief on `m1-05-wire-desktopapp-connections` should be renumbered `M1-08`.
