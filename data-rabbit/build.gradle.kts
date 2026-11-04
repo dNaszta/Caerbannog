@@ -16,7 +16,9 @@ kotlin {
 // and BrokerReachabilityChecker (TLS reachability) now live in src/main. Test-tooling spikes from
 // M1-01 stay as-is:
 //   - RabbitMqContainerSpikeTest (Testcontainers proof, tagged "broker")
-//   - KeyringRoundTripSpikeTest (keychain library proof, com.github.javakeyring:java-keyring)
+//   - KeyringRoundTripSpikeTest (keychain library proof, com.github.javakeyring:java-keyring; tagged
+//     "keychain", run only via `keychainTest` because it touches the real OS keychain, as does
+//     KeyringSecretStoreTest)
 dependencies {
     // M1-02: data-rabbit's real implementations (BrokerReachabilityChecker, ConnectionProfileRepository,
     // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
@@ -61,7 +63,11 @@ tasks.test {
         // M1-01 Design notes: the Testcontainers proof is tagged "broker" (mirrors the BDD @broker
         // tag) and excluded from the default fast test run; run `./gradlew :data-rabbit:brokerTest`
         // to opt in once Docker Desktop is available.
-        excludeTags("broker")
+        //
+        // M1-08: the two real-keychain classes (KeyringSecretStoreTest, KeyringRoundTripSpikeTest) are
+        // tagged "keychain" and excluded too: they write to the developer's real OS keychain and may
+        // prompt, so the default run must stay side-effect free. Opt in with `keychainTest`.
+        excludeTags("broker", "keychain")
     }
 }
 
@@ -84,4 +90,17 @@ tasks.register<Test>("brokerTest") {
     // `gradlew` command line only reaches the long-lived Gradle daemon, not the test process)
     // works around it until Testcontainers ships a fix. Record of the finding: docs/spec.md Risks.
     systemProperty("api.version", "1.43")
+}
+
+// M1-08: opt-in run of the real-keychain tests. Deliberately not wired via dependsOn/finalizedBy from
+// `test` or `check`. No Docker api.version pin: that workaround is only for Testcontainers.
+tasks.register<Test>("keychainTest") {
+    description = "Runs the data-rabbit tests tagged \"keychain\". Touches the real OS keychain and may prompt; run on demand."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("keychain")
+    }
+    outputs.upToDateWhen { false }
 }

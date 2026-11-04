@@ -44,6 +44,8 @@ tests/bdd/
 | `@needs-M1-07` | Retired: the permission-state UI (task `M1-07`) is built and its five scenarios in `02` (sidebar pill, edit panel banner wording, asserted in core through `permissionPill` / `permissionBanner`) run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 | `@needs-M1-06` | Retired: declared permissions on the profile (task `M1-06`) are built and their two scenarios in `02` run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 
+The real-keychain JUnit tests (`KeyringSecretStoreTest`, `KeyringRoundTripSpikeTest` in `data-rabbit`) are outside the Gherkin tags: they carry the JUnit tag `keychain` and run only via `./gradlew :data-rabbit:keychainTest` (`task test:keychain`), never in `./gradlew test`.
+
 Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@broker` in a separate CI job.
 
 ## Vocabulary used in steps

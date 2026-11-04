@@ -64,7 +64,7 @@ class InMemoryConnectionProfileRepository : ConnectionProfileRepository {
 /**
  * In-memory stand-in for the real `java-keyring`-backed SecretStore. Deliberately NOT the real OS
  * keychain - that honesty is owned by M1-01's already-passing `KeyringRoundTripSpikeTest` and this
- * task's new `data-rabbit` test `KeyringSecretStoreTest` (real ConnectionProfile-keyed round trip).
+ * task's new `data-rabbit` test `KeyringSecretStoreTest` (real ConnectionProfile-keyed round trip), both run on demand via `:data-rabbit:keychainTest`.
  * This fake only has to prove the application *wires* passwords through SecretStore rather than
  * through ConnectionProfile/the repository, so it records every call for that assertion.
  */

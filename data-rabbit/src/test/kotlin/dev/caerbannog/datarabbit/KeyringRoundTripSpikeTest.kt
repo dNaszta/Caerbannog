@@ -3,6 +3,7 @@ package dev.caerbannog.datarabbit
 import com.github.javakeyring.Keyring
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import com.github.javakeyring.PasswordAccessException
 
@@ -21,6 +22,7 @@ import com.github.javakeyring.PasswordAccessException
  * the engineering call the senior developer confirms (or replaces) while making this pass, recording
  * the final choice in docs/spec.md's "Settings and secrets" row.
  */
+@Tag("keychain")
 class KeyringRoundTripSpikeTest {
 
     private val service = "dev.caerbannog.spike.m1-01"
