@@ -18,7 +18,7 @@ test publishing; unreadable means safest mode.
 ## Scope
 In:
 - `core`: `BrokerPermissions` (configure, write, read patterns; empty pattern = no permission), `PermissionCheckResult`
-  sealed type (`Checked(topologyUnlocked, publishingEnabled)`, `Unreadable(reason)`), `PermissionChecker` interface
+  sealed type (`Checked(topologyUnlocked, publishingEnabled)`, `Unreadable(cause)`, plus `DeclaredByUser`), `PermissionChecker` interface
   (suspend, takes profile + secret), and a small use case / session gate `ConnectionSession.open(profile)` that runs the
   check first and only then reports the connection as usable; `ConnectionsViewModel` (or the save path) re-runs the
   check when an existing profile is saved. Pure decision function: patterns to locked/unlocked, enabled/disabled.
