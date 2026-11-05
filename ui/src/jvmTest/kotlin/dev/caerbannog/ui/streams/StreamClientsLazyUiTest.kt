@@ -319,4 +319,30 @@ class StreamClientsLazyUiTest {
         pressCopy()
         assertEquals("5,099 behind", clipboard.text, "a row that was not composed first copies as displayed")
     }
+
+    // --- 9 (R-FC1) ----------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `a publisher and a consumer with the same connection and id, and two just-attached rows of each, compose without a duplicate key`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        val unknown = StreamClientsTexts.UNKNOWN
+        clientsScreen(
+            content(
+                publishers = listOf(
+                    publisher("p-shared", "c#1", key = "c#1"),
+                    publisher("p-new-1", unknown, key = "#0", settling = true),
+                    publisher("p-new-2", unknown, key = "#0~2", settling = true),
+                ),
+                consumers = listOf(
+                    consumer("c#1", "k-shared", connection = "c#1"),
+                    consumer("#0", "k-new-1", connection = unknown, status = ConsumerStatus.Updating, browseFromOffset = null),
+                    consumer("#0~2", "k-new-2", connection = unknown, status = ConsumerStatus.Updating, browseFromOffset = null),
+                ),
+            ),
+        )
+        waitForIdle()
+        listOf("p-shared", "p-new-1", "p-new-2").forEachIndexed { i, ref -> publisherCell(i, "Reference").assertTextEquals(ref) }
+        consumerCell("c#1", "Name").assertTextEquals("k-shared")
+        consumerCell("#0", "Name").assertTextEquals("k-new-1")
+        consumerCell("#0~2", "Name").assertTextEquals("k-new-2")
+    }
 }

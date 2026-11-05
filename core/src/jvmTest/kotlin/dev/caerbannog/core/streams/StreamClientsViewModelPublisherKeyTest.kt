@@ -12,7 +12,7 @@ import kotlin.test.assertNotEquals
  *  - unique among the publishers of one state, even when connection and reference repeat (two just-attached rows both read "unknown");
  *  - the same publisher keeps its key when its counters change on a refresh;
  *  - the key follows the publisher, not the position: a publisher inserted before it, or a changed broker order, does not change it.
- * Red today at compile level: `PublisherRowState` has no `key`.
+ * R-FC1 format pinned in the last two tests. Red today at compile level: `PublisherRowState` has no `key`.
  */
 class StreamClientsViewModelPublisherKeyTest {
 
@@ -77,5 +77,33 @@ class StreamClientsViewModelPublisherKeyTest {
 
         s.pass(5)
         assertEquals(before, s.state.publishers.map { it.key })
+    }
+
+    @Test
+    fun `the key is the connection name, a hash and the publisher id, repeats get ~2 and ~3 in the broker's order (R-FC1)`() = runTest {
+        val s = ClientsHarness(this)
+        s.publishers(
+            s.publisherRow("a", connection = "c1", id = 0),
+            s.publisherRow("b", connection = "c1", id = 1),
+            s.publisherRow("c", connection = "c2", id = 0),
+            s.publisherRow(null, connection = "", id = 0),
+            s.publisherRow(null, connection = "", id = 0),
+            s.publisherRow(null, connection = "", id = 0),
+        )
+        s.open()
+
+        assertEquals(listOf("c1#0", "c1#1", "c2#0", "#0", "#0~2", "#0~3"), s.state.publishers.map { it.key })
+    }
+
+    @Test
+    fun `two just-attached consumers with the same subscription id get distinct keys that stay the same across a refresh`() = runTest {
+        val s = ClientsHarness(this)
+        s.consumers(s.consumerAt(null, 5, connection = "", id = 0), s.consumerAt(null, 5, connection = "", id = 0))
+        s.open()
+        val before = s.state.consumers.map { it.key }
+        assertEquals(2, before.toSet().size, "a LazyColumn crashes on a repeated key; keys: $before")
+
+        s.pass(5)
+        assertEquals(before, s.state.consumers.map { it.key }, "the same rows keep their keys")
     }
 }
