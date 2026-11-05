@@ -7,6 +7,7 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.StreamListViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -205,6 +206,50 @@ class ConnectionControlModelTest {
         val opens = r.h.gateway.openCalls.size
         r.pass(600)
         assertEquals(opens, r.h.gateway.openCalls.size, "no automatic reconnect (D2)")
+    }
+
+    @Test
+    fun `after Connection lost no connect reaches the broker and no new link state appears until connect or retry (D2)`() = runTest {
+        val r = Rig(this)
+        r.h.gateway.catalogOf("uat-eu").addStream(stream("orders", messages = 3))
+        r.model.connect("uat-eu")
+        r.streamList.setShown(true)
+        r.settle()
+        val seen = mutableListOf<LinkState>()
+        backgroundScope.launch { r.h.active.state.collect { seen += it } }
+        r.settle()
+        val opensBeforeLoss = r.h.gateway.openCalls.size
+
+        r.h.gateway.catalogOf("uat-eu").unreachable = true
+        r.pass(5)
+        val lost = LinkState.Failed("uat-eu", ConnectionFailureReason.CONNECTION_LOST)
+        assertEquals(lost, r.h.active.state.value)
+        // The loss itself is the only new state: no Connecting follows it, not even once.
+        assertEquals(listOf(LinkState.Connected("uat-eu"), lost), seen.toList(), "link states up to and including the loss")
+        val opens = r.h.gateway.openCalls.size
+        assertEquals(opensBeforeLoss, opens, "no connect call right after the loss")
+        val log = r.h.gateway.log.toList()
+        val seenAtLoss = seen.toList()
+
+        // The broker is reachable again; time passes (many refresh intervals, many ticks), the user does nothing.
+        r.h.gateway.catalogOf("uat-eu").unreachable = false
+        repeat(20) {
+            r.pass(60)
+            r.model.tick()
+            r.settle()
+        }
+
+        assertEquals(opens, r.h.gateway.openCalls.size, "no connect call after Connection lost without connect or retry (D2)")
+        assertEquals(log, r.h.gateway.log.toList(), "the broker saw nothing after Connection lost")
+        assertEquals(seenAtLoss, seen.toList(), "no new link state (not even Connecting) without connect or retry")
+        assertEquals(ChipState.Failed, r.state.chip.kind)
+        assertEquals(RowAction.Retry, r.row("uat-eu").action)
+
+        // Control: the explicit Retry is what reconnects.
+        r.model.retry("uat-eu")
+        r.settle()
+        assertEquals(opens + 1, r.h.gateway.openCalls.size)
+        assertEquals(LinkState.Connected("uat-eu"), r.h.active.state.value)
     }
 
     @Test
