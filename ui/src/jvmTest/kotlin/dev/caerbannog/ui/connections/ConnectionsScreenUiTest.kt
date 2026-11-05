@@ -1140,10 +1140,9 @@ class ConnectionsScreenUiTest {
 
     // --- M1-12a: layout (app bar, drawer, field grid), pill containment ------------------------------
     // Written before the code (red). Tags the production code must provide (names are the contract of this test):
-    //   "connectionsAppBar"      the app bar container (title text "Connections" and the New connection button inside)
-    //   "connectionsDrawer"      the drawer container (brand, Connection card, nav item inside)
-    //   "drawerConnectionCard"   the drawer's Connection card (label, profile name, host, pill inside)
-    //   "drawerPermissionPill"   the pill inside that card (NOT "permissionPill:<name>", which is the list card's pill)
+    //   "appBar"      the app bar container of the AppFrame (title text "Connections" and the New connection button inside; M2-05b: was "connectionsAppBar")
+    //   "appDrawer"      the drawer container of the AppFrame (brand, search, nav items; M2-05b: was "connectionsDrawer", the Connection card is gone)
+    //   (M2-05b: the drawer's "drawerConnectionCard" and "drawerPermissionPill" are gone; the chip replaced them)
     //   "profileCard:<name>"     each profile card in the list (the click target, the pill's parent)
     // Layout is asserted at the mockup's preview size 1280x880.
 
@@ -1169,11 +1168,11 @@ class ConnectionsScreenUiTest {
     fun `the app bar shows the title Connections and a New connection button at its right`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
 
-        assertTagged("connectionsAppBar", "Connections")
-        val bar = nodeBounds(hasTestTag("connectionsAppBar"))
-        val title = nodeBounds(hasText("Connections").and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        assertTagged("appBar", "Connections")
+        val bar = nodeBounds(hasTestTag("appBar"))
+        val title = nodeBounds(hasText("Connections").and(hasAnyAncestor(hasTestTag("appBar"))))
         // merged tree: the Button node carries the click action, its child Text carries the label
-        val button = onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        val button = onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("appBar"))))
             .fetchSemanticsNode().boundsInRoot
         assertTrue(title.left < button.left, "title must be left of the button: title $title, button $button")
         assertTrue(button.center.x > bar.center.x, "the button must sit in the right half of the app bar: bar $bar, button $button")
@@ -1187,7 +1186,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
 
         onAllNodes(hasText("New connection").and(hasClickAction())).assertCountEquals(1)
-        onAllNodes(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar"))))
+        onAllNodes(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("appBar"))))
             .assertCountEquals(1)
     }
 
@@ -1198,7 +1197,7 @@ class ConnectionsScreenUiTest {
         selectProfile(0)
         onNodeWithText("Edit connection").assertExists()
 
-        onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("connectionsAppBar")))).performClick()
+        onNode(hasText("New connection").and(hasClickAction()).and(hasAnyAncestor(hasTestTag("appBar")))).performClick()
         waitForIdle()
 
         onNodeWithText("Edit connection").assertDoesNotExist()
@@ -1284,149 +1283,88 @@ class ConnectionsScreenUiTest {
         assertFalse(gridField("Management port (HTTPS)").config.contains(SemanticsActions.SetText))
     }
 
-    // --- M2-01: the drawer Connection card follows the session's current connection ------------------
-    // Replaces the four M1-12a stand-in tests that asserted "the card shows the profile open in the edit panel"
-    // (the brief says that stand-in goes away). Contract for the screen (test developer's proposal, brief gap):
-    //   a button tagged "connectButton" (text "Connect") in the edit panel of a SAVED profile; clicking it calls
-    //   viewModel.connect(name). It is not shown for the "New connection" panel.
-    // The card reads ConnectionsState.currentConnection (name, status) and the host from the saved profile.
-
-    @OptIn(ExperimentalTestApi::class)
-    private fun DesktopComposeUiTest.connectButton() {
-        onNodeWithTag("connectButton").performScrollTo().performClick()
-        waitForIdle()
-    }
+    // --- M2-05b: the drawer Connection card and the edit-panel Connect button are GONE ------------------
+    // The chip in the app bar carries name, state and pill (ui `ConnectionControlUiTest`, `AppFrameUiTest`); the one place that connects is
+    // the chip's popup. The M2-01 tests of the card and of the interim Connect button were replaced by the tests below.
+    // Contract: the Connections screen is built with the AppFrame, so its container tags are the frame's: "appBar" (title "Connections",
+    // the New connection button, the chip) and "appDrawer". The screen takes `control` and `controlEvents` (null = no chip).
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer shows the current connection's name, host and pill after Connect`() = runDesktopComposeUiTest(1280, 880) {
+    fun `the drawer has no Connection card, with or without a profile open in the panel`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
-        selectProfile(0)
-        connectButton()
-
-        assertTagged("drawerConnectionCard", "Connection")
-        assertTagged("drawerConnectionCard", "prod-eu")
-        assertTagged("drawerConnectionCard", "rabbit.example")
-        assertTagged("drawerPermissionPill", "Can change topology")
-        assertEquals(1, fakeChecker.calls.size, "Connect runs one permission check")
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `selecting a profile in the panel without connecting does not change the drawer card`() = runDesktopComposeUiTest(1280, 880) {
-        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
-        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
+        onNodeWithTag("drawerConnectionCard").assertDoesNotExist()
+        onNode(hasText("No connection selected"), useUnmergedTree = true).assertDoesNotExist()
 
         selectProfile(0)
-        assertTagged("drawerConnectionCard", "No connection selected")
+
+        onNodeWithTag("drawerConnectionCard").assertDoesNotExist()
         onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
-
-        connectButton() // prod-eu is current (it is still open in the panel)
-        selectProfile(1) // dev-eu is open in the panel only
-        assertTagged("drawerConnectionCard", "prod-eu")
-        assertTagged("drawerConnectionCard", "rabbit.example")
-        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("dev-eu"))), useUnmergedTree = true).assertDoesNotExist()
-        assertEquals(1, fakeChecker.calls.size, "selecting in the panel must not run a check")
+        onNode(hasTestTag("appDrawer").and(hasAnyDescendant(hasText("rabbit.example"))), useUnmergedTree = true)
+            .assertDoesNotExist() // the host was only in the card; it stays a row detail of the Connections screen
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `connecting to the other profile switches the drawer card and its pill`() = runDesktopComposeUiTest(1280, 880) {
-        val dev = ConnectionProfile(name = "dev-eu", host = "rabbit-dev.example", virtualHost = "/", username = "svc")
-        setContent { ConnectionsScreen(permissionViewModel(prod, dev)) }
-        selectProfile(0)
-        connectButton()
-        fakeChecker.result = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = true)
-        selectProfile(1)
-        connectButton()
-
-        assertTagged("drawerConnectionCard", "dev-eu")
-        assertTagged("drawerConnectionCard", "rabbit-dev.example")
-        assertTagged("drawerPermissionPill", "Topology locked")
-        onNode(hasTestTag("drawerConnectionCard").and(hasAnyDescendant(hasText("prod-eu"))), useUnmergedTree = true).assertDoesNotExist()
-        assertTagged("permissionPill:prod-eu", "Can change topology") // the first connection keeps its own result
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `the drawer pill follows a re-check of the current connection from the panel button`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel(prod)) }
-        selectProfile(0)
-        connectButton()
-        fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
-        checkButton()
-
-        assertTagged("drawerPermissionPill", "Topology locked")
-        assertTagged("permissionPill:prod-eu", "Topology locked")
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `the drawer says No connection selected until Connect and keeps the current one for New connection`() =
-        runDesktopComposeUiTest(1280, 880) {
-            setContent { ConnectionsScreen(permissionViewModel(prod)) }
-
-            assertTagged("drawerConnectionCard", "No connection selected")
-            onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
-
-            selectProfile(0)
-            assertTagged("drawerConnectionCard", "No connection selected")
-
-            connectButton()
-            onNode(hasText("No connection selected"), useUnmergedTree = true).assertDoesNotExist()
-
-            newConnectionButton().performClick()
-            waitForIdle()
-            assertTagged("drawerConnectionCard", "prod-eu") // the panel moved on; the current connection did not
-        }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `deleting the current connection puts the drawer back to No connection selected`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel(prod)) }
-        selectProfile(0)
-        connectButton()
-        assertTagged("drawerConnectionCard", "prod-eu")
-
-        onNodeWithText("Delete profile").performScrollTo().performClick()
-        waitForIdle()
-        onNodeWithText("Yes").performClick()
-        waitForIdle()
-
-        assertTagged("drawerConnectionCard", "No connection selected")
-        onNodeWithTag("drawerPermissionPill", useUnmergedTree = true).assertDoesNotExist()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `there is no Connect button in the New connection panel`() = runDesktopComposeUiTest(1280, 880) {
+    fun `the edit panel of a saved profile has no Connect button, and keeps Check connection and permissions`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         onNodeWithTag("connectButton").assertDoesNotExist()
+
         selectProfile(0)
-        onNodeWithTag("connectButton").assertExists()
+
+        onNodeWithTag("connectButton").assertDoesNotExist()
+        onNode(hasClickAction().and(hasText("Connect")), useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithText("Check connection and permissions").performScrollTo().assertExists()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer has the brand, the Connection card and one Connections nav item as text`() = runDesktopComposeUiTest(1280, 880) {
+    fun `the profile card state line stays a read-only summary and has no action`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
 
-        assertTagged("connectionsDrawer", "Caerbannog")
-        assertTagged("connectionsDrawer", "behind the rabbit")
-        assertTagged("connectionsDrawer", "Connection")
-        assertTagged("connectionsDrawer", "Connections")
-        val drawer = nodeBounds(hasTestTag("connectionsDrawer"))
-        assertTrue(drawer.left <= 1f && drawer.width in 270f..600f, "the drawer sits at the left edge, about 280dp wide: $drawer")
+        onNode(hasTestTag("profileCard:prod-eu").and(hasAnyDescendant(hasText("Connect").or(hasText("Disconnect")))), useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the drawer has no Search field and no Streams, Topology or Migrations items in M1`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel(prod)) }
-
-        listOf("Search streams, queues, exchanges", "Streams", "Topology", "Migrations").forEach { text ->
-            onAllNodesWithText(text, useUnmergedTree = true).assertCountEquals(0)
+    fun `the Connections screen carries the connection chip in its app bar next to New connection`() = runDesktopComposeUiTest(1280, 880) {
+        val chip = dev.caerbannog.core.connections.ConnectionChipState(
+            dev.caerbannog.core.connections.ChipState.NoConnection, dev.caerbannog.core.connections.ChipIcon.LinkOff,
+            "No connection", null, null, null, "No connection. Open connection menu", false,
+        )
+        val control = dev.caerbannog.core.connections.ConnectionControlState(
+            chip, emptyList(), "No saved connections",
+            dev.caerbannog.core.connections.RefreshSectionState(dev.caerbannog.core.streams.RefreshInterval.Every5, false, "Connect to refresh"),
+        )
+        val events = object : dev.caerbannog.core.connections.ConnectionControlEvents {
+            override fun connect(name: String) = Unit
+            override fun disconnect(name: String) = Unit
+            override fun retry(name: String) = Unit
+            override fun setRefreshInterval(interval: dev.caerbannog.core.streams.RefreshInterval) = Unit
+            override fun refreshNow() = Unit
+            override fun openConnections() = Unit
         }
+        setContent { ConnectionsScreen(permissionViewModel(prod), control, events) }
+
+        onNode(hasTestTag("connectionChip").and(hasAnyAncestor(hasTestTag("appBar")))).assertExists("the chip is in the app bar of the Connections screen")
+        val newConnection = nodeBounds(hasText("New connection").and(hasClickAction()))
+        val chipBounds = nodeBounds(hasTestTag("connectionChip"))
+        assertTrue(newConnection.right <= chipBounds.left + 0.5f, "the chip is last, after the screen's own action: $newConnection, $chipBounds")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the drawer has the brand and the Connections nav item as text, and no Connection card label`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+
+        assertTagged("appDrawer", "Caerbannog")
+        assertTagged("appDrawer", "behind the rabbit")
+        assertTagged("appDrawer", "Connections")
+        onNode(hasText("Connection").and(hasAnyAncestor(hasTestTag("appDrawer"))), useUnmergedTree = true)
+            .assertDoesNotExist() // exact text "Connection" was the card label
+        val drawer = nodeBounds(hasTestTag("appDrawer"))
+        assertTrue(drawer.left <= 1f && drawer.width in 270f..600f, "the drawer sits at the left edge, about 280dp wide: $drawer")
     }
 
     // The pill must stay inside the profile card and never wrap; the name gives way (one line, ellipsis).
@@ -1782,19 +1720,16 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the pill, the drawer pill and the banner show the icon of their tone`() {
+    fun `the pill and the banner show the icon of their tone`() {
         iconCases.forEach { case ->
             runDesktopComposeUiTest(1280, 880) {
                 fakeChecker.result = case.result ?: PermissionCheckResult.Checked(true, true)
                 val profile = prod.copy(declaredPermissions = case.declared)
                 setContent { ConnectionsScreen(permissionViewModel(profile)) }
                 selectProfile(0)
-                if (case.result != null) connectButton() // M2-01: the drawer pill shows the current connection only
+                if (case.result != null) checkButton()
 
                 assertEquals(case.expectedIcons, iconTagsUnder("permissionPill:prod-eu"), "${case.label}: list pill icons")
-                if (case.result != null) {
-                    assertEquals(case.expectedIcons, iconTagsUnder("drawerPermissionPill"), "${case.label}: drawer pill icons")
-                }
                 assertEquals(case.expectedIcons, iconTagsUnder("permissionBanner"), "${case.label}: banner icons")
             }
         }
@@ -1802,17 +1737,16 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `Checking shows no icon on the pill, the drawer pill or the banner`() = runDesktopComposeUiTest(1280, 880) {
+    fun `Checking shows no icon on the pill or the banner`() = runDesktopComposeUiTest(1280, 880) {
         val gated = GatedChecker()
         setContent { ConnectionsScreen(viewModelWith(AlwaysReachableChecker(), gated, prod)) }
         selectProfile(0)
-        connectButton()
+        onNodeWithText("Check connection and permissions").performScrollTo().performClick()
+        waitForIdle()
 
         assertTagged("permissionPill:prod-eu", "Checking...")
-        assertTagged("drawerPermissionPill", "Checking...")
         assertTagged("permissionBanner", "Checking permissions...")
         assertEquals(emptyList(), iconTagsUnder("permissionPill:prod-eu"), "Checking: pill has no icon")
-        assertEquals(emptyList(), iconTagsUnder("drawerPermissionPill"), "Checking: drawer pill has no icon")
         assertEquals(emptyList(), iconTagsUnder("permissionBanner"), "Checking: banner has no icon")
         gated.gate.complete(PermissionCheckResult.Checked(true, true))
     }
@@ -1866,7 +1800,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
 
-        val inDrawer = iconTagsUnder("connectionsDrawer")
+        val inDrawer = iconTagsUnder("appDrawer")
         assertEquals(1, inDrawer.count { it == "icon:cruelty_free" }, "drawer brand icon, found $inDrawer")
         assertEquals(1, inDrawer.count { it == "icon:power" }, "drawer Connections nav icon, found $inDrawer")
         val brand = onNode(hasText("Caerbannog"), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -1892,7 +1826,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
 
-        assertEquals(listOf("icon:add"), iconTagsUnder("connectionsAppBar"), "the app bar shows exactly the add icon")
+        assertEquals(listOf("icon:add"), iconTagsUnder("appBar"), "the app bar shows exactly the add icon")
         assertLeadingIcon("add", "New connection")
     }
 

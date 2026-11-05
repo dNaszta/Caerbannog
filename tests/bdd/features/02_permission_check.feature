@@ -39,10 +39,10 @@ Feature: Permission check before the first connection
     And topology changes are locked
 
   @fake-broker
-  Scenario: A locked connection says so in the sidebar
+  Scenario: A locked connection says so in the app bar
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
-    Then the sidebar shows "Topology locked" next to "prod-eu"
+    Then the app bar shows "Topology locked" next to "prod-eu"
 
   @fake-broker @needs-M2
   Scenario: The topology screen explains why it is locked
@@ -51,10 +51,10 @@ Feature: Permission check before the first connection
     Then the topology screen explains that the user has no configure permission on virtual host "/"
 
   @fake-broker
-  Scenario: A verified connection says so in the sidebar and in the edit panel
+  Scenario: A verified connection says so in the app bar and in the edit panel
     Given the user has these permissions on "/": configure ".*", write ".*", read ".*"
     When I connect to "prod-eu"
-    Then the sidebar shows "Can change topology" next to "prod-eu"
+    Then the app bar shows "Can change topology" next to "prod-eu"
     And the edit panel says the broker confirmed that "svc-explorer" can change topology on virtual host "/"
 
   @fake-broker
@@ -63,18 +63,18 @@ Feature: Permission check before the first connection
     Given the first check of "prod-eu" is still running and would say the user can change topology
     And the connection "prod-eu" is checked again and that check says the user has no configure permission
     When the first check finishes
-    Then the sidebar shows "Topology locked" next to "prod-eu"
+    Then the app bar shows "Topology locked" next to "prod-eu"
 
   @fake-broker
-  # M2-01: each connection keeps its own result; the sidebar follows the connection that is current.
+  # M2-01: each connection keeps its own result; the app bar follows the connection that is current.
   # M2-05: switching means Connect to the other connection, which disconnects the held one (see 13).
   Scenario: Switching connection shows the permission state of the new current connection
     Given saved connections "uat-eu" and "prod-eu"
     And the user has configure permission on "uat-eu" and no configure permission on "prod-eu"
     And I am connected to "uat-eu"
     When I switch to "prod-eu"
-    Then the sidebar shows "prod-eu" as the current connection
-    And the sidebar shows "Topology locked" next to "prod-eu"
+    Then the app bar shows "prod-eu" as the current connection
+    And the app bar shows "Topology locked" next to "prod-eu"
 
   @fake-broker @needs-M2
   Scenario: Browsing streams does not need the configure permission
@@ -149,7 +149,7 @@ Feature: Permission check before the first connection
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the management API refuses to return the user's permissions
     When I connect to "prod-eu"
-    Then the sidebar shows "Can change topology (declared)" next to "prod-eu"
+    Then the app bar shows "Can change topology (declared)" next to "prod-eu"
     And the edit panel says the broker could not confirm the permissions and still enforces its own
 
   @fake-broker
@@ -157,14 +157,14 @@ Feature: Permission check before the first connection
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the user has no configure permission on "/"
     When I connect to "prod-eu"
-    Then the sidebar shows "Topology locked" next to "prod-eu"
+    Then the app bar shows "Topology locked" next to "prod-eu"
     And the edit panel says "Your declaration is not used, because the broker answered."
 
   @fake-broker
   Scenario: Permissions that could not be read are shown as locked with the reason
     Given the management API refuses to return the user's permissions
     When I connect to "prod-eu"
-    Then the sidebar shows "Topology locked" next to "prod-eu"
+    Then the app bar shows "Topology locked" next to "prod-eu"
     And the edit panel tells me that permissions could not be read
 
   @fake-broker @needs-M2

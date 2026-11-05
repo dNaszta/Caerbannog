@@ -2,6 +2,7 @@ package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
+import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
@@ -52,6 +53,8 @@ class AppComposition(
     val viewModel: ConnectionsViewModel,
     val active: ActiveConnection,
     val streamList: StreamListViewModel,
+    /** M2-05b compile stub: the model behind the app bar chip (the developer wires it for real). */
+    val control: ConnectionControlModel,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
@@ -100,7 +103,10 @@ fun createAppComposition(
         clock = RefreshClock { System.currentTimeMillis() },
         reconnect = viewModel::connect,
     )
-    return AppComposition(viewModel, active, streamList, streamListScope)
+    val control = ConnectionControlModel(
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = {},
+    )
+    return AppComposition(viewModel, active, streamList, control, streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

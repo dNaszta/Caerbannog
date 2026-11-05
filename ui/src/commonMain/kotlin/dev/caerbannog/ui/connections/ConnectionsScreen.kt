@@ -73,7 +73,12 @@ import kotlinx.coroutines.launch
  * it was built with - this screen never imports anything broker- or network-shaped.
  */
 @Composable
-fun ConnectionsScreen(viewModel: ConnectionsViewModel) {
+fun ConnectionsScreen(
+    viewModel: ConnectionsViewModel,
+    // M2-05b compile stub: the Connections screen is wrapped in the AppFrame, which needs these (null = no chip, for older callers).
+    control: dev.caerbannog.core.connections.ConnectionControlState? = null,
+    controlEvents: dev.caerbannog.core.connections.ConnectionControlEvents? = null,
+) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
 

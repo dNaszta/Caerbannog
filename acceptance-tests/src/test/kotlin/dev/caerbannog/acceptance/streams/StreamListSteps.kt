@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.LinkState
+import dev.caerbannog.core.connections.fakes.CallGate
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
@@ -67,6 +68,9 @@ class StreamListSteps {
     private lateinit var gateway: FakeConnectionGateway
     private lateinit var active: ActiveConnection
     private lateinit var settings: AppSettings
+    private lateinit var secrets: FakeSecretStore
+    private var heldList: CallGate? = null
+    private var listCallsAtDisconnect: Int = -1
     private var settingsDir: File? = null
     private lateinit var test: TestScope
     private lateinit var vm: StreamListViewModel
@@ -87,7 +91,9 @@ class StreamListSteps {
     // A fresh broker, connection and view model on the given settings: "the app was started". Nothing is connected yet.
     private fun buildApp(appSettings: AppSettings) {
         gateway = FakeConnectionGateway()
-        val secrets = FakeSecretStore().also { it.store(NAME, PASSWORD) }
+        secrets = FakeSecretStore().also { it.store(NAME, PASSWORD) }
+        heldList = null
+        listCallsAtDisconnect = -1
         active = ActiveConnection(ConnectionSession(FakePermissionChecker(), secrets), gateway)
         settings = appSettings
         test = TestScope()
@@ -123,7 +129,9 @@ class StreamListSteps {
         vm = newViewModel()
     }
 
-    private fun profile() = ConnectionProfile(name = NAME, host = "$NAME.example.com", virtualHost = "/", username = "svc")
+    private fun profile(name: String = NAME) = ConnectionProfile(name = name, host = "$name.example.com", virtualHost = "/", username = "svc")
+
+    private fun listCalls(): Int = synchronized(catalog.calls) { catalog.calls.count { it == "listStreams" } }
 
     private fun settle() = test.runCurrent()
 
@@ -318,6 +326,42 @@ class StreamListSteps {
         settle()
     }
 
+    // D3 and M2-05b: a load that the broker answers only later, after the connection it belongs to is gone.
+    @Given("the broker answers the next stream list call only when released")
+    fun theBrokerAnswersTheNextCallOnlyWhenReleased() {
+        // ignoreCancellation: the fake keeps waiting although the view model cancelled the load, so the test proves the late
+        // result is dropped by the view model itself and not only by cancellation.
+        heldList = catalog.holdNext("listStreams", ignoreCancellation = true)
+    }
+
+    @Given("the connection {string} has a stream {string} with last offset {long}")
+    fun theConnectionHasAStream(name: String, stream: String, last: Long) {
+        secrets.store(name, PASSWORD)
+        gateway.catalogOf(name).addStream(stream(stream, messages = last + 1))
+        gateway.offsetsOf(name).setFirst("/", stream, 0)
+    }
+
+    @When("I disconnect from {string}")
+    fun iDisconnectFrom(name: String) {
+        assertEquals(name, active.state.value.name, "precondition: $name is the connection held")
+        active.disconnect()
+        settle()
+        listCallsAtDisconnect = listCalls()
+    }
+
+    @When("I connect to {string}")
+    fun iConnectTo(name: String) {
+        secrets.store(name, PASSWORD)
+        runBlocking { active.connect(profile(name)) }
+        settle()
+    }
+
+    @When("the broker answers the held stream list call")
+    fun theBrokerAnswersTheHeldCall() {
+        checkNotNull(heldList) { "no stream list call was held in this scenario" }.release()
+        settle()
+    }
+
     @When("I look at the refresh interval")
     fun iLookAtTheRefreshInterval() {
         // Nothing to do: the interval is state, read by the Then.
@@ -329,6 +373,25 @@ class StreamListSteps {
     }
 
     // --- Then ---
+
+    @Then("the list says {string} and shows no streams")
+    fun theListSaysAndShowsNoStreams(text: String) {
+        assertEquals(text, state.message, "message; screen ${state.screen}")
+        assertEquals(emptyList<StreamRow>(), state.rows, "rows must be gone")
+    }
+
+    @Then("the broker was not asked for the stream list again after the disconnect")
+    fun theBrokerWasNotAskedAgain() {
+        assertTrue(listCallsAtDisconnect >= 0, "the disconnect step did not run")
+        assertEquals(listCallsAtDisconnect, listCalls(), "stream list calls to the broker after the disconnect")
+    }
+
+    @Then("the list stays that way when {int} minutes pass")
+    fun theListStaysThatWay(minutes: Int) {
+        val before = state.rows
+        pass(minutes * 60_000L)
+        assertEquals(before, state.rows, "rows changed while time passed")
+    }
 
     @Then("the refresh interval shown is off")
     fun theRefreshIntervalShownIsOff() {

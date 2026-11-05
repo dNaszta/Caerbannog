@@ -167,6 +167,34 @@ Feature: Stream list
     Then the refresh interval shown is 5 seconds
     And "orders-events" shows first offset 0 and last offset 9
 
+  # D3, "latest started check wins" (M2-05b): Disconnect ends the timer and a load that is still running cannot bring data back.
+  @fake-broker
+  Scenario: Disconnecting stops the refresh
+    Given a stream "orders-events" with last offset 100
+    And I have the stream list open
+    And the refresh interval is 5 seconds
+    And the broker answers the next stream list call only when released
+    When 5 seconds pass
+    And I disconnect from "uat-eu"
+    And the broker answers the held stream list call
+    And 10 minutes pass
+    Then the list says "Not connected" and shows no streams
+    And the broker was not asked for the stream list again after the disconnect
+
+  # A connection switch is a Connect on the other profile: the first connection is closed, its late answer is dropped.
+  @fake-broker
+  Scenario: Switching connection drops the late result of the old one
+    Given a stream "orders-events" with last offset 100
+    And the connection "prod-eu" has a stream "billing" with last offset 5
+    And I have the stream list open
+    And the refresh interval is 5 seconds
+    And the broker answers the next stream list call only when released
+    When 5 seconds pass
+    And I connect to "prod-eu"
+    And the broker answers the held stream list call
+    Then only "billing" is listed
+    And the list stays that way when 10 minutes pass
+
   @fake-broker
   Scenario: A broker with no streams
     Given the broker has no streams
