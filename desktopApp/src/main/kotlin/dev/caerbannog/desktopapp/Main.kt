@@ -18,6 +18,7 @@ import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
+import dev.caerbannog.ui.topology.TopologyScreen
 import kotlinx.coroutines.delay
 
 /**
@@ -43,7 +44,8 @@ fun main() = application {
         val openStream by composition.navigation.selectedStream.collectAsState()
         when (screen) {
             AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
-            // Topology and Migrations have no screen yet: AppNavigation never selects them.
+            AppDestination.Topology -> TopologyWindowContent(composition, control)
+            // Migrations has no screen yet: AppNavigation never selects it.
             else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
         }
     }
@@ -94,6 +96,21 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
         onOpenStream = composition.navigation::openStream,
+    )
+}
+
+/** The Topology screen with its own one-second clock; the clock runs only while this is in the composition (screen shown). */
+@Composable
+private fun TopologyWindowContent(composition: AppComposition, control: ConnectionControlState) {
+    val topology by composition.topology.state.collectAsState()
+    val now = rememberNowMillis()
+    TopologyScreen(
+        state = topology,
+        nowMillis = now,
+        events = composition.topologyEvents,
+        control = control,
+        controlEvents = composition.control,
+        onNavigate = composition.navigation::open,
     )
 }
 

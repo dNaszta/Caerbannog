@@ -139,6 +139,7 @@ class ActiveConnection(
             catalog = GuardedCatalog(connection.catalog, isCurrent),
             offsets = GuardedOffsets(connection.offsets, isCurrent),
             vhost = vhost,
+            topology = GuardedTopology(connection.topology, isCurrent),
         )
     }
 

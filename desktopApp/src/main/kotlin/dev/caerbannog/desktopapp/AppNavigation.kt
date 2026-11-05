@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Which screen the window shows. Only Connections and Streams have a screen (M2-05c); [open] of a destination without one
- * (Topology, Migrations) changes nothing, so the drawer never leads to a blank page and an open stream stays.
+ * Which screen the window shows. Connections, Streams (M2-05c) and Topology (M2-08c) have a screen; [open] of a destination without one
+ * (Migrations) changes nothing, so the drawer never leads to a blank page and an open stream stays.
  */
 class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     private val _screen = MutableStateFlow(initial)
@@ -38,6 +38,6 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     }
 
     private companion object {
-        val WITH_SCREEN = setOf(AppDestination.Connections, AppDestination.Streams)
+        val WITH_SCREEN = setOf(AppDestination.Connections, AppDestination.Streams, AppDestination.Topology)
     }
 }

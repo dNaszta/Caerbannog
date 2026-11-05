@@ -7,6 +7,12 @@ import dev.caerbannog.core.streams.Retention
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.SuperStreamLayout
+import dev.caerbannog.core.topology.BindingDestinationType
+import dev.caerbannog.core.topology.BindingRow
+import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.topology.QueuePage
+import dev.caerbannog.core.topology.QueueRow
+import dev.caerbannog.core.topology.VhostRow
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -62,11 +68,15 @@ internal object ManagementJson {
     // A super stream is a `direct` exchange whose marker is the JSON boolean true (spike S-A, S-B: false, "true", fanout are not).
     private fun superStreamNames(exchangesBody: String): CatalogResult<List<String>> = guarded(exchangesBody) { root ->
         val names = root.asArray().map { it.asObject() }.mapNotNull { exchange ->
-            val name = exchange.requiredString("name")
-            val marker = (exchange["arguments"] as? JsonObject)?.get(SUPER_STREAM_MARKER) as? JsonPrimitive
-            name.takeIf { exchange.string("type") == "direct" && marker != null && !marker.isString && marker.booleanOrNull == true }
+            exchange.requiredString("name").takeIf { isSuperStream(exchange) }
         }
         CatalogResult.Success(names)
+    }
+
+    // The one rule for "this exchange is a super stream", shared by the stream list and the Topology Exchanges tab.
+    private fun isSuperStream(exchange: JsonObject): Boolean {
+        val marker = (exchange["arguments"] as? JsonObject)?.get(SUPER_STREAM_MARKER) as? JsonPrimitive
+        return exchange.string("type") == "direct" && marker != null && !marker.isString && marker.booleanOrNull == true
     }
 
     /** M2-07: true when some exchange of `GET /api/exchanges/{vhost}` is a super stream, so the bindings call is worth making. */
@@ -210,4 +220,90 @@ internal object ManagementJson {
 
     private fun JsonObject.strings(key: String): List<String> =
         (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content } ?: emptyList()
+
+    // --- M2-08a topology (fields recorded in fixtures/m2-08 and m2-07) ---
+
+    /** The vhost comes from the caller: the list is asked with `columns`, which carries none. Streams are dropped here, counts stay the broker's. */
+    fun parseQueuePage(body: String, vhost: String): CatalogResult<QueuePage> = guarded(body) { root ->
+        val obj = root.asObject()
+        val rows = obj["items"].asArray().map { it.asObject() }.filter { it.string("type") != "stream" }.map { queueRow(it, vhost) }
+        CatalogResult.Success(
+            QueuePage(
+                rows = rows,
+                page = obj.requiredInt("page"),
+                pageCount = obj.requiredInt("page_count"),
+                pageSize = obj.requiredInt("page_size"),
+                totalCount = obj.requiredInt("total_count"),
+            ),
+        )
+    }
+
+    /** One queue object (vhost from the body); a stream is no queue here, so [CatalogResult.NotFound]. */
+    fun parseQueueDetail(body: String): CatalogResult<QueueRow> = guarded(body) { root ->
+        val obj = root.asObject()
+        if (obj.string("type") == "stream") return@guarded CatalogResult.NotFound
+        CatalogResult.Success(queueRow(obj, obj.requiredString("vhost")))
+    }
+
+    fun parseExchanges(body: String): CatalogResult<List<ExchangeRow>> = guarded(body) { root ->
+        CatalogResult.Success(
+            root.asArray().map { it.asObject() }.map { e ->
+                ExchangeRow(
+                    name = e.requiredString("name"),
+                    vhost = e.requiredString("vhost"),
+                    type = e.requiredString("type"),
+                    durable = e.boolean("durable"),
+                    autoDelete = e.boolean("auto_delete"),
+                    internal = e.boolean("internal"),
+                    arguments = e.argumentText(),
+                    superStream = isSuperStream(e),
+                )
+            },
+        )
+    }
+
+    fun parseBindingList(body: String): CatalogResult<List<BindingRow>> = guarded(body) { root ->
+        CatalogResult.Success(
+            root.asArray().map { it.asObject() }.map { b ->
+                BindingRow(
+                    source = b.requiredString("source"),
+                    vhost = b.requiredString("vhost"),
+                    destination = b.requiredString("destination"),
+                    destinationType = when (b.requiredString("destination_type")) {
+                        "queue" -> BindingDestinationType.QUEUE
+                        "exchange" -> BindingDestinationType.EXCHANGE
+                        else -> malformed()
+                    },
+                    routingKey = b.string("routing_key").orEmpty(),
+                    arguments = b.argumentText(),
+                )
+            },
+        )
+    }
+
+    /** Only `name` is read; the rest of each object is the broker's statistics. */
+    fun parseVhosts(body: String): CatalogResult<List<VhostRow>> = guarded(body) { root ->
+        CatalogResult.Success(root.asArray().map { VhostRow(it.asObject().requiredString("name")) })
+    }
+
+    // A count the broker has not sent (or sent as text) is null, never 0: the screen shows "n/a".
+    private fun queueRow(obj: JsonObject, vhost: String): QueueRow = QueueRow(
+        name = obj.requiredString("name"),
+        vhost = vhost,
+        type = obj.string("type").orEmpty(),
+        readyMessages = obj.long("messages_ready"),
+        unackedMessages = obj.long("messages_unacknowledged"),
+        consumers = obj.long("consumers")?.coerceIn(0L, Int.MAX_VALUE.toLong())?.toInt(),
+        leader = obj.string("leader"),
+        members = obj.strings("members"),
+        online = obj.strings("online"),
+        policy = obj.string("policy"),
+        state = obj.string("state"),
+    )
+
+    private fun JsonObject.boolean(key: String): Boolean = (this[key] as? JsonPrimitive)?.booleanOrNull ?: false
+
+    // A string as is, any other value as its JSON text (`true`, `1`, `[1,2]`).
+    private fun JsonObject.argumentText(): Map<String, String> =
+        (this["arguments"] as? JsonObject)?.mapValues { (_, v) -> if (v is JsonPrimitive && v.isString) v.content else v.toString() } ?: emptyMap()
 }

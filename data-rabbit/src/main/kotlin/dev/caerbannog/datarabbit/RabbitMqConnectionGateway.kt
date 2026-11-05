@@ -54,6 +54,7 @@ class RabbitMqConnectionGateway(
             RabbitMqHeldConnection(
                 catalog = ManagementStreamCatalog(http, requests),
                 offsets = RabbitMqStreamOffsets(environments),
+                topology = ManagementTopologyCatalog(http, requests),
                 resources = listOf(environments, http),
                 log = log,
             ),

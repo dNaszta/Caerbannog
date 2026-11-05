@@ -66,9 +66,11 @@ Feature: Permission check before the first connection
     When I connect to "prod-eu"
     Then the app bar shows "Topology locked" next to "prod-eu"
 
-  @fake-broker @needs-M2
+  # Built by task M2-08c (core half: the banner reasons of the view model; the drawing is in the Compose tests of 08c).
+  @fake-broker
   Scenario: The topology screen explains why it is locked
     Given the user has no configure permission on "/"
+    And the connection "prod-eu" is set to the "Declare and edit" topology level
     When I connect to "prod-eu"
     Then the topology screen explains that the user has no configure permission on virtual host "/"
 
@@ -98,11 +100,18 @@ Feature: Permission check before the first connection
     Then the app bar shows "prod-eu" as the current connection
     And the app bar shows "Topology locked" next to "prod-eu"
 
-  @fake-broker @needs-M2
+  # Split by M2-08 (2026-11-05): the list half runs since M2-08b; the browse half needs the M3 browser.
+  @fake-broker
+  Scenario: Listing streams does not need the configure permission
+    Given the user has no configure permission on "/"
+    When I connect to "prod-eu"
+    Then I can list streams
+
+  @fake-broker @needs-M3
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
-    Then I can list streams and browse their messages
+    Then I can browse the messages of a stream
 
   @fake-broker
   # Spike result: only administrators can read permissions through the management API, so this is the
@@ -189,9 +198,10 @@ Feature: Permission check before the first connection
     Then the app bar shows "Topology locked" next to "prod-eu"
     And the edit panel tells me that permissions could not be read
 
-  @fake-broker @needs-M2
+  @fake-broker
   Scenario: The topology screen says declared permissions are not confirmed
     Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the connection "prod-eu" is set to the "Declare and edit" topology level
     And the management API refuses to return the user's permissions
     When I connect to "prod-eu"
     Then the topology screen says the broker could not confirm the permissions and still enforces its own

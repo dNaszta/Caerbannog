@@ -1,4 +1,4 @@
-@M2 @M5 @topology @queues
+@topology @queues
 Feature: Topology and quorum queues
   As an engineer
   I want to see and, where allowed, change the queues, exchanges and bindings of a broker
@@ -7,10 +7,15 @@ Feature: Topology and quorum queues
   The app shows topology and statistics only. It never reads, gets or purges the messages
   of a queue, because reading would remove messages and change the data flow.
 
+  Milestones: the scenarios tagged @M2 are the read-only topology screen (task M2-08): the queues,
+  exchanges and bindings of the connection's virtual host, with statistics. The scenarios tagged @M5
+  change topology (declare, edit, delete, add to a migration) and are built with the migrations.
+  Until then the screen has no control that changes anything.
+
   Background:
     Given I am connected to "uat-eu"
 
-  @smoke @fake-broker
+  @M2 @smoke @fake-broker
   Scenario: List quorum queues with statistics
     Given these quorum queues
       | name          | ready | unacked | consumers | leader        | members online |
@@ -19,57 +24,58 @@ Feature: Topology and quorum queues
     When I open the topology screen on the "Queues" tab
     Then each queue is shown with its ready and unacked counts, consumers, leader and members online
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: A queue with a member offline is flagged
     Given the quorum queue "notifications" has 2 of its 3 members online
     When I open the topology screen on the "Queues" tab
     Then "notifications" is marked as having a member offline
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Queue details
     Given a quorum queue "orders" bound to the exchange "events" with routing key "order.created"
     When I select the queue "orders"
     Then I see its leader, members, ready and unacked counts, consumers, policy and bindings
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: See exchanges and bindings
+    Given a quorum queue "orders" bound to the exchange "events" with routing key "order.created"
     When I open the topology screen on the "Exchanges" tab
     Then I see the exchanges of the virtual host
     When I open the "Bindings" tab
     Then I see each binding with its source, destination and routing key
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Other queue types are not the focus
     Given a quorum queue "orders" and a classic queue "legacy"
     When I open the topology screen on the "Queues" tab with the "Quorum" filter
     Then only "orders" is listed
 
-  @negative @safety
+  @M2 @negative @safety
   Scenario: Queue messages cannot be read
     When I select the queue "orders"
     Then there is no control to browse, get, consume or purge its messages
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Declare a quorum queue when allowed
     Given the user has configure permission on "/"
     When I declare a quorum queue "invoices"
     Then the broker is asked to create a quorum queue "invoices"
     And "invoices" appears in the list
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Edit a queue's policy when allowed
     Given the user has configure permission on "/"
     And a quorum queue "orders" with the policy "quorum-default"
     When I change the policy of "orders" to "quorum-strict"
     Then the broker applies "quorum-strict" to "orders"
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Add a binding when allowed
     Given the user has configure permission on "/"
     When I bind the exchange "events" to the queue "orders" with routing key "order.created"
     Then the binding appears in the details of "orders"
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Deleting a queue needs the name typed to confirm
     Given the user has configure permission on "/"
     When I choose to delete the queue "legacy-orders"
@@ -77,7 +83,7 @@ Feature: Topology and quorum queues
     When I type "legacy-orders" and confirm
     Then the broker is asked to delete the queue "legacy-orders"
 
-  @negative @fake-broker
+  @M5 @negative @fake-broker
   Scenario Outline: Everything that changes topology is locked without configure permission
     Given the user has no configure permission on "/"
     When I select the queue "orders"
@@ -90,15 +96,208 @@ Feature: Topology and quorum queues
       | Delete queue |
       | Add binding |
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: A locked queue can still be added to a migration file
     Given the user has no configure permission on "/"
     When I choose "Add to migration" for the queue "orders"
     Then a migration file with the queue's declaration is prepared
     And I am told it can be applied on a connection that allows it
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Search queues by name
     Given quorum queues "orders", "invoices" and "legacy-orders"
     When I search the queue list for "orders"
     Then "orders" and "legacy-orders" are listed
+
+  # --- Added for task M2-08 (read-only topology screen). Decisions T1 to T5 are in docs/tasks/M2-08-topology-read-only.md. ---
+
+  # Decision T1 (owner, 2026-11-05): the screen may show every virtual host the user can see. It starts on the connection's
+  # own virtual host and shows one virtual host at a time. The stream list in 03 stays on the connection's virtual host.
+  @M2 @fake-broker
+  Scenario: Another vhost's queues are not listed
+    Given the connection's virtual host has 3 quorum queues
+    And another virtual host has 4 quorum queues
+    When I open the topology screen on the "Queues" tab
+    Then I see queues 1 to 3 of 3
+    And no queue of the other virtual host is listed
+
+  @M2 @fake-broker
+  Scenario: The topology screen starts on the connection's virtual host
+    Given the connection's virtual host is "/"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    Then the virtual host "/" is the chosen one
+
+  @M2 @fake-broker
+  Scenario: Another virtual host can be chosen
+    Given the user can see the virtual hosts "/" and "billing"
+    And the virtual host "billing" has the quorum queue "invoices"
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then only "invoices" is listed
+    And no queue of the virtual host "/" is shown
+
+  @M2 @fake-broker
+  Scenario: Only the virtual hosts the user may see are offered
+    Given the broker has the virtual hosts "/", "billing" and "secret"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    Then I can choose between "/" and "billing" and no other
+
+  # The management API answers 404 for a virtual host that is missing and for one the user has no permission on.
+  @M2 @negative @fake-broker
+  Scenario: A virtual host the user cannot see says so
+    Given the virtual host "billing" is offered but the broker answers that it is not available
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then I see the message "Virtual host billing is not available to this user. It may have been deleted, or the user may have no permission on it."
+    And no queue is shown
+    And I can still choose another virtual host
+
+  # The permission check reads the connection's own virtual host only, so nothing is claimed about the others.
+  @M2 @fake-broker
+  Scenario: Another virtual host says its permissions were not checked
+    Given the connection's virtual host is "/"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then the topology screen says permissions were checked on virtual host "/" only and this virtual host is shown read-only
+
+  # Streams have their own screen; a stream (or a partition of a super stream) is never listed as a queue here.
+  @M2 @fake-broker
+  Scenario: Streams are not listed as queues
+    Given a quorum queue "orders", a classic queue "legacy" and a stream "audit-log"
+    When I open the topology screen on the "Queues" tab with the "Other types" filter
+    Then only "legacy" is listed
+
+  @M2 @fake-broker
+  Scenario: A vhost with no queues
+    Given the connection's virtual host has no queues
+    When I open the topology screen on the "Queues" tab
+    Then I see a message that there are no queues yet
+
+  @M2 @fake-broker
+  Scenario: Long queue lists are paged
+    Given the connection's virtual host has 12 quorum queues
+    When I open the topology screen on the "Queues" tab with 5 queues per page
+    Then I see queues 1 to 5 of 12
+    And I can move to the next page
+
+  # Decision T2 (recommended): the default exchange and the implicit binding of every queue to it are real on the broker
+  # but noise on screen; they are hidden unless asked for.
+  @M2 @fake-broker
+  Scenario: The default exchange and its bindings are hidden until asked for
+    Given the broker has the default exchange, the exchange "events" and a queue "orders" bound to "events"
+    When I open the topology screen on the "Bindings" tab
+    Then the bindings view shows only the binding from "events" to "orders"
+    When I choose to show the default exchange
+    Then the bindings view also shows the implicit binding from the default exchange to "orders"
+
+  @M2 @fake-broker
+  Scenario: A binding to an exchange is shown as such
+    Given the exchange "events" is bound to the exchange "audit" with routing key "#"
+    When I open the topology screen on the "Bindings" tab
+    Then the binding from "events" to "audit" says its destination is an exchange
+
+  # --- The bindings graph (decision T2, owner 2026-11-05; task M2-08d). The table of the Bindings tab (above) is its fallback. ---
+
+  @M2 @fake-broker @needs-08d
+  Scenario: The bindings graph shows an exchange with its queues
+    Given the exchange "events" is bound to the queues "orders" and "audit" with routing keys "order.created" and "#"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then the graph has the nodes "events", "orders" and "audit"
+    And it has an edge from "events" to "orders" labelled "order.created"
+    And it has an edge from "events" to "audit" labelled "#"
+
+  @M2 @fake-broker @needs-08d
+  Scenario: The bindings graph never draws the default exchange unless asked
+    Given the broker has the default exchange and 1000 queues, each bound to it
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then the graph has no node for the default exchange
+    And no queue is drawn only because of the default exchange
+
+  @M2 @fake-broker @needs-08d
+  Scenario: A big neighbourhood is not drawn partly
+    Given the exchange "events" is bound to 100 queues
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then no partial graph is drawn
+    And the screen says there are more bindings than can be drawn and asks me to choose an exchange or narrow the filter
+
+  @M2 @fake-broker @needs-08d
+  Scenario: The bindings can also be read as a table
+    Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    And I switch to the table view
+    Then I see the binding with its source, destination and routing key
+
+  @M2 @fake-broker @needs-08d
+  Scenario: Graph nodes can be reached by the keyboard
+    Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then every node can be focused with the keyboard
+    And a focused node is described with its kind, name and number of bindings
+
+  @M2 @fake-broker
+  Scenario: A super stream exchange is marked
+    Given a super stream "orders" with 3 partitions
+    When I open the topology screen on the "Exchanges" tab
+    Then the exchange "orders" is marked as a super stream
+
+  # Decision D3 (refresh only while shown) applies to this screen like to the stream list.
+  @M2 @fake-broker
+  Scenario: The topology screen refreshes by itself only while it is shown
+    Given a quorum queue "orders" with 12 ready messages
+    And I have the topology screen open
+    And the refresh interval is 30 seconds
+    When the queue gets 20 more ready messages
+    And 30 seconds pass
+    Then "orders" shows 32 ready messages
+    When I open the stream list
+    And 30 seconds pass
+    Then the topology screen does not ask the broker again
+
+  # Decision D2 (no automatic reconnect), same rule as the stream list in 13.
+  @M2 @fake-broker
+  Scenario: A lost connection keeps the last queues on screen
+    Given the quorum queue "orders" is listed
+    When the broker stops answering
+    Then "orders" stays listed and the screen is marked stale
+    And the app does not reconnect by itself
+
+  @M2 @fake-broker
+  Scenario: A user without the management tag
+    Given the user of "uat-eu" has no management tag
+    When I open the topology screen on the "Queues" tab
+    Then I see the message "This user cannot read topology. Ask for the management tag."
+    And no queue list is shown
+
+  @M2 @fake-broker
+  Scenario: Queue counts are labelled as approximate
+    Given a quorum queue "orders" with 1240 ready messages
+    When I open the topology screen on the "Queues" tab
+    Then the screen says the counts are approximate
+
+  # The only requests the app makes about a queue are reads of its statistics.
+  @M2 @negative @safety @fake-broker
+  Scenario: The app never asks the broker for a queue's messages
+    Given a quorum queue "orders"
+    When I open the topology screen on every tab and select the queue "orders"
+    Then every request the app made to the broker was a read of topology or statistics
+    And none of them was a request for the messages of a queue
+
+  # Decision T4 (recommended): in M2 the screen has no action that changes topology, so none is drawn,
+  # not even a disabled one. The locked actions of the @M5 scenarios come with the migrations.
+  @M2 @fake-broker
+  Scenario: The M2 topology screen offers no action that changes topology
+    Given the user has configure permission on "/"
+    And a quorum queue "orders"
+    When I select the queue "orders"
+    Then there is no control to edit, delete or bind
+
+  # Decision T5 (recommended): the self-constraint level is a second reason for a read-only screen.
+  @M2 @fake-broker
+  Scenario: The topology screen says the connection is set to read-only
+    Given the user has configure permission on "/"
+    And the connection "uat-eu" is set to the "Read-only" topology level
+    When I open the topology screen on the "Queues" tab
+    Then the topology screen explains that the connection is set to read-only

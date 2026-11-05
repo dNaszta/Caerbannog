@@ -1,0 +1,18 @@
+[
+ {
+  "cluster_state": {
+   "rabbit@node1": "running"
+  },
+  "default_queue_type": "classic",
+  "description": "",
+  "metadata": {
+   "default_queue_type": "classic",
+   "description": "",
+   "tags": []
+  },
+  "name": "m208-e-other",
+  "protected_from_deletion": false,
+  "tags": [],
+  "tracing": false
+ }
+]

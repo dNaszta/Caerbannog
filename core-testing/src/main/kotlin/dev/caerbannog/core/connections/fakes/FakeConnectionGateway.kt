@@ -8,6 +8,7 @@ import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.Visibility
+import dev.caerbannog.core.topology.TopologyCatalog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeout
@@ -57,6 +58,7 @@ class FakeConnectionGateway(
         private val log: MutableList<String>,
         override val catalog: StreamCatalog,
         override val offsets: StreamOffsets,
+        override val topology: TopologyCatalog,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -86,6 +88,7 @@ class FakeConnectionGateway(
     private val silentStreamPort = ConcurrentHashMap.newKeySet<String>()
     private val gates = ConcurrentHashMap<String, Gate>()
     private val catalogs = ConcurrentHashMap<String, FakeStreamCatalog>()
+    private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
     private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
@@ -140,12 +143,16 @@ class FakeConnectionGateway(
     /** The catalog every connection opened for [profileName] exposes; configure it before Connect. */
     fun catalogOf(profileName: String): FakeStreamCatalog = catalogs.getOrPut(profileName) { FakeStreamCatalog() }
 
+    /** M2-08b: the topology every connection opened for [profileName] exposes; configure it before Connect. */
+    fun topologyOf(profileName: String): FakeTopologyCatalog = topologies.getOrPut(profileName) { FakeTopologyCatalog() }
+
     /** The first-offset source every connection opened for [profileName] exposes. */
     fun offsetsOf(profileName: String): FakeStreamOffsets = offsetSources.getOrPut(profileName) { FakeStreamOffsets() }
 
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
+        topologyOf(profileName).hasManagementTag = false
     }
 
     /** The broker of [profileName] answers only after [Gate.release]. Overlap and progress tests need no sleeps. */
@@ -180,7 +187,7 @@ class FakeConnectionGateway(
             return OpenResult.Failed(it.reason)
         }
         logins.incrementAndGet()
-        val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log, catalogOf(name), offsetsOf(name))
+        val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log, catalogOf(name), offsetsOf(name), topologyOf(name))
         opened += held
         log += "opened:$name#${held.number}"
         return OpenResult.Opened(held)

@@ -21,6 +21,6 @@ import org.junit.platform.suite.api.Suite
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.permissions")
 @ConfigurationParameter(
     key = FILTER_TAGS_PROPERTY_NAME,
-    value = "not @needs-M2 and not @broker",
+    value = "not @needs-M2 and not @needs-M3 and not @broker", // M2-08 split "Browsing streams ..." out as @needs-M3: no step until the M3 browser
 )
 class RunPermissionCheckAcceptanceTest

@@ -11,6 +11,7 @@ import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
@@ -88,6 +89,7 @@ class CompositionRootControlWiringTest {
                 override val offsets = object : StreamOffsets {
                     override suspend fun firstOffset(vhost: String, stream: String) = FirstOffset.Unavailable
                 }
+                override val topology = FakeTopologyCatalog()
                 override fun close() = Unit
             })
         }

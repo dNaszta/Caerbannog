@@ -7,6 +7,7 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.PermissionCheckResult
@@ -90,6 +91,7 @@ class CompositionRootWiringTest {
             return OpenResult.Opened(object : HeldConnection {
                 override val catalog = NoCatalog
                 override val offsets = NoOffsets
+                override val topology = FakeTopologyCatalog()
                 override fun close() { log += "close:${profile.name}" }
             })
         }
@@ -153,6 +155,7 @@ class CompositionRootWiringTest {
                 return OpenResult.Opened(object : HeldConnection {
                     override val catalog = NoCatalog
                     override val offsets = NoOffsets
+                    override val topology = FakeTopologyCatalog()
                     override fun close() { log += "close:${profile.name}" }
                 })
             }

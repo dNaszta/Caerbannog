@@ -1,0 +1,56 @@
+[
+ {
+  "cluster_state": {
+   "rabbit@node1": "running"
+  },
+  "default_queue_type": "classic",
+  "description": "",
+  "message_stats": {
+   "confirm": 9,
+   "confirm_details": {
+    "rate": 0.0
+   },
+   "drop_unroutable": 0,
+   "drop_unroutable_details": {
+    "rate": 0.0
+   },
+   "publish": 9,
+   "publish_details": {
+    "rate": 0.0
+   },
+   "return_unroutable": 0,
+   "return_unroutable_details": {
+    "rate": 0.0
+   }
+  },
+  "messages": 0,
+  "messages_details": {
+   "rate": 0.0
+  },
+  "messages_ready": 0,
+  "messages_ready_details": {
+   "rate": 0.0
+  },
+  "messages_unacknowledged": 0,
+  "messages_unacknowledged_details": {
+   "rate": 0.0
+  },
+  "metadata": {
+   "default_queue_type": "classic",
+   "description": "",
+   "tags": []
+  },
+  "name": "/",
+  "protected_from_deletion": false,
+  "recv_oct": 3730,
+  "recv_oct_details": {
+   "rate": 0.0
+  },
+  "send_oct": 9204,
+  "send_oct_details": {
+   "rate": 0.0
+  },
+  "tags": [],
+  "tracing": false
+ }
+]

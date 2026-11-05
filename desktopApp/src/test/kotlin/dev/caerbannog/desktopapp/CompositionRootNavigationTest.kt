@@ -11,6 +11,7 @@ import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
@@ -94,6 +95,7 @@ class CompositionRootNavigationTest {
                 override val offsets = object : StreamOffsets {
                     override suspend fun firstOffset(vhost: String, stream: String) = FirstOffset.Unavailable
                 }
+                override val topology = FakeTopologyCatalog()
                 override fun close() = Unit
             })
         }
@@ -135,15 +137,15 @@ class CompositionRootNavigationTest {
     }
 
     @Test
-    fun `Topology and Migrations have no screen yet, opening them changes nothing`() {
+    fun `Migrations has no screen yet, opening it changes nothing, and Topology opens`() {
         val queue = QueueDispatcher()
         val composition = compose(queue)
         try {
             composition.navigation.open(AppDestination.Streams)
-            composition.navigation.open(AppDestination.Topology)
-            assertEquals(AppDestination.Streams, composition.navigation.screen.value)
             composition.navigation.open(AppDestination.Migrations)
             assertEquals(AppDestination.Streams, composition.navigation.screen.value)
+            composition.navigation.open(AppDestination.Topology)
+            assertEquals(AppDestination.Topology, composition.navigation.screen.value)
         } finally {
             composition.close()
         }

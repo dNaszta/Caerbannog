@@ -1,0 +1,85 @@
+{
+ "arguments": {
+  "x-queue-type": "quorum"
+ },
+ "auto_delete": false,
+ "consumer_capacity": 0,
+ "consumer_details": [],
+ "consumer_utilisation": 0,
+ "consumers": 0,
+ "delayed_retry": "disabled",
+ "deliveries": [],
+ "delivery_limit": 20,
+ "durable": true,
+ "effective_policy_definition": {
+  "max-length": 1000
+ },
+ "exclusive": false,
+ "garbage_collection": {
+  "fullsweep_after": 65535,
+  "max_heap_size": 0,
+  "min_bin_vheap_size": 2984878,
+  "min_heap_size": 233,
+  "minor_gcs": 4
+ },
+ "incoming": [],
+ "internal": false,
+ "internal_owner": false,
+ "leader": "rabbit@node1",
+ "members": [
+  "rabbit@node1"
+ ],
+ "memory": 26844,
+ "message_bytes": 27,
+ "message_bytes_dlx": 0,
+ "message_bytes_persistent": 27,
+ "message_bytes_ram": 0,
+ "message_bytes_ready": 27,
+ "message_bytes_unacknowledged": 0,
+ "message_stats": {
+  "publish": 3,
+  "publish_details": {
+   "rate": 0.0
+  }
+ },
+ "messages": 3,
+ "messages_active_priorities": 1,
+ "messages_by_priority": {
+  "4": 3
+ },
+ "messages_delayed": 0,
+ "messages_details": {
+  "rate": 0.0
+ },
+ "messages_dlx": 0,
+ "messages_persistent": 3,
+ "messages_ram": 0,
+ "messages_ready": 3,
+ "messages_ready_details": {
+  "rate": 0.0
+ },
+ "messages_ready_returned": 0,
+ "messages_unacknowledged": 0,
+ "messages_unacknowledged_details": {
+  "rate": 0.0
+ },
+ "name": "spike-m208-quorum",
+ "node": "rabbit@node1",
+ "online": [
+  "rabbit@node1"
+ ],
+ "open_files": {
+  "rabbit@node1": 0
+ },
+ "operator_policy": null,
+ "policy": "spike-m208-pol",
+ "publishers": 0,
+ "reductions": 36246,
+ "reductions_details": {
+  "rate": 94.8
+ },
+ "single_active_consumer_tag": null,
+ "state": "running",
+ "type": "quorum",
+ "vhost": "/"
+}
