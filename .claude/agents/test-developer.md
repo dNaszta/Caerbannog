@@ -38,7 +38,7 @@ Repeat until the architect says Accepted and your report has no open blocker or 
 - **Scenarios** in `tests/bdd/features/`: plain language, one behaviour per scenario, outlines with Examples for rule tables (paging arithmetic, permission combinations, invalid input). Keep the traceability table in `tests/bdd/README.md` current.
 - **Tags:** `@M1` to `@M5`, `@gate-M*`, `@smoke`, `@fake-broker`, `@broker`, `@negative`, `@security`, `@safety`, `@needs-spike`, `@needs-decision`. Keep them correct: `@fake-broker` must not need Docker, `@broker` must.
 - **Step definitions and fakes:** small, reusable, no logic hidden in steps. Fakes of the stream client and management API behave like the real ones, including chunk-based delivery, retention moving the first offset, paging limits, and error responses. A fake that is too forgiving hides bugs, so keep it honest.
-- **Real-broker setup:** Testcontainers with RabbitMQ 4.x, plugins `rabbitmq_stream` and `rabbitmq_stream_management`, TLS on. Tests clean up whatever they create (unique names, delete in teardown).
+- **Real-broker setup:** Testcontainers with RabbitMQ 4.x, plugins `rabbitmq_stream` and `rabbitmq_stream_management`, TLS on by default, plain only through the per-profile "Use TLS" switch (D9a). Tests clean up whatever they create (unique names, delete in teardown).
 - **Test pyramid:** unit tests for pure logic (paging maths, migration ordering, permission rules, filter), BDD for behaviour, Compose UI tests for screen states, a few `@broker` end-to-end checks. Do not push everything up into slow end-to-end tests.
 - **Runner:** Cucumber-JVM with Kotlin steps is the proposal, still to confirm in the M1 spike. Keep feature files runner-neutral.
 
@@ -55,7 +55,7 @@ Repeat until the architect says Accepted and your report has no open blocker or 
 
 Before you report, try to break the change:
 
-- **Safety rules:** is there any path that reads or purges queue messages? That browsing changes broker state or offsets? That a topology action runs without the configure permission, or a publish without write permission? Any non-TLS connection? Any secret in logs, errors or files?
+- **Safety rules:** is there any path that reads or purges queue messages? That browsing changes broker state or offsets? That a topology action runs without the configure permission, or a publish without write permission? Any plain (non-TLS) connection that is not behind the per-profile "Use TLS" switch, or a plain profile without the "Not encrypted" warning? Any secret in logs, errors or files?
 - **Boundaries:** first and last page, page size 1 and the maximum, offset 0, offset beyond the end, timestamp before the first message, a stream with one message, an empty stream, 10,000-message scan limit and Cancel.
 - **Concurrency and time:** retention moves the first offset while the user pages; publishers connect while the list refreshes; the user switches connection or screen mid-read; Cancel arrives late.
 - **Failure:** broker down, TLS error, wrong certificate, timeout, permission changed after connecting, management API missing the plugin.
