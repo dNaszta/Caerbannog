@@ -31,3 +31,6 @@ Whether the stale layer clips popups on desktop Skia is unverified; test B answe
 
 ## Definition of done
 Tests written and green (or the finding raised), mutation results recorded in the brief Status of F-C, `StreamClientsLazyUiTest` and the clients screenshot tests green, no unrelated changes. This task is a merge condition of F-C (see the F-C brief, Status).
+
+## Status
+Test B found a real defect: the per-row `alpha(0.6f)` layer clipped the inline hint popup of a stale Behind row (304 x 25 px against 304 x 48 px on a fresh row). Fixed in `StreamClientsTables.kt`: the stale look is now a 0.6 alpha on the text, divider, "i" and green colours (`StaleDim`), with no layer; the popup keeps its inverse colours. A fresh row gets no wrapper. `StreamClientsLazyUiTest` all green; ui jvmTest 323 tests, desktopApp 58, no failures. Mutation `graphicsLayer { alpha = 0.6f; clip = true }` on a stale row makes B red (reverted). Screenshots: 8 of 9 clients PNGs byte-identical to HEAD; `clients-05-lost-connection.png` IS a stale state (stale = true) and differs by anti-aliasing only (looked at both, same look).

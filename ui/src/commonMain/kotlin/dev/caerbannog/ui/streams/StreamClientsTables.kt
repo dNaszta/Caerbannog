@@ -28,11 +28,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -226,8 +228,33 @@ private fun Modifier.rowScroll(scroll: ScrollState, total: Dp): Modifier {
         .widthIn(min = total)
 }
 
-/** The stale look (0.6 alpha); a fresh row gets no layer at all, so the hint popup of one row is drawn as before. */
-private fun Modifier.dimWhen(stale: Boolean): Modifier = if (stale) alpha(0.6f) else this
+private const val STALE_ALPHA = 0.6f
+
+/** 1 on a fresh row; [STALE_ALPHA] inside [StaleDim]. Read by the colours the theme does not own (the green "caught up"). */
+private val LocalRowAlpha = compositionLocalOf { 1f }
+
+/**
+ * The stale look as colour alpha on the text, divider and "i" colours, NOT as an alpha layer: a layer is an offscreen buffer
+ * clipped to the row, which cut the inline hint popup (a child of the row) down to the row height. The popup keeps its own
+ * inverse colours, so it stays opaque. A fresh row gets no wrapper at all, so it is drawn exactly as before.
+ */
+@Composable
+private fun StaleDim(stale: Boolean, content: @Composable () -> Unit) {
+    if (!stale) {
+        content()
+        return
+    }
+    val scheme = MaterialTheme.colorScheme
+    val dimmed = scheme.copy(
+        onSurface = scheme.onSurface.copy(alpha = STALE_ALPHA),
+        onSurfaceVariant = scheme.onSurfaceVariant.copy(alpha = STALE_ALPHA),
+        outline = scheme.outline.copy(alpha = STALE_ALPHA),
+        outlineVariant = scheme.outlineVariant.copy(alpha = STALE_ALPHA),
+    )
+    MaterialTheme(colorScheme = dimmed, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
+        CompositionLocalProvider(LocalContentColor provides LocalContentColor.current.copy(alpha = STALE_ALPHA), LocalRowAlpha provides STALE_ALPHA, content = content)
+    }
+}
 
 private fun List<ClientColumn>.totalWidth(): Dp = fold(0.dp) { sum, column -> sum + column.width }
 
@@ -256,7 +283,7 @@ private fun LoadingRow(columns: List<ClientColumn>, scale: Float, first: Boolean
 @Composable
 private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
     val tag = "publisherCell:$index"
-    Column(Modifier.dimWhen(stale).rowScroll(scroll, PublisherColumns.totalWidth())) {
+    StaleDim(stale) { Column(Modifier.rowScroll(scroll, PublisherColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.reference, "$tag:Reference", PublisherColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, PublisherColumns[1], scale)
@@ -265,13 +292,13 @@ private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float, scrol
             ValueCell(row.errors, "$tag:Errors", PublisherColumns[4], scale)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    }
+    } }
 }
 
 @Composable
 private fun ConsumerRow(row: ConsumerRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
     val tag = "consumerCell:${row.key}"
-    Column(Modifier.dimWhen(stale).rowScroll(scroll, ConsumerColumns.totalWidth())) {
+    StaleDim(stale) { Column(Modifier.rowScroll(scroll, ConsumerColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.name, "$tag:Name", ConsumerColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, ConsumerColumns[1], scale)
@@ -280,7 +307,7 @@ private fun ConsumerRow(row: ConsumerRowState, scale: Float, scroll: ScrollState
             StatusCell(row.status, "$tag:Status", row.key, ConsumerColumns[4], scale)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    }
+    } }
 }
 
 @Composable
@@ -320,7 +347,7 @@ internal fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, col
             Box(Modifier.weight(1f)) {
                 CopyableText(
                     status.text, tag, MaterialTheme.typography.bodyMedium,
-                    color = if (status == ConsumerStatus.CaughtUp) OkGreen else Color.Unspecified,
+                    color = if (status == ConsumerStatus.CaughtUp) OkGreen.copy(alpha = LocalRowAlpha.current) else Color.Unspecified,
                     extra = if (hint != null) Modifier.semantics { stateDescription = hint } else Modifier,
                 )
             }
