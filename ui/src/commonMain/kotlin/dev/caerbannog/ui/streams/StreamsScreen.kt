@@ -44,10 +44,12 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.CreateStreamGate
+import dev.caerbannog.core.streams.StreamClientsTexts
 import dev.caerbannog.core.streams.StreamListScreen
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.StreamSort
+import dev.caerbannog.core.streams.UpdatedAge
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrame
 import dev.caerbannog.ui.connections.AppIcon
@@ -73,8 +75,6 @@ interface StreamListEvents {
      */
     fun setShown(shown: Boolean)
 }
-
-private const val MILLIS_PER_SECOND = 1000L
 
 /**
  * The stream list (`docs/ux/Streams.dc.html`), drawn inside the app frame. It draws the strings of [state] and decides none
@@ -111,10 +111,9 @@ fun StreamsScreen(
 
 @Composable
 private fun RowScope.StreamsActions(state: StreamListState, nowMillis: Long, gate: CreateStreamGate, events: StreamListEvents) {
-    state.updatedAtMillis?.let { updated ->
-        val seconds = (nowMillis - updated).coerceAtLeast(0) / MILLIS_PER_SECOND
+    UpdatedAge.text(nowMillis, state.updatedAtMillis)?.let { age ->
         Text(
-            "Updated $seconds s ago",
+            age,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("updatedAge"),
@@ -125,7 +124,7 @@ private fun RowScope.StreamsActions(state: StreamListState, nowMillis: Long, gat
     IconButton(
         onClick = events::refreshNow,
         enabled = canRefresh,
-        modifier = Modifier.testTag("refreshIcon").semantics { contentDescription = "Refresh" },
+        modifier = Modifier.testTag("refreshIcon").semantics { contentDescription = StreamClientsTexts.REFRESH },
     ) {
         ConnectionIcon(AppIcon.Refresh, IconSize)
     }
