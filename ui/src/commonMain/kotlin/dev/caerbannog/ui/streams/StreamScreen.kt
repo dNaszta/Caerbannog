@@ -233,7 +233,7 @@ private fun ClientsSections(state: StreamClientsState, loading: Boolean, events:
         state.ownConnectionsNotice?.let { notice ->
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ConnectionIcon(AppIcon.Check, SmallIconSize)
+                    ConnectionIcon(AppIcon.Info, SmallIconSize)
                     Text(notice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("ownConnectionsNotice"))
                 }
             }

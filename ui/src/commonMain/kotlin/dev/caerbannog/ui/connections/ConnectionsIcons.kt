@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Check
@@ -82,6 +83,7 @@ internal enum class AppIcon(val mockupName: String) {
     Hub("hub"),
     AccountTree("account_tree"),
     ArrowBack("arrow_back"),
+    Info("info"),
     ArrowUpward("arrow_upward"),
     ArrowDownward("arrow_downward"),
     ChevronLeft("chevron_left"),
@@ -114,6 +116,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Hub -> Icons.Outlined.Hub
     AppIcon.AccountTree -> Icons.Outlined.AccountTree
     AppIcon.ArrowBack -> Icons.Outlined.ArrowBack
+    AppIcon.Info -> Icons.Outlined.Info
     AppIcon.ArrowUpward -> Icons.Outlined.ArrowUpward
     AppIcon.ArrowDownward -> Icons.Outlined.ArrowDownward
     AppIcon.ChevronLeft -> Icons.Outlined.ChevronLeft
