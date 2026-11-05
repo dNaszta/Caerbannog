@@ -43,7 +43,7 @@ class SeedArgsTest {
         val a = parse(
             "--host", "broker.test", "--stream-port", "6551", "--management-port", "16671", "--user", "alice",
             "--password", "pw", "--ca", "/tmp/ca.pem", "--vhost", "many", "--streams", "s1,s2,s3",
-            "--messages", "25", "--queues", "1000", "--max-age", "7D",
+            "--messages", "25", "--queues", "1000",
         )
         assertEquals("broker.test", a.host)
         assertEquals(6551, a.streamPort)
@@ -55,7 +55,9 @@ class SeedArgsTest {
         assertEquals(listOf("s1", "s2", "s3"), a.streams)
         assertEquals(25, a.messages)
         assertEquals(1000, a.queues)
-        assertEquals("7D", a.retentionMaxAge)
+        assertNull(a.retentionMaxAge)
+        // --max-age cannot be combined with --queues N off '/' (M2-12b), so it is read in a second call.
+        assertEquals("7D", parse("--password", "pw", "--vhost", "many", "--max-age", "7D").retentionMaxAge)
     }
 
     @Test
