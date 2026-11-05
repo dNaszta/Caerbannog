@@ -19,7 +19,6 @@ data class ConnectionProfile(
     val username: String,
     val streamPort: Int = 5551,
     val managementPort: Int = 15671,
-    /** M2-14 compile stub: the field exists, the behaviour (persistence, transport, ports) is built in 14a. */
     val tls: Boolean = true,
     val caCertificatePath: String? = null,
     val topologyControlLevel: TopologyControlLevel = TopologyControlLevel.READ_ONLY,

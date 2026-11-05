@@ -62,6 +62,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            tls = input.tls ?: true,
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
             declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
@@ -89,6 +90,7 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            tls = input.tls ?: original.tls,
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
             declaredPermissions = when (val edit = input.declaredPermissions) {
                 DeclaredPermissionsEdit.Keep -> original.declaredPermissions

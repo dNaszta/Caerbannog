@@ -42,12 +42,14 @@ object ConnectionNotes {
 }
 
 /**
- * M2-14 compile stub: the notes of the edit panel for the TLS switch position [tls] (the form's value, saved or not).
+ * M2-14: the notes of the edit panel for the TLS switch position [tls] (the form's value, saved or not).
  * [hostNameNotVerified] is [ConnectionNotes.HOST_NAME_NOT_VERIFIED] only with TLS on, otherwise null;
  * [notEncrypted] is [ConnectionNotes.NOT_ENCRYPTED] only with TLS off, otherwise null. One pure rule, so the BDD
  * steps and the screen cannot drift.
  */
 data class EditPanelNotes(val hostNameNotVerified: String?, val notEncrypted: String?)
 
-// Stub = today's behaviour: the host name note always, never a warning.
-fun editPanelNotes(tls: Boolean): EditPanelNotes = EditPanelNotes(hostNameNotVerified = ConnectionNotes.HOST_NAME_NOT_VERIFIED, notEncrypted = null)
+fun editPanelNotes(tls: Boolean): EditPanelNotes = EditPanelNotes(
+    hostNameNotVerified = if (tls) ConnectionNotes.HOST_NAME_NOT_VERIFIED else null,
+    notEncrypted = if (tls) null else ConnectionNotes.NOT_ENCRYPTED,
+)
