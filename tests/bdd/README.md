@@ -36,9 +36,9 @@ tests/bdd/
 | `@gate-M2`, `@gate-M4`, `@gate-M5` | Scenario that is the gate check for that milestone |
 | `@smoke` | Smallest set that proves the feature works; run on every commit |
 | `@fake-broker` | Runs against in-memory fakes of the stream and management clients; no broker needed |
-| `@broker` | Needs a real RabbitMQ 4.x broker with TLS (Testcontainers, needs Docker) |
+| `@broker` | Needs a real RabbitMQ 4.x broker with TLS and plain listeners (Testcontainers, needs Docker) |
 | `@negative` | Checks a refusal, an error or a safety rule |
-| `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS only, never reading queue messages, browsing never changes offsets) |
+| `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
 | `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
 | `@needs-M2` | Step definitions exist and compile but are deliberately left pending (`PendingException`) because the scenario needs a later milestone's feature (in `02` the browsing scenario and the three topology-screen text scenarios, which need the M2 topology screen); excluded from the default Cucumber run |
