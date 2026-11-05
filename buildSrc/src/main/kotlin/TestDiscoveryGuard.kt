@@ -268,21 +268,24 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
             "runBlocking ending in assertFailsWith is rejected",
             "BadNonUnitFixtureTest has 3 test methods but the run reported 0 testcases",
             "HiddenCountFixtureTest has 3 test methods but the run reported 2 testcases",
-            "FreshTaggedFixtureTest has 3 test methods but the run reported 2 testcases",
+            "ExtraTaggedFixtureTest has 1 test methods but the run reported 2 testcases",
         )
         val mustNotFlag = listOf("a fine test returns Unit", "runBlocking Unit is accepted", "block body is accepted")
         val text = r.violations.joinToString("\n")
+        val freshLine = r.report.firstOrNull { it.contains("FreshTaggedFixtureTest") }
         val missed = mustFlag.filterNot { text.contains(it) }
         val falseAlarm = mustNotFlag.filter { text.contains(it) }
         if (missed.isNotEmpty() || falseAlarm.isNotEmpty() || r.violations.size != mustFlag.size ||
-            r.unchecked != 1 || !r.report.contains("1 classes unchecked (run brokerTest, keychainTest, screenshotTest)")) {
+            r.unchecked != 2 || !r.report.any { it.startsWith("2 classes unchecked") } ||
+            freshLine == null || !freshLine.contains("partial result") || text.contains("FreshTaggedFixtureTest")) {
             throw GradleException(
                 "Guard self-test failed. Not rejected: $missed. Wrongly rejected: $falseAlarm. " +
                     "Violations found (${r.violations.size}, expected ${mustFlag.size}); " +
-                    "unchecked ${r.unchecked} (expected 1: the stale tagged class):\n$text",
+                    "unchecked ${r.unchecked} (expected 2: the stale and the partial tagged class); " +
+                    "FreshTagged report line (must contain 'partial result'): $freshLine:\n$text",
             )
         }
-        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones, left the stale tagged class unchecked.")
+        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones, left the stale and the partial tagged class unchecked.")
         marker.get().asFile.apply { parentFile.mkdirs() }.writeText("ok\n")
     }
 }

@@ -1,0 +1,10 @@
+package fixture
+
+// Tagged class, fresh result XML holding MORE testcases than there are test methods (not dynamic). That cannot come
+// from a filtered run, so it stays a violation even though partial tagged results are only "unchecked".
+@Tag("broker")
+class ExtraTaggedFixtureTest {
+    @Test
+    fun `only one`() {
+    }
+}
