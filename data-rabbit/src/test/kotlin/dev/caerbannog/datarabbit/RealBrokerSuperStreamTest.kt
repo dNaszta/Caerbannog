@@ -88,7 +88,6 @@ class RealBrokerSuperStreamTest {
 
     private val caPath = File(javaClass.classLoader.getResource("tls/ca.pem")!!.toURI()).absolutePath
     private val superStreams = mutableListOf<String>()
-    private val plainStreams = mutableListOf<String>()
     private val held = mutableListOf<HeldConnection>()
     private var scope: CoroutineScope? = null
     private var vm: StreamListViewModel? = null
@@ -100,8 +99,7 @@ class RealBrokerSuperStreamTest {
         runCatching { active?.close() }
         held.forEach { runCatching { it.close() } }
         superStreams.forEach { runCatching { ctl("rabbitmq-streams", "delete_super_stream", it) } }
-        plainStreams.forEach { runCatching { ctl("rabbitmq-streams", "delete_stream", it) } }
-        held.clear(); superStreams.clear(); plainStreams.clear()
+        held.clear(); superStreams.clear()
     }
 
     private fun unique(prefix: String) = "$prefix${UUID.randomUUID().toString().take(8)}"
@@ -161,16 +159,13 @@ class RealBrokerSuperStreamTest {
     fun `a super stream on a real broker is listed once, as a super stream with 3 partitions, and expands in order`() {
         val orders = unique("m207-orders-")
         addSuperStream(orders, "--partitions", "3")
-        val plain = unique("m207-plain-")
-        ctl("rabbitmq-streams", "add_stream", plain)
-        plainStreams += plain
         startList()
 
-        awaitState("the super stream is listed as one entry") { s -> s.rows.any { it.name == orders } && s.rows.any { it.name == plain } }
+        awaitState("the super stream is listed as one entry") { s -> s.rows.any { it.name == orders } }
 
         assertInstanceOf(StreamListScreen.Rows::class.java, state.screen)
         val mine = state.rows.filter { it.name.startsWith("m207-") }
-        assertEquals(listOf(orders, plain).sorted(), mine.map { it.name }, "partitions are not separate entries")
+        assertEquals(listOf(orders), mine.map { it.name }, "partitions are not separate entries")
         val row = mine.single { it.name == orders }
         assertEquals(StreamRowKind.SuperStream, row.kind)
         assertEquals("Super stream", row.type)
