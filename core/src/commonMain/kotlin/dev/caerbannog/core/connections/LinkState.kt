@@ -25,6 +25,10 @@ object ConnectionFailureReason {
     const val NO_PASSWORD_STORED: String = "No password is stored"
     const val CREDENTIALS_REFUSED: String = "Credentials were refused"
 
+    /** M2-14c: shared with the Check text (`checkResultMessage`, TlsRefused). It only tells; it never switches TLS off. */
+    const val NO_TLS_ANSWER: String =
+        "The broker did not answer the TLS handshake. It may not use TLS; turn off 'Use TLS' in this connection's settings if that is intended."
+
     /** D2 (decided 2026-11-04): a data call found the broker unreachable while connected. */
     const val CONNECTION_LOST: String = "Connection lost"
 

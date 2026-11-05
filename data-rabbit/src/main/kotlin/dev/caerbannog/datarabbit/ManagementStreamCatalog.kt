@@ -40,7 +40,7 @@ internal class ManagementStreamCatalog(
     override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> {
         val exchanges = when (val reply = http.get(requests.exchanges(vhost))) {
             is ManagementReply.Response -> if (reply.status == 200) reply.body else return ManagementErrors.map(reply.status, CatalogResult.Unexpected)
-            ManagementReply.Unreachable, ManagementReply.TlsRefused -> return CatalogResult.Unreachable
+            ManagementReply.Unreachable, ManagementReply.CertificateRejected, ManagementReply.NoTlsAnswer -> return CatalogResult.Unreachable
         }
         when (val any = ManagementJson.hasSuperStreamExchange(exchanges)) {
             is CatalogResult.Failure -> return any
@@ -91,6 +91,6 @@ internal class ManagementStreamCatalog(
         when (val reply = http.get(url)) {
             is ManagementReply.Response ->
                 if (reply.status == 200) parse(reply.body) else ManagementErrors.map(reply.status, on404)
-            ManagementReply.Unreachable, ManagementReply.TlsRefused -> CatalogResult.Unreachable
+            ManagementReply.Unreachable, ManagementReply.CertificateRejected, ManagementReply.NoTlsAnswer -> CatalogResult.Unreachable
         }
 }

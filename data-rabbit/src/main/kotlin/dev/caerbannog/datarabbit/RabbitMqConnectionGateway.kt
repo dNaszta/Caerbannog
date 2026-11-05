@@ -63,7 +63,8 @@ class RabbitMqConnectionGateway(
     // null means the broker let us in. A 401 "Not management user" is NOT a failure (M2-03a): visibility NONE.
     private suspend fun probe(http: ManagementHttp, requests: ManagementRequests): String? =
         when (val reply = http.get(requests.whoami())) {
-            ManagementReply.TlsRefused -> ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED
+            ManagementReply.CertificateRejected -> ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED
+            ManagementReply.NoTlsAnswer -> ConnectionFailureReason.NO_TLS_ANSWER
             ManagementReply.Unreachable -> ConnectionFailureReason.BROKER_NOT_REACHABLE
             is ManagementReply.Response -> when {
                 reply.status == 200 -> null

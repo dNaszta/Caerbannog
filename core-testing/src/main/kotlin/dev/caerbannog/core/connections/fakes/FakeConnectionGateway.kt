@@ -36,6 +36,16 @@ class FakeConnectionGateway(
         CERTIFICATE_NOT_TRUSTED(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED),
         NO_PASSWORD_STORED(ConnectionFailureReason.NO_PASSWORD_STORED),
         CREDENTIALS_REFUSED(ConnectionFailureReason.CREDENTIALS_REFUSED),
+
+        /** M2-14c: the broker did not answer the TLS handshake (a plain broker); the text is shared with the Check. */
+        NO_TLS_ANSWER(ConnectionFailureReason.NO_TLS_ANSWER),
+        ;
+
+        /** True for the two reasons that can only come out of a TLS handshake; the real gateway never raises them for a TLS-off profile. */
+        val needsTls: Boolean get() = this == CERTIFICATE_NOT_TRUSTED || this == NO_TLS_ANSWER
+
+        /** True when the broker was reached and asked for the credentials: only then did the app send them. */
+        val afterLogin: Boolean get() = this == CREDENTIALS_REFUSED
     }
 
     /** One open connection (the holder). [closeCalls] counts calls, so "closed once" is checkable. */
@@ -67,6 +77,12 @@ class FakeConnectionGateway(
     }
 
     private val failures = ConcurrentHashMap<String, Failure>()
+    @Volatile
+    private var plainOnly = false
+
+    /** True after [brokerOnlyOffersPlain]. */
+    val onlyPlain: Boolean get() = plainOnly
+    private val logins = AtomicInteger()
     private val silentStreamPort = ConcurrentHashMap.newKeySet<String>()
     private val gates = ConcurrentHashMap<String, Gate>()
     private val catalogs = ConcurrentHashMap<String, FakeStreamCatalog>()
@@ -99,6 +115,17 @@ class FakeConnectionGateway(
     fun failWith(profileName: String, failure: Failure) {
         failures[profileName] = failure
     }
+
+    /**
+     * M2-14c: the broker has plain listeners only. A profile with TLS on gets no answer to its handshake ([Failure.NO_TLS_ANSWER]) and
+     * nothing is sent; a profile with TLS off opens as usual. The fake never falls back: it only ever sees the profile it is asked with.
+     */
+    fun brokerOnlyOffersPlain() {
+        plainOnly = true
+    }
+
+    /** How many opens got as far as the broker asking for the credentials (a TLS refusal or an unreachable broker never does). */
+    val credentialsSent: Int get() = logins.get()
 
     fun succeed(profileName: String) {
         failures.remove(profileName)
@@ -141,10 +168,18 @@ class FakeConnectionGateway(
                 throw e
             }
         }
+        if (plainOnly && profile.tls) {
+            log += "failed:$name"
+            return OpenResult.Failed(Failure.NO_TLS_ANSWER.reason)
+        }
         failures[name]?.let {
+            // Honest: without TLS there is no handshake to fail, so a scenario that asks for one is wrong, not the app.
+            check(!it.needsTls || profile.tls) { "$it cannot happen to '$name': its TLS is off" }
+            if (it.afterLogin) logins.incrementAndGet()
             log += "failed:$name"
             return OpenResult.Failed(it.reason)
         }
+        logins.incrementAndGet()
         val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log, catalogOf(name), offsetsOf(name))
         opened += held
         log += "opened:$name#${held.number}"

@@ -162,6 +162,9 @@ class ConnectionLifecycleSteps {
         else -> error("TLS is 'on' or 'off' in a scenario, got '$word'")
     }
 
+    @Given("a saved connection {string} with TLS {word}")
+    fun aSavedConnectionWithTls(name: String, word: String) = theConnectionHasTls(name, word)
+
     @Given("the connection {string} has TLS {word}")
     fun theConnectionHasTls(name: String, word: String) {
         val tls = tlsFromWord(word)
@@ -240,6 +243,7 @@ class ConnectionLifecycleSteps {
             "the certificate is not trusted" -> FakeConnectionGateway.Failure.CERTIFICATE_NOT_TRUSTED
             "no password is stored" -> FakeConnectionGateway.Failure.NO_PASSWORD_STORED
             "the credentials are refused" -> FakeConnectionGateway.Failure.CREDENTIALS_REFUSED
+            "the broker does not answer the TLS handshake" -> FakeConnectionGateway.Failure.NO_TLS_ANSWER
             else -> error("Unknown failure cause in a scenario: '$cause'")
         }
         gateway.failWith(name, failure)
@@ -340,6 +344,60 @@ class ConnectionLifecycleSteps {
         assertState(name, expected)
     }
 
+    // --- M2-14c: the TLS hint on a failed Connect ---
+
+    // Shared with the Check's text on purpose: one sentence, the same words, asserted by its two halves.
+    private fun failedReason(): String {
+        val state = active.stateOf(lastName)
+        return (state as? LinkState.Failed)?.reason ?: error("'$lastName' is not Failed, it is $state")
+    }
+
+    @Given("the broker only offers plain connections")
+    fun theBrokerOnlyOffersPlainConnections() {
+        gateway.brokerOnlyOffersPlain()
+    }
+
+    @Then("the reason says the broker may not use TLS")
+    fun theReasonSaysTheBrokerMayNotUseTls() {
+        assertTrue(failedReason().contains("may not use TLS")) { "reason: ${failedReason()}" }
+    }
+
+    @Then("the reason says the switch can be turned off in the connection settings")
+    fun theReasonSaysTheSwitchCanBeTurnedOff() {
+        assertTrue(failedReason().contains("turn off 'Use TLS' in this connection's settings")) { "reason: ${failedReason()}" }
+    }
+
+    @Then("the reason does not mention turning TLS off")
+    fun theReasonDoesNotMentionTurningTlsOff() {
+        val reason = failedReason()
+        // A wrong CA has its own words ("certificate") and must not point at the switch.
+        assertFalse(reason.contains("TLS", ignoreCase = true) || reason.contains("turn off", ignoreCase = true)) { "reason: $reason" }
+    }
+
+    @Then("the reason does not mention TLS")
+    fun theReasonDoesNotMentionTls() {
+        val reason = failedReason()
+        // Spec "Connection lifecycle": with TLS off no text names TLS or a certificate.
+        assertFalse(reason.contains("TLS", ignoreCase = true) || reason.contains("certificate", ignoreCase = true)) { "reason: $reason" }
+    }
+
+    @Then("the saved connection {string} still has TLS on")
+    fun theSavedConnectionStillHasTlsOn(name: String) {
+        val saved = repository.list().firstOrNull { it.name == name } ?: error("no saved connection '$name'")
+        assertTrue(saved.tls) { "'$name' was changed by the failed Connect, TLS is now off: $saved" }
+    }
+
+    @Then("no attempt without TLS was made")
+    fun noAttemptWithoutTlsWasMade() {
+        val asked = gateway.openedProfiles
+        assertTrue(asked.isNotEmpty() && asked.all { it.tls }) { "every attempt must be with TLS (no fallback), attempts (true = TLS): ${asked.map { it.tls }}" }
+    }
+
+    @Then("no credential was sent")
+    fun noCredentialWasSent() {
+        assertEquals(0, gateway.credentialsSent, "the broker was asked for credentials: ${gateway.log}")
+    }
+
     @Then("the state of {string} is {string} with the reason {string}")
     fun theStateOfIsWithTheReason(name: String, expected: String, reason: String) {
         val state = active.stateOf(name)
@@ -377,9 +435,12 @@ class ConnectionLifecycleSteps {
 
     @Then("I can retry")
     fun iCanRetry() {
+        assertEquals(RowAction.Retry, model().state.value.rows.first { it.name == lastName }.action, "the app bar offers Retry")
         gateway.succeed(lastName)
         connect(lastName)
-        assertState(lastName, "Connected")
+        // Against a broker that only offers plain, Retry asks again with TLS on and fails the same way: the app never switches TLS off.
+        val tlsOn = repository.list().first { it.name == lastName }.tls
+        assertState(lastName, if (gateway.onlyPlain && tlsOn) "Failed" else "Connected")
     }
 
     @Then("topology is locked \\(see 02, safest mode)")

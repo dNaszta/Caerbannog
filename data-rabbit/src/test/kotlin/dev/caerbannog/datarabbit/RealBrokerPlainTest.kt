@@ -124,7 +124,8 @@ class RealBrokerPlainTest {
     fun `Connect with TLS on at the plain management port fails and nothing leaks the password`() = runBlocking<Unit> {
         val lines = mutableListOf<String>()
         val result = RabbitMqConnectionGateway(Secrets(rabbit.adminPassword)) { lines += it }.open(tlsOnAtPlainPorts())
-        assertInstanceOf(OpenResult.Failed::class.java, result, "got $result")
+        // M2-14c: a plain broker is told apart from a wrong CA by the typed reply, on a real RabbitMQ (the real answer is a 400 to the ClientHello).
+        assertEquals(OpenResult.Failed(dev.caerbannog.core.connections.ConnectionFailureReason.NO_TLS_ANSWER), result, "got $result")
         assertTrue(!(result.toString() + lines).contains(rabbit.adminPassword))
     }
 

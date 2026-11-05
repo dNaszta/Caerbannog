@@ -7,9 +7,14 @@ import java.io.File
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.time.Duration
+import java.net.Socket
+import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLParameters
 import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509ExtendedTrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * TLS and HTTP client setup shared by every management API caller, so the CA handling exists once.
@@ -24,8 +29,7 @@ internal object TlsSupport {
         engine {
             config {
                 if (transport is BrokerTransport.Tls) {
-                    sslContext(sslContextOf(transport.trust))
-                    sslParameters(permissiveSslParameters())
+                    sslContext(managementSslContextOf(transport.trust))
                 }
                 connectTimeout(Duration.ofMillis(timeoutMillis))
             }
@@ -64,4 +68,40 @@ internal object TlsSupport {
 
     fun sslContextOf(trust: TrustManagerFactory): SSLContext =
         SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }
+
+    /**
+     * The context of the management HTTP client. The JDK HttpClient ignores an empty endpoint identification
+     * algorithm and checks the host name itself, so D7 (host name not verified) is kept by [NameTolerantTrustManager].
+     */
+    fun managementSslContextOf(trust: TrustManagerFactory): SSLContext {
+        val managers = trust.trustManagers.map { if (it is X509TrustManager) NameTolerantTrustManager(it) else it }
+        return SSLContext.getInstance("TLS").apply { init(null, managers.toTypedArray(), null) }
+    }
+}
+
+/**
+ * The single place where the host name check is dropped (spec D7). It must extend [X509ExtendedTrustManager]: the JDK
+ * wraps a plain [X509TrustManager] and adds a name check again. The chain is still validated by [delegate] against the
+ * profile CA only (or the JVM store), so this is not trust-all: a wrong CA still throws a CertificateException.
+ */
+private class NameTolerantTrustManager(private val delegate: X509TrustManager) : X509ExtendedTrustManager() {
+    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) =
+        delegate.checkServerTrusted(chain, authType)
+
+    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) =
+        delegate.checkServerTrusted(chain, authType)
+
+    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) =
+        delegate.checkServerTrusted(chain, authType)
+
+    override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) =
+        delegate.checkClientTrusted(chain, authType)
+
+    override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) =
+        delegate.checkClientTrusted(chain, authType)
+
+    override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) =
+        delegate.checkClientTrusted(chain, authType)
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = delegate.acceptedIssuers
 }

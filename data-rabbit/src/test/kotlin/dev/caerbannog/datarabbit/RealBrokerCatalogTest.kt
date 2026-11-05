@@ -353,6 +353,22 @@ class RealBrokerCatalogTest {
         assertEquals(OpenResult.Failed(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED), open(ca = wrongCaPath))
     }
 
+    // M2-14c / D7: a wrong CA stays the certificate reason (asserted above, never the TLS-off hint); the host name is not verified.
+    // The container's certificate names localhost and 127.0.0.1; 0.0.0.0 reaches the same mapped port under a name it does not list.
+    @Test
+    fun `a host name the certificate does not list still connects when the CA is trusted (D7)`() = runBlocking<Unit> {
+        val result = RabbitMqConnectionGateway(Passwords(mapOf("rb-test" to rabbit.adminPassword))).open(profile().copy(host = "0.0.0.0"))
+            .also { if (it is OpenResult.Opened) connections += it.connection }
+        assertInstanceOf(OpenResult.Opened::class.java, result, "host name verification is off by decision D7, got $result")
+    }
+
+    @Test
+    fun `a wrong CA is never the TLS-off hint`() {
+        val result = open(ca = wrongCaPath)
+        assertEquals(OpenResult.Failed(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED), result)
+        assertTrue(!(result as OpenResult.Failed).reason.contains("Use TLS"), result.toString())
+    }
+
     // ---- real StreamOffsets ----
 
     @Test

@@ -10,6 +10,7 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URISyntaxException
 import java.net.http.HttpTimeoutException
+import java.security.cert.CertificateException
 import javax.net.ssl.SSLException
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -20,8 +21,11 @@ internal sealed interface ManagementReply {
     /** Timeout, refused connection, closed holder, malformed address. */
     data object Unreachable : ManagementReply
 
-    /** The TLS handshake failed (an untrusted certificate, or a port that does not speak TLS). */
-    data object TlsRefused : ManagementReply
+    /** The TLS handshake failed because the certificate chain was not trusted (wrong or missing CA). */
+    data object CertificateRejected : ManagementReply
+
+    /** The TLS handshake failed and no certificate was at fault: the broker probably does not speak TLS. */
+    data object NoTlsAnswer : ManagementReply
 }
 
 /**
@@ -50,7 +54,7 @@ internal class ManagementHttp(
             // A client closed under a running call reports cancellation; that is a lost connection, not the caller leaving.
             if (closed) ManagementReply.Unreachable else throw e
         } catch (e: SSLException) {
-            ManagementReply.TlsRefused
+            classify(e)
         } catch (e: HttpRequestTimeoutException) {
             ManagementReply.Unreachable
         } catch (e: HttpTimeoutException) {
@@ -72,5 +76,28 @@ internal class ManagementHttp(
         closed = true
         password = null
         client.close()
+    }
+
+    internal companion object {
+        private const val MAX_CAUSE_DEPTH = 20
+
+        /**
+         * One place that tells the two user actions apart (set the CA, or turn TLS off). Rule: a CertificateException
+         * anywhere in the cause chain (walked to a depth limit, so a cause loop ends) means the certificate was rejected;
+         * every other SSLException is "no TLS answer". Measured on JDK 21: a plain broker is a bare SSLException, a wrong
+         * CA is an SSLHandshakeException caused by a CertificateException. Shapes not measured (a server that closes the
+         * handshake, a fatal alert, a required client certificate) fall into NoTlsAnswer on purpose: the hint is
+         * conditional and changes nothing.
+         */
+        fun classify(error: SSLException): ManagementReply {
+            var cause: Throwable? = error
+            var depth = 0
+            while (cause != null && depth < MAX_CAUSE_DEPTH) {
+                if (cause is CertificateException) return ManagementReply.CertificateRejected
+                cause = cause.cause
+                depth++
+            }
+            return ManagementReply.NoTlsAnswer
+        }
     }
 }
