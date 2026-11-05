@@ -1,0 +1,19 @@
+package fixture
+
+// Tagged class whose result XML is NEWER than this source (the self-test sets the file times explicitly) but holds
+// fewer testcases than there are test methods. Per the architect ruling this is "unchecked ... partial result 2 of 3"
+// (a filtered --tests run looks exactly like this), not a violation.
+@Tag("broker")
+class FreshTaggedFixtureTest {
+    @Test
+    fun `fresh a`() {
+    }
+
+    @Test
+    fun `fresh b`() {
+    }
+
+    @Test
+    fun `fresh c`() {
+    }
+}

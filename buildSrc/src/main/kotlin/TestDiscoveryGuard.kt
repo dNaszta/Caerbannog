@@ -22,8 +22,11 @@ import java.io.File
 //   2. Style (fast, clear message): file, line and name of every @Test function with a declared return type other
 //      than Unit, or an expression body `= runBlocking { ... }` (without <Unit>) whose last statement is a known
 //      value-returning assertion (assertIs, assertFailsWith, assertThrows, assertNotNull, ...).
-// Classes tagged @Tag("broker" | "keychain" | "screenshot") only produce XML in their own task (`<tag>Test`). They
-// are compared when that XML exists and is newer than the source, otherwise reported as "unchecked".
+// Classes tagged @Tag("broker" | "keychain" | "screenshot") only produce XML in their own task (`<tag>Test`) and are
+// optional. No XML, or XML older than the source: "unchecked". Fewer testcases than methods: "unchecked ... partial
+// result N of M", NOT a violation, because a filtered run (`--tests`) and a really incomplete run leave the same XML
+// (Gradle's XML carries no filter). More testcases than methods stays a violation. Plain `test`/`jvmTest` classes stay
+// strict: the guard always runs them in full, so their count check is the real guard.
 // `verifyTestDiscoveryFixtures` runs the same checker over tests/guard-fixtures/ (deliberately bad sources and a
 // result file with a missing testcase) and fails unless the checker rejects exactly what it must: the proof that the
 // guard can fail. No dependencies; configuration cache compatible (file inputs only, no Project at execution).
@@ -200,6 +203,12 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
         if (taskDir != null && (xml == null || (resultFile != null && resultFile.lastModified() < c.lastModified))) {
             unchecked++
             verdict = "unchecked (tag ${c.tag}: run $taskDir to check)"
+        } else if (taskDir != null && xml != null && xml < c.methods) {
+            // A --tests run and a really incomplete run leave the same XML, so for optional tagged tasks this is
+            // reported, not failed. The numbers let a human tell.
+            unchecked++
+            verdict = "unchecked (tag ${c.tag}: partial result $xml of ${c.methods} testcases, probably a --tests run; " +
+                "run $taskDir in full to check)"
         } else if (xml == null) {
             verdict = "FAIL no result: class ${c.fqn} has ${c.methods} test methods but no test run reported any"
             violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods and no XML result at all: " +
@@ -208,9 +217,13 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
             verdict = "ok"
         } else {
             verdict = "FAIL"
-            violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods but the run reported $xml testcases: " +
+            val detail = if (xml > c.methods) {
+                "${xml - c.methods} more testcase(s) than @Test methods (stale XML from an older source, or generated cases)"
+            } else {
                 "${c.methods - xml} test(s) not discovered (a @Test function returning a value, wrong @Test import, " +
-                "private function?)")
+                    "private function?)"
+            }
+            violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods but the run reported $xml testcases: $detail")
         }
         report.add("%-70s %6d %6s  %s".format(c.fqn, c.methods, xml?.toString() ?: "-", verdict))
     }
@@ -248,11 +261,19 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
     @TaskAction
     fun verify() {
         val base = fixtureRoot.get().asFile
-        val sources = base.resolve("sources").listFiles { f -> f.name.endsWith(".kt.txt") }!!.toList()
-        // Age a copy of the stale-case XML: file times from a git checkout are arbitrary, so the fixture sets its own.
-        val staleDir = temporaryDir.resolve("brokerTest").apply { deleteRecursively(); mkdirs() }
-        base.resolve("results/brokerTest").listFiles()!!.forEach { it.copyTo(staleDir.resolve(it.name)).setLastModified(1000L) }
-        val r = runGuard(sources, listOf(base.resolve("results/test"), staleDir), rootDirectory.get().asFile)
+        // File times from a git checkout are arbitrary, so the fixture sets its own, explicitly (no wall clock):
+        // sources 5000, stale result XML 1000 (older than its class), fresh result XML 9000 (newer).
+        val stagedSources = temporaryDir.resolve("sources").apply { deleteRecursively(); mkdirs() }
+        val sources = base.resolve("sources").listFiles { f -> f.name.endsWith(".kt.txt") }!!
+            .map { it.copyTo(stagedSources.resolve(it.name)).apply { setLastModified(5000L) } }
+        fun staged(name: String, mtime: (File) -> Long): File {
+            val dir = temporaryDir.resolve(name).apply { deleteRecursively(); mkdirs() }
+            base.resolve("results/$name").listFiles()!!.forEach { it.copyTo(dir.resolve(it.name)).setLastModified(mtime(it)) }
+            return dir
+        }
+        val staleDir = staged("brokerTest") { if (it.name.contains("Stale")) 1000L else 9000L }
+        val testDir = staged("test") { 9000L }
+        val r = runGuard(sources, listOf(testDir, staleDir), rootDirectory.get().asFile)
         // Every bad test below must be named by the guard; the good one must not be.
         val mustFlag = listOf(
             "declared return type is rejected",
@@ -260,20 +281,24 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
             "runBlocking ending in assertFailsWith is rejected",
             "BadNonUnitFixtureTest has 3 test methods but the run reported 0 testcases",
             "HiddenCountFixtureTest has 3 test methods but the run reported 2 testcases",
+            "ExtraTaggedFixtureTest has 1 test methods but the run reported 2 testcases",
         )
         val mustNotFlag = listOf("a fine test returns Unit", "runBlocking Unit is accepted", "block body is accepted")
         val text = r.violations.joinToString("\n")
+        val freshLine = r.report.firstOrNull { it.contains("FreshTaggedFixtureTest") }
         val missed = mustFlag.filterNot { text.contains(it) }
         val falseAlarm = mustNotFlag.filter { text.contains(it) }
         if (missed.isNotEmpty() || falseAlarm.isNotEmpty() || r.violations.size != mustFlag.size ||
-            r.unchecked != 1 || !r.report.contains("1 classes unchecked (run brokerTest, keychainTest, screenshotTest)")) {
+            r.unchecked != 2 || !r.report.any { it.startsWith("2 classes unchecked") } ||
+            freshLine == null || !freshLine.contains("partial result") || text.contains("FreshTaggedFixtureTest")) {
             throw GradleException(
                 "Guard self-test failed. Not rejected: $missed. Wrongly rejected: $falseAlarm. " +
                     "Violations found (${r.violations.size}, expected ${mustFlag.size}); " +
-                    "unchecked ${r.unchecked} (expected 1: the stale tagged class):\n$text",
+                    "unchecked ${r.unchecked} (expected 2: the stale and the partial tagged class); " +
+                    "FreshTagged report line (must contain 'partial result'): $freshLine:\n$text",
             )
         }
-        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones, left the stale tagged class unchecked.")
+        logger.lifecycle("Test discovery guard self-test: rejected all ${mustFlag.size} bad fixtures, accepted the good ones, left the stale and the partial tagged class unchecked.")
         marker.get().asFile.apply { parentFile.mkdirs() }.writeText("ok\n")
     }
 }
