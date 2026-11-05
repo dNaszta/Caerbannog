@@ -7,9 +7,6 @@ import dev.caerbannog.core.connections.StreamSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,8 +44,6 @@ class StreamListViewModel(
     private val reconnect: suspend (String) -> Unit,
     pageSize: Int = DEFAULT_PAGE_SIZE,
 ) : AutoCloseable {
-    private enum class Start { LoadNow, OffsetsThenTimer, TimerOnly }
-
     private var link: LinkState = active.state.value
     private var source: StreamSource? = active.source
     private var shown = false
@@ -71,9 +66,13 @@ class StreamListViewModel(
     private var cannotRead = false
     private var failedFirstLoad = false
 
-    private var driver: Job? = null
-    private var driverToken: Any? = null
-    private var loadingToken: Any? = null
+    private val loop = RefreshLoop(
+        scope = scope,
+        active = active,
+        isCurrent = { !closed && source === it },
+        interval = { interval },
+        loadOnce = ::loadOnce,
+    )
 
     private val _state = MutableStateFlow(StreamListState())
     val state: StateFlow<StreamListState> = _state.asStateFlow()
@@ -93,9 +92,9 @@ class StreamListViewModel(
         if (closed || this.shown == shown) return@onScope
         this.shown = shown
         if (shown) {
-            if (canRun()) startDriver(Start.LoadNow)
+            if (canRun()) source?.let(loop::loadNow)
         } else {
-            cancelDriver()
+            loop.cancel()
         }
     }
 
@@ -141,7 +140,7 @@ class StreamListViewModel(
         this.interval = interval
         render()
         // A running load picks the new value up when it ends.
-        if (canRun() && loadingToken == null) startDriver(Start.TimerOnly)
+        if (canRun() && !loop.loading) source?.let(loop::timerOnly)
     }
 
     /**
@@ -154,7 +153,7 @@ class StreamListViewModel(
     override fun close() {
         onScope {
             closed = true
-            cancelDriver()
+            loop.cancel()
             following.cancel()
         }
     }
@@ -165,7 +164,7 @@ class StreamListViewModel(
     }
 
     private fun refresh() {
-        if (canRun() && loadingToken == null) startDriver(Start.LoadNow)
+        if (canRun() && !loop.loading) source?.let(loop::loadNow)
     }
 
     private fun showPage(requested: Int) {
@@ -179,7 +178,7 @@ class StreamListViewModel(
         if (closed || (newSource === source && newLink == link)) return
         link = newLink
         source = newSource
-        cancelDriver()
+        loop.cancel()
         if (newLink is LinkState.Failed && newLink.reason == ConnectionFailureReason.CONNECTION_LOST) {
             // D2: the rows of the last load stay, marked stale, with the banner.
             if (loaded != null) {
@@ -190,7 +189,7 @@ class StreamListViewModel(
             clearData()
         }
         render()
-        if (canRun()) startDriver(Start.LoadNow)
+        if (canRun()) source?.let(loop::loadNow)
     }
 
     private fun clearData() {
@@ -209,62 +208,6 @@ class StreamListViewModel(
 
     // --- loading -------------------------------------------------------------------------------------
 
-    private fun cancelDriver() {
-        driver?.cancel()
-        driver = null
-        driverToken = null
-        loadingToken = null
-    }
-
-    private fun startDriver(start: Start) {
-        cancelDriver()
-        val src = source ?: return
-        val token = Any()
-        driverToken = token
-        driver = scope.launch {
-            when (start) {
-                Start.LoadNow -> load(src, token)
-                Start.OffsetsThenTimer -> fetchOffsets(src, refreshAll = false)
-                Start.TimerOnly -> Unit
-            }
-            while (true) {
-                val wait = interval
-                if (wait == RefreshInterval.Off) break
-                delay(wait.seconds * MILLIS)
-                if (!alive(src)) break
-                load(src, token)
-            }
-        }
-    }
-
-    // False when the connection changed or this coroutine was cancelled: the caller drops its result.
-    private suspend fun alive(src: StreamSource): Boolean {
-        currentCoroutineContext().ensureActive()
-        return !closed && source === src
-    }
-
-    private suspend fun load(src: StreamSource, token: Any) {
-        loadingToken = token
-        try {
-            loadOnce(src)
-        } finally {
-            if (loadingToken === token) loadingToken = null
-        }
-    }
-
-    // One call to the broker. Null: the result must be dropped (superseded) or the connection was reported lost (D2).
-    private suspend fun <T> ask(src: StreamSource, call: suspend () -> CatalogResult<T>): CatalogResult<T>? {
-        val result = call()
-        if (!alive(src)) return null
-        if (result == CatalogResult.Unreachable) {
-            // D2 (decided 2026-11-04): the one place that turns an unreachable broker into a lost connection.
-            // Called from this coroutine, never from an observer of the link.
-            active.connectionLost(src)
-            return null
-        }
-        return result
-    }
-
     @Suppress("ReturnCount")
     private suspend fun loadOnce(src: StreamSource) {
         if (loaded == null && failedFirstLoad) {
@@ -272,7 +215,7 @@ class StreamListViewModel(
             render()
         }
         val caps = capabilities ?: run {
-            val result = ask(src) { src.catalog.capabilities() } ?: return
+            val result = loop.ask(src) { src.catalog.capabilities() } ?: return
             if (result !is CatalogResult.Success) return loadFailed(result)
             result.value.also { capabilities = it }
         }
@@ -283,7 +226,7 @@ class StreamListViewModel(
         // D8: one call per load, and only when the number is complete; otherwise "unavailable", never a partial number.
         var counts: Map<String, Int>? = null
         if (caps.visibility == Visibility.FULL && caps.streamPlugin == PluginStatus.PRESENT) {
-            val result = ask(src) { src.catalog.publisherCounts(src.vhost) } ?: return
+            val result = loop.ask(src) { src.catalog.publisherCounts(src.vhost) } ?: return
             counts = (result as? CatalogResult.Success)?.value
         }
 
@@ -304,7 +247,7 @@ class StreamListViewModel(
         val all = mutableListOf<StreamSummary>()
         var next = 1
         while (true) {
-            val result = ask(src) { src.catalog.listStreams(StreamListRequest(vhost = src.vhost, page = next, pageSize = BROKER_PAGE_SIZE)) } ?: return null
+            val result = loop.ask(src) { src.catalog.listStreams(StreamListRequest(vhost = src.vhost, page = next, pageSize = BROKER_PAGE_SIZE)) } ?: return null
             if (result !is CatalogResult.Success) {
                 loadFailed(result)
                 return null
@@ -337,7 +280,7 @@ class StreamListViewModel(
                 for (name in names) {
                     launch {
                         val offset = gate.withPermit { src.offsets.firstOffset(src.vhost, name) }
-                        if (alive(src)) {
+                        if (loop.alive(src)) {
                             firstOffsets[name] = offset
                             render()
                         }
@@ -355,7 +298,7 @@ class StreamListViewModel(
     private fun viewChanged() {
         page = clampedPage()
         render()
-        if (canRun() && loadingToken == null) startDriver(Start.OffsetsThenTimer)
+        if (canRun() && !loop.loading) source?.let { src -> loop.stepThenTimer(src) { fetchOffsets(src, refreshAll = false) } }
     }
 
     private fun filteredSorted(): List<StreamSummary> {
