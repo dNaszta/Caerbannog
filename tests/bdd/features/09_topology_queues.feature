@@ -110,7 +110,8 @@ Feature: Topology and quorum queues
 
   # --- Added for task M2-08 (read-only topology screen). Decisions T1 to T5 are in docs/tasks/M2-08-topology-read-only.md. ---
 
-  # Decision T1 (recommended): the screen lists the connection's virtual host only, like the stream list in 03.
+  # Decision T1 (owner, 2026-11-05): the screen may show every virtual host the user can see. It starts on the connection's
+  # own virtual host and shows one virtual host at a time. The stream list in 03 stays on the connection's virtual host.
   @M2 @fake-broker
   Scenario: Another vhost's queues are not listed
     Given the connection's virtual host has 3 quorum queues
@@ -118,6 +119,48 @@ Feature: Topology and quorum queues
     When I open the topology screen on the "Queues" tab
     Then I see queues 1 to 3 of 3
     And no queue of the other virtual host is listed
+
+  @M2 @fake-broker
+  Scenario: The topology screen starts on the connection's virtual host
+    Given the connection's virtual host is "/"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    Then the virtual host "/" is the chosen one
+
+  @M2 @fake-broker
+  Scenario: Another virtual host can be chosen
+    Given the user can see the virtual hosts "/" and "billing"
+    And the virtual host "billing" has the quorum queue "invoices"
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then only "invoices" is listed
+    And no queue of the virtual host "/" is shown
+
+  @M2 @fake-broker
+  Scenario: Only the virtual hosts the user may see are offered
+    Given the broker has the virtual hosts "/", "billing" and "secret"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    Then I can choose between "/" and "billing" and no other
+
+  # The management API answers 404 for a virtual host that is missing and for one the user has no permission on.
+  @M2 @negative @fake-broker
+  Scenario: A virtual host the user cannot see says so
+    Given the virtual host "billing" is offered but the broker answers that it is not available
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then I see the message "Virtual host billing is not available to this user. It may have been deleted, or the user may have no permission on it."
+    And no queue is shown
+    And I can still choose another virtual host
+
+  # The permission check reads the connection's own virtual host only, so nothing is claimed about the others.
+  @M2 @fake-broker
+  Scenario: Another virtual host says its permissions were not checked
+    Given the connection's virtual host is "/"
+    And the user can see the virtual hosts "/" and "billing"
+    When I open the topology screen on the "Queues" tab
+    And I choose the virtual host "billing"
+    Then the topology screen says permissions were checked on virtual host "/" only and this virtual host is shown read-only
 
   # Streams have their own screen; a stream (or a partition of a super stream) is never listed as a queue here.
   @M2 @fake-broker
@@ -145,15 +188,53 @@ Feature: Topology and quorum queues
   Scenario: The default exchange and its bindings are hidden until asked for
     Given the broker has the default exchange, the exchange "events" and a queue "orders" bound to "events"
     When I open the topology screen on the "Bindings" tab
-    Then I see only the binding from "events" to "orders"
+    Then the bindings view shows only the binding from "events" to "orders"
     When I choose to show the default exchange
-    Then I also see the implicit binding from the default exchange to "orders"
+    Then the bindings view also shows the implicit binding from the default exchange to "orders"
 
   @M2 @fake-broker
   Scenario: A binding to an exchange is shown as such
     Given the exchange "events" is bound to the exchange "audit" with routing key "#"
     When I open the topology screen on the "Bindings" tab
     Then the binding from "events" to "audit" says its destination is an exchange
+
+  # --- The bindings graph (decision T2, owner 2026-11-05; task M2-08d). The table of the Bindings tab (above) is its fallback. ---
+
+  @M2 @fake-broker
+  Scenario: The bindings graph shows an exchange with its queues
+    Given the exchange "events" is bound to the queues "orders" and "audit" with routing keys "order.created" and "#"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then the graph has the nodes "events", "orders" and "audit"
+    And it has an edge from "events" to "orders" labelled "order.created"
+    And it has an edge from "events" to "audit" labelled "#"
+
+  @M2 @fake-broker
+  Scenario: The bindings graph never draws the default exchange unless asked
+    Given the broker has the default exchange and 1000 queues, each bound to it
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then the graph has no node for the default exchange
+    And no queue is drawn only because of the default exchange
+
+  @M2 @fake-broker
+  Scenario: A big neighbourhood is not drawn partly
+    Given the exchange "events" is bound to 100 queues
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then no partial graph is drawn
+    And the screen says there are more bindings than can be drawn and asks me to choose an exchange or narrow the filter
+
+  @M2 @fake-broker
+  Scenario: The bindings can also be read as a table
+    Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    And I switch to the table view
+    Then I see the binding with its source, destination and routing key
+
+  @M2 @fake-broker
+  Scenario: Graph nodes can be reached by the keyboard
+    Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
+    When I open the topology screen on the "Bindings" tab and choose the graph view
+    Then every node can be focused with the keyboard
+    And a focused node is described with its kind, name and number of bindings
 
   @M2 @fake-broker
   Scenario: A super stream exchange is marked
