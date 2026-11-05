@@ -110,7 +110,7 @@ Feature: Publishers and consumers of a stream
   @fake-broker
   Scenario: A row settles on the next refresh
     Given a consumer on "orders-events" whose connection name is not known yet
-    And I open the "Publishers and consumers" tab of "orders-events"
+    And I am on the "Publishers and consumers" tab of "orders-events"
     When the broker now reports "billing" at offset 48299 with connection "10.0.5.14:38812 - billing-service"
     And the tab refreshes
     Then "billing" shows 0 messages behind

@@ -15,6 +15,17 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     /** The screen on show. */
     val screen: StateFlow<AppDestination> = _screen.asStateFlow()
 
+    private val _selectedStream = MutableStateFlow<String?>(null)
+
+    /** COMPILE STUB (M2-06a step 2): the stream whose screen is open (Streams only), null for the list. Never set yet. */
+    val selectedStream: StateFlow<String?> = _selectedStream.asStateFlow()
+
+    /** COMPILE STUB: no behaviour yet. */
+    fun openStream(name: String) = Unit
+
+    /** COMPILE STUB: no behaviour yet. */
+    fun closeStream() = Unit
+
     fun open(destination: AppDestination) {
         if (destination in WITH_SCREEN) _screen.value = destination
     }

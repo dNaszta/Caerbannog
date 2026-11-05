@@ -4,20 +4,33 @@ import com.rabbitmq.stream.Address
 import com.rabbitmq.stream.Consumer
 import com.rabbitmq.stream.Environment
 import com.rabbitmq.stream.OffsetSpecification
+import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.ConnectionProfile
+import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.SecretStore
-import dev.caerbannog.core.streams.CAUGHT_UP_MAX_LAG
+import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
 import dev.caerbannog.core.streams.PluginStatus
 import dev.caerbannog.core.streams.PublisherRow
+import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.RefreshInterval
+import dev.caerbannog.core.streams.StreamClientsScreen
+import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.streams.StreamListScreen
+import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.streams.Visibility
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -36,13 +49,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * M2-06a step 2 (@broker, needs Docker): spikes S-A (consumer lag and the Caught up tolerance), S-B (unnamed publisher, row right
+ * M2-06a step 2 (@broker, needs Docker): spikes S-A (consumer lag and what "Caught up" may claim, lag ruling of 2026-11-05), S-B (unnamed publisher, row right
  * after attach) and S-C (a second vhost) of docs/tasks/M2-06-publishers-consumers.md, kept as assertions, plus the counts check of
  * scenario "Counts on the tab match counts in the stream list" with the three tag levels (administrator FULL, management OWN, no tag NONE).
  * The tab's view model is exercised against fakes in `core`; here the real catalog answers the same questions the tab asks.
  * Spike output lines start with "SPIKE-" (printed once, for the Status record). Stats lag up to 5 s: bounded polling on the value.
  * Run with `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerClientsTest*'`.
- * Red until the constant [CAUGHT_UP_MAX_LAG] exists (compile stub in step 2).
  */
 @Tag("broker")
 @Testcontainers(disabledWithoutDocker = true)
@@ -192,7 +204,7 @@ class RealBrokerClientsTest {
     // ---- S-A ----
 
     @Test
-    fun `S-A the lag of unnamed, named non-storing, storing and another applications storing consumer is 0 or 1 once settled`() = runBlocking<Unit> {
+    fun `S-A unnamed and non-storing consumers settle at lag 0, every lag is within 0 and stores plus 1, nobody borrows another applications lag`() = runBlocking<Unit> {
         val stream = unique("m206-lag-")
         val e = createStream(stream)
         publish(e, stream, 100, reference = "pub-$stream")
@@ -210,8 +222,7 @@ class RealBrokerClientsTest {
             fetch = { consumersOf(held, stream).also { samples += it } },
             done = { rows -> rows.size == 4 && rows.all { it.connectionName.isNotEmpty() && it.offset >= 99 } },
         )
-        // The rule must hold on the values that stay: look again after the stats had time to move (bounded, on the value).
-        // (stores are asynchronous: give the tracking entries a bounded chance to show, on the value; not seeing one is recorded, not failed)
+        // Stores are asynchronous and the stats lag: give the storing consumers a bounded chance to show a lag above 0 (recorded, not required).
         val later = runCatching {
             awaitUntil("a storing consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { it.offsetLag >= 1 } })
         }.getOrElse { consumersOf(held, stream) }
@@ -220,13 +231,24 @@ class RealBrokerClientsTest {
                 println("SPIKE-A $label name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
             }
         }
-        println("SPIKE-A first-seen rows: ${samples.first().map { "${it.name}:${it.offset}/${it.offsetLag}/conn='${it.connectionName}'" }}")
         println("SPIKE-A max lag seen across ${samples.size} polls: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
-        for (rows in listOf(settled, later)) {
-            for (r in rows) {
-                assertTrue(r.offsetLag in 0..CAUGHT_UP_MAX_LAG, "consumer ${r.name} is caught up but reports offset_lag ${r.offsetLag}; the rule 'Caught up = 0..$CAUGHT_UP_MAX_LAG' is wrong")
+
+        // Number of offset stores each consumer did (auto tracking: one per 10 of the 100 messages; the other application: 3).
+        val stores = mapOf<String?, Int>(null to 0, "plain-$stream" to 0, "storing-$stream" to 10, "other-app-$stream" to 3)
+        // (2) every lag is >= 0 and at most the stores of that consumer plus 1 (loose upper bound; the value varies between runs and is not pinned)
+        for (rows in samples + listOf(settled, later)) {
+            for (r in rows.filter { it.connectionName.isNotEmpty() }) {
+                val limit = stores.getValue(r.name?.takeIf { it.isNotEmpty() }) + 1
+                assertTrue(r.offsetLag in 0..limit.toLong(), "consumer '${r.name}' reports offset_lag ${r.offsetLag}, expected 0..$limit (its stores plus 1)")
             }
         }
+        // (1) and (3): the unnamed and the named non-storing consumer are exactly 0, although another application stored on the same stream
+        for ((label, rows) in listOf("settled" to settled, "later" to later)) {
+            for (r in rows.filter { it.name.isNullOrEmpty() || it.name == "plain-$stream" }) {
+                assertEquals(0L, r.offsetLag, "$label: consumer '${r.name}' never stores an offset and has read everything, so offset_lag must be 0 (it must not borrow the lag of another application's stores)")
+            }
+        }
+        // No assertion that a storing consumer reads 0 or 1 (lag ruling).
     }
 
     // ---- S-B ----
@@ -298,6 +320,55 @@ class RealBrokerClientsTest {
         val listPublishers = awaitUntil("publisherCounts of $stream is 2", fetch = { success(runBlocking { held.catalog.publisherCounts("/") })[stream] }, done = { it == 2 })
         assertEquals(tab.first, listPublishers, "publishers: tab vs list column")
         assertEquals(tab.second, listConsumers, "consumers: tab vs list column")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `the tab view model on a real broker lists 2 publishers and 3 consumers and agrees with the list row (scenario Counts on the tab match counts in the stream list)`() = runBlocking<Unit> {
+        val stream = unique("m206-vm-")
+        val e = createStream(stream)
+        publish(e, stream, 4, reference = "pub-a-$stream")
+        closeables += e.producerBuilder().stream(stream).name("pub-b-$stream").build()
+        repeat(3) { i -> consume(e, stream, "cons-$i-$stream", Tracking.None, 4) }
+
+        val secrets = Passwords(mapOf("rb-test" to rabbit.adminPassword))
+        val settings = object : AppSettings { @Volatile override var streamListRefresh: RefreshInterval = RefreshInterval.Every5 }
+        val active = ActiveConnection(ConnectionSession(ManagementApiPermissionChecker(), secrets), RabbitMqConnectionGateway(secrets))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
+        val clock = RefreshClock { System.currentTimeMillis() }
+        val tab = StreamClientsViewModel(active, settings, scope, clock) { }
+        val list = StreamListViewModel(active, settings, scope, clock, { }, pageSize = 50)
+        try {
+            active.connect(
+                ConnectionProfile(
+                    name = "rb-test", host = rabbit.host, virtualHost = "/", username = rabbit.adminUsername,
+                    streamPort = rabbit.getMappedPort(STREAM_TLS_PORT), managementPort = rabbit.httpsPort, caCertificatePath = caPath,
+                ),
+            )
+            tab.show(stream)
+            list.setShown(true)
+            // settled by value, bounded: both counts, no settling row left (rows with an empty connection name read "unknown")
+            val settled = awaitUntil(
+                "the tab shows 2 publishers and 3 settled consumers of $stream",
+                fetch = { tab.state.value },
+                done = { it.screen == StreamClientsScreen.Content && it.publishers.size == 2 && it.consumers.size == 3 && it.publishers.none { p -> p.settling } && it.consumers.none { c -> c.connection == "unknown" } && it.lastOffset == "3" },
+            )
+            val row = awaitUntil(
+                "the list row of $stream shows 2 publishers and 3 consumers",
+                fetch = { list.state.value.rows.firstOrNull { it.name == stream } },
+                done = { it != null && it.publishers == "2" && it.consumers == "3" },
+            )
+            assertEquals(row!!.publishers, settled.publishers.size.toString(), "publishers: tab vs list column")
+            assertEquals(row.consumers, settled.consumers.size.toString(), "consumers: tab vs list column")
+            assertEquals("3", settled.lastOffset, "4 messages from offset 0")
+            assertTrue(list.state.value.screen is StreamListScreen.Rows)
+            assertEquals(null, settled.ownConnectionsNotice, "an administrator sees every connection")
+        } finally {
+            runCatching { tab.close() }
+            runCatching { list.close() }
+            runCatching { scope.cancel() }
+            runCatching { active.close() }
+        }
     }
 
     @Test

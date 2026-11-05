@@ -1,11 +1,5 @@
 package dev.caerbannog.core.streams
 
-/**
- * A consumer is Caught up when the broker's `offset_lag` is 0..[CAUGHT_UP_MAX_LAG] (M2-06 brief, confirmed by spike S-A on a real broker).
- * A named consumer that stored its offset reads 1: its tracking entry occupies the next offset.
- */
-const val CAUGHT_UP_MAX_LAG: Long = 1
-
 /** What the Publishers and consumers tab shows (spec "Publishers and consumers tab"). Display strings only (UI1). */
 sealed interface StreamClientsScreen {
     data object NotConnected : StreamClientsScreen
@@ -30,9 +24,17 @@ sealed interface StreamClientsScreen {
 sealed interface ConsumerStatus {
     val text: String
 
+    /** Tooltip text of the status cell; null when there is none. Only [Behind] carries one ([StreamClientsTexts.STORED_OFFSETS_HINT]). */
+    val hint: String? get() = null
+
+    /** `offsetLag` 0 only (lag ruling 2026-11-05). */
     data object CaughtUp : ConsumerStatus { override val text: String = StreamClientsTexts.CAUGHT_UP }
 
-    data object Behind : ConsumerStatus { override val text: String = StreamClientsTexts.BEHIND }
+    /** `offsetLag` above 0: the broker's number, grouped digits, neutral style, never a verdict. */
+    data class Behind(val lag: Long) : ConsumerStatus {
+        override val text: String = "${groupDigits(lag)} behind"
+        override val hint: String = StreamClientsTexts.STORED_OFFSETS_HINT
+    }
 
     /** Single-active-consumer standby (brief Open point 3). */
     data object NotActive : ConsumerStatus { override val text: String = StreamClientsTexts.NOT_ACTIVE }
@@ -87,7 +89,7 @@ object StreamClientsTexts {
     const val UPDATING: String = "updating"
     const val UNNAMED: String = "unnamed"
     const val CAUGHT_UP: String = "Caught up"
-    const val BEHIND: String = "Behind"
+    const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything."
     const val NOT_ACTIVE: String = "Not active"
     const val OWN_CONNECTIONS_NOTICE: String = "Showing only your own connections. The monitoring tag shows all."
     const val PLUGIN_MISSING: String = "The stream management plugin is not enabled. Enable rabbitmq_stream_management on the broker."

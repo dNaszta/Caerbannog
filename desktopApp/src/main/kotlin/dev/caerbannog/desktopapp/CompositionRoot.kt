@@ -17,6 +17,7 @@ import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,8 @@ class AppComposition(
     val viewModel: ConnectionsViewModel,
     val active: ActiveConnection,
     val streamList: StreamListViewModel,
+    /** The Publishers and consumers tab (M2-06a). COMPILE STUB: created, not yet closed or followed by the control. */
+    val streamClients: StreamClientsViewModel,
     /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
     val control: ConnectionControlModel,
     /** Which screen the window shows; "Manage connections" and "New connection" in the chip popup bring Connections back. */
@@ -115,7 +118,8 @@ fun createAppComposition(
     val control = ConnectionControlModel(
         viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = { navigation.open(AppDestination.Connections) },
     )
-    return AppComposition(viewModel, active, streamList, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
+    val streamClients = StreamClientsViewModel(active, appSettings, streamListScope, RefreshClock { System.currentTimeMillis() }, viewModel::connect)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

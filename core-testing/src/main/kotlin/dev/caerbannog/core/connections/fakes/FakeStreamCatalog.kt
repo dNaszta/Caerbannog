@@ -40,6 +40,7 @@ class FakeStreamCatalog : StreamCatalog {
 
     private val entries = Collections.synchronizedList(ArrayList<Entry>())
     private val publisherRows = Collections.synchronizedMap(HashMap<Pair<String, String>, List<PublisherRow>>())
+    private val deleted: MutableSet<Pair<String, String>> = Collections.synchronizedSet(HashSet())
     private val consumerRows = Collections.synchronizedMap(HashMap<Pair<String, String>, List<ConsumerRow>>())
 
     /** What the user's tags allow. NONE answers every call with NotAuthorised (HTTP 401 "Not management user"). */
@@ -66,7 +67,17 @@ class FakeStreamCatalog : StreamCatalog {
         pageFailures[page] = failure
     }
 
-    fun clearFailures() = pageFailures.clear()
+    fun clearFailures() {
+        pageFailures.clear()
+        callFailures.clear()
+    }
+
+    private val callFailures = ConcurrentHashMap<String, CatalogResult.Failure>()
+
+    /** M2-06: every call named [call] (see [calls]) answers [failure] (default: a body this app does not understand) until [clearFailures]. */
+    fun failCall(call: String, failure: CatalogResult.Failure = CatalogResult.Unexpected) {
+        callFailures[call] = failure
+    }
 
     private suspend fun <T> late(call: String, answer: T): T {
         holds.remove(call)?.await()
@@ -74,6 +85,7 @@ class FakeStreamCatalog : StreamCatalog {
     }
 
     private fun put(entry: Entry) {
+        deleted -= entry.vhost to entry.name
         synchronized(entries) {
             entries.removeAll { it.vhost == entry.vhost && it.name == entry.name }
             entries += entry
@@ -89,6 +101,16 @@ class FakeStreamCatalog : StreamCatalog {
         put(Entry(name, vhost, type, null))
     }
 
+    /**
+     * M2-06: the stream is deleted on the broker. `streamDetail` answers NotFound, and so do `publishers` and `consumers` of it
+     * (spec brief M2-06: NotFound on either means the stream is gone). A later [addStream] of the same name brings it back.
+     * Only streams deleted through this method answer NotFound on `publishers` and `consumers`; a name never added keeps answering an empty list (M2-04 tests rely on it).
+     */
+    fun deleteStream(name: String, vhost: String = "/") {
+        synchronized(entries) { entries.removeAll { it.vhost == vhost && it.name == name } }
+        deleted += vhost to name
+    }
+
     fun setPublishers(vhost: String, stream: String, rows: List<PublisherRow>) {
         publisherRows[vhost to stream] = rows
     }
@@ -102,7 +124,7 @@ class FakeStreamCatalog : StreamCatalog {
         return when {
             unreachable -> CatalogResult.Unreachable
             visibility == Visibility.NONE -> CatalogResult.NotAuthorised
-            else -> null
+            else -> callFailures[call]
         }
     }
 
@@ -145,13 +167,14 @@ class FakeStreamCatalog : StreamCatalog {
     override suspend fun streamDetail(vhost: String, name: String): CatalogResult<StreamSummary> {
         refusal("streamDetail")?.let { return it }
         val found = synchronized(entries) { entries.firstOrNull { it.vhost == vhost && it.name == name }?.summary }
-        return found?.let { CatalogResult.Success(it) } ?: CatalogResult.NotFound
+        return late("streamDetail", found?.let { CatalogResult.Success(it) } ?: CatalogResult.NotFound)
     }
 
     override suspend fun publishers(vhost: String, stream: String): CatalogResult<List<PublisherRow>> {
         refusal("publishers")?.let { return it }
         if (!pluginPresent) return CatalogResult.PluginMissing
-        return CatalogResult.Success(publisherRows[vhost to stream].orEmpty())
+        if ((vhost to stream) in deleted) return late("publishers", CatalogResult.NotFound)
+        return late("publishers", CatalogResult.Success(publisherRows[vhost to stream].orEmpty()))
     }
 
     override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> {
@@ -168,12 +191,14 @@ class FakeStreamCatalog : StreamCatalog {
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> {
         refusal("consumers")?.let { return it }
         if (!pluginPresent) return CatalogResult.PluginMissing
-        return CatalogResult.Success(consumerRows[vhost to stream].orEmpty())
+        if ((vhost to stream) in deleted) return late("consumers", CatalogResult.NotFound)
+        return late("consumers", CatalogResult.Success(consumerRows[vhost to stream].orEmpty()))
     }
 
     override suspend fun capabilities(): CatalogResult<Capabilities> {
         calls += "capabilities"
         if (unreachable) return CatalogResult.Unreachable
+        callFailures["capabilities"]?.let { return it }
         val plugin = when {
             visibility == Visibility.NONE -> PluginStatus.UNKNOWN // the detection call is a 401 for a user without the tag
             pluginPresent -> PluginStatus.PRESENT
@@ -184,6 +209,36 @@ class FakeStreamCatalog : StreamCatalog {
 
     companion object {
         const val MAX_PAGE_SIZE = 500
+
+        /**
+         * A consumer row. [offsetLag] defaults to `lastOffset - offset` (what the broker reports for a consumer that never stores an offset);
+         * pass it explicitly for a consumer that stored its offset (stored offsets add to the lag). [connectionName] empty is a row that
+         * has just attached (the broker's `connection_details` is `{}` for some seconds). [name] null is an unnamed consumer.
+         */
+        fun consumer(
+            name: String?,
+            offset: Long,
+            lastOffset: Long,
+            offsetLag: Long = lastOffset - offset,
+            connectionName: String = "10.0.5.14:38812 -> 10.0.0.1:5552",
+            user: String? = "svc",
+            subscriptionId: Int = 0,
+            active: Boolean = true,
+        ) = ConsumerRow(
+            connectionName = connectionName, user = user, subscriptionId = subscriptionId, name = name, active = active,
+            activityStatus = if (active) "single_active" else "waiting", consumed = offset, credits = 10, offset = offset, offsetLag = offsetLag,
+        )
+
+        /** A publisher row; empty [connectionName] is a row that has just attached (zero counters). */
+        fun publisher(
+            reference: String?,
+            published: Long = 0,
+            confirmed: Long = published,
+            errored: Long = 0,
+            connectionName: String = "10.0.4.21:51234 -> 10.0.0.1:5552",
+            user: String? = "svc",
+            publisherId: Int = 0,
+        ) = PublisherRow(connectionName, user, publisherId, reference, published, confirmed, errored)
 
         /** A stream row with the values of the recorded fixtures (`queues-page-one-stream.json`) unless overridden. */
         fun stream(
