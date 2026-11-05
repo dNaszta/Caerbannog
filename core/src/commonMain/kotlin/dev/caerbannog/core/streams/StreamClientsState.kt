@@ -98,6 +98,12 @@ object StreamClientsTexts {
     const val PLUGIN_MISSING: String = "The stream management plugin is not enabled. Enable rabbitmq_stream_management on the broker."
     const val STREAM_GONE: String = "This stream no longer exists."
     const val LOAD_FAILED: String = "Publishers and consumers could not be loaded."
+    const val NO_PUBLISHERS: String = "There are no publishers on this stream."
+    const val NO_CONSUMERS: String = "There are no consumers on this stream."
+    const val LAST_OFFSET_LABEL: String = "Last offset on the stream:"
+    const val BACK_TO_STREAMS: String = "Back to streams"
+    const val FOOTNOTE: String = "Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher " +
+        "than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0."
 }
 
 /** Something the connection control can refresh and age: the shown screen's view model (M2-06 brief item 6). */

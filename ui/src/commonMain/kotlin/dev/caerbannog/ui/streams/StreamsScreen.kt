@@ -90,7 +90,7 @@ fun StreamsScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
-    /** The name cell of a row is a link: click or Enter calls this with the stream name (M2-06b; compile stub, not used yet). */
+    /** The name cell of a row is a link: click or Enter calls this with the stream name (M2-06b). */
     onOpenStream: (String) -> Unit = {},
 ) {
     val currentEvents by rememberUpdatedState(events)
@@ -105,7 +105,7 @@ fun StreamsScreen(
         onNavigate = onNavigate,
         actions = { StreamsActions(state, nowMillis, createStream, events) },
     ) {
-        StreamsBody(state, createStream, events)
+        StreamsBody(state, createStream, events, onOpenStream)
     }
 }
 
@@ -162,9 +162,9 @@ private fun CreateStreamButton(gate: CreateStreamGate, onClick: () -> Unit, modi
 }
 
 @Composable
-private fun StreamsBody(state: StreamListState, gate: CreateStreamGate, events: StreamListEvents) {
+private fun StreamsBody(state: StreamListState, gate: CreateStreamGate, events: StreamListEvents, onOpen: (String) -> Unit) {
     when (val screen = state.screen) {
-        StreamListScreen.Rows -> StreamsRowsView(state, events)
+        StreamListScreen.Rows -> StreamsRowsView(state, events, onOpen)
         StreamListScreen.Loading -> Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
             StreamsTable(rows = null, state = state, onSort = events::setSort)
         }
@@ -180,7 +180,7 @@ private fun StreamsBody(state: StreamListState, gate: CreateStreamGate, events: 
 
 /** A centred message, with an optional action under it. */
 @Composable
-private fun Message(text: String?, action: (@Composable () -> Unit)? = null) {
+internal fun Message(text: String?, action: (@Composable () -> Unit)? = null) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (text != null) Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
@@ -190,22 +190,22 @@ private fun Message(text: String?, action: (@Composable () -> Unit)? = null) {
 }
 
 @Composable
-private fun StreamsRowsView(state: StreamListState, events: StreamListEvents) {
+private fun StreamsRowsView(state: StreamListState, events: StreamListEvents, onOpen: (String) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         state.banner?.let { LostConnectionBanner(it, state.action ?: StreamListTexts.RETRY, events::retry) }
         StreamsSearchField(state.filter, events::setFilter)
-        Box(Modifier.weight(1f).fillMaxWidth()) { StreamsTable(state.rows, state, events::setSort) }
+        Box(Modifier.weight(1f).fillMaxWidth()) { StreamsTable(state.rows, state, events::setSort, onOpen) }
         StreamsFooter(state, events)
     }
 }
 
 /** The lost-connection banner (D2): the rows below stay, dimmed; the user decides when to retry. */
 @Composable
-private fun LostConnectionBanner(message: String, action: String, onRetry: () -> Unit) {
+internal fun LostConnectionBanner(message: String, action: String, onRetry: () -> Unit, tag: String = "streamsBanner") {
     Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
             Modifier
-                .testTag("streamsBanner")
+                .testTag(tag)
                 // The row carries the message itself (a polite live region says it when it appears); the visible text is hidden from
                 // the tree so it is not read twice.
                 .semantics { text = AnnotatedString(message); liveRegion = LiveRegionMode.Polite }
