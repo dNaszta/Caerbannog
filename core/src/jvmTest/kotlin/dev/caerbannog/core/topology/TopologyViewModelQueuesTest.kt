@@ -318,4 +318,49 @@ class TopologyViewModelQueuesTest {
         assertEquals(listOf("q-00", "q-01", "q-02"), s.names())
         assertEquals("1 to 3 of 3", s.state.rangeText)
     }
+
+    // --- step 4 exploratory: the `many` vhost of the dev broker, 1000 quorum queues ---
+
+    @Test
+    fun `a 1000 queue vhost pages and searches in memory with two broker calls per tick`() = runTest {
+        val s = TopologyHarness(this, pageSize = 50)
+        s.quorumQueues(1000, prefix = "many-queue-")
+        s.open()
+        assertEquals(listOf("queues /|1", "queues /|2"), s.requests().filter { it.startsWith("queues") })
+        assertEquals("1 to 50 of 1000", s.state.rangeText)
+        s.vm.setPage(20)
+        s.settle()
+        assertEquals("951 to 1000 of 1000", s.state.rangeText)
+        assertFalse(s.state.hasNextPage)
+
+        s.vm.setSearch("many-queue-999")
+        s.settle()
+        assertEquals(listOf("many-queue-999"), s.names())
+        s.vm.setSearch("queue-5")
+        s.settle()
+        assertEquals(1, s.state.page)
+        assertEquals(110, s.state.total, "queue-50..59 and queue-500..599 (single digits are zero padded)")
+        s.forgetRequests()
+        s.pass(5)
+        assertEquals(2, s.count("queues"), "a tick reads both broker pages again")
+    }
+
+    @Test
+    fun `a vhost list that answers badly keeps the previous list, and one that recovers replaces it`() = runTest {
+        val s = TopologyHarness(this)
+        s.topology.declareVhost("billing")
+        s.quorumQueues(1)
+        s.open()
+        assertEquals(listOf("/", "billing"), s.state.vhosts)
+
+        s.topology.failCall("vhosts", dev.caerbannog.core.streams.CatalogResult.Unexpected)
+        s.topology.declareVhost("newcomer")
+        s.pass(5)
+        assertEquals(listOf("/", "billing"), s.state.vhosts, "the previous list stays")
+        assertTrue(s.state.showVhostSwitch)
+
+        s.topology.clearFailures()
+        s.pass(5)
+        assertEquals(listOf("/", "billing", "newcomer"), s.state.vhosts)
+    }
 }
