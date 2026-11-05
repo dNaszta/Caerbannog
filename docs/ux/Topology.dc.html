@@ -28,15 +28,15 @@ body{margin:0}
 <h1>Topology</h1>
 <span class="t-bs dim">Updated 8 s ago</span>
 <button class="iconbtn" type="button" aria-label="Refresh"><span class="ms" aria-hidden="true">refresh</span></button>
-<button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">add</span>New migration</button>
 <button class="connchip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Connection prod-eu, Connected, topology locked. Open connection menu"><span class="ms sm" aria-hidden="true" style="color:var(--ok,#386A20)">link</span><span class="nm">prod-eu</span><span class="pill bad"><span class="ms sm" aria-hidden="true">lock</span>Topology locked</span><span class="ms" aria-hidden="true">arrow_drop_down</span></button>
 </header>
 <div class="content">
 <div class="tabs"><span class="tab on">Queues</span><span class="tab">Exchanges</span><span class="tab">Bindings</span></div>
-<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div><b>Topology is locked on this connection.</b> The permission check found no configure permission for svc-explorer on virtual host /, so queues, exchanges and bindings are read-only.</div></div>
+<div id="banner-no-configure" class="banner err"><span class="ms" aria-hidden="true">lock</span><div><b>Topology is locked on this connection.</b> The permission check found no configure permission for svc-explorer on virtual host /, so queues, exchanges and bindings are read-only.</div></div>
 <div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
 <section style="flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<button class="chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Virtual host /. Choose a virtual host" style="height:48px"><span class="ms sm" aria-hidden="true">dns</span>Virtual host&nbsp;<b class="mono">/</b><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button>
 <div class="search" style="height:48px"><span class="ms" aria-hidden="true">search</span><span>Search queues</span></div>
 <span class="chip on"><span class="ms sm" aria-hidden="true">check</span>Quorum</span>
 <span class="chip">Other types</span>
@@ -51,7 +51,6 @@ body{margin:0}
 <th class="r">Consumers</th>
 <th>Leader</th>
 <th>Members online</th>
-<th></th>
 </tr>
 </thead>
 <tbody>
@@ -62,7 +61,6 @@ body{margin:0}
 <td class="r">3</td>
 <td class="mono">rabbit@node-1</td>
 <td><span class="pill ok">3 of 3</span></td>
-<td class="r"><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
 </tr>
 <tr>
 <td class="t-ts">invoices</td>
@@ -71,7 +69,6 @@ body{margin:0}
 <td class="r">2</td>
 <td class="mono">rabbit@node-2</td>
 <td><span class="pill ok">3 of 3</span></td>
-<td class="r"><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
 </tr>
 <tr>
 <td class="t-ts">notifications</td>
@@ -80,7 +77,6 @@ body{margin:0}
 <td class="r">1</td>
 <td class="mono">rabbit@node-3</td>
 <td><span class="pill warn">2 of 3</span></td>
-<td class="r"><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
 </tr>
 <tr>
 <td class="t-ts">legacy-orders</td>
@@ -89,12 +85,11 @@ body{margin:0}
 <td class="r">0</td>
 <td class="mono">rabbit@node-1</td>
 <td><span class="pill ok">3 of 3</span></td>
-<td class="r"><button class="iconbtn" type="button" aria-label="More actions"><span class="ms" aria-hidden="true">more_vert</span></button></td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="t-bs dim">Queue messages are never read here. The app shows topology and statistics only.</div>
+<div class="t-bs dim" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px"><span>Queue messages are never read here. The app shows topology and statistics only. Counts are approximate.</span><span style="flex-grow:1"></span><span>1 to 4 of 4</span><button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button><button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button></div>
 </section>
 <aside class="sheet">
 <div style="display:flex;align-items:center;gap:8px"><span class="t-tm" style="flex-grow:1">orders</span><span class="pill">Quorum queue</span></div>
@@ -106,14 +101,80 @@ body{margin:0}
 <div class="kv"><span>Policy</span><span>quorum-default</span></div>
 <div class="kv" style="border-bottom:0"><span>Binding</span><span class="mono">events → orders</span></div>
 </div>
-<div class="banner info"><span class="ms" aria-hidden="true">info</span><div class="t-bs">Edit and delete are locked because this user has no configure permission. Add the queue to a migration file to apply on a connection that allows it.</div></div>
-<div style="display:flex;flex-wrap:wrap;gap:8px">
-<button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">lock</span>Edit policy</button>
-<button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">lock</span>Delete queue</button>
-</div>
-<button class="btn tonal lead" type="button" style="align-self:flex-start"><span class="ms sm" aria-hidden="true">account_tree</span>Add to migration</button>
 </aside>
 </div>
+</div>
+<div class="content" style="padding-top:0">
+<div class="t-tl" style="margin:8px 0">Other states and tabs (M2-08c). Decided by the product owner 2026-11-05: T1 every visible virtual host, T4 no write control, T5 second banner reason. The block above is the Queues tab with the virtual host switch. In M2 there is no row menu, no Edit, Delete, Add binding, Add to migration and no New migration anywhere.</div>
+
+<section id="tab-exchanges" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Exchanges tab</div>
+<div class="tabs"><span class="tab">Queues</span><span class="tab on">Exchanges</span><span class="tab">Bindings</span></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><button class="chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Virtual host /. Choose a virtual host" style="height:48px"><span class="ms sm" aria-hidden="true">dns</span>Virtual host&nbsp;<b class="mono">/</b><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button><div class="search" style="height:48px"><span class="ms" aria-hidden="true">search</span><span>Search exchanges</span></div></div>
+<div class="tscroll"><table class="tbl" style="min-width:720px"><thead><tr><th>Name</th><th>Type</th><th>Durable</th><th>Auto-delete</th><th>Internal</th><th></th></tr></thead><tbody>
+<tr><td class="t-ts">(default exchange)</td><td>direct</td><td>yes</td><td>no</td><td>no</td><td></td></tr>
+<tr><td class="t-ts">dev.events</td><td>topic</td><td>yes</td><td>no</td><td>no</td><td></td></tr>
+<tr><td class="t-ts">dev.fanout</td><td>fanout</td><td>yes</td><td>no</td><td>no</td><td></td></tr>
+<tr><td class="t-ts">orders</td><td>direct</td><td>yes</td><td>no</td><td>no</td><td><span class="pill">Super stream</span></td></tr>
+</tbody></table></div>
+<div class="t-bs dim">Name, type and flags as the broker reports them. A direct exchange with the super stream marker shows the pill (its partitions are on the stream list). The default exchange is listed here; its bindings are hidden on the Bindings tab.</div>
+</section>
+
+<section id="tab-bindings-table" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Bindings tab, table (a graph view is a later design, task M2-08d)</div>
+<div class="tabs"><span class="tab">Queues</span><span class="tab">Exchanges</span><span class="tab on">Bindings</span></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><button class="chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Virtual host /. Choose a virtual host" style="height:48px"><span class="ms sm" aria-hidden="true">dns</span>Virtual host&nbsp;<b class="mono">/</b><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button><div class="search" style="height:48px"><span class="ms" aria-hidden="true">search</span><span>Search bindings</span></div><span style="flex-grow:1"></span><span style="display:inline-flex;align-items:center;gap:8px" class="t-bs">Show default exchange<span role="switch" aria-checked="false" aria-label="Show default exchange" class="ms">toggle_off</span></span></div>
+<div class="tscroll"><table class="tbl" style="min-width:820px"><thead><tr><th>Source</th><th>Destination</th><th>Destination type</th><th>Routing key</th><th>Arguments</th></tr></thead><tbody>
+<tr><td class="t-ts">dev.events</td><td>dev-jobs</td><td>queue</td><td class="mono">job.#</td><td class="mono">{}</td></tr>
+<tr><td class="t-ts">dev.events</td><td>dev-mail</td><td>queue</td><td class="mono">mail.*</td><td class="mono">{}</td></tr>
+<tr><td class="t-ts">dev.events</td><td>dev.fanout</td><td>exchange</td><td class="mono">#</td><td class="mono">{}</td></tr>
+<tr><td class="t-ts">orders</td><td>orders-0</td><td>queue</td><td class="mono">0</td><td class="mono">{"x-stream-partition-order": 0}</td></tr>
+</tbody></table></div>
+<div class="t-bs dim">Default off: the default exchange and the implicit binding of every queue to it are hidden (one row per queue, 1000 on a big virtual host). With the switch on they appear with source "(default exchange)" and the queue name as routing key. A destination that is an exchange says "exchange". Paged like the other lists; values are selectable text.</div>
+</section>
+
+<section id="vhost-menu" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Virtual host switch, open</div>
+<div class="popup" role="menu" style="position:static;width:320px"><div class="sec">Virtual hosts</div>
+<div class="row on" role="menuitemradio" aria-checked="true"><span class="ms sm" aria-hidden="true">check</span><div style="flex:1"><div class="mono">/</div><div class="t-bs">This connection's virtual host</div></div></div>
+<div class="row" role="menuitemradio" aria-checked="false"><span class="ms sm" aria-hidden="true"></span><div style="flex:1"><div class="mono">billing</div></div></div>
+<div class="row" role="menuitemradio" aria-checked="false"><span class="ms sm" aria-hidden="true"></span><div style="flex:1"><div class="mono">many</div></div></div></div>
+<div class="t-bs dim">One virtual host at a time, starting on the connection's own. The list is the broker's: the connection's virtual host first, then alphabetical. Virtual hosts are NOT marked for permissions: the app cannot read them for a non-administrator, and a monitoring or administrator user is listed every virtual host, so one without permission opens the "not available" state below. Shown only when the list could be read (a user without the management tag gets the no-tag message and no switch). Switching clears the table and loads the chosen virtual host; the choice is not saved and resets when the connection changes.</div>
+</section>
+
+<section id="state-empty" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Empty virtual host</div>
+<div class="tscroll" style="padding:32px;text-align:center"><span class="ms" aria-hidden="true" style="color:var(--on-surface-variant)">inbox</span><div class="t-bs">There are no queues in this virtual host yet.</div></div>
+<div class="t-bs dim">No action (nothing can be created in M2). Same pattern on Exchanges ("no exchanges") and Bindings ("no bindings"). Loading: the table frame with "loading..." cells, never blank.</div>
+</section>
+
+<section id="state-vhost-unavailable" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Virtual host not available (R2)</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">block</span><div><b>Virtual host billing is not available to this user.</b> It may have been deleted, or the user may have no permission on it.</div></div>
+<div class="t-bs dim">The broker answers 404 for both cases. No table and no filters; the virtual host switch stays so the user can choose another one. The rows of that virtual host are dropped, not dimmed: dimming is only for a lost connection. Exact text: "Virtual host billing is not available to this user. It may have been deleted, or the user may have no permission on it."</div>
+</section>
+
+<section id="state-stale" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Connection lost (D2): stale rows</div>
+<div class="banner err"><span class="ms" aria-hidden="true">cloud_off</span><div style="flex:1"><b>Connection lost.</b> The rows below are the last ones read.</div><button class="btn text" type="button">Retry</button></div>
+<div class="tscroll" style="opacity:.6"><table class="tbl" style="min-width:760px"><thead><tr><th>Name</th><th class="r">Ready</th><th class="r">Unacked</th><th class="r">Consumers</th><th>Leader</th><th>Members online</th></tr></thead><tbody><tr><td class="t-ts">orders</td><td class="r">1,240</td><td class="r">12</td><td class="r">3</td><td class="mono">rabbit@node-1</td><td><span class="pill ok">3 of 3</span></td></tr></tbody></table></div>
+<div class="t-bs dim">Same banner, Retry and dimmed rows as the stream list (Streams.dc.html); the screen never reconnects by itself. The app bar's "Updated ... ago" keeps counting.</div>
+</section>
+
+<section id="banner-reasons" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Banner reasons above the tabs (one banner, first match wins in this order)</div>
+<div class="t-bs dim">1. No configure permission on the connection's virtual host (top of this page, id banner-no-configure). 2. Declared, not confirmed. 3. Connection level Read-only (T5). 4. Another virtual host (R6). 5. Nothing to say: no banner.</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">info</span><div><b>Topology is locked on this connection.</b> You declared that svc-explorer can change topology; the broker could not confirm the permissions and still enforces its own.</div></div>
+<div class="banner info"><span class="ms" aria-hidden="true">lock</span><div><b>This connection is set to read-only.</b> Its topology level is Read-only, so nothing here can be changed whatever the broker allows. Change the level in the connection's settings.</div></div>
+<div class="banner info"><span class="ms" aria-hidden="true">dns</span><div>Permissions were checked on virtual host <b class="mono">/</b> only. This virtual host is shown read-only.</div></div>
+<div class="t-bs dim">The screen is read-only in M2 in every case; the banner only says why. From M5, topology changes are limited to the connection's own virtual host. The texts are the core strings asserted by the scenarios in 02 and 09.</div>
+</section>
+
+<section id="state-no-tag" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">User without the management tag</div>
+<div class="banner err"><span class="ms" aria-hidden="true">block</span><div>This user cannot read topology. Ask for the management tag.</div></div>
+<div class="t-bs dim">No tabs content, no table, no filters and no virtual host switch (the broker refuses the virtual host list too).</div>
+</section>
 </div>
 </main>
 </div>
