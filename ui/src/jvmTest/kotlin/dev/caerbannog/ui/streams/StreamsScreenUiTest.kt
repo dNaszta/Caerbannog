@@ -335,7 +335,8 @@ class StreamsScreenUiTest {
         val shown = screen(rowsState(updatedAtMillis = 1_000), nowMillis = 13_000)
         onNode(hasTestTag("updatedAge").and(hasText("Updated 12 s ago")), useUnmergedTree = true).assertExists()
 
-        shown.now = 500
+        // 5 s back (not 500 ms: integer division would turn -0.5 s into 0 and hide a missing coerceAtLeast).
+        shown.now = -4_000
         waitForIdle()
         onNode(hasTestTag("updatedAge").and(hasText("Updated 0 s ago")), useUnmergedTree = true).assertExists("a clock that went back never shows a negative age")
 
