@@ -29,6 +29,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.streams.ConsumerRowState
@@ -59,6 +61,7 @@ class StreamClientsLazyUiTest {
 
         /** Composed rows allowed at 1280x800 (about 8 are visible): the buffer of the list plus slack. */
         const val MAX_COMPOSED_ROWS = 100
+        const val ROWS_IN_FOCUS_TEST = 300
         const val WIDTH = 1280
         const val HEIGHT = 800
     }
@@ -244,20 +247,26 @@ class StreamClientsLazyUiTest {
 
     @Test
     fun `a refresh with the same keys keeps the focus and the open popup, and a row that scrolled out comes back closed and unfocused`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
-        val shown = clientsScreen(content(consumers = rows(300)))
+        val shown = clientsScreen(content(consumers = rows(ROWS_IN_FOCUS_TEST)))
         waitForIdle()
         onNodeWithTag("statusHint:c0", useUnmergedTree = true).requestFocus()
         waitForIdle()
         onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertExists()
 
-        shown.state = content(consumers = rows(300, offset = "555"))
+        shown.state = content(consumers = rows(ROWS_IN_FOCUS_TEST, offset = "555"))
         waitForIdle()
         consumerCell("c0", "Offset").assertTextEquals("555")
         onNodeWithTag("statusHint:c0", useUnmergedTree = true).assertIsFocused()
         onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertTextEquals(HINT_TEXT)
 
+        // Pinned (Compose behaviour, fine for keyboard users): a lazy item that holds the focus is kept composed while the list scrolls away.
         scrollToEnd()
-        assertTrue(!exists("statusHint:c0"), "the row scrolled out of the composition")
+        assertTrue(exists("statusHint:c0"), "a row that holds the focus stays composed when scrolled far away")
+        onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertExists("its open popup stays with it")
+        // Move the focus to a row at the end: the first row is no longer held, so it leaves the composition and comes back closed.
+        consumerCell("c${ROWS_IN_FOCUS_TEST - 1}", "Name").requestFocus()
+        waitForIdle()
+        assertTrue(!exists("statusHint:c0"), "the unfocused row scrolled out of the composition")
         scrollToTop()
         onNodeWithTag("statusHint:c0", useUnmergedTree = true).assertIsNotFocused()
         onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertDoesNotExist()
@@ -344,5 +353,50 @@ class StreamClientsLazyUiTest {
         consumerCell("c#1", "Name").assertTextEquals("k-shared")
         consumerCell("#0", "Name").assertTextEquals("k-new-1")
         consumerCell("#0~2", "Name").assertTextEquals("k-new-2")
+    }
+
+    // --- 10 (verify round) ---------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `in a narrow window the header and the rows of a table scroll sideways together, and never past the last column`() = runDesktopComposeUiTest(700, HEIGHT) {
+        clientsScreen(content(consumers = rows(40)))
+        waitForIdle()
+        val headerBefore = bounds("consumersHeader:Connection")
+        assertEquals(headerBefore.left, bounds("consumerCell:c0:Connection").left, "header and row columns line up before scrolling")
+
+        onNodeWithTag("consumersHeader:Connection", useUnmergedTree = true).performTouchInput { swipeLeft(startX = centerX, endX = centerX - 60f, durationMillis = 200) }
+        waitForIdle()
+        val headerAfter = bounds("consumersHeader:Connection")
+        assertTrue(headerAfter.left < headerBefore.left, "the header scrolled sideways: $headerBefore -> $headerAfter")
+        assertEquals(headerAfter.left, bounds("consumerCell:c0:Connection").left, "the first row moved with the header")
+        assertEquals(headerAfter.left, bounds("consumerCell:c5:Connection").left, "a lower visible row moved with the header")
+
+        onNodeWithTag("consumersHeader:Connection", useUnmergedTree = true).performTouchInput { swipeLeft(startX = right - 1f, endX = 1f, durationMillis = 100); swipeLeft(startX = right - 1f, endX = 1f, durationMillis = 100); swipeLeft(startX = right - 1f, endX = 1f, durationMillis = 100) }
+        waitForIdle()
+        val view = list().fetchSemanticsNode().boundsInRoot
+        val status = bounds("consumersHeader:Status")
+        assertEquals(status.left, bounds("consumerCell:c0:Status").left, "the rows are at the same place as the header at the far end")
+        assertTrue(status.right <= view.right + 1f && status.right >= view.right - 40f, "scrolled to the end, the last column ends at the viewport edge (not past it, not short of it): $status vs $view")
+    }
+
+    // --- 11 (verify round) ---------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `Tab from the last composed row reaches rows below the fold`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows(300)))
+        waitForIdle()
+        val composedBefore = names().toSet()
+        val last = names().last()
+        consumerCell(last, "Name").requestFocus()
+        waitForIdle()
+        val reached = mutableSetOf<String>()
+        repeat(12) {
+            onRoot().performKeyInput { keyDown(Key.Tab); keyUp(Key.Tab) }
+            waitForIdle()
+            onAllNodes(SemanticsMatcher("focused") { it.config.getOrNull(SemanticsProperties.Focused) == true }, useUnmergedTree = true)
+                .fetchSemanticsNodes().forEach { reached += tag(it) }
+        }
+        val newRows = reached.filter { it.startsWith("consumerCell:") }.map { it.split(":")[1] }.filter { it !in composedBefore }
+        assertTrue(newRows.isNotEmpty(), "Tab never reached a row that was not composed at first (from $last); focused: $reached")
     }
 }
