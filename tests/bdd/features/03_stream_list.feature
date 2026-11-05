@@ -105,8 +105,8 @@ Feature: Stream list
     When I search the list for "orders"
     Then only "orders-events" is listed
 
-  # Super streams are listed by M2-07; until then this scenario is pending (tag @needs-M2, see README).
-  @fake-broker @needs-M2
+  # M2-07: super streams are listed; the Given is shared with 06_super_streams.feature.
+  @fake-broker
   Scenario: Filter by kind
     Given a stream "audit-log" and a super stream "orders" with 3 partitions exist
     When I choose the "Super streams" filter
