@@ -56,6 +56,12 @@ class FakeTopologyCatalog : TopologyCatalog {
     /** Names of the calls in order: "vhosts", "queues", "exchanges", "bindings", "queueDetail". */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
+    /**
+     * M2-08b: every call with its arguments, in order: `vhosts`, `queues /|1`, `exchanges /`, `bindings /`, `queueDetail /|name`
+     * (the vhost as given, `|` before the page or name). Lets a test say WHICH vhost and which page the app asked for.
+     */
+    val requests: MutableList<String> = Collections.synchronizedList(ArrayList())
+
     private val holds = ConcurrentHashMap<String, CallGate>()
     private val pageFailures = ConcurrentHashMap<Int, CatalogResult.Failure>()
     private val callFailures = ConcurrentHashMap<String, CatalogResult.Failure>()
@@ -98,6 +104,9 @@ class FakeTopologyCatalog : TopologyCatalog {
         synchronized(queueEntries) { queueEntries.removeAll { it.vhost == vhost && it.name == name } }
     }
 
+    /** The queue as the fake holds it now (test accessor, not a broker call: it is not recorded). Null when missing or a stream. */
+    fun queueRow(name: String, vhost: String = "/"): QueueRow? = synchronized(queueEntries) { queueEntries.firstOrNull { it.vhost == vhost && it.name == name }?.row }
+
     fun addExchange(row: ExchangeRow): FakeTopologyCatalog = apply {
         vhosts += row.vhost
         synchronized(exchangeRows) {
@@ -120,8 +129,9 @@ class FakeTopologyCatalog : TopologyCatalog {
     }
 
     // The tag is checked before the vhost: a user without the tag gets 401 for a missing vhost too.
-    private fun refusal(call: String, vhost: String?): CatalogResult.Failure? {
+    private fun refusal(call: String, vhost: String?, detail: String = ""): CatalogResult.Failure? {
         calls += call
+        requests += listOfNotNull(call, vhost).joinToString(" ") + detail
         return when {
             unreachable -> CatalogResult.Unreachable
             !hasManagementTag -> CatalogResult.NotAuthorised
@@ -147,7 +157,7 @@ class FakeTopologyCatalog : TopologyCatalog {
     override suspend fun queues(vhost: String, page: Int): CatalogResult<QueuePage> = late("queues", computeQueues(vhost, page))
 
     private fun computeQueues(vhost: String, page: Int): CatalogResult<QueuePage> {
-        refusal("queues", vhost)?.let { return it }
+        refusal("queues", vhost, "|$page")?.let { return it }
         pageFailures[page]?.let { return it }
         val all = synchronized(queueEntries) { queueEntries.filter { it.vhost == vhost } }.sortedBy { it.name }
         val size = TopologyCatalog.QUEUE_PAGE_SIZE
@@ -176,7 +186,7 @@ class FakeTopologyCatalog : TopologyCatalog {
     }
 
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> {
-        refusal("queueDetail", vhost)?.let { return it }
+        refusal("queueDetail", vhost, "|$name")?.let { return it }
         val found = synchronized(queueEntries) { queueEntries.firstOrNull { it.vhost == vhost && it.name == name }?.row }
         return late("queueDetail", found?.let { CatalogResult.Success(it) } ?: CatalogResult.NotFound)
     }

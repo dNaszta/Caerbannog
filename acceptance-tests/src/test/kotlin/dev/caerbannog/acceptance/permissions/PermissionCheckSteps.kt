@@ -269,6 +269,25 @@ class PermissionCheckSteps {
         assertTrue(checkNotNull(result).canBrowseStreams, "reading streams must never depend on the permission check")
     }
 
+    // M2-08b: "Listing streams does not need the configure permission" (the browse half of the old scenario is @needs-M3 and has no step).
+    // The step runs the REAL stream list view model on the connection the scenario opened with the locked permission result: reading streams
+    // must not depend on the check (`canBrowseStreams` is true in every case) and the list must come out all the same.
+    @Then("I can list streams")
+    fun iCanListStreams() {
+        val checked = checkNotNull(result) { "no permission check result: the scenario must connect first" }
+        assertFalse(checked.topologyUnlocked, "precondition: the user has no configure permission, got $checked")
+        assertTrue(checked.canBrowseStreams, "reading streams must never depend on the permission check")
+        gateway.catalogOf(profile.name).addStream(dev.caerbannog.core.connections.fakes.FakeStreamCatalog.stream("orders"))
+        val list = StreamListViewModel(
+            active = active, settings = FakeAppSettings(), scope = test.backgroundScope,
+            clock = RefreshClock { test.testScheduler.currentTime }, reconnect = viewModel::connect,
+        )
+        list.setShown(true)
+        test.runCurrent()
+        assertEquals(listOf("orders"), list.state.value.rows.map { it.name }, "the stream list with a locked topology, screen ${list.state.value.screen}")
+        list.close()
+    }
+
     // --- M1-07: what the sidebar pill and the edit panel banner say (core level) --------------------
 
     @Given("the user has no configure permission on {string}")

@@ -99,8 +99,8 @@ Feature: Permission check before the first connection
     Then the app bar shows "prod-eu" as the current connection
     And the app bar shows "Topology locked" next to "prod-eu"
 
-  # Split by M2-08 (2026-11-05): the list half is real since M2-05 and runs in M2-08b; the browse half needs the M3 browser.
-  @fake-broker @needs-M2
+  # Split by M2-08 (2026-11-05): the list half runs since M2-08b; the browse half needs the M3 browser.
+  @fake-broker
   Scenario: Listing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
