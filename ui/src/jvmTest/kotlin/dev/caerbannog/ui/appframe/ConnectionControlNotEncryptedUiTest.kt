@@ -18,6 +18,8 @@ import dev.caerbannog.core.connections.ConnectionChipState
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.ConnectionRowState
+import dev.caerbannog.core.connections.PermissionPill
+import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.RefreshSectionState
 import dev.caerbannog.core.connections.RowAction
 import dev.caerbannog.core.streams.RefreshInterval
@@ -136,5 +138,45 @@ class ConnectionControlNotEncryptedUiTest {
         val w = warning.boundsInRoot
         assertTrue(w.width > 0f && w.height > 0f, "the warning must be laid out, not squeezed to nothing: $w")
         assertTrue(w.right <= chipBounds.right + 1f, "the warning ($w) must stay inside the chip ($chipBounds); the name ellipsizes, the warning does not")
+    }
+
+    // --- M2-14a R1: the chip keeps the connection name at the default window width ------------------------------------------
+
+    private fun pillChip(name: String) = ConnectionChipState(
+        ChipState.Connected, ChipIcon.Link, name, null, PermissionPill("Topology locked", PillTone.LOCKED), null,
+        "Connection $name, Connected, topology locked, Not encrypted. Open connection menu", false, notEncrypted = true,
+    )
+
+    /** The name text of the chip: how many characters are visible and whether the layout ellipsised them. */
+    private fun DesktopComposeUiTest.nameVisibility(name: String): Pair<Int, Boolean> {
+        val node = onNode(hasText(name).and(hasAnyAncestor(hasTestTag("connectionChip"))), useUnmergedTree = true).fetchSemanticsNode()
+        val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        node.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)?.action?.invoke(results)
+        val layout = results.single()
+        return layout.getLineEnd(0, visibleEnd = true) to layout.isLineEllipsized(0)
+    }
+
+    @Test
+    fun `at the default window size a chip for prod-eu Connected with the pill and Not encrypted shows the whole name`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { AppFrame("Streams", state(pillChip("prod-eu")), Quiet()) { androidx.compose.material3.Text("the screen") } }
+        waitForIdle()
+
+        val (visible, ellipsised) = nameVisibility("prod-eu")
+        assertTrue(!ellipsised && visible == "prod-eu".length, "the name must be fully shown, got $visible of 7 characters, ellipsised=$ellipsised")
+        assertTrue(has("chipPill", under = "connectionChip"), "the permission pill is not dropped")
+        onNode(hasTestTag("chipNotEncrypted").and(hasText("Not encrypted")), useUnmergedTree = true).assertExists("Not encrypted is not abbreviated")
+    }
+
+    @Test
+    fun `at the default window size a 24 character name shows at least 12 characters, with the pill and Not encrypted`() = runDesktopComposeUiTest(1280, 880) {
+        val name = "production-eu-frankfurt1" // 24 characters
+        assertEquals(24, name.length)
+        setContent { AppFrame("Streams", state(pillChip(name)), Quiet()) { androidx.compose.material3.Text("the screen") } }
+        waitForIdle()
+
+        val (visible, _) = nameVisibility(name)
+        assertTrue(visible >= 12, "at least 12 of 24 characters of the name must be visible, got $visible")
+        assertTrue(has("chipPill", under = "connectionChip"), "the permission pill is not dropped")
+        onNode(hasTestTag("chipNotEncrypted").and(hasText("Not encrypted")), useUnmergedTree = true).assertExists("Not encrypted is not abbreviated")
     }
 }

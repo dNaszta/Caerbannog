@@ -174,6 +174,45 @@ class ConnectionsScreenTlsUiTest {
         waitForIdle()
     }
 
+    // --- M2-14a R3: accessible names of the switches ------------------------------------------------------------------------------
+
+    /** The accessible name of a node: its ContentDescription, else its Text (merged tree, as a screen reader sees it). */
+    private fun SemanticsNode.accessibleName(): String =
+        (config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() + config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text })
+            .joinToString(" ")
+
+    private fun DesktopComposeUiTest.switches(): List<SemanticsNode> =
+        onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Switch)).fetchSemanticsNodes()
+
+    @Test
+    fun `the Use TLS switch has the accessible name Use TLS`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        tlsSwitch()
+        waitForIdle()
+
+        assertTrue(onAllNodes(hasTestTag("tlsSwitch"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(), "the tlsSwitch tag stays")
+        val names = switches().map { it.accessibleName() }
+        assertTrue(names.any { it.contains("Use TLS") }, "a screen reader must say what the TLS switch is for; the switch nodes are named: $names")
+        // and the node that carries that name is the one that toggles
+        onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Switch).and(hasText("Use TLS").or(androidx.compose.ui.test.hasContentDescription("Use TLS"))))
+            .performScrollTo().assertIsOn().performClick()
+        waitForIdle()
+        onNodeWithTag("notEncryptedWarning").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `the declaration switch has an accessible name`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        onNodeWithText("I know what this user may do on the broker").performScrollTo()
+        waitForIdle()
+
+        val names = switches().map { it.accessibleName() }
+        assertTrue(
+            names.any { it.contains("I know what this user may do on the broker") },
+            "a screen reader must say what the declaration switch is for; the switch nodes are named: $names",
+        )
+    }
+
     // --- the switch and the warning --------------------------------------------------------------------------------------------
 
     @Test

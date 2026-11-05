@@ -27,6 +27,8 @@ data class ConnectionProfileInput(
     val tls: Boolean? = null,
     val topologyControlLevel: TopologyControlLevel? = null,
     val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
+    /** M2-14a R2 (stub, no behaviour yet): add null = none; update null = keep, blank = clear, non-blank = stored only when Valid. */
+    val caCertificatePath: String? = null,
 )
 
 /**

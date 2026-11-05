@@ -203,6 +203,15 @@ Feature: Connection profiles
     And I check the connection "uat-eu"
     Then the check reports that both endpoints are reachable
 
+  # M2-14a R2: the form sends the CA path with Save, so a NEW connection keeps it (was a known gap: the path was dropped on add).
+  @fake-broker
+  Scenario: A new connection keeps the CA certificate typed in the form
+    Given the broker presents a certificate signed by a private CA
+    When I add a connection "uat-eu" with the private CA file typed in the form
+    Then the saved CA certificate path of "uat-eu" is the private CA file
+    When I check the connection "uat-eu"
+    Then the check reports that both endpoints are reachable
+
   # The result appears when the user leaves the field (and on Save), not per keystroke, and the file is read off the UI thread:
   # pinned by the Compose tests in ConnectionsScreenUiTest. Here the rule is the validation itself.
   @negative

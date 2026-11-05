@@ -235,17 +235,99 @@ class ConnectionsViewModelTlsTest {
         assertEquals(result, vm.state.value.lastCaCertificateValidationResult)
     }
 
-    // KNOWN GAP, characterisation (step 4 finding, not new in M2-14, same on main): ConnectionProfileInput has no CA field, so a NEW
-    // profile saved after typing a CA path in the form stores no CA; the path attaches only through setCaCertificate on a SAVED profile.
-    // If the architect decides to fix it, this test is the one to flip.
+    private class RejectingValidator : CaCertificateValidator {
+        val validated = mutableListOf<String>()
+        override fun validate(filePath: String): CaCertificateValidationResult {
+            validated += filePath
+            return CaCertificateValidationResult.Invalid("not a certificate")
+        }
+    }
+
+    private fun inputWithCa(ca: String?, tls: Boolean? = null) = input(tls = tls).copy(caCertificatePath = ca)
+
+    // M2-14a R2 (flipped from the step 4 KNOWN GAP characterisation): the CA path typed in the form is stored with a NEW profile.
     @Test
-    fun `KNOWN GAP a new connection saved with a CA path typed in the form stores no CA path`() {
+    fun `a new connection saved with a CA path typed in the form stores the CA path`() {
         assertEquals(CaCertificateValidationResult.Valid, viewModel.validateCaCertificateFile("/some/ca.pem"))
-        viewModel.addConnection(input(tls = true))
-        assertNull(saved().caCertificatePath)
-        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
-        assertEquals("/some/ca.pem", saved().caCertificatePath, "on a saved profile the path attaches")
+        viewModel.addConnection(inputWithCa("/some/ca.pem", tls = true))
+        assertEquals("/some/ca.pem", saved().caCertificatePath, "the path typed in the form is stored on add")
+        assertEquals(listOf("/some/ca.pem", "/some/ca.pem"), validator.validated.takeLast(2), "stored only after the validator said Valid")
         viewModel.updateConnection("uat-eu", input(tls = true))
         assertEquals("/some/ca.pem", saved().caCertificatePath, "and an edit without touching it keeps it")
+    }
+
+    @Test
+    fun `a new connection without a CA path has none`() {
+        viewModel.addConnection(inputWithCa(null))
+        assertNull(saved().caCertificatePath)
+    }
+
+    @Test
+    fun `an update with a null CA path keeps the saved path`() {
+        viewModel.addConnection(input())
+        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
+        viewModel.updateConnection("uat-eu", inputWithCa(null))
+        assertEquals("/some/ca.pem", saved().caCertificatePath)
+    }
+
+    @Test
+    fun `an update with a blank CA path clears the saved path`() {
+        viewModel.addConnection(input())
+        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
+        viewModel.updateConnection("uat-eu", inputWithCa(""))
+        assertNull(saved().caCertificatePath, "blank clears")
+        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
+        viewModel.updateConnection("uat-eu", inputWithCa("   "))
+        assertNull(saved().caCertificatePath, "whitespace only is blank too")
+    }
+
+    @Test
+    fun `an update with a valid new CA path stores it`() {
+        viewModel.addConnection(input())
+        viewModel.updateConnection("uat-eu", inputWithCa("/other/ca.pem"))
+        assertEquals("/other/ca.pem", saved().caCertificatePath)
+    }
+
+    @Test
+    fun `an invalid CA path is not stored on add, the message is shown and the save still succeeds`() {
+        val rejecting = RejectingValidator()
+        val vm = ConnectionsViewModel(repository, h.secrets, Reachable(), rejecting, h.session, h.active)
+        val result = vm.addConnection(inputWithCa("/not/a/cert.txt"))
+        assertIs<SaveConnectionResult.Saved>(result, "P8: Save itself goes through")
+        assertNull(saved().caCertificatePath, "an invalid path is never stored")
+        assertEquals(CaCertificateValidationResult.Invalid("not a certificate"), vm.state.value.lastCaCertificateValidationResult)
+    }
+
+    @Test
+    fun `an invalid CA path is not stored on update and does not replace the saved one, the save still succeeds`() {
+        viewModel.addConnection(input())
+        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
+        val rejecting = RejectingValidator()
+        val vm = ConnectionsViewModel(repository, h.secrets, Reachable(), rejecting, h.session, h.active)
+        val result = vm.updateConnection("uat-eu", input().copy(host = "other.example", caCertificatePath = "/not/a/cert.txt"))
+        assertIs<SaveConnectionResult.Saved>(result)
+        assertEquals("other.example", saved().host, "the rest of the edit was saved")
+        assertEquals("/some/ca.pem", saved().caCertificatePath, "the old valid path stays")
+        assertEquals(CaCertificateValidationResult.Invalid("not a certificate"), vm.state.value.lastCaCertificateValidationResult)
+    }
+
+    @Test
+    fun `a CA path is stored with TLS off too, and then the validator is not asked (O3)`() {
+        viewModel.addConnection(inputWithCa("/some/ca.pem", tls = false))
+        assertEquals("/some/ca.pem", saved().caCertificatePath, "kept but unused")
+        assertEquals(emptyList(), validator.validated, "with TLS off nothing is validated")
+    }
+
+    @Test
+    fun `an update that changes the CA path closes the held connection with the settings note`() {
+        viewModel.addConnection(input(tls = true))
+        h.secrets.store("uat-eu", PASSWORD)
+        runBlocking { withTimeout(5_000) { viewModel.connect("uat-eu") } }
+        assertIs<LinkState.Connected>(h.active.stateOf("uat-eu"))
+
+        viewModel.updateConnection("uat-eu", inputWithCa("/some/ca.pem", tls = true))
+
+        assertEquals("Connection settings changed. Connect again.", assertIs<LinkState.Disconnected>(h.active.stateOf("uat-eu")).note)
+        assertTrue(h.gateway.heldNow.isEmpty(), "the connection that trusted the old CA is closed")
     }
 }

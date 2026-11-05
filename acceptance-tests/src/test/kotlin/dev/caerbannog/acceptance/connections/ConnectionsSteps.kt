@@ -446,6 +446,27 @@ class ConnectionsSteps {
 
     // "and leave the field": the screen validates on focus loss and on Save, not per keystroke (ConnectionsScreenUiTest pins when and on
     // which thread); the step calls the same view model method the screen calls then.
+    @When("I add a connection {string} with the private CA file typed in the form")
+    fun iAddAConnectionWithThePrivateCaFileTypedInTheForm(name: String) {
+        val result = viewModel.addConnection(
+            ConnectionProfileInput(
+                name = name, host = "rabbit-$name.example.com", virtualHost = "/", username = "svc-explorer", password = "s3cret",
+                caCertificatePath = PRIVATE_CA_FIXTURE_PATH,
+            ),
+        )
+        check(result is SaveConnectionResult.Saved) { "Test setup failed: could not save '$name': $result" }
+        lastProfileName = name
+        lastPassword = "s3cret"
+    }
+
+    @Then("the saved CA certificate path of {string} is the private CA file")
+    fun theSavedCaCertificatePathIsThePrivateCaFile(name: String) {
+        assertEquals(
+            PRIVATE_CA_FIXTURE_PATH, viewModel.state.value.profiles.first { it.name == name }.caCertificatePath,
+            "the CA path typed in the form was not stored with the new connection",
+        )
+    }
+
     @When("I enter the path of a file that is not a valid certificate and leave the field")
     fun iEnterThePathOfAFileThatIsNotAValidCertificate() {
         lastCaCertificateResult = viewModel.validateCaCertificateFile(INVALID_CERTIFICATE_FIXTURE_PATH)
