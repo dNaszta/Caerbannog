@@ -2,7 +2,7 @@
 
 Milestone: M2 (follow-up of M2-06; may slip to the start of M3 with F-H)    Depends on: M2-06 (merged after the hand trial A1)    Size: M
 
-Status: briefed (architect, 2026-11-05, branch `f-c-lazy-clients-list`, docs only). The owner asked for it on 2026-11-05 ("F-C: a LazyColumn"); the M2-06 review had it as conditional. NEXT: step 2 (test developer): spike S-1 first, then the tests below (red), then step 3 build, step 4 verify, step 5 review. Not started in code. Decisions for the owner: D-FC1 and D-FC2 below.
+Status: briefed (architect, 2026-11-05, branch `f-c-lazy-clients-list`, docs only). F-H prep DONE (senior developer, 2026-11-05, D-FC2 (a)): `StreamScreen.kt` split as a pure move into `StreamScreen.kt` (230), `StreamClientsTables.kt` (281), `StreamStatusHint.kt` (102); no test edited; ui jvmTest 307/0 and desktopApp 58/0 before and after; the 9 `clients-*` screenshots byte-identical to HEAD; the two inline numbers are now `HintShadowElevation` and `HintPopupPadding`. The owner asked for it on 2026-11-05 ("F-C: a LazyColumn"); the M2-06 review had it as conditional. NEXT: step 2 (test developer): spike S-1 first, then the tests below (red), then step 3 build, step 4 verify, step 5 review. Not started in code. Decisions for the owner: D-FC1 and D-FC2 below.
 
 ## Goal
 The Publishers and consumers tab composes only the rows that are on screen (plus a small buffer) however many clients a stream has; header, status hint, keyboard hint popup, copy, scroll position and screenshots behave exactly as today.
