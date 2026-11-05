@@ -290,6 +290,28 @@ class StreamListViewModelSuperStreamTest {
         assertEquals(listOf("orders"), s.names(), "collapsed again after disconnect and connect")
     }
 
+    // Architect ruling 3: queue and exchange names are separate namespaces, both are listed.
+    @Test
+    fun `a plain stream and a super stream both named orders are two rows, the plain one first, and toggle expands the super stream only`() = runTest {
+        val s = StreamListHarness(this)
+        s.addStream("orders")
+        s.superStream("orders", listOf("orders-p0", "orders-p1"))
+        s.open()
+
+        assertEquals(listOf("orders", "orders"), s.names())
+        assertEquals(listOf(StreamRowKind.Stream, StreamRowKind.SuperStream), s.state.rows.map { it.kind }, "plain first, then the super stream")
+        assertEquals(2, s.state.totalStreams)
+        assertEquals("1 to 2 of 2", s.state.rangeText)
+
+        s.expand("orders")
+
+        assertEquals(listOf(StreamRowKind.Stream, StreamRowKind.SuperStream, StreamRowKind.Partition, StreamRowKind.Partition), s.state.rows.map { it.kind })
+        assertFalse(s.state.rows[0].expanded, "the plain stream does not expand")
+        assertTrue(s.state.rows[1].expanded)
+        assertEquals(listOf("orders-p0", "orders-p1"), s.state.rows.drop(2).map { it.name })
+        assertEquals(listOf("orders", "orders"), s.state.rows.drop(2).map { it.partitionOf })
+    }
+
     // --- offsets only where visible ----------------------------------------------------------------
 
     @Test

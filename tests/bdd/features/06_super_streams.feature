@@ -22,7 +22,7 @@ Feature: Super streams
     Given the partitions hold 31200, 32900 and 32000 messages
     When I open the stream list
     And I expand "orders"
-    Then I see each partition with its own messages, offsets, publishers and consumers, and a blank Size cell
+    Then I see each partition with its own messages, offsets, publishers and consumers, and the dash in the Size cell
     And the super stream row shows 96,100 messages in total
 
   # The browser is M3. M2-07 only proves that the row carries "partition of orders" (core unit test); the scenario runs in M3.

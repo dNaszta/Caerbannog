@@ -13,9 +13,11 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -257,6 +259,23 @@ class StreamsSuperStreamUiTest {
         assertEquals(Role.Button, node("cell:audit-log:Name").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role))
         node("browse:orders").assertDoesNotExistCompat()
         node("openStream:orders").assertDoesNotExistCompat()
+    }
+
+    // Architect ruling 3: a plain stream and a super stream both named "orders"; the name cells keep the tag `cell:orders:Name` (the plain one first).
+    @Test
+    fun `with the same name the plain stream keeps the link and the super stream stays plain text`() = runDesktopComposeUiTest(1280, 800) {
+        val opened = mutableListOf<String>()
+        val rows = listOf(row("orders"), superRow("orders"))
+        setContent { StreamsScreen(rowsState(rows), 0, CreateStreamGate.Enabled, RecordedEvents(), connected, noControlEvents, onOpenStream = { opened += it }) }
+
+        val names = onAllNodesWithTag("cell:orders:Name", useUnmergedTree = true)
+        names.assertCountEquals(2)
+        assertEquals(Role.Button, names[0].fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role), "the plain stream is the link")
+        assertNull(names[1].fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role), "the super stream is plain text")
+        names[0].performClick()
+        names[1].performClick()
+        waitForIdle()
+        assertEquals(listOf("orders"), opened, "only the plain stream opens")
     }
 
     // --- copy (UI1) ---------------------------------------------------------------------------------------------------------

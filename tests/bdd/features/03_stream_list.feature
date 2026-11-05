@@ -29,7 +29,7 @@ Feature: Stream list
       | payments-stream | 0            | 7849        | 1          | 0         |
     When I open the stream list
     Then each stream is shown with its type, approximate messages, first offset, last offset, publishers and consumers
-    And the Size cell of each stream is blank
+    And the Size cell of each stream shows the dash
 
   @fake-broker
   Scenario Outline: The message count and the offsets agree

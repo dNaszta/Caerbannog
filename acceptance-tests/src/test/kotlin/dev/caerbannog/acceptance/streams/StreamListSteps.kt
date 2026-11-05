@@ -55,7 +55,7 @@ import java.util.Locale
  * core jvmTest `StreamListHarness`.
  *
  * What a step is thinner than its wording:
- *  - "the Size cell of each stream is blank": the row model has no size member at all (N1), checked by name; the blank cell is
+ *  - "the Size cell of each stream shows the dash": the row model has no size member at all (N1), checked by name; the blank cell is
  *    drawn by M2-05.
  *  - "I can move to the next page" and "I see streams 1 to 5 of 12" read the state (`hasNextPage`, `rangeText`), not a screen.
  */
@@ -421,7 +421,7 @@ class StreamListSteps {
         }
     }
 
-    @Then("the Size cell of each stream is blank")
+    @Then("the Size cell of each stream shows the dash")
     fun theSizeCellIsBlank() {
         val members = StreamRow::class.java.declaredFields.map { it.name.lowercase() }
         assertTrue(members.none { "size" in it || "bytes" in it }, "N1: the row model carries no size, members: $members")
@@ -634,7 +634,7 @@ class StreamListSteps {
     @Then("{string} is listed")
     fun isListed(name: String) = assertTrue(state.rows.any { it.name == name }, "rows ${state.rows.map { it.name }}")
 
-    @Then("I see each partition with its own messages, offsets, publishers and consumers, and a blank Size cell")
+    @Then("I see each partition with its own messages, offsets, publishers and consumers, and the dash in the Size cell")
     fun iSeeEachPartition() {
         val partitions = state.rows.filter { it.kind == StreamRowKind.Partition }
         assertEquals(partitionsOf("orders"), partitions.map { it.name }, "partition rows of orders")

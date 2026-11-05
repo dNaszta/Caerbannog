@@ -59,6 +59,20 @@ class ManagementSuperStreamCatalogTest {
         }
     }
 
+    // Architect ruling 1: no exchange with the marker (direct + boolean true) means no bindings call.
+    @Test
+    fun `without a marker exchange the layout is empty and only the exchanges are asked`() {
+        val plainExchanges = """[{"name":"","vhost":"/","type":"direct","arguments":{}},{"name":"f","vhost":"/","type":"fanout","arguments":{"x-super-stream":true}},""" +
+            """{"name":"s","vhost":"/","type":"direct","arguments":{"x-super-stream":"true"}}]"""
+        PlainManagementServer(mapOf(whoami, exchangesPath to (200 to plainExchanges), bindingsPath to (200 to bindings))).use { server ->
+            val result = withCatalog(server) { it.superStreams("/") }
+
+            assertEquals(CatalogResult.Success(emptyList<SuperStreamLayout>()), result)
+            val calls = server.seen.filter { it.rawPath != "/api/whoami" }
+            assertEquals(listOf("GET $exchangesPath"), calls.map { "${it.method} ${it.rawPath}" }, "calls: $calls")
+        }
+    }
+
     @Test
     fun `a user without the management tag gets NotAuthorised from the 401 and no layout`() {
         val denied = 401 to """{"error":"not_authorised","reason":"Not management user"}"""

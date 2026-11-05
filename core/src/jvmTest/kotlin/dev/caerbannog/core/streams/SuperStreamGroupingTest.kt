@@ -105,6 +105,20 @@ class SuperStreamGroupingTest {
         assertEquals(listOf("b-0"), entries.byName().getValue("b").partitionNames())
     }
 
+    // Architect ruling 2: nothing is listed for a super stream none of whose partitions was loaded.
+    @Test
+    fun `a layout with no partition among the streams gives no entry`() {
+        val entries = groupStreams(streams("audit-log"), listOf(SuperStreamLayout("orders", "/", listOf("orders-0", "orders-1"))))
+
+        assertEquals(listOf("audit-log"), entries.map { it.name })
+        assertIs<StreamEntry.Single>(entries.single())
+    }
+
+    @Test
+    fun `a layout with no partitions at all gives no entry`() {
+        assertEquals(emptyList(), groupStreams(emptyList(), listOf(SuperStreamLayout("orders", "/", emptyList()))))
+    }
+
     @Test
     fun `no streams and no layouts give no entries`() {
         assertEquals(emptyList(), groupStreams(emptyList(), emptyList()))
