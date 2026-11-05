@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    application
 }
 
 kotlin {
@@ -22,4 +23,13 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+application {
+    mainClass.set("dev.caerbannog.devseed.MainKt")
+}
+
+// Relative paths such as the CA file are given from the repository root (see the Taskfile).
+tasks.named<JavaExec>("run") {
+    workingDir = rootDir
 }

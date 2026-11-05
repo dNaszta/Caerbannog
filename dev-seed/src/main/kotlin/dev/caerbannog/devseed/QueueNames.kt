@@ -1,6 +1,13 @@
 package dev.caerbannog.devseed
 
-/** M2-12 skeleton, see SeedArgs. */
+/** Names for the generated queues of the many-queues vhost. */
 object QueueNames {
-    fun generate(count: Int): List<String> = TODO("M2-12: senior developer")
+    /**
+     * [count] distinct names, zero-padded to eight digits so lexical order is numeric order and a smaller count is
+     * a prefix of a larger one.
+     */
+    fun generate(count: Int): List<String> {
+        require(count >= 0) { "count must not be negative" }
+        return List(count) { "many-queue-%08d".format(it) }
+    }
 }
