@@ -30,3 +30,6 @@ The measured `--queues` maximum: the developer runs 10,000 and 100,000 once and 
 
 ## Definition of done
 Tests first and green, README updated, no unrelated change, `docs/tasks/README.md` row added.
+
+## Status
+- Step 2 (test developer): tests first. `SeedArgsTest` +6 (rejected mix names `--max-age` and `--queues`; five allowed mixes), new `CaHintTest` (4). Stub `caHint(failureMessage: String?): String? = null` in `dev-seed/src/main/.../CaHint.kt` (signature only; the senior developer replaces the body and wires it into `main`). `./gradlew :dev-seed:test`: 44 tests, 4 red (rejected mix not thrown; three hint tests get null), 40 green incl. the 34 untouched.
