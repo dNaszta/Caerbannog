@@ -11,7 +11,7 @@ and the TLS files are test fixtures, never real, never reuse them anywhere**.
 | `task dev:seed -- --password dev-password` | Publishes 1000 messages into each of `dev-orders`, `dev-events`, `dev-audit` on `/`, so offsets and counts are not zero. |
 | `task dev:seed:plain -- --password dev-password` | The same seed over plain (no TLS): stream 5552, management HTTP 15672, no CA. Passes `--no-tls` and no `--ca`. |
 | `task dev:seed -- --password dev-password --queues 1000 --vhost many` | Declares 1000 quorum queues in the `many` vhost (the M2-04 refresh-cost trial); declares only queues, no publishing. No `--queues` means no queues. |
-| `task dev:seed:plain -- --password dev-password --hold` (or `dev:seed`) | Seeds as usual, then keeps one named publisher (`dev-seed-publisher`) and one named consumer (`dev-seed-consumer`, stores its offset) connected per stream so the Publishers and consumers tab has rows. Press Ctrl+C to stop; the rows vanish on the next refresh. |
+| `task dev:seed:plain -- --password dev-password --hold` (or `dev:seed`) | Seeds as usual, then keeps one named publisher (`dev-seed-publisher`) and one named consumer (`dev-seed-consumer`, stores its offset) connected per stream so the Publishers and consumers tab has rows. Press Ctrl+C to stop; the rows vanish on the next refresh. Run through `task` (Gradle), the stop ends with exit code 130 and a red "Failed to run task": that is the normal JVM exit after SIGINT, not an error; the connections were closed. |
 | `task dev:reset` | `docker compose down -v` (container and volume gone), then `up -d --wait`. Run it twice: same result. |
 
 Seed flags: `--password` (required), `--user` (default `admin`), `--host`, `--stream-port`, `--management-port`,
