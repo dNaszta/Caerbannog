@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.CreateStreamGate
 import dev.caerbannog.core.streams.StreamClientsTexts
+import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListScreen
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
@@ -66,11 +68,11 @@ interface StreamListEvents {
     fun nextPage()
     fun previousPage()
 
-    /** M2-07 COMPILE STUB (default no-op, the builder removes the default): expand or collapse the super stream [name]. */
-    fun toggleExpanded(name: String) = Unit
+    /** Expand or collapse the super stream [name]. */
+    fun toggleExpanded(name: String)
 
-    /** M2-07 COMPILE STUB (default no-op, the builder removes the default): the kind chips. */
-    fun setKindFilter(kind: dev.caerbannog.core.streams.StreamKindFilter) = Unit
+    /** The kind chips (All, Streams, Super streams). */
+    fun setKindFilter(kind: StreamKindFilter)
 
     /** The Create stream button (enabled by [CreateStreamGate]). The dialog is M3: the app wires this to nothing in M2-05. */
     fun createStream()
@@ -171,7 +173,7 @@ private fun StreamsBody(state: StreamListState, gate: CreateStreamGate, events: 
     when (val screen = state.screen) {
         StreamListScreen.Rows -> StreamsRowsView(state, events, onOpen)
         StreamListScreen.Loading -> Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
-            StreamsTable(rows = null, state = state, onSort = events::setSort)
+            StreamsTable(rows = null, state = state, events = events)
         }
         StreamListScreen.Empty -> Message(state.message) {
             CreateStreamButton(gate, onClick = events::createStream, modifier = Modifier.testTag("createStreamEmpty"), filled = true)
@@ -198,9 +200,50 @@ internal fun Message(text: String?, action: (@Composable () -> Unit)? = null) {
 private fun StreamsRowsView(state: StreamListState, events: StreamListEvents, onOpen: (String) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         state.banner?.let { LostConnectionBanner(it, state.action ?: StreamListTexts.RETRY, events::retry) }
-        StreamsSearchField(state.filter, events::setFilter)
-        Box(Modifier.weight(1f).fillMaxWidth()) { StreamsTable(state.rows, state, events::setSort, onOpen) }
+        state.groupingNotice?.let { GroupingNotice(it) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StreamsSearchField(state.filter, events::setFilter)
+            KindChips(state.kindFilter, events::setKindFilter)
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) { StreamsTable(state.rows, state, events, onOpen) }
         StreamsFooter(state, events)
+    }
+}
+
+/** The kind chips of the mockup; the selected one follows the state, a click sends the kind. */
+@Composable
+private fun KindChips(selected: StreamKindFilter, onSelect: (StreamKindFilter) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        StreamKindFilter.entries.forEach { kind ->
+            val label = when (kind) {
+                StreamKindFilter.All -> "All"
+                StreamKindFilter.Streams -> "Streams"
+                StreamKindFilter.SuperStreams -> "Super streams"
+            }
+            FilterChip(
+                selected = kind == selected,
+                onClick = { onSelect(kind) },
+                label = { Text(label) },
+                // The label is also the node's own text, so the chip reads the same in the unmerged tree.
+                modifier = Modifier.testTag("kindChip:${kind.name}").semantics { text = AnnotatedString(label) },
+            )
+        }
+    }
+}
+
+/** Shown while the super stream grouping was never read: the list is flat and says why. Not the lost-connection banner. */
+@Composable
+private fun GroupingNotice(message: String) {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ConnectionIcon(AppIcon.Info, SmallIconSize)
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.testTag("groupingNotice"),
+            )
+        }
     }
 }
 

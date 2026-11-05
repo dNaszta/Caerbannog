@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +25,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -54,6 +57,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextRange
@@ -65,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.StreamRow
+import dev.caerbannog.core.streams.StreamRowKind
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -93,7 +98,7 @@ private enum class Column(val header: String, val width: Dp, val numeric: Boolea
 
     fun cell(row: StreamRow): String = when (this) {
         Name -> row.name
-        Type -> row.type
+        Type -> row.typeText
         Retention -> row.retention
         Messages -> row.messages
         FirstOffset -> row.firstOffset
@@ -108,21 +113,23 @@ private enum class Column(val header: String, val width: Dp, val numeric: Boolea
 private val TotalWidth: Dp = Column.entries.fold(0.dp) { sum, column -> sum + column.width }
 
 private val CellPadding = 6.dp
+private val ToggleSize = 28.dp
+private val PartitionIndent = 28.dp
 
 /**
  * The table. [rows] null draws the loading frame (header and placeholder rows). It scrolls sideways when the window is narrow,
  * so no column is ever dropped; only the rows scroll down, the header stays.
  */
 @Composable
-internal fun StreamsTable(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit, onOpen: (String) -> Unit = {}) {
+internal fun StreamsTable(rows: List<StreamRow>?, state: StreamListState, events: StreamListEvents, onOpen: (String) -> Unit = {}) {
     BoxWithConstraints {
         val scale = if (maxWidth.value.isFinite()) (maxWidth / TotalWidth).coerceAtLeast(1f) else 1f
-        StreamsTableBody(rows, state, onSort, scale, onOpen)
+        StreamsTableBody(rows, state, events, scale, onOpen)
     }
 }
 
 @Composable
-private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit, scale: Float, onOpen: (String) -> Unit) {
+private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, events: StreamListEvents, scale: Float, onOpen: (String) -> Unit) {
     val horizontal = rememberScrollState()
     Column(
         Modifier
@@ -133,7 +140,7 @@ private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onS
             .widthIn(min = TotalWidth)
             .fillMaxHeight(),
     ) {
-        HeaderRow(state.sort, onSort, scale)
+        HeaderRow(state.sort, events::setSort, scale)
         HorizontalDivider()
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).alpha(if (state.stale) 0.6f else 1f)) {
             if (rows == null) {
@@ -141,7 +148,7 @@ private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onS
             } else {
                 // One SelectionContainer for the whole body: mouse selection works as in any text; the focusable cells add the keyboard.
                 SelectionContainer {
-                    Column { rows.forEach { DataRow(it, scale, onOpen) } }
+                    Column { rows.forEach { DataRow(it, scale, events, onOpen) } }
                 }
             }
         }
@@ -202,30 +209,76 @@ private fun SizeHeader(scale: Float) {
 }
 
 @Composable
-private fun DataRow(row: StreamRow, scale: Float, onOpen: (String) -> Unit) {
+private fun DataRow(row: StreamRow, scale: Float, events: StreamListEvents, onOpen: (String) -> Unit) {
     Column(Modifier.testTag("streamRow:${row.name}")) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column.entries.forEach { column ->
-                CopyableCell(
-                    text = column.cell(row),
-                    tag = "cell:${row.name}:${column.name}",
-                    column = column,
-                    scale = scale,
-                    style = if (column == Column.Name) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
-                    onOpen = if (column == Column.Name) ({ onOpen(row.name) }) else null,
-                )
+                if (column == Column.Name) {
+                    NameCell(row, scale, events, onOpen)
+                } else {
+                    CopyableCell(column.cell(row), "cell:${row.name}:${column.name}", column, scale, MaterialTheme.typography.bodyMedium)
+                }
             }
         }
+        if (row.kind == StreamRowKind.SuperStream && row.expanded) PartitionNote(row.name)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
-/** One list cell. The name cell is a link ([onOpen]); the others only select and copy. */
+/**
+ * The name cell. A stream or a partition name is the link of M2-06 (a partition is indented under its super stream); a super stream
+ * name is plain text, because no stream of that name exists to open, and carries the expand control. The text node holds the name only,
+ * so a copy never includes the indent or the control.
+ */
 @Composable
-private fun CopyableCell(text: String, tag: String, column: Column, scale: Float, style: androidx.compose.ui.text.TextStyle, onOpen: (() -> Unit)? = null) {
+private fun NameCell(row: StreamRow, scale: Float, events: StreamListEvents, onOpen: (String) -> Unit) {
+    val openable = row.kind != StreamRowKind.SuperStream
+    Row(
+        Modifier.width(Column.Name.width * scale).padding(horizontal = CellPadding, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (row.kind == StreamRowKind.Partition) Spacer(Modifier.width(PartitionIndent))
+        if (row.kind == StreamRowKind.SuperStream) ExpandToggle(row, events)
+        CopyableText(
+            text = row.name,
+            tag = "cell:${row.name}:Name",
+            style = MaterialTheme.typography.titleSmall,
+            extra = Modifier.weight(1f),
+            onOpen = if (openable) ({ onOpen(row.name) }) else null,
+        )
+    }
+}
+
+@Composable
+private fun ExpandToggle(row: StreamRow, events: StreamListEvents) {
+    IconButton(
+        onClick = { events.toggleExpanded(row.name) },
+        modifier = Modifier
+            .size(ToggleSize)
+            .testTag("expandToggle:${row.name}")
+            .semantics { contentDescription = if (row.expanded) "Collapse ${row.name}" else "Expand ${row.name}" },
+    ) {
+        ConnectionIcon(if (row.expanded) AppIcon.ArrowDownward else AppIcon.ChevronRight, SmallIconSize)
+    }
+}
+
+/** Order exists only inside a partition; the list says so under an expanded super stream (there is no merged view to open). */
+@Composable
+private fun PartitionNote(name: String) {
+    Text(
+        StreamListTexts.PARTITION_ORDER_NOTE,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = CellPadding + ToggleSize, end = CellPadding, bottom = 8.dp).testTag("partitionNote:$name"),
+    )
+}
+
+/** One list cell; it only selects and copies (the name cell is [NameCell]). */
+@Composable
+private fun CopyableCell(text: String, tag: String, column: Column, scale: Float, style: androidx.compose.ui.text.TextStyle) {
     // The padding is on the box, not on the text node: a mouse drag that starts at the edge of the cell must still start a selection.
     Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 4.dp)) {
-        CopyableText(text, tag, style, if (column.numeric) TextAlign.End else TextAlign.Start, onOpen = onOpen)
+        CopyableText(text, tag, style, if (column.numeric) TextAlign.End else TextAlign.Start)
     }
 }
 

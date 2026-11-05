@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.ui.streams.StreamListEvents
@@ -13,6 +14,8 @@ class StreamListEventsAdapter(private val viewModel: StreamListViewModel) : Stre
     override fun retry() = viewModel.retry()
     override fun setFilter(text: String) = viewModel.setFilter(text)
     override fun setSort(sort: StreamSort) = viewModel.setSort(sort)
+    override fun toggleExpanded(name: String) = viewModel.toggleExpanded(name)
+    override fun setKindFilter(kind: StreamKindFilter) = viewModel.setKindFilter(kind)
     override fun nextPage() = viewModel.nextPage()
     override fun previousPage() = viewModel.previousPage()
 
