@@ -5,10 +5,15 @@ import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import java.io.File
 
 /**
@@ -27,6 +32,7 @@ import java.io.File
  * `@TempDir` instead of touching a developer's real `~/.caerbannog/connections.json`; see
  * [defaultFile] for the real production path.
  */
+@OptIn(ExperimentalSerializationApi::class)
 class JsonFileConnectionProfileRepository(private val file: File) : ConnectionProfileRepository {
 
     @Serializable
@@ -37,6 +43,9 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         val username: String,
         val streamPort: Int,
         val managementPort: Int,
+        // A JsonElement, not a Boolean: any value that is not a JSON boolean (string, number, null, array, object) must
+        // load as TLS on (the safe side) without failing the whole file. Always written, also when on.
+        @EncodeDefault val tls: JsonElement = JsonPrimitive(true),
         val caCertificatePath: String? = null,
         val topologyControlLevel: TopologyControlLevelDto = TopologyControlLevelDto.READ_ONLY,
         // Optional and additive: no key is written when null (Json does not encode defaults), and old files
@@ -100,6 +109,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         username = username,
         streamPort = streamPort,
         managementPort = managementPort,
+        tls = (tls as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: true,
         caCertificatePath = caCertificatePath,
         topologyControlLevel = when (topologyControlLevel) {
             TopologyControlLevelDto.READ_ONLY -> TopologyControlLevel.READ_ONLY
@@ -116,6 +126,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         username = username,
         streamPort = streamPort,
         managementPort = managementPort,
+        tls = JsonPrimitive(tls),
         caCertificatePath = caCertificatePath,
         topologyControlLevel = when (topologyControlLevel) {
             TopologyControlLevel.READ_ONLY -> TopologyControlLevelDto.READ_ONLY

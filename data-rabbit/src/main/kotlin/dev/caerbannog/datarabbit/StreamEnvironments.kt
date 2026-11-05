@@ -10,7 +10,6 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.TrustManagerFactory
 
 /**
  * The stream client side of one held connection: one `Environment` per vhost, built on the first offset call of
@@ -66,13 +65,8 @@ internal class StreamEnvironments(
 
     private fun build(vhost: String): Environment {
         val secret = checkNotNull(password) { "closed" }
-        val trust = (transport as BrokerTransport.Tls).trust // M2-14 stub: plain is not built yet
-        val sslContext = SslContextBuilder.forClient()
-            .trustManager(trust)
-            .endpointIdentificationAlgorithm(null)
-            .build()
         val address = Address(profile.host, profile.streamPort)
-        return Environment.builder()
+        val builder = Environment.builder()
             .host(profile.host)
             .port(profile.streamPort)
             .username(profile.username)
@@ -82,9 +76,15 @@ internal class StreamEnvironments(
             .rpcTimeout(Duration.ofSeconds(ConnectionTimeouts.STREAM_RPC_SECONDS))
             .netty().bootstrapCustomizer { it.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, ConnectionTimeouts.STREAM_CONNECT_MILLIS) }
             .environmentBuilder()
-            .tls().sslContext(sslContext)
-            .environmentBuilder()
-            .build()
+        // Plain: no TLS context at all (spike S-E: host and port are enough). Only the transport decides.
+        if (transport is BrokerTransport.Tls) {
+            val sslContext = SslContextBuilder.forClient()
+                .trustManager(transport.trust)
+                .endpointIdentificationAlgorithm(null)
+                .build()
+            builder.tls().sslContext(sslContext)
+        }
+        return builder.build()
     }
 
     override fun close() {

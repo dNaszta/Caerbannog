@@ -18,12 +18,15 @@ import javax.net.ssl.TrustManagerFactory
  */
 internal object TlsSupport {
 
-    fun buildHttpClient(sslContext: SSLContext, timeoutMillis: Long): HttpClient = HttpClient(Java) {
+    /** The HTTP client for [transport]: TLS with the profile trust, or plain HTTP with no TLS settings at all. */
+    fun buildHttpClient(transport: BrokerTransport, timeoutMillis: Long): HttpClient = HttpClient(Java) {
         expectSuccess = false
         engine {
             config {
-                sslContext(sslContext)
-                sslParameters(permissiveSslParameters())
+                if (transport is BrokerTransport.Tls) {
+                    sslContext(sslContextOf(transport.trust))
+                    sslParameters(permissiveSslParameters())
+                }
                 connectTimeout(Duration.ofMillis(timeoutMillis))
             }
         }
@@ -59,8 +62,6 @@ internal object TlsSupport {
         return factory
     }
 
-    fun buildSslContext(caCertificatePath: String?): SSLContext =
-        SSLContext.getInstance("TLS").apply {
-            init(null, trustManagerFactory(caCertificatePath).trustManagers, null)
-        }
+    fun sslContextOf(trust: TrustManagerFactory): SSLContext =
+        SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }
 }

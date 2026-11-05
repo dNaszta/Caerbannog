@@ -5,7 +5,7 @@ import dev.caerbannog.core.streams.StreamListRequest
 import java.net.URLEncoder
 
 /**
- * The URLs of the management API calls the catalog makes. M2-14 (compile stub): the scheme of [baseUrl] must match [transport]
+ * The URLs of the management API calls the catalog makes. The scheme of [baseUrl] must match [transport]
  * (https for [BrokerTransport.Tls], http for [BrokerTransport.Plain]); a mismatch is refused, so a plain base can only come from a
  * profile with TLS off. The one-argument form means TLS (https) as before.
  */
@@ -13,7 +13,8 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     private val base: String = baseUrl.trimEnd('/')
 
     init {
-        require(base.startsWith("https://")) { "The management API is reached over https only" }
+        val scheme = transport?.scheme ?: "https"
+        require(base.startsWith("$scheme://")) { "The management API base must use $scheme to match the connection's TLS setting" }
     }
 
     fun listStreams(request: StreamListRequest): String {
@@ -48,7 +49,10 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
         private const val LIST_COLUMNS =
             "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"
 
-        fun forProfile(profile: ConnectionProfile): ManagementRequests =
-            ManagementRequests("https://${profile.host}:${profile.managementPort}")
+        fun forProfile(profile: ConnectionProfile, transport: BrokerTransport? = null): ManagementRequests {
+            val resolved = transport ?: if (profile.tls) null else BrokerTransport.Plain
+            val scheme = resolved?.scheme ?: "https"
+            return ManagementRequests("$scheme://${profile.host}:${profile.managementPort}", resolved)
+        }
     }
 }
