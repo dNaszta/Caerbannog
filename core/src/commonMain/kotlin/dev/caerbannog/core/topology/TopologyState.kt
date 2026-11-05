@@ -129,7 +129,10 @@ data class TopologyState(
     val stale: Boolean = false,
     /** D2: [dev.caerbannog.core.connections.ConnectionFailureReason.CONNECTION_LOST] while the link is lost with rows on screen; else null. */
     val connectionBanner: String? = null,
-    /** Every reason the screen is read-only that applies, in the mockup's precedence order; the screen shows the first. */
+    /**
+     * Every reason the screen is read-only that applies, in this order (owner decision O1 = b): ReadOnlyLevel (only at the Read-only level), NoConfigure,
+     * DeclaredNotConfirmed or NotReadable, OtherVhost; the screen draws the first. On another vhost the broker and declared reasons are hidden (R6).
+     */
     val banners: List<TopologyBanner> = emptyList(),
     val refreshInterval: RefreshInterval = DEFAULT_REFRESH,
     val updatedAtMillis: Long? = null,

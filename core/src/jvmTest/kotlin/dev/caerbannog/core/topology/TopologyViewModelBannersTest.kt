@@ -9,9 +9,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * M2-08b step 2: why the screen is read-only (brief T5, R6; mockup `banner-reasons`: "one banner, first match wins in this order: 1 no
- * configure permission on the connection's virtual host, 2 declared, not confirmed, 3 connection level Read-only, 4 another virtual host").
- * The state carries EVERY reason that applies, in that order, in [TopologyState.banners]; the screen shows the first (08c). Scenarios:
+ * M2-08b step 2: why the screen is read-only (brief T5, R6; mockup `banner-reasons`). Order of [TopologyState.banners], the screen draws the first
+ * (owner decision O1 = b, 2026-11-05: the level the user can act on comes first): 1 connection level Read-only, 2 no configure permission on the
+ * connection's virtual host, 3 declared not confirmed or permissions unreadable, 4 another virtual host. The state carries EVERY reason that applies.
+ * On another vhost the broker and declared reasons are hidden (R6). Scenarios:
  * "The topology screen says the connection is set to read-only", "Another virtual host says its permissions were not checked", and the core half of the
  * two `02` text scenarios (the Compose half is 08c). The screen is read-only in M2 in every case: a banner only says why. Contract: [TopologyHarness].
  */
@@ -66,9 +67,17 @@ class TopologyViewModelBannersTest {
     }
 
     @Test
-    fun `no configure permission and a Read-only level are both reasons, the broker's first`() = runTest {
+    fun `owner decision O1, a Read-only level and a broker reason are both reasons, the level first`() = runTest {
         val s = TopologyHarness(this, permission = locked, level = TopologyControlLevel.READ_ONLY).opened()
-        assertEquals(listOf(TopologyBannerKind.NoConfigure, TopologyBannerKind.ReadOnlyLevel), kinds(s))
+        assertEquals(listOf(TopologyBannerKind.ReadOnlyLevel, TopologyBannerKind.NoConfigure), kinds(s))
+    }
+
+    @Test
+    fun `the level comes first before a declaration and before unreadable permissions too`() = runTest {
+        val a = TopologyHarness(this, permission = declared, level = TopologyControlLevel.READ_ONLY).opened()
+        assertEquals(listOf(TopologyBannerKind.ReadOnlyLevel, TopologyBannerKind.DeclaredNotConfirmed), kinds(a))
+        val b = TopologyHarness(this, permission = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED), level = TopologyControlLevel.READ_ONLY).opened()
+        assertEquals(listOf(TopologyBannerKind.ReadOnlyLevel, TopologyBannerKind.NotReadable), kinds(b), "a non-administrator on a default profile: the level the user can act on is first")
     }
 
     @Test
@@ -91,7 +100,7 @@ class TopologyViewModelBannersTest {
     }
 
     @Test
-    fun `the order is no configure, declared or unreadable, level, other vhost`() = runTest {
+    fun `the order is level, no configure, declared or unreadable, other vhost, and on another vhost the broker reasons are hidden`() = runTest {
         val s = TopologyHarness(this, permission = locked, level = TopologyControlLevel.READ_ONLY).opened()
         s.topology.declareVhost("billing")
         s.pass(5)
