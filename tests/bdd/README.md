@@ -42,6 +42,7 @@ tests/bdd/
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
 | `@needs-decision` | The product behavior is not decided yet; the scenario states the proposed behavior |
 | `@needs-M2` | Step definitions exist and compile but are deliberately left pending (`PendingException`) because the scenario needs a later milestone's feature (in `02` the browsing scenario and the three topology-screen text scenarios, which need the M2 topology screen); excluded from the default Cucumber run |
+| `@needs-M3` | Like `@needs-M2`, for a scenario that needs a later milestone (M3 message browser): steps are written when that feature exists, the scenario is excluded from the default Cucumber run; the part that can be asserted earlier is covered by a unit test (in `04` "Jump from a consumer to its offset in the browser": the core state carries the offset to browse from) |
 | `@needs-M1-07` | Retired: the permission-state UI (task `M1-07`) is built and its five scenarios in `02` (sidebar pill, edit panel banner wording, asserted in core through `permissionPill` / `permissionBanner`) run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 | `@needs-M1-06` | Retired: declared permissions on the profile (task `M1-06`) are built and their two scenarios in `02` run in the normal `@fake-broker` set; the tag is no longer used on any scenario |
 

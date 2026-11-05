@@ -1,4 +1,4 @@
-@M2 @clients @needs-spike
+@M2 @clients
 Feature: Publishers and consumers of a stream
   As an engineer
   I want to see who publishes to and consumes from a stream
@@ -8,9 +8,11 @@ Feature: Publishers and consumers of a stream
   Fields confirmed on a real RabbitMQ 4.4.0 broker (M2-02 spike, docs/spec.md "Management API facts"):
   publisher reference, published, confirmed, errored (shown as "errors"), connection; consumer offset,
   offset_lag, active, connection. A named consumer's lag can be 1 higher than the number of user messages
-  behind, because its offset tracking entry occupies an offset, so "Caught up" needs M2-06 to decide how to
-  read offset_lag. Users with only the management tag see only their own connections' rows, and users with
-  no management tag see nothing (product decisions S3a and S3b, decided: message, and a fixed notice). The @needs-spike tag stays until M2-06 reviews this file.
+  behind, because its offset tracking entry occupies an offset; M2-06 decided to show offset_lag as the broker
+  reports it and to call 0 or 1 "Caught up" (labelled approximate; docs/tasks/M2-06-publishers-consumers.md).
+  Users with only the management tag see only their own connections' rows, and users with no management
+  tag see nothing (product decisions S3a and S3b, decided: message, and a fixed notice).
+  The stream screen opens from the stream list (the name is a link); only this tab exists until M3.
 
   Background:
     Given I am connected to "uat-eu"
@@ -37,8 +39,9 @@ Feature: Publishers and consumers of a stream
       | billing   | 48299  | 0      | Caught up |
       | analytics | 47950  | 349    | Behind    |
       | audit     | 48100  | 199    | Behind    |
+      | reports   | 48297  | 2      | Behind    |
 
-  @fake-broker
+  @needs-M3 @fake-broker
   Scenario: Jump from a consumer to its offset in the browser
     Given a consumer "analytics" on "orders-events" at offset 47950
     When I open the "Publishers and consumers" tab of "orders-events"
@@ -84,3 +87,55 @@ Feature: Publishers and consumers of a stream
     When I open the stream list
     And I open the "Publishers and consumers" tab of "orders-events"
     Then the tab lists 2 publishers and 3 consumers
+
+  @fake-broker
+  Scenario: Opening a stream from the list shows its publishers and consumers
+    Given these publishers on "orders-events"
+      | reference  | connection                         | published | confirmed | errors |
+      | checkout-1 | 10.0.4.21:51234 - checkout-service | 48100     | 48100     | 0      |
+    When I open the stream list
+    And I open the stream "orders-events"
+    Then the "Publishers and consumers" tab of "orders-events" lists 1 publisher
+
+  @fake-broker
+  Scenario: A client that has just attached is not shown as a settled row
+    Given a consumer on "orders-events" whose connection name is not known yet
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then its connection reads "unknown"
+    And its offset, messages behind and status read "updating"
+
+  @fake-broker
+  Scenario: A row settles on the next refresh
+    Given a consumer on "orders-events" whose connection name is not known yet
+    And I open the "Publishers and consumers" tab of "orders-events"
+    When the broker now reports "billing" at offset 48299 with connection "10.0.5.14:38812 - billing-service"
+    And the tab refreshes
+    Then "billing" shows 0 messages behind
+    And its status is "Caught up"
+
+  @fake-broker
+  Scenario: The tab refreshes only while it is shown
+    Given I am on the "Publishers and consumers" tab of "orders-events"
+    When I leave the tab
+    And the refresh interval passes
+    Then the broker is not asked for publishers or consumers
+
+  @fake-broker
+  Scenario: The stream is deleted while its tab is open
+    Given I am on the "Publishers and consumers" tab of "orders-events"
+    When "orders-events" is deleted on the broker and the tab refreshes
+    Then I am told that the stream no longer exists
+    And I can go back to the stream list
+
+  @fake-broker
+  Scenario: A lost connection keeps the rows and marks them stale
+    Given a consumer "billing" on "orders-events" at offset 48299
+    And I am on the "Publishers and consumers" tab of "orders-events"
+    When the connection to the broker is lost
+    Then "billing" is still listed and marked stale
+    And the tab offers "Retry"
+
+  @fake-broker
+  Scenario: The last offset of the stream is shown above the consumers
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then the tab shows the last offset 48299
