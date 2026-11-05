@@ -10,6 +10,7 @@ import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.Visibility
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -56,7 +57,7 @@ class FakeStreamCatalog : StreamCatalog {
     /** True: every call answers [CatalogResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
-    /** Names of the calls in order: "listStreams", "streamDetail", "publishers", "publisherCounts", "consumers", "capabilities". */
+    /** Names of the calls in order: "listStreams", "streamDetail", "publishers", "publisherCounts", "consumers", "superStreams", "capabilities". */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     private val holds = ConcurrentHashMap<String, CallGate>()
@@ -114,6 +115,24 @@ class FakeStreamCatalog : StreamCatalog {
         synchronized(entries) { entries.removeAll { it.vhost == vhost && it.name == name } }
         deleted += vhost to name
     }
+
+    private val layouts = Collections.synchronizedList(ArrayList<SuperStreamLayout>())
+
+    /**
+     * M2-07: a super stream (exchange with the marker and its bindings) whose partitions are [partitions], in the order the BROKER would
+     * return them (the real parser sorts by `x-stream-partition-order`; the fake keeps what the test gives). Declaring it does NOT add the
+     * partition streams: add them with [addStream], or leave one out to model a partition that is not among the listed streams.
+     * A name is unique per vhost: declaring it again replaces it. Not served from `listStreams`: a super stream is no queue.
+     */
+    fun superStream(name: String, partitions: List<String>, vhost: String = "/"): FakeStreamCatalog = apply {
+        synchronized(layouts) {
+            layouts.removeAll { it.vhost == vhost && it.name == name }
+            layouts += SuperStreamLayout(name, vhost, partitions)
+        }
+    }
+
+    /** M2-07: `superStreams` answers [failure] (until [clearFailures]), the stream calls keep working: "the broker refuses to list the exchanges". */
+    fun failSuperStreams(failure: CatalogResult.Failure = CatalogResult.NotAuthorised) = failCall("superStreams", failure)
 
     fun setPublishers(vhost: String, stream: String, rows: List<PublisherRow>) {
         publisherRows[vhost to stream] = rows
@@ -197,6 +216,12 @@ class FakeStreamCatalog : StreamCatalog {
         if (!pluginPresent) return CatalogResult.PluginMissing
         if ((vhost to stream) in deleted) return late("consumers", CatalogResult.NotFound)
         return late("consumers", CatalogResult.Success(consumerRows[vhost to stream].orEmpty()))
+    }
+
+    override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> {
+        val answer: CatalogResult<List<SuperStreamLayout>> = refusal("superStreams")
+            ?: CatalogResult.Success(synchronized(layouts) { layouts.filter { it.vhost == vhost } })
+        return late("superStreams", answer)
     }
 
     override suspend fun capabilities(): CatalogResult<Capabilities> {

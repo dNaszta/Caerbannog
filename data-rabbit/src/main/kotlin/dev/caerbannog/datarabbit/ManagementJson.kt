@@ -6,6 +6,7 @@ import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.Retention
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.streams.SuperStreamLayout
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -53,6 +54,14 @@ internal object ManagementJson {
             ),
         )
     }
+
+    /**
+     * M2-07 COMPILE STUB (no behaviour). Contract (pinned by `ManagementJsonSuperStreamTest`): [exchangesBody] is `GET /api/exchanges/{vhost}`,
+     * [bindingsBody] is `GET /api/bindings/{vhost}`; a super stream is a `direct` exchange with the JSON boolean `true` in `arguments.x-super-stream`.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun parseSuperStreams(vhost: String, exchangesBody: String, bindingsBody: String): CatalogResult<List<SuperStreamLayout>> =
+        CatalogResult.Unexpected
 
     fun parseStreamDetail(body: String): CatalogResult<StreamSummary> = guarded(body) { root ->
         val obj = root.asObject()

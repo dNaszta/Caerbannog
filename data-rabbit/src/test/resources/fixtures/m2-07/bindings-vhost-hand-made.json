@@ -1,0 +1,113 @@
+[
+    {
+        "source": "",
+        "vhost": "m207",
+        "destination": "hand-0",
+        "destination_type": "queue",
+        "routing_key": "hand-0",
+        "arguments": {},
+        "properties_key": "hand-0"
+    },
+    {
+        "source": "",
+        "vhost": "m207",
+        "destination": "hand-1",
+        "destination_type": "queue",
+        "routing_key": "hand-1",
+        "arguments": {},
+        "properties_key": "hand-1"
+    },
+    {
+        "source": "",
+        "vhost": "m207",
+        "destination": "hand-shared",
+        "destination_type": "queue",
+        "routing_key": "hand-shared",
+        "arguments": {},
+        "properties_key": "hand-shared"
+    },
+    {
+        "source": "",
+        "vhost": "m207",
+        "destination": "only-q",
+        "destination_type": "queue",
+        "routing_key": "only-q",
+        "arguments": {},
+        "properties_key": "only-q"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "hand-0",
+        "destination_type": "queue",
+        "routing_key": "a",
+        "arguments": {
+            "x-stream-partition-order": 1
+        },
+        "properties_key": "a~1jlUUQ"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "hand-1",
+        "destination_type": "queue",
+        "routing_key": "b",
+        "arguments": {},
+        "properties_key": "b"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "hand-shared",
+        "destination_type": "queue",
+        "routing_key": "c",
+        "arguments": {
+            "x-stream-partition-order": 0
+        },
+        "properties_key": "c~iKEaZQ"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "hand-shared",
+        "destination_type": "queue",
+        "routing_key": "c2",
+        "arguments": {
+            "x-stream-partition-order": 5
+        },
+        "properties_key": "c2~BYHH3g"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "hand2",
+        "destination_type": "exchange",
+        "routing_key": "x",
+        "arguments": {
+            "x-stream-partition-order": 9
+        },
+        "properties_key": "x~ompVZg"
+    },
+    {
+        "source": "hand",
+        "vhost": "m207",
+        "destination": "only-q",
+        "destination_type": "queue",
+        "routing_key": "o",
+        "arguments": {
+            "x-stream-partition-order": "abc"
+        },
+        "properties_key": "o~v-fqHQ"
+    },
+    {
+        "source": "hand2",
+        "vhost": "m207",
+        "destination": "hand-shared",
+        "destination_type": "queue",
+        "routing_key": "d",
+        "arguments": {
+            "x-stream-partition-order": 0
+        },
+        "properties_key": "d~iKEaZQ"
+    }
+]

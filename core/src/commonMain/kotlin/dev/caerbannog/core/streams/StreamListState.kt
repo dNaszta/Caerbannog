@@ -22,7 +22,16 @@ sealed interface StreamListScreen {
 
 enum class StreamSort { NameAscending, NameDescending }
 
-/** One row, all cells as text. There is no size (N1). */
+/** M2-07: what a row stands for. */
+enum class StreamRowKind { Stream, SuperStream, Partition }
+
+/** M2-07: the kind chips of the list (default [All]). */
+enum class StreamKindFilter { All, Streams, SuperStreams }
+
+/**
+ * One row, all cells as text. There is no size (N1). M2-07: [kind], [partitionCount] (super stream rows, else 0), [partitionOf]
+ * (partition rows: the super stream's name, else null; M3 reads it for the page title) and [expanded] (super stream rows).
+ */
 data class StreamRow(
     val name: String,
     val type: String,
@@ -32,6 +41,10 @@ data class StreamRow(
     val publishers: String,
     val consumers: String,
     val retention: String,
+    val kind: StreamRowKind = StreamRowKind.Stream,
+    val partitionCount: Int = 0,
+    val partitionOf: String? = null,
+    val expanded: Boolean = false,
 )
 
 /** The whole state of the stream list. [rows] are the visible page only. */
@@ -55,6 +68,10 @@ data class StreamListState(
     /** Clock time of the last successful load; null before the first one. The screen computes "Updated N s ago" from it. */
     val updatedAtMillis: Long? = null,
     val approximateNote: String = StreamListTexts.APPROXIMATE,
+    /** M2-07: the selected kind chip. */
+    val kindFilter: StreamKindFilter = StreamKindFilter.All,
+    /** M2-07: set while the super stream grouping was never read (the list is flat); null otherwise. */
+    val groupingNotice: String? = null,
 )
 
 /** Texts of the stream list, shared by core and the screen. */
@@ -68,5 +85,11 @@ object StreamListTexts {
     const val CREATE_STREAM: String = "Create stream"
     const val RETRY: String = "Retry"
     const val LOAD_FAILED: String = "The stream list could not be loaded. Check that the virtual host exists and that this user may use it."
+    const val SUPER_STREAM: String = "Super stream"
+    const val PARTITION: String = "partition"
+    const val MIXED: String = "mixed"
+    const val NOT_APPLICABLE: String = "\u2013"
+    const val PARTITION_ORDER_NOTE: String = "Messages are ordered only inside a partition. Choose a partition to browse it."
+    const val GROUPING_UNAVAILABLE: String = "Super stream grouping is unavailable. Partitions are listed as separate streams."
     const val APPROXIMATE: String = "Message counts and offsets are approximate."
 }

@@ -9,6 +9,7 @@ import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.Visibility
 
 /** [StreamCatalog] over the management API of one held connection. Reads only; every call is a GET. */
@@ -31,6 +32,9 @@ internal class ManagementStreamCatalog(
 
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> =
         callPerStream(requests.consumers(vhost)) { ManagementJson.parseConsumers(it, stream) }
+
+    /** M2-07 COMPILE STUB (no behaviour): the real one calls `requests.exchanges` and `requests.bindings` and parses with `ManagementJson.parseSuperStreams`. */
+    override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> = CatalogResult.Unexpected
 
     override suspend fun capabilities(): CatalogResult<Capabilities> {
         val whoami = when (val reply = http.get(requests.whoami())) {

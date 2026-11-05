@@ -40,6 +40,12 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** The top-level path: per-stream paths answer 404 both for a missing plugin and a missing stream. */
     fun pluginProbe(): String = "$base/api/stream/publishers"
 
+    /** M2-07 (S-A): every exchange of the vhost, unpaged (a plain array, `arguments` present on each). */
+    fun exchanges(vhost: String): String = "$base/api/exchanges/${encode(vhost)}"
+
+    /** M2-07 (S-A): every binding of the vhost in one unpaged call (a plain array; includes the default exchange's bindings). */
+    fun bindings(vhost: String): String = "$base/api/bindings/${encode(vhost)}"
+
     fun whoami(): String = "$base/api/whoami"
 
     // URLEncoder makes a space "+", which a path segment does not understand.

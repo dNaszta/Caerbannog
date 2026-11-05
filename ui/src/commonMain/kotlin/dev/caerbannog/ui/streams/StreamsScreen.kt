@@ -66,6 +66,12 @@ interface StreamListEvents {
     fun nextPage()
     fun previousPage()
 
+    /** M2-07 COMPILE STUB (default no-op, the builder removes the default): expand or collapse the super stream [name]. */
+    fun toggleExpanded(name: String) = Unit
+
+    /** M2-07 COMPILE STUB (default no-op, the builder removes the default): the kind chips. */
+    fun setKindFilter(kind: dev.caerbannog.core.streams.StreamKindFilter) = Unit
+
     /** The Create stream button (enabled by [CreateStreamGate]). The dialog is M3: the app wires this to nothing in M2-05. */
     fun createStream()
 

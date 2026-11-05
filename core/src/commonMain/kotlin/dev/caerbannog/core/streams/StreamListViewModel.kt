@@ -124,6 +124,14 @@ class StreamListViewModel(
         viewChanged()
     }
 
+    /** M2-07 COMPILE STUB (no behaviour): expand or collapse the super stream [name]; the set survives refresh, is dropped on switch/disconnect. */
+    @Suppress("UNUSED_PARAMETER")
+    fun toggleExpanded(name: String) = onScope { }
+
+    /** M2-07 COMPILE STUB (no behaviour): the kind chips; composes with the name filter. */
+    @Suppress("UNUSED_PARAMETER")
+    fun setKindFilter(kind: StreamKindFilter) = onScope { }
+
     fun setPage(page: Int) = onScope { showPage(page) }
 
     fun nextPage() = onScope { showPage(clampedPage() + 1) }
