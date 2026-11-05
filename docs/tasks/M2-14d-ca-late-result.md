@@ -66,3 +66,5 @@ Tests written first and passing (core cases, ui holder table, the new scenario o
 
 ## Status
 Step 1 (architect, 2026-11-05): brief written; scenario outline "A late CA certificate answer for a profile that was renamed or deleted is dropped" added to `01_connections.feature` (steps not yet written, so it is pending until step 2); no app code. Next: step 2 test developer writes unit tests and steps (red), step 3 senior developer builds, step 4 verify, step 5 architect review.
+
+Step 2 (test developer, 2026-11-05): tests first. core `ConnectionsViewModelTest` +9 (4 red for the right reason, 5 guards green), `GatedCaCertificateValidator` in `core-testing`, `01` outline steps (2 examples red: `IllegalStateException: No saved connection named 'uat-eu'`), ui `ConnectionFormStateTest` (red by compile). No app code. Owner decisions D-1 and D-2 = recommended. Next: step 3 senior developer builds.

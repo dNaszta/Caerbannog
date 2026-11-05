@@ -12,11 +12,21 @@ import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.checkResultMessage
 import io.cucumber.datatable.DataTable
+import dev.caerbannog.core.connections.fakes.GatedCaCertificateValidator
+import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -497,6 +507,76 @@ class ConnectionsSteps {
     @Then("the file is rejected with a message saying the file could not be read")
     fun theFileIsRejectedWithAMessageSayingTheFileCouldNotBeRead() {
         assertEquals(CaCertificateValidationResult.Invalid("the file could not be read"), lastCaCertificateResult)
+    }
+
+    // --- M2-14d: a late CA answer for a renamed or deleted profile ----------------------------------------------------------
+
+    private var gatedValidator: GatedCaCertificateValidator? = null
+    private var lateCheck: Deferred<CaCertificateValidationResult?>? = null
+    private var checkPool: ExecutorService? = null
+
+    @After
+    fun stopLateCheckWorker() {
+        gatedValidator?.release()
+        checkPool?.shutdownNow()
+    }
+
+    @Given("the check of a valid CA certificate file for {string} is still running")
+    fun theCheckOfAValidCaFileIsStillRunning(name: String) {
+        val gate = GatedCaCertificateValidator()
+        gatedValidator = gate
+        // A view model of its own over the same repository and secret store: only this check goes through the held validator.
+        viewModel = ConnectionsViewModel(repository, secretStore, checker, gate)
+        val pool = Executors.newSingleThreadExecutor { r -> Thread(r, "late-ca-check") }.also { checkPool = it }
+        viewModel.selectConnection(name) // the form for this profile is on screen
+        // Like the form: the check runs on a worker, the answer comes back to the caller. Unconfined = started here, no extra thread.
+        lateCheck = CoroutineScope(Dispatchers.Unconfined).async {
+            viewModel.validateCaCertificateOffThread(name, PRIVATE_CA_FIXTURE_PATH, pool.asCoroutineDispatcher())
+        }
+        gate.awaitStarted()
+    }
+
+    @When("the connection {string} is renamed to {string} before the check finishes")
+    fun theConnectionIsRenamedBeforeTheCheckFinishes(name: String, newName: String) {
+        val saved = repository.list().first { it.name == name }
+        val result = viewModel.updateConnection(
+            originalName = name,
+            input = ConnectionProfileInput(
+                name = newName, host = saved.host, virtualHost = saved.virtualHost, username = saved.username, password = null,
+                streamPort = saved.streamPort, managementPort = saved.managementPort, tls = saved.tls,
+            ),
+        )
+        check(result is SaveConnectionResult.Saved) { "Test setup failed: could not rename '$name' to '$newName': $result" }
+    }
+
+    @When("the connection {string} is deleted before the check finishes")
+    fun theConnectionIsDeletedBeforeTheCheckFinishes(name: String) {
+        viewModel.requestDelete(name)
+        viewModel.confirmDelete()
+    }
+
+    @When("the check finishes")
+    fun theCheckFinishes() {
+        requireNotNull(gatedValidator) { "No running check in this scenario" }.release()
+    }
+
+    @Then("the late answer is dropped without an error")
+    fun theLateAnswerIsDroppedWithoutAnError() {
+        val check = requireNotNull(lateCheck) { "No running check in this scenario" }
+        // await() rethrows anything the check threw (today: IllegalStateException from profileNamed): that is the failure.
+        val answer = runBlocking { withTimeout(10_000) { check.await() } }
+        assertEquals(null, answer, "a late answer for a renamed or deleted profile must be dropped (null)")
+    }
+
+    @Then("no CA certificate message is shown")
+    fun noCaCertificateMessageIsShown() {
+        assertEquals(null, viewModel.state.value.lastCaCertificateValidationResult, "a CA validation result is on screen")
+    }
+
+    @Then("no saved connection has a CA certificate path")
+    fun noSavedConnectionHasACaCertificatePath() {
+        val withPath = repository.list().filter { it.caCertificatePath != null }.map { it.name to it.caCertificatePath }
+        assertEquals(emptyList<Pair<String, String?>>(), withPath, "saved connections with a CA certificate path")
     }
 
     // --- Passwords and secrets -----------------------------------------------
