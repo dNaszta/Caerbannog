@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-04 (merged), M2-05 (list screen, on its branch), M2-06 (name link, on its branch)    Size: M (about 3 days: one spike hour, core and data about 1.5 days, screen half a day)
 
-Status: step 2 done (test developer, 2026-11-05): tests written first, RED on compile stubs (see "Step 2 handoff" below); spikes S-A and S-B answered; next: step 3 build (senior developer). Scenarios written by the architect in `06`; the `@needs-M2` tag on "Filter by kind" in `03` was removed in step 2.
+Status: step 2 done (test developer, 2026-11-05): tests written first, RED on compile stubs (see "Step 2 handoff" below); spikes S-A and S-B answered; architect rulings on the step 2 questions written (2026-11-05, see "Architect rulings"); next: step 3 build (senior developer), after the test developer adds the small test additions listed there. Scenarios written by the architect in `06`; the `@needs-M2` tag on "Filter by kind" in `03` was removed in step 2.
 
 ### Spike S-A answered (test developer, dev broker `rabbitmq:4-management`, 2026-11-05)
 - `GET /api/exchanges/{vhost}` returns `arguments` on EVERY exchange (`{}` when none; the marker is `{"x-super-stream": true}`), also for the default exchange (name `""`) and the `amq.*` ones. Without `page` it answers a plain JSON array with all exchanges; with `page=1&page_size=2&name=ord` it answers the paged envelope (`items`, `total_count`, `filtered_count`...); `page_size=501` is a 400 `invalid_pagination_parameters`. The app sends no paging parameter.
@@ -25,6 +25,25 @@ Tests are red; compile stubs (no behaviour) exist so every module compiles. Repl
 - `ui/.../streams/StreamsScreen.kt` and `StreamsTable.kt`: chips, expand control, note row, indent, name cell plain for a super stream, notice; the tag contract is in the KDoc of `StreamsSuperStreamUiTest`. Remove the default bodies of `StreamListEvents.toggleExpanded/setKindFilter`.
 - `desktopApp/.../StreamListEventsAdapter.kt`: map `toggleExpanded` and `setKindFilter` to the view model (`CompositionRootStreamEventsTest`).
 - Pinned choices to confirm or overrule (architect): a super stream with no partition among the loaded streams (zero) is not specified by any test; a plain stream and a super stream with the same name (queue and exchange names are separate namespaces on the broker) are not specified either; the Size cell is the em dash `—` as on every row (the scenario says "blank"); the offsets dash is the en dash `–` of the mockup.
+### Architect rulings on the step 2 questions (2026-11-05)
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | Calls per tick | CONFIRMED: 2 calls (exchanges, then bindings) per tick, not 1 + N. Reason: N is unbounded, the bindings body (146 KB at 1000 streams) is below one queue page, and the cost is 2 calls (55 vs 53 on 1000 queues). Optional saving ADOPTED: when no exchange of the answer carries the marker (`direct`, boolean `true`), `ManagementStreamCatalog.superStreams` skips the bindings call and returns an empty list (1 call on a broker without super streams). Keep `parseSuperStreams(vhost, exchangesBody, bindingsBody)` as pinned; the catalog may decide with a small new `ManagementJson` function (name free, e.g. `hasSuperStreamExchange(exchangesBody)`) that uses the same marker rule. |
+| 2 | Super stream with zero partitions among the loaded streams | NOTHING is listed (no entry). An entry with 0 partitions has nothing to expand, nothing to count and could not be told from a broken one; the broker cannot hold a binding to a missing queue (S-B), so this only happens when the bound queues are not streams. The sibling rule stays: a partition not among the loaded streams is skipped. |
+| 3 | Plain stream and super stream with the same name | BOTH are listed, as two entries (separate namespaces on the broker). Row ids must not collide: the id carries the kind as well as vhost and name (shape free, e.g. vhost + kind + name; partition rows use the stream id). The plain one keeps the name link, the super stream is plain text. Sort ties on name: plain stream first, then the super stream. `toggleExpanded(name)` addresses the super stream (it is the only kind that expands). A partition named like a super stream is not a conflict: it is a plain stream under its parent. |
+| 4 | "blank Size cell" | The em dash `—` stays (as on every row, N1). Reword, test developer to apply: `06_super_streams.feature` line 25 "...publishers and consumers, and a blank Size cell" becomes "...publishers and consumers, and the dash in the Size cell"; same cleanup in `03_stream_list.feature` line 32 "And the Size cell of each stream is blank" becomes "And the Size cell of each stream shows the dash". If a step definition matches the old text, the step text changes with it (no logic change). |
+| 5 | Type cell text | CONFIRMED: `StreamRow.typeText` in core ("Super stream \u00b7 3 partitions", "Super stream \u00b7 1 partition"; plain "Stream", partition "Partition"); the UI draws only core strings. The offsets dash stays the en dash `\u2013` of the mockup, Size the em dash. |
+
+Pinned tests changed by these rulings: NONE. `ManagementSuperStreamCatalogTest` (two-call test, line 49) uses a fixture with the marker, so it still holds; the failing-bindings test (line 71) too.
+Additions the test developer makes before or alongside the build (small, each one test, red first):
+- data-rabbit, `ManagementSuperStreamCatalogTest`: no exchange with the marker gives an empty layout and exactly one GET (exchanges only); with the marker, two GETs (exists).
+- core, `SuperStreamGroupingTest`: a layout whose partitions are all absent from `streams` gives no entry (ruling 2).
+- core, `StreamListViewModelSuperStreamTest`: a plain stream and a super stream both named "orders" give two rows with different ids, plain first; `toggleExpanded("orders")` expands only the super stream (ruling 3).
+- Scenario wording in `06` line 25 and `03` line 32 (ruling 4).
+
+### Build handoff for the senior developer (step 3)
+Implement the rulings above on top of the Step 2 handoff: skip the bindings call when no marker (ruling 1); drop a super stream with no loaded partition in `groupStreams` (2); kind-aware row ids and the plain-before-super tie order (3); `typeText` in core (5). The "Pinned choices to confirm or overrule" line of the Step 2 handoff is now answered by this table. No pinned test needs a change; if one of the added tests above is not yet there when you start, write to the test developer rather than guessing.
+
 ## Goal
 In the stream list a super stream is one entry (type "Super stream", partition count, summed messages, publishers and consumers) that expands to its partitions, each with its own statistics; partitions never appear as separate top-level entries; the "Super streams" and "Streams" kind filter works; there is no way to open or browse a super stream as one sequence, and the list says why.
 
