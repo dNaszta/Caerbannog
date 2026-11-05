@@ -5,6 +5,9 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.requestFocus
+import dev.caerbannog.core.streams.ConsumerStatus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
@@ -62,4 +65,27 @@ class StreamClientsScreenshotTest {
     fun `screenshot - stream gone`() = runDesktopComposeUiTest(1280, 880) {
         shot(messageOnly(StreamClientsScreen.StreamGone, GONE_TEXT), "clients-06-stream-gone.png")
     }
+
+    /** M2-06 F-G: the keyboard hint popup open on the first, a middle and the last Behind row, so a human can look at it. */
+    private fun hintShot(key: String, fileName: String) = runDesktopComposeUiTest(1280, 900) {
+        val rows = (0..7).map { i -> consumer("c$i", "c$i", behind = "${100 + i}", status = ConsumerStatus.Behind(100L + i)) }
+        clientsScreen(content(consumers = rows, updatedAtMillis = 1_000), nowMillis = 6_000)
+        waitForIdle()
+        onNodeWithTag("statusHint:$key", useUnmergedTree = true).requestFocus()
+        waitForIdle()
+        val image = onAllNodes(isRoot())[0].captureToImage().toAwtImage()
+        outDir.mkdirs()
+        val file = File(outDir, fileName)
+        check(ImageIO.write(image, "png", file)) { "no PNG writer available for $fileName" }
+        assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
+    }
+
+    @Test
+    fun `screenshot - hint popup on the first Behind row`() = hintShot("c0", "clients-02a-hint-first.png")
+
+    @Test
+    fun `screenshot - hint popup on a middle Behind row`() = hintShot("c4", "clients-02b-hint-middle.png")
+
+    @Test
+    fun `screenshot - hint popup on the last Behind row`() = hintShot("c7", "clients-02c-hint-last.png")
 }
