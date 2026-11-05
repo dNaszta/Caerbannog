@@ -157,42 +157,19 @@ private fun EditPanel(
 ) {
     val selected = state.selectedProfile
 
-    var name by remember(selected?.name) { mutableStateOf(selected?.name.orEmpty()) }
-    var host by remember(selected?.name) { mutableStateOf(selected?.host.orEmpty()) }
-    var virtualHost by remember(selected?.name) { mutableStateOf(selected?.virtualHost ?: "/") }
-    var username by remember(selected?.name) { mutableStateOf(selected?.username.orEmpty()) }
-    var password by remember(selected?.name) { mutableStateOf("") }
+    val form = remember(selected?.name) { ConnectionFormState(selected) }
     // Local UI state only: never in the view model or on disk. Masked again when another profile is selected.
     var passwordVisible by remember(selected?.name) { mutableStateOf(false) }
-    var caCertificatePath by remember(selected?.name) { mutableStateOf(selected?.caCertificatePath.orEmpty()) }
-    // The TLS switch and the ports that follow it (the ports themselves are read-only, see BrokerEndpoints.afterTlsSwitch).
-    var tls by remember(selected?.name) { mutableStateOf(selected?.tls ?: true) }
-    var ports by remember(selected?.name) {
-        mutableStateOf(
-            selected?.let { BrokerPorts(it.streamPort, it.managementPort) } ?: BrokerEndpoints.defaultsFor(tls = true),
-        )
-    }
-    // The CA path is validated when the field loses focus or on Save, and only if the user changed it since the last validation.
-    var caEdited by remember(selected?.name) { mutableStateOf(false) }
-    var caHadFocus by remember(selected?.name) { mutableStateOf(false) }
-    var caValidatedPath by remember(selected?.name) { mutableStateOf<String?>(null) }
+    var pendingLevel by remember(selected?.name) { mutableStateOf<TopologyControlLevel?>(null) }
     val panelScope = rememberCoroutineScope()
     val validateCa: () -> Unit = {
-        val path = caCertificatePath
-        if (caEdited && tls && path.isNotBlank()) {
-            caEdited = false
-            caValidatedPath = path
+        val path = form.caCertificatePath
+        if (form.caEdited && form.tls && path.isNotBlank()) {
+            form.caEdited = false
+            form.caValidatedPath = path
             panelScope.launch { onValidateCaCertificate(selected?.name, path) }
         }
     }
-    // Form state like every other field: applied on Save only. pendingLevel non-null = confirmation open.
-    var level by remember(selected?.name) { mutableStateOf(selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY) }
-    var pendingLevel by remember(selected?.name) { mutableStateOf<TopologyControlLevel?>(null) }
-    // Declaration form state, applied on Save only: switch off sends Clear, on sends Set.
-    var declares by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions != null) }
-    var declaredConfigure by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions?.configure ?: false) }
-    var declaredWrite by remember(selected?.name) { mutableStateOf(selected?.declaredPermissions?.write ?: false) }
-
     // Scrollable: the panel is taller than a small window, which would push the banners and Save off-screen.
     // The bar is always visible so the user can see that it scrolls.
     val scrollState = rememberScrollState()
@@ -207,24 +184,24 @@ private fun EditPanel(
             ConnectionFieldGrid(
                 listOf(
                     {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = form.name, onValueChange = { form.name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
                     },
                     {
-                        OutlinedTextField(value = virtualHost, onValueChange = { virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = form.virtualHost, onValueChange = { form.virtualHost = it }, label = { Text("Virtual host") }, modifier = Modifier.fillMaxWidth())
                     },
                     {
-                        OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = form.host, onValueChange = { form.host = it }, label = { Text("Host") }, modifier = Modifier.fillMaxWidth())
                     },
                     {
-                        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = form.username, onValueChange = { form.username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
                     },
                     // Read-only: the ports follow the TLS switch (P1 of M2-14).
-                    { ReadOnlyPortField(if (tls) "Stream port (TLS)" else "Stream port", ports.stream) },
-                    { ReadOnlyPortField(if (tls) "Management port (HTTPS)" else "Management port", ports.management) },
+                    { ReadOnlyPortField(if (form.tls) "Stream port (TLS)" else "Stream port", form.ports.stream) },
+                    { ReadOnlyPortField(if (form.tls) "Management port (HTTPS)" else "Management port", form.ports.management) },
                     {
                         OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
+                            value = form.password,
+                            onValueChange = { form.password = it },
                             label = { Text("Password") },
                             supportingText = if (selected == null) null else {
                                 { Text("Blank keeps the saved password", maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -244,54 +221,54 @@ private fun EditPanel(
                     },
                     {
                         OutlinedTextField(
-                            value = caCertificatePath,
+                            value = form.caCertificatePath,
                             onValueChange = { path ->
-                                caCertificatePath = path
-                                caEdited = true
+                                form.caCertificatePath = path
+                                form.caEdited = true
                             },
-                            enabled = tls,
+                            enabled = form.tls,
                             label = { Text("CA certificate") },
                             supportingText = {
                                 Text(
-                                    if (tls) "Blank uses the system trust store" else "Not used without TLS",
+                                    if (form.tls) "Blank uses the system trust store" else "Not used without TLS",
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             },
                             trailingIcon = { ConnectionIcon(AppIcon.UploadFile, IconSize) },
                             modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
-                                if (caHadFocus && !focus.isFocused) validateCa()
-                                caHadFocus = focus.isFocused
+                                if (form.caHadFocus && !focus.isFocused) validateCa()
+                                form.caHadFocus = focus.isFocused
                             },
                         )
                     },
                 ),
             )
             // Product decision D7: TLS is checked against the CA, the host name is not. Said where the user sets the CA.
-            editPanelNotes(tls).hostNameNotVerified?.let {
+            editPanelNotes(form.tls).hostNameNotVerified?.let {
                 Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             val caResult = state.lastCaCertificateValidationResult
             // The CA is ignored with TLS off, so is a message about it.
-            if (tls && caResult is CaCertificateValidationResult.Invalid) {
+            if (form.tls && caResult is CaCertificateValidationResult.Invalid) {
                 Text(caResult.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
             TopologyControlSelector(
-                level = level,
+                level = form.level,
                 onChange = { picked ->
-                    if (picked == TopologyControlLevel.FULL_CONTROL && level != TopologyControlLevel.FULL_CONTROL) {
+                    if (picked == TopologyControlLevel.FULL_CONTROL && form.level != TopologyControlLevel.FULL_CONTROL) {
                         pendingLevel = picked
                     } else {
-                        level = picked
+                        form.level = picked
                     }
                 },
             )
             pendingLevel?.let { pending ->
                 FullControlConfirmDialog(
                     onConfirm = {
-                        level = pending
+                        form.level = pending
                         pendingLevel = null
                     },
                     onCancel = { pendingLevel = null },
@@ -300,12 +277,12 @@ private fun EditPanel(
 
             Spacer(modifier = Modifier.height(20.dp))
             DeclaredPermissionsSection(
-                declares = declares,
-                configure = declaredConfigure,
-                write = declaredWrite,
-                onDeclaresChange = { declares = it },
-                onConfigureChange = { declaredConfigure = it },
-                onWriteChange = { declaredWrite = it },
+                declares = form.declares,
+                configure = form.declaredConfigure,
+                write = form.declaredWrite,
+                onDeclaresChange = { form.declares = it },
+                onConfigureChange = { form.declaredConfigure = it },
+                onWriteChange = { form.declaredWrite = it },
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -315,16 +292,16 @@ private fun EditPanel(
 
             Spacer(modifier = Modifier.height(20.dp))
             TlsSwitchRow(
-                tls = tls,
+                tls = form.tls,
                 onChange = { now ->
-                    tls = now
-                    ports = BrokerEndpoints.afterTlsSwitch(ports, now)
+                    form.tls = now
+                    form.ports = BrokerEndpoints.afterTlsSwitch(form.ports, now)
                 },
             )
 
             state.lastCheckResult?.let { result ->
                 Spacer(modifier = Modifier.height(8.dp))
-                CheckConnectionBanner(result, tls = selected?.tls ?: tls)
+                CheckConnectionBanner(result, tls = selected?.tls ?: form.tls)
             }
 
             (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
@@ -352,27 +329,8 @@ private fun EditPanel(
                 Button(onClick = {
                     // The typed CA path travels in the input: the view model validates it once and stores it only when Valid (R2),
                     // so there is no validate-then-save detour any more and no stale panel scope can save under an old name (R5).
-                    caEdited = false
-                    // A saved profile whose path is unchanged, or was just validated on focus loss (which stores a valid one), sends null
-                    // (keep) so the file is not read twice; a new profile and any other change send the typed value.
-                    val sendCa = selected == null || (caCertificatePath != selected.caCertificatePath.orEmpty() && caCertificatePath != caValidatedPath)
-                    val input = ConnectionProfileInput(
-                        name = name,
-                        host = host,
-                        virtualHost = virtualHost,
-                        username = username,
-                        password = password.ifBlank { null },
-                        streamPort = ports.stream,
-                        managementPort = ports.management,
-                        tls = tls,
-                        caCertificatePath = if (sendCa) caCertificatePath else null,
-                        topologyControlLevel = level,
-                        declaredPermissions = if (declares) {
-                            DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
-                        } else {
-                            DeclaredPermissionsEdit.Clear
-                        },
-                    )
+                    form.caEdited = false
+                    val input = form.toInput()
                     onSave(selected?.name, input)
                 }) {
                     Text("Save")

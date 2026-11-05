@@ -13,6 +13,10 @@ import kotlinx.coroutines.withContext
  * broker-shaped goes through the [ConnectionProfileRepository], [SecretStore],
  * [BrokerReachabilityChecker] and [CaCertificateValidator] interfaces passed in, so this class runs
  * unchanged against fakes (the BDD layer) and real `data-rabbit` implementations.
+ *
+ * Confined to the UI thread: every method is called there only. [applyCaCertificate], [updateConnection] and
+ * [panelEpoch] read, then write, without a lock and rely on that. The suspend methods return to the caller's
+ * context after their `withContext`, so their state reads and writes are on the UI thread too.
  */
 class ConnectionsViewModel(
     private val repository: ConnectionProfileRepository,
@@ -24,7 +28,7 @@ class ConnectionsViewModel(
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 
-    // Counts panel switches; a late CA validation result compares it to know the user moved on. Touched on the UI thread only.
+    // Counts panel switches and renames; a late CA validation result compares it to know the user moved on. Touched on the UI thread only.
     private var panelEpoch: Int = 0
 
     // The session tells this view model after each of its changes; the view model copies the latest session
@@ -114,6 +118,8 @@ class ConnectionsViewModel(
             renameTo(originalName, updated, input.password)
         }
 
+        // A rename makes a running validation for the old name stale, like a panel switch does.
+        if (input.name != originalName && result is SaveConnectionResult.Saved) panelEpoch++
         refreshAfter(result)
         // The held connection was made with the old settings (spec: closed on edit or rename).
         if (result is SaveConnectionResult.Saved) active?.profileChanged(originalName)
@@ -223,14 +229,18 @@ class ConnectionsViewModel(
      * The form's CA validation (M2-14, review item a of M2-05): reads the file on [dispatcher] (the validator does file IO, so
      * never on the UI thread), then applies the result like [setCaCertificate] ([name] set) or [validateCaCertificateFile]
      * ([name] null). A result is dropped when the user opened another panel meanwhile, so a late answer for one profile is never
-     * shown on another. Returns null for a dropped result.
+     * shown on another, and when the profile was renamed or deleted meanwhile. Returns null for a dropped result.
      */
     suspend fun validateCaCertificateOffThread(name: String?, filePath: String, dispatcher: CoroutineDispatcher): CaCertificateValidationResult? {
         val panel = panelEpoch
         val validation = withContext(dispatcher) { caCertificateValidator.validate(filePath) }
-        if (panel != panelEpoch) return null
+        if (!isStillCurrent(panel, name)) return null
         return if (name == null) applyCaCertificateFile(validation) else applyCaCertificate(name, filePath, validation)
     }
+
+    // The one drop rule for a late answer: same panel (no switch, no rename) and, for a named profile, it still exists.
+    private fun isStillCurrent(panel: Int, name: String?): Boolean =
+        panel == panelEpoch && (name == null || repository.list().any { it.name == name })
 
     /** Proves the named profile's stream and management endpoints are reachable over TLS. */
     suspend fun checkConnection(name: String): ConnectionCheckResult {
@@ -255,6 +265,7 @@ class ConnectionsViewModel(
 
     fun confirmDelete() {
         val name = _state.value.pendingDeleteName ?: return
+        if (_state.value.selectedProfileName == name) panelEpoch++
         repository.delete(name)
         secretStore.delete(name)
         session?.forget(name)
