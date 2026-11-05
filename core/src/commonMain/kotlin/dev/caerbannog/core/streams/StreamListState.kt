@@ -46,11 +46,13 @@ data class StreamRow(
     val partitionOf: String? = null,
     val expanded: Boolean = false,
 ) {
-    /**
-     * M2-07 COMPILE STUB (no behaviour): the text of the Type cell, what the screen draws and what is copied (UI1). The real one reads
-     * "Super stream \u00b7 3 partitions" ("1 partition" for one) for a super stream row and [type] for every other row (mockup).
-     */
-    val typeText: String get() = type
+    /** The text of the Type cell, what the screen draws and what is copied (UI1): "Super stream \u00b7 3 partitions" for a super stream. */
+    val typeText: String
+        get() = if (kind == StreamRowKind.SuperStream) {
+            "$type \u00b7 $partitionCount ${if (partitionCount == 1) "partition" else "partitions"}"
+        } else {
+            type
+        }
 }
 
 /** The whole state of the stream list. [rows] are the visible page only. */
