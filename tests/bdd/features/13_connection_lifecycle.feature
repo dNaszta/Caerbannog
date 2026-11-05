@@ -58,6 +58,38 @@ Feature: Connect and disconnect
       | no password is stored          | No password is stored           |
       | the credentials are refused    | Credentials were refused        |
 
+  # M2-14c. The hint only tells. The app never turns TLS off by itself and never retries without TLS.
+  # Which real failures count as "the broker does not answer the TLS handshake" is measured first (brief M2-14c, step 2);
+  # a wrong CA must keep its own reason.
+  @negative @security @fake-broker
+  Scenario: Connecting with TLS on to a plain broker says the broker may not use TLS
+    Given a saved connection "plain-broker" with TLS on
+    And the broker only offers plain connections
+    When I connect to "plain-broker"
+    Then the state of "plain-broker" is "Failed"
+    And the reason says the broker may not use TLS
+    And the reason says the switch can be turned off in the connection settings
+    And the app holds no connection to the broker
+    And I can retry
+    And the saved connection "plain-broker" still has TLS on
+    And no attempt without TLS was made
+    And no credential was sent
+
+  @negative @security @fake-broker
+  Scenario: A certificate that is not trusted does not suggest turning TLS off
+    Given the connection "uat-eu" fails because the certificate is not trusted
+    When I connect to "uat-eu"
+    Then the state of "uat-eu" is "Failed" with the reason "The certificate was not trusted"
+    And the reason does not mention turning TLS off
+
+  @fake-broker
+  Scenario: A connection with TLS off never shows the TLS hint
+    Given the connection "uat-eu" has TLS off
+    And the connection "uat-eu" fails because the broker is not reachable
+    When I connect to "uat-eu"
+    Then the state of "uat-eu" is "Failed" with the reason "The broker could not be reached"
+    And the reason does not mention TLS
+
   @negative @fake-broker
   Scenario: Connecting without a stored password does not open the clients
     Given no password is stored for "uat-eu"
