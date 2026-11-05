@@ -90,7 +90,7 @@ body{margin:0}
 </tbody>
 </table>
 </div>
-<div class="t-bs dim" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px"><span>Queue messages are never read here. The app shows topology and statistics only. Counts are approximate.</span><span style="flex-grow:1"></span><span>1 to 4 of 4</span><button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button><button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button></div>
+<div class="t-bs dim" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px"><span>Counts are approximate.</span><span style="flex-grow:1"></span><span>1 to 4 of 4</span><button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button><button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button></div>
 </section>
 <aside class="sheet">
 <div style="display:flex;align-items:center;gap:8px"><span class="t-tm" style="flex-grow:1">orders</span><span class="pill">Quorum queue</span><button class="iconbtn" type="button" aria-label="Close details"><span class="ms" aria-hidden="true">close</span></button></div>
@@ -141,7 +141,7 @@ body{margin:0}
 <div class="row on" role="menuitemradio" aria-checked="true"><span class="ms sm" aria-hidden="true">check</span><div style="flex:1"><div class="mono">/</div><div class="t-bs">This connection's virtual host</div></div></div>
 <div class="row" role="menuitemradio" aria-checked="false"><span class="ms sm" aria-hidden="true"></span><div style="flex:1"><div class="mono">billing</div></div></div>
 <div class="row" role="menuitemradio" aria-checked="false"><span class="ms sm" aria-hidden="true"></span><div style="flex:1"><div class="mono">many</div></div></div></div>
-<div class="t-bs dim">One virtual host at a time, starting on the connection's own. The list is the broker's: the connection's virtual host first, then alphabetical. Virtual hosts are NOT marked for permissions: the app cannot read them for a non-administrator, and a monitoring or administrator user is listed every virtual host, so one without permission opens the "not available" state below. Shown only when the list could be read (a user without the management tag gets the no-tag message and no switch). Switching clears the table and loads the chosen virtual host; the choice is not saved and resets when the connection changes.</div>
+<div class="t-bs dim">The caption "This connection's virtual host" is drawn under the connection's own entry only (the state carries it as `homeVhost`, null when the broker does not list it; follow-up F1). One virtual host at a time, starting on the connection's own. The list is the broker's: the connection's virtual host first, then alphabetical. Virtual hosts are NOT marked for permissions: the app cannot read them for a non-administrator, and a monitoring or administrator user is listed every virtual host, so one without permission opens the "not available" state below. Shown only when the list could be read (a user without the management tag gets the no-tag message and no switch). Switching clears the table and loads the chosen virtual host; the choice is not saved and resets when the connection changes.</div>
 </section>
 
 <section id="state-empty" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
