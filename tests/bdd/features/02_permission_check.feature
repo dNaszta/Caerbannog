@@ -70,6 +70,7 @@ Feature: Permission check before the first connection
   @fake-broker
   Scenario: The topology screen explains why it is locked
     Given the user has no configure permission on "/"
+    And the connection "prod-eu" is set to the "Declare and edit" topology level
     When I connect to "prod-eu"
     Then the topology screen explains that the user has no configure permission on virtual host "/"
 
@@ -200,6 +201,7 @@ Feature: Permission check before the first connection
   @fake-broker
   Scenario: The topology screen says declared permissions are not confirmed
     Given the profile "prod-eu" declares configure "yes" and write "yes"
+    And the connection "prod-eu" is set to the "Declare and edit" topology level
     And the management API refuses to return the user's permissions
     When I connect to "prod-eu"
     Then the topology screen says the broker could not confirm the permissions and still enforces its own

@@ -301,17 +301,36 @@ class PermissionCheckSteps {
         return vm.state.value.banners.also { vm.close() }
     }
 
+    // The default level of a profile is Read-only (T5), and the level banner is drawn first (owner decision O1), so the scenarios that name the
+    // broker's reason put the connection at a level above Read-only first. Saved through the view model, so the connect below uses it.
+    @Given("the connection {string} is set to the {string} topology level")
+    fun theConnectionIsSetToLevel(name: String, level: String) {
+        assertEquals(profile.name, name, "the level must be set on the saved connection")
+        val wanted = when (level) {
+            "Read-only" -> dev.caerbannog.core.connections.TopologyControlLevel.READ_ONLY
+            "Declare and edit" -> dev.caerbannog.core.connections.TopologyControlLevel.DECLARE_AND_EDIT
+            "Full control" -> dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL
+            else -> error("unknown level \"$level\"")
+        }
+        val saved = viewModel.setTopologyControlLevel(name, wanted)
+        assertTrue(saved is SaveConnectionResult.Saved, "the level was not saved: $saved")
+        profile = profile.copy(topologyControlLevel = wanted)
+    }
+
     @Then("the topology screen explains that the user has no configure permission on virtual host {string}")
     fun topologyScreenExplainsLocked(vhost: String) {
         val banners = topologyBanners()
-        val reason = banners.firstOrNull { it.kind == dev.caerbannog.core.topology.TopologyBannerKind.NoConfigure }
+        val reason = banners.firstOrNull()
+        assertEquals(dev.caerbannog.core.topology.TopologyBannerKind.NoConfigure, reason?.kind, "the FIRST banner is the one drawn, banners: $banners")
         assertEquals(dev.caerbannog.core.topology.TopologyTexts.noConfigure(profile.username, vhost), reason?.headline, "banners: $banners")
     }
 
     @Then("the topology screen says the broker could not confirm the permissions and still enforces its own")
     fun topologyScreenSaysDeclared() {
         val banners = topologyBanners()
-        val text = banners.firstOrNull { it.kind == dev.caerbannog.core.topology.TopologyBannerKind.DeclaredNotConfirmed }?.let { it.headline + " " + it.detail.orEmpty() }.orEmpty()
+        val first = banners.firstOrNull()
+        assertEquals(dev.caerbannog.core.topology.TopologyBannerKind.DeclaredNotConfirmed, first?.kind, "the FIRST banner is the one drawn, banners: $banners")
+        val text = first?.let { it.headline + " " + it.detail.orEmpty() }.orEmpty()
         assertTrue(text.contains("could not confirm") && text.contains("still enforces its own"), "banners: $banners")
     }
 
