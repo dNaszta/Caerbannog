@@ -1,0 +1,212 @@
+[
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-audit",
+        "destination_type": "queue",
+        "routing_key": "dev-audit",
+        "arguments": {},
+        "properties_key": "dev-audit"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-events",
+        "destination_type": "queue",
+        "routing_key": "dev-events",
+        "arguments": {},
+        "properties_key": "dev-events"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-jobs",
+        "destination_type": "queue",
+        "routing_key": "dev-jobs",
+        "arguments": {},
+        "properties_key": "dev-jobs"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-mail",
+        "destination_type": "queue",
+        "routing_key": "dev-mail",
+        "arguments": {},
+        "properties_key": "dev-mail"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-orders",
+        "destination_type": "queue",
+        "routing_key": "dev-orders",
+        "arguments": {},
+        "properties_key": "dev-orders"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "dev-retry",
+        "destination_type": "queue",
+        "routing_key": "dev-retry",
+        "arguments": {},
+        "properties_key": "dev-retry"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "orders-0",
+        "destination_type": "queue",
+        "routing_key": "orders-0",
+        "arguments": {},
+        "properties_key": "orders-0"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "orders-1",
+        "destination_type": "queue",
+        "routing_key": "orders-1",
+        "arguments": {},
+        "properties_key": "orders-1"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "orders-2",
+        "destination_type": "queue",
+        "routing_key": "orders-2",
+        "arguments": {},
+        "properties_key": "orders-2"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "regions-apac",
+        "destination_type": "queue",
+        "routing_key": "regions-apac",
+        "arguments": {},
+        "properties_key": "regions-apac"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "regions-eu",
+        "destination_type": "queue",
+        "routing_key": "regions-eu",
+        "arguments": {},
+        "properties_key": "regions-eu"
+    },
+    {
+        "source": "",
+        "vhost": "/",
+        "destination": "regions-us",
+        "destination_type": "queue",
+        "routing_key": "regions-us",
+        "arguments": {},
+        "properties_key": "regions-us"
+    },
+    {
+        "source": "dev.commands",
+        "vhost": "/",
+        "destination": "dev-mail",
+        "destination_type": "queue",
+        "routing_key": "mail",
+        "arguments": {},
+        "properties_key": "mail"
+    },
+    {
+        "source": "dev.events",
+        "vhost": "/",
+        "destination": "dev-jobs",
+        "destination_type": "queue",
+        "routing_key": "job.#",
+        "arguments": {},
+        "properties_key": "job.%23"
+    },
+    {
+        "source": "dev.fanout",
+        "vhost": "/",
+        "destination": "dev-jobs",
+        "destination_type": "queue",
+        "routing_key": "",
+        "arguments": {},
+        "properties_key": "~"
+    },
+    {
+        "source": "dev.fanout",
+        "vhost": "/",
+        "destination": "dev-retry",
+        "destination_type": "queue",
+        "routing_key": "",
+        "arguments": {},
+        "properties_key": "~"
+    },
+    {
+        "source": "orders",
+        "vhost": "/",
+        "destination": "orders-0",
+        "destination_type": "queue",
+        "routing_key": "0",
+        "arguments": {
+            "x-stream-partition-order": 0
+        },
+        "properties_key": "0~iKEaZQ"
+    },
+    {
+        "source": "orders",
+        "vhost": "/",
+        "destination": "orders-1",
+        "destination_type": "queue",
+        "routing_key": "1",
+        "arguments": {
+            "x-stream-partition-order": 1
+        },
+        "properties_key": "1~1jlUUQ"
+    },
+    {
+        "source": "orders",
+        "vhost": "/",
+        "destination": "orders-2",
+        "destination_type": "queue",
+        "routing_key": "2",
+        "arguments": {
+            "x-stream-partition-order": 2
+        },
+        "properties_key": "2~eQ_kzA"
+    },
+    {
+        "source": "regions",
+        "vhost": "/",
+        "destination": "regions-apac",
+        "destination_type": "queue",
+        "routing_key": "apac",
+        "arguments": {
+            "x-stream-partition-order": 2
+        },
+        "properties_key": "apac~eQ_kzA"
+    },
+    {
+        "source": "regions",
+        "vhost": "/",
+        "destination": "regions-eu",
+        "destination_type": "queue",
+        "routing_key": "eu",
+        "arguments": {
+            "x-stream-partition-order": 1
+        },
+        "properties_key": "eu~1jlUUQ"
+    },
+    {
+        "source": "regions",
+        "vhost": "/",
+        "destination": "regions-us",
+        "destination_type": "queue",
+        "routing_key": "us",
+        "arguments": {
+            "x-stream-partition-order": 0
+        },
+        "properties_key": "us~iKEaZQ"
+    }
+]
