@@ -10,6 +10,12 @@ import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.topology.BindingRow
+import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.topology.QueuePage
+import dev.caerbannog.core.topology.QueueRow
+import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.VhostRow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertSame
@@ -23,7 +29,7 @@ import java.util.Collections
  * still closes everything else, never throws, and is idempotent (spec "Connection lifecycle": "Closing is idempotent").
  * The shared fakes of `core` jvmTest are not on this module's classpath; this file uses small local stubs.
  * Contract, package `dev.caerbannog.datarabbit`:
- *   class RabbitMqHeldConnection(catalog: StreamCatalog, offsets: StreamOffsets, resources: List<AutoCloseable>, log: (String) -> Unit) : HeldConnection
+ *   class RabbitMqHeldConnection(catalog: StreamCatalog, offsets: StreamOffsets, topology: TopologyCatalog, resources: List<AutoCloseable>, log: (String) -> Unit) : HeldConnection
  *   `resources` are the HTTP client, the Environment holder and whatever else the holder owns; `close()` closes each exactly once.
  */
 class RabbitMqHeldConnectionTest {
@@ -46,7 +52,7 @@ class RabbitMqHeldConnectionTest {
     private val lines: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     private fun holder(vararg resources: AutoCloseable) =
-        RabbitMqHeldConnection(StubCatalog, StubOffsets, resources.toList()) { lines += it }
+        RabbitMqHeldConnection(StubCatalog, StubOffsets, StubTopology, resources.toList()) { lines += it }
 
     @Test
     fun `close closes every resource once`() {
@@ -113,6 +119,7 @@ class RabbitMqHeldConnectionTest {
         val held = holder()
         assertSame(StubCatalog, held.catalog)
         assertSame(StubOffsets, held.offsets)
+        assertSame(StubTopology, held.topology)
     }
 }
 
@@ -128,4 +135,12 @@ private object StubCatalog : StreamCatalog {
 
 private object StubOffsets : StreamOffsets {
     override suspend fun firstOffset(vhost: String, stream: String): FirstOffset = FirstOffset.Unavailable
+}
+
+private object StubTopology : TopologyCatalog {
+    override suspend fun vhosts(): CatalogResult<List<VhostRow>> = CatalogResult.Unexpected
+    override suspend fun queues(vhost: String, page: Int): CatalogResult<QueuePage> = CatalogResult.Unexpected
+    override suspend fun exchanges(vhost: String): CatalogResult<List<ExchangeRow>> = CatalogResult.Unexpected
+    override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = CatalogResult.Unexpected
+    override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = CatalogResult.Unexpected
 }

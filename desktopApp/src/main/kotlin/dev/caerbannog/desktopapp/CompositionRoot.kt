@@ -5,8 +5,10 @@ import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionSession
+import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.LinkState
+import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.streams.AppSettings
@@ -14,6 +16,8 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshTarget
 import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
+import dev.caerbannog.core.topology.TopologyContext
+import dev.caerbannog.core.topology.TopologyViewModel
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
 import dev.caerbannog.datarabbit.JsonFileAppSettings
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
@@ -72,6 +76,8 @@ class AppComposition(
     val streamEvents: StreamListEventsAdapter,
     /** The stream screen's events, mapped onto [streamClients] and [navigation] (M2-06b). */
     val streamClientsEvents: StreamClientsEventsAdapter,
+    /** The read-only Topology screen's state holder (M2-08b); the screen and the drawer entry come with 08c. */
+    val topology: TopologyViewModel,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
@@ -81,6 +87,7 @@ class AppComposition(
             // chip model; the close() calls are for callers that keep the scope alive.
             streamList.close()
             streamClients.close()
+            topology.close()
             control.close()
             streamListScope.cancel()
         } finally {
@@ -135,11 +142,26 @@ fun createAppComposition(
     streamListScope.launch {
         active.state.collect { if (it is LinkState.Disconnected) navigation.closeStream() }
     }
+    val topology = TopologyViewModel(
+        active = active,
+        settings = appSettings,
+        scope = streamListScope,
+        clock = clock,
+        reconnect = viewModel::connect,
+        context = viewModel.state.map(::topologyContext).stateIn(streamListScope, SharingStarted.Eagerly, topologyContext(viewModel.state.value)),
+    )
     val control = ConnectionControlModel(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), streamListScope)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, streamListScope)
+}
+
+// The banner of the Topology screen needs the connected profile (user, level) and what the permission check found, nothing else.
+private fun topologyContext(state: ConnectionsState): TopologyContext? {
+    val current = state.currentConnection ?: return null
+    val profile = state.profiles.firstOrNull { it.name == current.name } ?: return null
+    return TopologyContext(profile, (current.status as? PermissionCheckStatus.Done)?.result)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

@@ -2,6 +2,7 @@ package dev.caerbannog.core.connections
 
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
+import dev.caerbannog.core.topology.TopologyCatalog
 
 /**
  * Opens the clients of one connection profile (management API over HTTPS, stream client lazily). Gateway
@@ -31,10 +32,6 @@ interface HeldConnection : AutoCloseable {
     /** First offsets over the stream protocol of this connection. */
     val offsets: StreamOffsets
 
-    /**
-     * M2-08b: queues, exchanges, bindings and vhosts over the management API of this connection.
-     * COMPILE STUB by the test developer: the default answers `Unreachable` to everything. The developer removes the default and gives
-     * every implementation its real catalog (`RabbitMqHeldConnection`, the fake, the anonymous holders of the desktopApp tests).
-     */
-    val topology: dev.caerbannog.core.topology.TopologyCatalog get() = dev.caerbannog.core.topology.UnavailableTopology
+    /** M2-08b: queues, exchanges, bindings and vhosts over the management API of this connection (read-only). */
+    val topology: TopologyCatalog
 }
