@@ -233,6 +233,24 @@ Feature: Connection profiles
       | the temp folder/    |
       | a file that is gone |
 
+  # M2-14d: the file is read off the UI thread, so the answer can arrive after the user renamed or deleted the profile.
+  # The late answer is dropped: nothing is saved, no message is shown, nothing fails. The ordering needs a validator that is held
+  # until the step releases it (core-testing), so the scenario stays deterministic. The panel-switch case is a unit test.
+  @negative @fake-broker
+  Scenario Outline: A late CA certificate answer for a profile that was renamed or deleted is dropped
+    Given a saved connection "uat-eu"
+    And the check of a valid CA certificate file for "uat-eu" is still running
+    When the connection "uat-eu" is <change> before the check finishes
+    And the check finishes
+    Then the late answer is dropped without an error
+    And no CA certificate message is shown
+    And no saved connection has a CA certificate path
+
+    Examples:
+      | change              |
+      | renamed to "uat-us" |
+      | deleted             |
+
   @security
   Scenario: Passwords are not stored in the profile file
     Given a saved connection "uat-eu" with password "s3cret"
