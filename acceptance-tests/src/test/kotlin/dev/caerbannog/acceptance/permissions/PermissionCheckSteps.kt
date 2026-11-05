@@ -288,6 +288,33 @@ class PermissionCheckSteps {
         list.close()
     }
 
+    // M2-08c: the topology screen's reasons, core half: the REAL `TopologyViewModel` on the connection the scenario opened, with the context the
+    // composition root builds (profile and the session's permission result). The drawing of the banner is a Compose test of 08c. NOTE (owner decision
+    // O1): at the default Read-only level the level banner comes FIRST in the list and is the one drawn; these steps check the reason is in the list.
+    private fun topologyBanners(): List<dev.caerbannog.core.topology.TopologyBanner> {
+        val vm = dev.caerbannog.core.topology.TopologyViewModel(
+            active = active, settings = FakeAppSettings(), scope = test.backgroundScope, clock = RefreshClock { test.testScheduler.currentTime },
+            reconnect = viewModel::connect,
+            context = kotlinx.coroutines.flow.MutableStateFlow(dev.caerbannog.core.topology.TopologyContext(profile, session.permissions(profile.name))),
+        )
+        test.runCurrent()
+        return vm.state.value.banners.also { vm.close() }
+    }
+
+    @Then("the topology screen explains that the user has no configure permission on virtual host {string}")
+    fun topologyScreenExplainsLocked(vhost: String) {
+        val banners = topologyBanners()
+        val reason = banners.firstOrNull { it.kind == dev.caerbannog.core.topology.TopologyBannerKind.NoConfigure }
+        assertEquals(dev.caerbannog.core.topology.TopologyTexts.noConfigure(profile.username, vhost), reason?.headline, "banners: $banners")
+    }
+
+    @Then("the topology screen says the broker could not confirm the permissions and still enforces its own")
+    fun topologyScreenSaysDeclared() {
+        val banners = topologyBanners()
+        val text = banners.firstOrNull { it.kind == dev.caerbannog.core.topology.TopologyBannerKind.DeclaredNotConfirmed }?.let { it.headline + " " + it.detail.orEmpty() }.orEmpty()
+        assertTrue(text.contains("could not confirm") && text.contains("still enforces its own"), "banners: $banners")
+    }
+
     // --- M1-07: what the sidebar pill and the edit panel banner say (core level) --------------------
 
     @Given("the user has no configure permission on {string}")

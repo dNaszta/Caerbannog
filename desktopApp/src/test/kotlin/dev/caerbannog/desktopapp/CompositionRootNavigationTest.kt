@@ -137,15 +137,15 @@ class CompositionRootNavigationTest {
     }
 
     @Test
-    fun `Topology and Migrations have no screen yet, opening them changes nothing`() {
+    fun `Migrations has no screen yet, opening it changes nothing, and Topology opens`() {
         val queue = QueueDispatcher()
         val composition = compose(queue)
         try {
             composition.navigation.open(AppDestination.Streams)
-            composition.navigation.open(AppDestination.Topology)
-            assertEquals(AppDestination.Streams, composition.navigation.screen.value)
             composition.navigation.open(AppDestination.Migrations)
             assertEquals(AppDestination.Streams, composition.navigation.screen.value)
+            composition.navigation.open(AppDestination.Topology)
+            assertEquals(AppDestination.Topology, composition.navigation.screen.value)
         } finally {
             composition.close()
         }

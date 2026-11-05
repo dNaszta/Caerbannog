@@ -66,8 +66,8 @@ Feature: Permission check before the first connection
     When I connect to "prod-eu"
     Then the app bar shows "Topology locked" next to "prod-eu"
 
-  # Built by task M2-08c; remove @needs-M2 there.
-  @fake-broker @needs-M2
+  # Built by task M2-08c (core half: the banner reasons of the view model; the drawing is in the Compose tests of 08c).
+  @fake-broker
   Scenario: The topology screen explains why it is locked
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
@@ -197,7 +197,7 @@ Feature: Permission check before the first connection
     Then the app bar shows "Topology locked" next to "prod-eu"
     And the edit panel tells me that permissions could not be read
 
-  @fake-broker @needs-M2
+  @fake-broker
   Scenario: The topology screen says declared permissions are not confirmed
     Given the profile "prod-eu" declares configure "yes" and write "yes"
     And the management API refuses to return the user's permissions

@@ -287,9 +287,10 @@ Feature: Topology and quorum queues
 
   # Decision T4 (recommended): in M2 the screen has no action that changes topology, so none is drawn,
   # not even a disabled one. The locked actions of the @M5 scenarios come with the migrations.
-  @M2 @fake-broker @needs-08c
+  @M2 @fake-broker
   Scenario: The M2 topology screen offers no action that changes topology
     Given the user has configure permission on "/"
+    And a quorum queue "orders"
     When I select the queue "orders"
     Then there is no control to edit, delete or bind
 

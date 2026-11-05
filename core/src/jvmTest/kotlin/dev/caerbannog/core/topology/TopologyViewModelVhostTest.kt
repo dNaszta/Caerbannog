@@ -300,4 +300,21 @@ class TopologyViewModelVhostTest {
         assertEquals(emptyList(), s.requests())
         assertFalse(s.state.screen is TopologyScreen.VhostUnavailable)
     }
+
+    // Architect follow-up of 08b step 5: the search texts belong to the vhost they were typed on.
+    @Test
+    fun `a switch clears the search text of every tab`() = runTest {
+        val s = TopologyHarness(this).billing()
+        s.open()
+        s.vm.setSearch("q-0")
+        s.vm.setTab(TopologyTab.Exchanges)
+        s.vm.setSearch("ev")
+        s.settle()
+        s.vm.selectVhost("billing")
+        s.settle()
+        assertEquals("", s.state.search, "the Exchanges tab text is gone")
+        s.vm.setTab(TopologyTab.Queues)
+        s.settle()
+        assertEquals("", s.state.search, "and so is the Queues tab text")
+    }
 }

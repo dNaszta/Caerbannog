@@ -80,6 +80,9 @@ class AppComposition(
     val topology: TopologyViewModel,
     private val streamListScope: CoroutineScope,
 ) {
+    /** M2-08c COMPILE STUB (test developer): the Topology screen's events, mapped onto [topology]. */
+    val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
+
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
     fun close() {
         try {

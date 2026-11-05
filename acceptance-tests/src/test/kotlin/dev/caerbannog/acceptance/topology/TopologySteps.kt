@@ -39,6 +39,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 
 /**
@@ -573,6 +574,18 @@ class TopologySteps {
         val words = listOf("get", "consume", "purge", "message", "contents", "ack")
         val offending = (topology.calls.toSet() + TopologyCatalog::class.java.methods.map { it.name }).filter { name -> words.any { name.lowercase().contains(it) && name != "queueDetail" } }
         assertEquals(emptyList<String>(), offending)
+    }
+
+    // M2-08c: T4, no write control at all. The view model is the core half: it has no method that changes topology or touches a message, so no screen
+    // can offer one; the Compose half (no such control drawn, in any state) is `TopologyDetailAndSafetyUiTest` in `ui`.
+    @Then("there is no control to edit, delete or bind")
+    fun noWriteControl() {
+        assertNotNull(state.selectedQueue, "the queue is selected, the screen shows ${state.screen}")
+        val words = listOf("edit", "delete", "bind", "declare", "purge", "create", "migration", "policy")
+        val methods = TopologyViewModel::class.java.methods.filter { it.declaringClass == TopologyViewModel::class.java }.map { it.name.lowercase() }
+        assertTrue(methods.isNotEmpty(), "reflection found no public method of the view model")
+        val offending = methods.filter { name -> words.any { name.contains(it) } }
+        assertEquals(emptyList<String>(), offending, "view model methods that could change topology")
     }
 
     @Then("the topology screen explains that the connection is set to read-only")
