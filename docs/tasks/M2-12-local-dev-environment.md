@@ -144,7 +144,7 @@ Rulings on the verify findings:
 | # | Ruling |
 | --- | --- |
 | 1 wrong CA gives `StreamException: null` | Follow-up (M2-12b): when the message is null or empty, print a hint "TLS handshake failed: is --ca the CA that signed the broker certificate?". |
-| 2 `--max-age` ignored with `--queues N --vhost many`; `--queues 0 --vhost many` creates streams in `many` | Follow-up (M2-12b): reject `--max-age` together with `--queues N` on a vhost other than `/`, and print a one-line note when `--queues` is absent and `--vhost` is not `/` is not needed: instead `--queues 0` with a non-default `--vhost` and default streams stays allowed (explicit choice) but the README says so. Small `SeedArgs` rule, test first. |
+| 2 `--max-age` ignored with `--queues N --vhost many`; `--queues 0 --vhost many` creates streams in `many` | Follow-up (M2-12b): reject `--max-age` together with `--queues N` on a vhost other than `/`, ; `--queues 0` with a non-default `--vhost` stays allowed (explicit choice), the README says what it does. Small `SeedArgs` rule, test first. |
 | 3 `--streams x` creates it if absent | Accept as designed (the seed makes missing streams so it works on a bare broker); document in the README (M2-12b). |
 | 4 wrapper noise buries usage text | Accept. `-q` is already set; the usage text is printed last by the tool itself. |
 | 5 password visible in `ps` | Accept: throwaway value, local machine, documented. No env var now; adding `DEV_SEED_PASSWORD` would change the tested contract "`--password` is the only required flag". Idea only. |
