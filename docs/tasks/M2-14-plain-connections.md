@@ -191,9 +191,9 @@ Step 5 whole-task review (architect, 2026-11-05): M2-14 ACCEPTED WITH FOLLOW-UPS
 Follow-ups (none block the merge):
 | Id | What | Size | When |
 | --- | --- | --- | --- |
-| F1 | KDoc on `ConnectionsViewModel`: confined to the UI thread, `applyCaCertificate` relies on it | S (minutes) | with F2 |
-| F2 | Late CA validation result for a renamed or deleted profile is dropped (no `IllegalStateException` in `panelScope`); rename also bumps `panelEpoch`; tests first | S | M2-15 or next task touching the view model |
-| R6 | Move the screen's `sendCa` logic into the form state holder | S | with F2 |
+| F1 | KDoc on `ConnectionsViewModel`: confined to the UI thread, `applyCaCertificate` relies on it | S (minutes) | with F2. DONE (M2-14e, 2026-11-05) |
+| F2 | Late CA validation result for a renamed or deleted profile is dropped (no `IllegalStateException` in `panelScope`); rename also bumps `panelEpoch`; tests first | S | M2-15 or next task touching the view model. DONE (M2-14e, 2026-11-05) |
+| R6 | Move the screen's `sendCa` logic into the form state holder | S | with F2. DONE (M2-14e, 2026-11-05; see its brief finding 1) |
 | M2-14c | Connect hint "may not use TLS": first measure in `RealBrokerPlainTest` whether a wrong CA and a plain broker differ; ask the user at the hand trial whether they want it | S | after the hand trial |
 | M2-TESTHYGIENE-02 | Guard: ignore stale XML and fix the task wiring (see its brief) | S | before the next milestone verify |
 

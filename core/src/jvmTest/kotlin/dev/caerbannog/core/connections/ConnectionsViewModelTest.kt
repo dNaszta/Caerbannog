@@ -1,6 +1,13 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.connections.fakes.GatedCaCertificateValidator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
+import java.util.concurrent.Executors
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -392,5 +399,146 @@ class ConnectionsViewModelTest {
         assertEquals(listOf("/"), seen)
         assertEquals(CaCertificateValidationResult.Invalid("the file could not be read"), returned)
         assertEquals(returned, viewModel.state.value.lastCaCertificateValidationResult)
+    }
+
+    // --- M2-14e (F2): a late CA validation answer must not land on the wrong profile -----------------------------------------
+    // The validator is held at a gate (no sleep); the test changes the state while the file "is being read", then releases it.
+
+    private val lateCa = "/some/ca.pem"
+
+    private class LateCaFixture {
+        val repository = InMemoryRepository()
+        val secretStore = InMemorySecretStore()
+        val gate = GatedCaCertificateValidator()
+        val vm = ConnectionsViewModel(repository, secretStore, UncalledReachabilityChecker(), gate)
+        fun add(name: String) = vm.addConnection(ConnectionProfileInput(name, "rabbit-$name.example.com", "/", "svc-explorer", password = null))
+    }
+
+    /** Starts the check for [name], runs [whileRunning] while it waits at the gate, releases it and returns what it answered. */
+    private fun LateCaFixture.answerAfter(name: String?, whileRunning: () -> Unit): CaCertificateValidationResult? {
+        val pool = Executors.newSingleThreadExecutor { r -> Thread(r, "late-ca-test") }
+        try {
+            return runBlocking {
+                withTimeout(15_000) {
+                    val answer = async(Dispatchers.Unconfined) { vm.validateCaCertificateOffThread(name, lateCa, pool.asCoroutineDispatcher()) }
+                    gate.awaitStarted()
+                    whileRunning()
+                    gate.release()
+                    answer.await()
+                }
+            }
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `a late CA answer for a deleted profile is dropped without an error and changes nothing`() {
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") { f.vm.requestDelete("a"); f.vm.confirmDelete() }
+        assertNull(answer, "a late answer for a deleted profile is dropped (null)")
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult, "no CA message for a deleted profile")
+        assertEquals(listOf("b"), f.vm.state.value.profiles.map { it.name })
+        assertEquals(listOf("b"), f.repository.list().map { it.name })
+        assertTrue(f.repository.list().all { it.caCertificatePath == null }, "no profile got a CA path")
+    }
+
+    @Test
+    fun `a late CA answer for a renamed profile is dropped and the profile under the new name has no CA path`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") { f.vm.updateConnection("a", ConnectionProfileInput("a2", "rabbit-a.example.com", "/", "svc-explorer", password = null)) }
+        assertNull(answer, "a late answer for a renamed profile is dropped (null)")
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult, "no CA message after a dropped answer")
+        assertEquals(listOf("a2"), f.repository.list().map { it.name })
+        assertNull(f.repository.list().single().caCertificatePath)
+    }
+
+    @Test
+    fun `a rename bumps the epoch so the late answer is dropped even when the old name is added again`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") {
+            f.vm.updateConnection("a", ConnectionProfileInput("a2", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+            f.add("a") // a different profile now owns the old name: the existence check alone would let the answer through
+        }
+        assertNull(answer, "the answer belongs to the profile that was renamed, not to the new profile called 'a'")
+        assertNull(f.repository.list().first { it.name == "a" }.caCertificatePath)
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult)
+    }
+
+    @Test
+    fun `an update without a rename does not drop a running CA validation`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") {
+            f.vm.updateConnection("a", ConnectionProfileInput("a", "other-host.example.com", "/", "svc-explorer", password = null))
+        }
+        assertEquals(CaCertificateValidationResult.Valid, answer)
+        val saved = f.repository.list().single()
+        assertEquals(lateCa, saved.caCertificatePath, "the validated path is stored")
+        assertEquals("other-host.example.com", saved.host, "the edit made meanwhile is kept")
+    }
+
+    @Test
+    fun `a failed rename does not drop a running CA validation`() {
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") {
+            val result = f.vm.updateConnection("a", ConnectionProfileInput("b", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+            assertTrue(result is SaveConnectionResult.NameAlreadyExists, "setup: the rename collides, got $result")
+        }
+        assertEquals(CaCertificateValidationResult.Valid, answer, "nothing changed for 'a', so its answer still applies")
+        assertEquals(lateCa, f.repository.list().first { it.name == "a" }.caCertificatePath)
+    }
+
+    @Test
+    fun `deleting the selected profile bumps the epoch so a running validation without a name is dropped`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter(null) { f.vm.requestDelete("a"); f.vm.confirmDelete() }
+        assertNull(answer, "the panel the answer was for is gone")
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult)
+    }
+
+    @Test
+    fun `deleting another profile does not drop a running validation`() {
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") { f.vm.requestDelete("b"); f.vm.confirmDelete() }
+        assertEquals(CaCertificateValidationResult.Valid, answer)
+        assertEquals(lateCa, f.repository.list().single { it.name == "a" }.caCertificatePath)
+    }
+
+    @Test
+    fun `a late CA answer for a profile deleted while another one is selected is dropped by the existence check`() {
+        // Deleting a profile that is not selected does not bump the epoch, so only the "still exists" check can drop this answer.
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("b") }
+        val answer = f.answerAfter("a") { f.vm.requestDelete("a"); f.vm.confirmDelete() }
+        assertNull(answer)
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult)
+        assertTrue(f.repository.list().all { it.caCertificatePath == null })
+    }
+
+    @Test
+    fun `renaming a profile and back while a CA validation runs drops the answer`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") {
+            f.vm.updateConnection("a", ConnectionProfileInput("a2", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+            f.vm.updateConnection("a2", ConnectionProfileInput("a", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+        }
+        assertNull(answer, "the name is back, but the profile was renamed meanwhile: the epoch drops the answer")
+        assertNull(f.repository.list().single().caCertificatePath)
+    }
+
+    @Test
+    fun `a panel switch still drops the late CA answer`() {
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") { f.vm.selectConnection("b") }
+        assertNull(answer)
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult)
+        assertTrue(f.repository.list().all { it.caCertificatePath == null })
+    }
+
+    @Test
+    fun `a late CA answer for the new connection form with no name still applies`() {
+        val f = LateCaFixture().also { it.vm.startNewConnection() }
+        val answer = f.answerAfter(null) {}
+        assertEquals(CaCertificateValidationResult.Valid, answer)
+        assertEquals(CaCertificateValidationResult.Valid, f.vm.state.value.lastCaCertificateValidationResult)
     }
 }
