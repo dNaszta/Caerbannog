@@ -483,6 +483,39 @@ class ConnectionsScreenTlsUiTest {
     }
 
     @Test
+    fun `editing a saved profile's CA path then Save without leaving the field stores the valid path, validated once`() = runDesktopComposeUiTest(1280, 880) {
+        show(uat)
+        select("uat-eu")
+        onNodeWithText("CA certificate").performTextInput("/valid.pem")
+
+        save() // focus never left the field
+        waitUntil(timeoutMillis = 10_000) { repository.list().single().caCertificatePath == "/valid.pem" }
+
+        assertEquals(listOf("/valid.pem"), validator.paths.toList(), "the file is read exactly once")
+    }
+
+    @Test
+    fun `Save pressed while the focus-loss validation is still running loses neither the path nor the other edits`() = runDesktopComposeUiTest(1280, 880) {
+        validator.gate = CountDownLatch(1)
+        show(uat)
+        select("uat-eu")
+        onNodeWithText("CA certificate").performTextInput("/valid.pem")
+        focusName()
+        assertTrue(validator.entered.await(10, TimeUnit.SECONDS), "the validator was never asked")
+
+        onNodeWithText("Host").performTextInput("-edited")
+        save() // validation of /valid.pem is still held
+        validator.gate!!.countDown()
+        waitUntil(timeoutMillis = 10_000) { repository.list().single().caCertificatePath == "/valid.pem" }
+        waitForIdle()
+
+        val stored = repository.list().single()
+        assertEquals("/valid.pem", stored.caCertificatePath, "the validated path must be stored, not a stale value")
+        assertTrue(stored.host.contains("-edited"), "the late validation result must not overwrite the host saved meanwhile, was '${stored.host}'")
+        assertEquals(listOf("/valid.pem"), validator.paths.toList(), "validated once")
+    }
+
+    @Test
     fun `a blank CA path is never validated`() = runDesktopComposeUiTest(1280, 880) {
         show(uat)
         select("uat-eu")
