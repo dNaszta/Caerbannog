@@ -33,7 +33,7 @@ sealed interface RowAction {
 /**
  * The closed chip. [text] is the connection name, or "No connection". [stateText] is the visible state word next to the
  * name, only for [ChipState.Disconnected] ("Disconnected"), otherwise null. [pill] is null when hidden. [tooltip] is the
- * failure reason for [ChipState.Failed], otherwise null.
+ * failure reason or the settings-changed note, otherwise null.
  */
 data class ConnectionChipState(
     val kind: ChipState,
@@ -53,6 +53,8 @@ data class ConnectionRowState(
     val stateText: String,
     val action: RowAction,
     val current: Boolean,
+    /** The settings-changed note of a Disconnected row, otherwise null. */
+    val note: String? = null,
 )
 
 /** "Stream list refresh" section. [note] is "Connect to refresh", "Not loaded yet" or "Updated N s ago". */

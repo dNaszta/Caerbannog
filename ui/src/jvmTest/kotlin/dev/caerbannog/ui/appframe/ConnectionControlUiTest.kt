@@ -51,6 +51,7 @@ import kotlin.test.assertTrue
  *   "chipPill"              the permission pill inside the chip, only when the state has a pill (text = pill text)
  *   "connectionPopup"       the popup container, shown while open
  *   "popupRow:<name>"       one saved profile row (merged text: name and state text); `selected` is true for the current row
+ *   "popupNote:<name>"      the settings-changed note line of a Disconnected row (only when `note` is set)
  *   "popupAction:<name>"    the row's one action button (text Connect, Disconnect or Retry); absent for RowAction.None
  *   "refreshChoice:<label>" a single-choice chip with label Off, 5 s, 10 s, 30 s or 60 s; `selected` for the chosen one
  *   "refreshNow"            the "Refresh now" button;  "refreshNote"  the note text;
@@ -372,6 +373,20 @@ class ConnectionControlUiTest {
 
         assertEquals(listOf("connect:uat-eu", "disconnect:prod-eu", "retry:staging-eu"), recorder.events)
         onNodeWithTag("connectionPopup").assertExists()
+    }
+
+    @Test
+    fun `a Disconnected row with a note shows the note text under its own tag`() = runDesktopComposeUiTest(1280, 800) {
+        val note = "Connection settings changed. Connect again."
+        show(
+            mockupState.copy(
+                rows = mockupState.rows.map { if (it.name == "uat-eu") it.copy(note = note) else it },
+            ),
+        )
+        open()
+
+        onNode(hasTestTag("popupNote:uat-eu").and(hasText(note)), useUnmergedTree = true).assertExists("the note in the row of uat-eu")
+        onNodeWithTag("popupNote:prod-eu", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

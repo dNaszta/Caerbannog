@@ -134,6 +134,16 @@ class ConnectionControlStateTest {
 
         assertEquals(ChipState.Disconnected, s.chip.kind)
         assertEquals(RowAction.Connect, s.rows.first { it.name == "uat-eu" }.action)
+        assertEquals(ConnectionNotes.SETTINGS_CHANGED, s.chip.tooltip, "the note is the chip tooltip")
+        assertEquals(ConnectionNotes.SETTINGS_CHANGED, s.rows.first { it.name == "uat-eu" }.note, "the note is also a line of the popup row")
+    }
+
+    @Test
+    fun `a Disconnected link without a note has no tooltip and no row note`() {
+        val s = state(LinkState.Disconnected("uat-eu"))
+
+        assertNull(s.chip.tooltip)
+        assertNull(s.rows.first { it.name == "uat-eu" }.note)
     }
 
     @Test
