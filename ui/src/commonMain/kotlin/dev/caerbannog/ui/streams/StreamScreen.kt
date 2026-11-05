@@ -1,8 +1,10 @@
 package dev.caerbannog.ui.streams
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,11 +12,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -33,27 +37,21 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -64,6 +62,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
@@ -103,6 +102,12 @@ private const val STALE_STATE = "Stale"
 private const val LOADING_PLACEHOLDER_ROWS = 2
 private const val PUBLISHERS_TAB = "Publishers and consumers"
 private val CellPadding = 6.dp
+private val CellVerticalPadding = 6.dp
+private val HintControlSize = 20.dp
+private val HintGap = 6.dp
+private val HintPopupGap = 4.dp
+private val HintPopupMaxWidth = 320.dp
+private val HintCornerRadius = 4.dp
 private val OkGreen = Color(0xFF386A20)
 
 /** A tab of the stream screen. The shell takes a list so the Messages tab (M3) is one more entry, not a redesign. */
@@ -434,7 +439,7 @@ private fun ConsumerRow(row: ConsumerRowState, scale: Float) {
 @Composable
 private fun ValueCell(text: String, tag: String, column: ClientColumn, scale: Float, style: TextStyle = MaterialTheme.typography.bodyMedium) {
     // The padding is on the box, not on the text node: a drag that starts at the edge of the cell must still start a selection.
-    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp)) {
+    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = CellVerticalPadding)) {
         CopyableText(text, tag, style, if (column.numeric) TextAlign.End else TextAlign.Start)
     }
 }
@@ -442,7 +447,7 @@ private fun ValueCell(text: String, tag: String, column: ClientColumn, scale: Fl
 /** The socket pair with the user under it; a missing user is an em dash that screen readers hear as the NO_USER_NAME text. */
 @Composable
 private fun ConnectionCell(connection: String, user: String, tag: String, column: ClientColumn, scale: Float) {
-    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp)) {
+    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = CellVerticalPadding)) {
         Column {
             CopyableText(connection, "$tag:Connection", MaterialTheme.typography.bodyMedium)
             CopyableText(
@@ -463,7 +468,7 @@ private fun ConnectionCell(connection: String, user: String, tag: String, column
 private fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, column: ClientColumn, scale: Float) {
     val hint = status.hint
     val cell: @Composable () -> Unit = {
-        Row(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = CellVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
             // CopyableText fills the width it is given, so the weighted box keeps room for the "i" control.
             Box(Modifier.weight(1f)) {
                 CopyableText(
@@ -473,7 +478,7 @@ private fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, colu
                 )
             }
             if (hint != null) {
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(HintGap))
                 StatusHintControl(hint, rowKey)
             }
         }
@@ -484,8 +489,8 @@ private fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, colu
         // The area shows on hover after a delay and never on keyboard focus; the "i" control covers the keyboard.
         TooltipArea(
             tooltip = {
-                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
-                    Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.inverseOnSurface, modifier = Modifier.widthIn(max = 320.dp).padding(8.dp))
+                Surface(shape = RoundedCornerShape(HintCornerRadius), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
+                    Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.inverseOnSurface, modifier = Modifier.widthIn(max = HintPopupMaxWidth).padding(8.dp))
                 }
             },
         ) { cell() }
@@ -493,8 +498,18 @@ private fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, colu
 }
 
 /**
+ * Places this node to the LEFT of its zero-size slot, top aligned with the slot, without taking layout space (the row does not move).
+ * Left and top aligned, not above: for the first row "above" is the table header, and the status column is the last one, so the
+ * space to the left is inside the table. Only the placement changes; nothing here clips.
+ */
+private fun Modifier.floatingBesideLeft(gap: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity))
+    layout(0, 0) { placeable.place(-placeable.width - gap.roundToPx(), 0) }
+}
+
+/**
  * A focusable "i" that shows [hint] in an INLINE popup while it has keyboard focus (not a Popup window: that would add a second root).
- * Escape closes the popup and keeps the focus; the popup is drawn above the cell with zero layout size so the row does not move.
+ * Escape closes the popup and keeps the focus; the popup is drawn beside the "i" with zero layout size so the row does not move.
  */
 @Composable
 private fun StatusHintControl(hint: String, rowKey: String) {
@@ -503,7 +518,7 @@ private fun StatusHintControl(hint: String, rowKey: String) {
     val shape = RoundedCornerShape(50)
     Box(
         Modifier
-            .size(20.dp)
+            .size(HintControlSize)
             .onKeyEvent { event ->
                 if (focused && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
                     dismissed = true
@@ -517,7 +532,7 @@ private fun StatusHintControl(hint: String, rowKey: String) {
                 if (!it.isFocused) dismissed = false
             }
             .testTag("statusHint:$rowKey")
-            .clip(shape)
+            // No clip here: a clip on the control would cut the inline popup (a child) down to the 20 dp circle. Only the border is round.
             .border(if (focused) 2.dp else 1.dp, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, shape)
             .clickable(role = Role.Button, onClickLabel = StreamClientsTexts.HINT_CONTROL_LABEL) { dismissed = !dismissed },
         contentAlignment = Alignment.Center,
@@ -525,19 +540,16 @@ private fun StatusHintControl(hint: String, rowKey: String) {
         Text("i", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (focused && !dismissed) {
             Surface(
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(HintCornerRadius),
                 color = MaterialTheme.colorScheme.inverseSurface,
                 shadowElevation = 4.dp,
-                modifier = Modifier.layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity))
-                    layout(0, 0) { placeable.place(0, -placeable.height - 4.dp.roundToPx()) }
-                },
+                modifier = Modifier.floatingBesideLeft(HintPopupGap),
             ) {
                 Text(
                     hint,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.widthIn(max = 320.dp).padding(8.dp).testTag("statusHintPopup:$rowKey"),
+                    modifier = Modifier.widthIn(max = HintPopupMaxWidth).padding(8.dp).testTag("statusHintPopup:$rowKey"),
                 )
             }
         }

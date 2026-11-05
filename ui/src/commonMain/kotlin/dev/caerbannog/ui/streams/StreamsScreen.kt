@@ -76,7 +76,6 @@ interface StreamListEvents {
     fun setShown(shown: Boolean)
 }
 
-
 /**
  * The stream list (`docs/ux/Streams.dc.html`), drawn inside the app frame. It draws the strings of [state] and decides none
  * (message, range text, note, cells). [nowMillis] is the clock for "Updated N s ago"; the caller ticks it once a second, and only
