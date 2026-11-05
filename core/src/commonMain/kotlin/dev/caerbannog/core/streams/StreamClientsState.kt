@@ -101,6 +101,22 @@ object StreamClientsTexts {
     const val NO_PUBLISHERS: String = "There are no publishers on this stream."
     const val NO_CONSUMERS: String = "There are no consumers on this stream."
     const val LAST_OFFSET_LABEL: String = "Last offset on the stream:"
+
+    // F-D compile stubs (M2-06 follow-ups, test developer): empty on purpose, the senior developer moves the literals of the UI here
+    // (values pinned by StreamClientsSharedTextsTest). The Refresh icon text is shared with the list screen.
+    const val REFRESH: String = ""
+    const val PUBLISHERS_TITLE: String = ""
+    const val CONSUMERS_TITLE: String = ""
+    const val NO_USER_NAME: String = ""
+    const val HEADER_REFERENCE: String = ""
+    const val HEADER_CONNECTION: String = ""
+    const val HEADER_PUBLISHED: String = ""
+    const val HEADER_CONFIRMED: String = ""
+    const val HEADER_ERRORS: String = ""
+    const val HEADER_CONSUMER: String = ""
+    const val HEADER_OFFSET: String = ""
+    const val HEADER_MESSAGES_BEHIND: String = ""
+    const val HEADER_STATUS: String = ""
     const val BACK_TO_STREAMS: String = "Back to streams"
     const val FOOTNOTE: String = "Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher " +
         "than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0."
