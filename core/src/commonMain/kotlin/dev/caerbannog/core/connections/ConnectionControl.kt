@@ -233,6 +233,8 @@ class ConnectionControlModel(
     private val scope: CoroutineScope,
     private val clock: RefreshClock,
     private val onOpenConnections: () -> Unit,
+    /** The screen on show (list or tab): its age and its Refresh now drive the control. Null: the stream list (M2-05 behaviour). COMPILE STUB, not read yet. */
+    private val shownTarget: kotlinx.coroutines.flow.StateFlow<dev.caerbannog.core.streams.RefreshTarget>? = null,
 ) : ConnectionControlEvents, AutoCloseable {
     private val ticks = MutableStateFlow(0L)
     private val _state = MutableStateFlow(compute())
