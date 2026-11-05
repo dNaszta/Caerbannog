@@ -43,8 +43,12 @@ sealed interface ConsumerStatus {
     data object Updating : ConsumerStatus { override val text: String = StreamClientsTexts.UPDATING }
 }
 
-/** [settling]: the broker's connection details are still empty; connection reads "unknown" and the counters read "updating". */
+/**
+ * [key] is unique among the rows of one state and follows the publisher across refreshes (`<connection>#<publisherId>`, `~2`, `~3`
+ * for repeats). [settling]: the broker's connection details are still empty; connection reads "unknown" and the counters read "updating".
+ */
 data class PublisherRowState(
+    val key: String,
     val connection: String,
     val user: String,
     val reference: String,

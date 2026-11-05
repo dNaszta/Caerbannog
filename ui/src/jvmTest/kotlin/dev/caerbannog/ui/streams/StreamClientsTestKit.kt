@@ -41,7 +41,8 @@ internal fun publisher(
     confirmed: String = "48,100",
     errors: String = "0",
     settling: Boolean = false,
-) = PublisherRowState(connection, user, reference, published, confirmed, errors, settling)
+    key: String = "$connection#$reference",
+) = PublisherRowState(key, connection, user, reference, published, confirmed, errors, settling)
 
 internal fun consumer(
     key: String = "billing",

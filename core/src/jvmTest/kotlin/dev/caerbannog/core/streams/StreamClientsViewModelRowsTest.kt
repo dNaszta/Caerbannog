@@ -29,8 +29,8 @@ class StreamClientsViewModelRowsTest {
         assertIs<StreamClientsScreen.Content>(s.state.screen)
         assertEquals(
             listOf(
-                PublisherRowState("10.0.4.21:51234 - checkout-service", "svc", "checkout-1", "48,100", "48,100", "0", settling = false),
-                PublisherRowState("10.0.7.8:40022 - backfill", "svc", "backfill-job", "200", "200", "0", settling = false),
+                PublisherRowState("10.0.4.21:51234 - checkout-service#0", "10.0.4.21:51234 - checkout-service", "svc", "checkout-1", "48,100", "48,100", "0", settling = false),
+                PublisherRowState("10.0.7.8:40022 - backfill#1", "10.0.7.8:40022 - backfill", "svc", "backfill-job", "200", "200", "0", settling = false),
             ),
             s.state.publishers,
         )

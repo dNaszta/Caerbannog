@@ -264,8 +264,12 @@ class StreamClientsViewModel(
                 is Outcome.PluginMissing -> result.lastOffset
                 else -> ""
             },
-            publishers = sections?.publishers.orEmpty().map(::publisherState),
-            consumers = sections?.consumers.orEmpty().map(::consumerState),
+            publishers = sections?.publishers.orEmpty().let { rows ->
+                uniqueKeys(rows.map { "${it.connectionName}#${it.publisherId}" }).zip(rows) { key, row -> publisherState(key, row) }
+            },
+            consumers = sections?.consumers.orEmpty().let { rows ->
+                uniqueKeys(rows.map { "${it.connectionName}#${it.subscriptionId}" }).zip(rows) { key, row -> consumerState(key, row) }
+            },
             ownConnectionsNotice = if (sections?.ownOnly == true) StreamClientsTexts.OWN_CONNECTIONS_NOTICE else null,
             stale = stale,
             banner = banner,
@@ -282,10 +286,24 @@ private fun ConsumerRow.isSettling(): Boolean = connectionName.isEmpty()
 
 private fun nameOrUnnamed(name: String?): String = if (name.isNullOrBlank()) StreamClientsTexts.UNNAMED else name
 
-private fun publisherState(row: PublisherRow): PublisherRowState {
+/**
+ * Makes row keys unique within one state: the 2nd and later repeat of a base key gets `~2`, `~3` in the broker's order. Repeats occur for
+ * clients that have just attached (blank connection name, same id); a duplicate key would crash the lazy list.
+ */
+private fun uniqueKeys(bases: List<String>): List<String> {
+    val seen = HashMap<String, Int>()
+    return bases.map { base ->
+        val n = (seen[base] ?: 0) + 1
+        seen[base] = n
+        if (n == 1) base else "$base~$n"
+    }
+}
+
+private fun publisherState(key: String, row: PublisherRow): PublisherRowState {
     val settling = row.isSettling()
     fun count(value: Long): String = if (settling) StreamClientsTexts.UPDATING else groupDigits(value)
     return PublisherRowState(
+        key = key,
         connection = if (settling) StreamClientsTexts.UNKNOWN else row.connectionName,
         user = row.user ?: StreamClientsTexts.NO_USER,
         reference = nameOrUnnamed(row.reference),
@@ -296,7 +314,7 @@ private fun publisherState(row: PublisherRow): PublisherRowState {
     )
 }
 
-private fun consumerState(row: ConsumerRow): ConsumerRowState {
+private fun consumerState(key: String, row: ConsumerRow): ConsumerRowState {
     val settling = row.isSettling()
     val status = when {
         settling -> ConsumerStatus.Updating
@@ -305,8 +323,7 @@ private fun consumerState(row: ConsumerRow): ConsumerRowState {
         else -> ConsumerStatus.Behind(row.offsetLag)
     }
     return ConsumerRowState(
-        // The subscription id is unique within a connection; with the connection name it is unique on the stream.
-        key = "${row.connectionName}#${row.subscriptionId}",
+        key = key,
         name = nameOrUnnamed(row.name),
         connection = if (settling) StreamClientsTexts.UNKNOWN else row.connectionName,
         user = row.user ?: StreamClientsTexts.NO_USER,
