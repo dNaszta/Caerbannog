@@ -91,20 +91,20 @@ body{margin:0}
 <td class="mono">10.0.9.3:52901 -&gt; 10.0.0.5:5551</td>
 <td class="r">47950</td>
 <td class="r">349</td>
-<td><span class="pill warn">Behind</span></td>
+<td><span class="pill" title="Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.">349 behind</span></td>
 </tr>
 <tr>
 <td class="t-ts">audit</td>
 <td class="mono">10.0.6.30:44417 -&gt; 10.0.0.5:5551</td>
 <td class="r">48100</td>
 <td class="r">199</td>
-<td><span class="pill warn">Behind</span></td>
+<td><span class="pill" title="Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.">199 behind</span></td>
 </tr>
 </tbody>
 </table>
 </div>
 </section>
-<div class="t-bs dim">Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be one too high for a consumer that stores its offset; 0 or 1 counts as Caught up.</div>
+<div class="t-bs dim">Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0.</div>
 <div class="banner info" role="note"><span class="ms" aria-hidden="true">info</span><div>Showing only your own connections. The monitoring tag shows all.</div></div>
 <div class="banner warn" role="note"><span class="ms" aria-hidden="true">extension</span><div>Publishers and consumers need the rabbitmq_stream_management plugin. Enable it on the broker.</div></div>
 <div class="t-bs dim" style="display:flex;flex-direction:column;gap:6px;padding:8px 0">
@@ -116,7 +116,7 @@ body{margin:0}
 <div>Plugin missing: the warning banner above in place of both sections; the header and the last offset still show. The banner is the only thing that goes.</div>
 <div>Management tag only (S3b): the info banner above stays on screen even when both lists are empty, so an empty list never reads as "nobody is connected". No management tag (S3a): the message "This user cannot read stream statistics. Ask for the monitoring tag." and no sections.</div>
 <div>Client that has just attached: the broker row has no connection name and zero counters for a few seconds. The Connection cell says "unknown", the counters, offset, behind and status cells say "updating" (not 0), and the next refresh replaces them.</div>
-<div>Consumer status: "Caught up" for 0 or 1 behind (green), "Behind" above 1 (amber), "Not active" for a consumer that is not the active one of a single-active group (neutral). Unnamed publisher or consumer: the name cell says "unnamed". Offset is plain digits, other counts grouped (same rule as the list). Last offset on the stream is "unavailable" when it cannot be read.</div>
+<div>Consumer status: "Caught up" for 0 behind (green), "N behind" (the broker's number, neutral grey, never amber or red) above 0, with a tooltip: "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.", "Not active" for a consumer that is not the active one of a single-active group (neutral). Unnamed publisher or consumer: the name cell says "unnamed". Offset is plain digits, other counts grouped (same rule as the list). Last offset on the stream is "unavailable" when it cannot be read.</div>
 <div>Stream deleted while open: "This stream no longer exists" and a Back to streams button. Lost connection (D2): banner "Connection lost" with Retry, rows stay dimmed and marked stale. Failed first load: "Publishers and consumers could not be loaded." and Retry.</div>
 <div>Copy: every value in both tables (reference, connection, counts, offset, behind, status) is selectable and copies as displayed. The jump to a consumer's offset is not drawn: it needs the message browser (M3).</div>
 </div>

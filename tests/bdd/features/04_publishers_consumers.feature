@@ -7,9 +7,11 @@ Feature: Publishers and consumers of a stream
   Data comes from the management API (rabbitmq_stream_management).
   Fields confirmed on a real RabbitMQ 4.4.0 broker (M2-02 spike, docs/spec.md "Management API facts"):
   publisher reference, published, confirmed, errored (shown as "errors"), connection; consumer offset,
-  offset_lag, active, connection. A named consumer's lag can be 1 higher than the number of user messages
-  behind, because its offset tracking entry occupies an offset; M2-06 decided to show offset_lag as the broker
-  reports it and to call 0 or 1 "Caught up" (labelled approximate; docs/tasks/M2-06-publishers-consumers.md).
+  offset_lag, active, connection. A consumer's lag can be higher than the number of user messages
+  behind, because every stored offset (offset tracking entry) occupies an offset (real broker, M2-06 spike S-A:
+  2 and 3 for a consumer that stored 3 times, varying between runs, not derivable from the API). M2-06 decided:
+  "Caught up" only at lag 0; above 0 the status reads "N behind" with the broker's number, in a neutral style,
+  and a tooltip says stored offsets count (docs/tasks/M2-06-publishers-consumers.md).
   Users with only the management tag see only their own connections' rows, and users with no management
   tag see nothing (product decisions S3a and S3b, decided: message, and a fixed notice).
   The stream screen opens from the stream list (the name is a link); only this tab exists until M3.
@@ -35,11 +37,11 @@ Feature: Publishers and consumers of a stream
     And its status is "<status>"
 
     Examples:
-      | consumer  | offset | behind | status    |
-      | billing   | 48299  | 0      | Caught up |
-      | analytics | 47950  | 349    | Behind    |
-      | audit     | 48100  | 199    | Behind    |
-      | reports   | 48297  | 2      | Behind    |
+      | consumer  | offset | behind | status     |
+      | billing   | 48299  | 0      | Caught up  |
+      | analytics | 47950  | 349    | 349 behind |
+      | audit     | 48100  | 199    | 199 behind |
+      | reports   | 48297  | 2      | 2 behind   |
 
   @needs-M3 @fake-broker
   Scenario: Jump from a consumer to its offset in the browser
@@ -76,10 +78,11 @@ Feature: Publishers and consumers of a stream
     And no publishers or consumers are listed
 
   @fake-broker
-  Scenario: A consumer that stored its offset is caught up at one message behind
-    Given a consumer "billing" on "orders-events" that stored its offset and is 1 message behind
+  Scenario: A consumer that stored its offsets can read a few behind without being behind
+    Given a consumer "billing" on "orders-events" that stored its offset and is 3 messages behind
     When I open the "Publishers and consumers" tab of "orders-events"
-    Then its status is "Caught up"
+    Then its status is "3 behind"
+    And the status explains that stored offsets count towards the number
 
   @broker
   Scenario: Counts on the tab match counts in the stream list

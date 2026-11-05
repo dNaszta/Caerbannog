@@ -93,7 +93,7 @@ Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`)
 
 ## Open points that affect these tests
 
-- `04` keeps `@needs-spike` until M2-06 reviews it; the exact fields of the stream publisher and consumer endpoints were confirmed by the M2-02 spike (`docs/spec.md`, "Management API facts"). What users without the management tag, or with only the `management` tag, see is decided (S3a, S3b) and covered by `03` and `04`.
+- `04` lag rule (M2-06 ruling): "Caught up" only at lag 0, otherwise "N behind" with a stored-offsets hint, because stored offsets count towards `offset_lag`; `04` kept `@needs-spike` until M2-06 reviewed it; the exact fields of the stream publisher and consumer endpoints were confirmed by the M2-02 spike (`docs/spec.md`, "Management API facts"). What users without the management tag, or with only the `management` tag, see is decided (S3a, S3b) and covered by `03` and `04`.
 - What happens when a migration fails half-way (`10`, `@needs-decision`).
 - Case-sensitivity of the server-side `name` filter (the `11` scenario "Search is case-insensitive for plain text"); not tested by the M2-02 spike.
 - `13`: the lost-connection rule (D2) is decided (2026-11-04) and its scenario runs since M2-05b; D3 (refresh) is decided: interval in seconds in the connection control, values Off, 5, 10, 30, 60, per app, default 5 seconds (product owner 2026-11-04, to be revisited after trying); the `03` scenario "The refresh interval is 5 seconds on a fresh install" is no longer `@needs-decision`; the lost-connection rule D2 is not yet confirmed. The last three scenarios in `13` (the app bar connection control) and the lost-connection scenario run since M2-05b (`@needs-M2` removed).
