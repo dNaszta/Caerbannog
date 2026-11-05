@@ -7,6 +7,7 @@ import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.VhostRow
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,6 +23,9 @@ import java.util.concurrent.ConcurrentHashMap
  *    vhost that does not exist; the user's configure/write/read permissions do NOT hide anything (measured: an empty-permission user with the tag sees everything);
  *  - exchanges always carry the default exchange `""` (direct, durable) first; bindings always carry the implicit binding of the default
  *    exchange for EVERY queue of the vhost, streams included (routing key = queue name), before the declared bindings;
+ *  - M2-08a round 2 (spike S-E): [vhosts] lists the declared vhosts the user has a permission on ([permittedVhosts], null = all); with
+ *    [listsEveryVhost] (a `monitoring` or administrator user) it lists EVERY declared vhost, and a listed vhost the user has no permission
+ *    on still answers NotFound on the queue, exchange, binding and detail calls (404, measured); no tag is NotAuthorised;
  *  - a missing queue, or a stream asked for as a queue, is NotFound on [queueDetail]; names are unique per vhost (adding again REPLACES).
  * Not modelled: statistics lag (a test sets the counts it wants), policy matching (a test sets [QueueRow.policy]), a real cluster's offline member
  * (a test builds a row with a shorter `online`; S-D: not measurable on a single node).
@@ -40,10 +44,16 @@ class FakeTopologyCatalog : TopologyCatalog {
     /** False: the user has no management tag, every call is NotAuthorised. */
     @Volatile var hasManagementTag: Boolean = true
 
+    /** M2-08a round 2: the vhosts the user has a permission on; null means every declared vhost. Others answer NotFound on the vhost calls. */
+    @Volatile var permittedVhosts: Set<String>? = null
+
+    /** M2-08a round 2: true for a `monitoring` or administrator user: `vhosts()` lists every declared vhost, readable or not (S-E). */
+    @Volatile var listsEveryVhost: Boolean = false
+
     /** True: every call answers [CatalogResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
-    /** Names of the calls in order: "queues", "exchanges", "bindings", "queueDetail". */
+    /** Names of the calls in order: "vhosts", "queues", "exchanges", "bindings", "queueDetail". */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     private val holds = ConcurrentHashMap<String, CallGate>()
@@ -115,7 +125,7 @@ class FakeTopologyCatalog : TopologyCatalog {
         return when {
             unreachable -> CatalogResult.Unreachable
             !hasManagementTag -> CatalogResult.NotAuthorised
-            vhost != null && vhost !in vhosts -> CatalogResult.NotFound
+            vhost != null && (vhost !in vhosts || permittedVhosts?.let { vhost !in it } == true) -> CatalogResult.NotFound
             else -> callFailures[call]
         }
     }
@@ -123,6 +133,15 @@ class FakeTopologyCatalog : TopologyCatalog {
     private suspend fun <T> late(call: String, answer: T): T {
         holds.remove(call)?.await()
         return answer
+    }
+
+    override suspend fun vhosts(): CatalogResult<List<VhostRow>> {
+        val answer: CatalogResult<List<VhostRow>> = refusal("vhosts", null) ?: run {
+            val declared = synchronized(vhosts) { vhosts.toList() }
+            val listed = if (listsEveryVhost) declared else declared.filter { permittedVhosts?.contains(it) ?: true }
+            CatalogResult.Success(listed.sorted().map { VhostRow(it) })
+        }
+        return late("vhosts", answer)
     }
 
     override suspend fun queues(vhost: String, page: Int): CatalogResult<QueuePage> = late("queues", computeQueues(vhost, page))

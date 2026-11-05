@@ -6,6 +6,7 @@ import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.VhostRow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -40,6 +41,7 @@ class ManagementTopologyCatalogTest {
         "$queuesPath/spike-m208-quorum" to (200 to singleBody),
         "/api/exchanges/%2F" to (200 to exchangesBody),
         "/api/bindings/%2F" to (200 to bindingsBody),
+        "/api/vhosts" to (200 to FixtureFiles.text("m2-08/vhosts-multi.json")),
     )
 
     private fun <T> withCatalog(server: PlainManagementServer, block: suspend (TopologyCatalog) -> T): T {
@@ -83,6 +85,31 @@ class ManagementTopologyCatalogTest {
             assertTrue((exchanges as CatalogResult.Success<List<ExchangeRow>>).value.any { it.isDefault })
             assertTrue((bindings as CatalogResult.Success<List<BindingRow>>).value.any { it.source.isEmpty() })
             assertEquals(listOf("GET /api/exchanges/%2F", "GET /api/bindings/%2F"), lines(server))
+        }
+    }
+
+    @Test
+    fun `vhosts is one GET of the vhost list and parses it`() {
+        PlainManagementServer(allRoutes).use { server ->
+            val result = withCatalog(server) { it.vhosts() }
+            assertEquals(CatalogResult.Success(listOf(VhostRow("/"), VhostRow("many"))), result)
+            assertEquals(listOf("GET /api/vhosts"), lines(server))
+        }
+    }
+
+    @Test
+    fun `vhosts maps 401 to NotAuthorised, 500 to Unexpected, garbage to Unexpected and a closed port to Unreachable`() {
+        val (status, body) = FixtureFiles.errorBody("m2-02/non-admin-no-tag-401.json")
+        assertEquals(CatalogResult.NotAuthorised, answer(status, body) { it.vhosts() })
+        assertEquals(CatalogResult.NotAuthorised, answer(403) { it.vhosts() })
+        assertEquals(CatalogResult.Unexpected, answer(500) { it.vhosts() })
+        assertEquals(CatalogResult.Unexpected, answer(200, "<html/>") { it.vhosts() })
+        val http = ManagementHttp(TlsSupport.buildHttpClient(BrokerTransport.Plain, 2_000), "svc", "pw")
+        try {
+            val catalog = ManagementTopologyCatalog(http, ManagementRequests("http://127.0.0.1:${closedLocalPort()}", BrokerTransport.Plain))
+            assertEquals(CatalogResult.Unreachable, runBlocking { catalog.vhosts() })
+        } finally {
+            http.close()
         }
     }
 
@@ -195,6 +222,7 @@ class ManagementTopologyCatalogTest {
         val segments = request.rawPath.removePrefix("/api/").split("/")
         when (segments[0]) {
             "queues" -> assertTrue(segments.size in 2..3, "a queue path with more than {vhost}/{name}: $line")
+            "vhosts" -> assertEquals(1, segments.size, "a vhost path with more than the list: $line")
             "exchanges", "bindings" -> assertEquals(2, segments.size, "an exchange or binding path with more than {vhost}: $line")
             else -> org.junit.jupiter.api.Assertions.fail<Unit>("outside the topology paths: $line")
         }
@@ -208,6 +236,7 @@ class ManagementTopologyCatalogTest {
         for (status in outcomes) {
             PlainManagementServer(allRoutes.mapValues { (_, reply) -> if (status == 200) reply else status to "{}" }).use { server ->
                 withCatalog(server) {
+                    it.vhosts()
                     it.queues("/", 1)
                     it.queues("/", 2)
                     it.exchanges("/")
@@ -219,7 +248,7 @@ class ManagementTopologyCatalogTest {
                 seen += server.seen
             }
         }
-        assertEquals(outcomes.size * 7, seen.size, "calls: ${seen.map { "${it.method} ${it.rawPath}" }}")
+        assertEquals(outcomes.size * 8, seen.size, "calls: ${seen.map { "${it.method} ${it.rawPath}" }}")
         seen.forEach(::assertReadOnlyTopologyRequest)
     }
 
@@ -234,6 +263,9 @@ class ManagementTopologyCatalogTest {
             PlainManagementServer.Seen("GET", "/api/exchanges/%2F/x/bindings/source", null),
             PlainManagementServer.Seen("GET", "/api/consumers/%2F", null),
             PlainManagementServer.Seen("PUT", "/api/queues/%2F/q", null),
+            PlainManagementServer.Seen("GET", "/api/vhosts/many", null),
+            PlainManagementServer.Seen("GET", "/api/vhosts/many/permissions", null),
+            PlainManagementServer.Seen("PUT", "/api/vhosts/many", null),
         )
         bad.forEach { request ->
             val failed = try {

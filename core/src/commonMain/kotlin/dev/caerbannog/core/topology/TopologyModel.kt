@@ -62,3 +62,6 @@ data class BindingRow(
     val routingKey: String,
     val arguments: Map<String, String> = emptyMap(),
 )
+
+/** One virtual host of `GET /api/vhosts`; the name is all the app needs (`/` is the default vhost). */
+data class VhostRow(val name: String)

@@ -171,6 +171,58 @@ class TopologyCatalogContractTest {
         assertEquals(listOf("o", "o"), (catalog.bindings("other") as CatalogResult.Success).value.map { it.destination })
     }
 
+    // --- vhosts (round 2, spike S-E) ---
+
+    private fun vhostNames(catalog: FakeTopologyCatalog): List<String> {
+        val result = runBlocking { catalog.vhosts() }
+        assertIs<CatalogResult.Success<List<VhostRow>>>(result, "expected the vhosts, got $result")
+        return result.value.map { it.name }
+    }
+
+    @Test
+    fun `the slash vhost is always listed and declared vhosts follow, name ascending`() {
+        assertEquals(listOf("/"), vhostNames(FakeTopologyCatalog()))
+        val catalog = FakeTopologyCatalog().declareVhost("many").addQueue(quorum("q", vhost = "b-vhost")).addExchange(exchange("x", vhost = "a-vhost"))
+        assertEquals(listOf("/", "a-vhost", "b-vhost", "many"), vhostNames(catalog))
+    }
+
+    @Test
+    fun `a management user is listed only the vhosts it has a permission on, and the others are NotFound`() = runBlocking<Unit> {
+        val catalog = FakeTopologyCatalog().declareVhost("many").declareVhost("mine")
+        catalog.permittedVhosts = setOf("/", "mine")
+        assertEquals(listOf("/", "mine"), vhostNames(catalog))
+        assertEquals(CatalogResult.NotFound, catalog.queues("many", 1))
+        assertIs<CatalogResult.Success<*>>(catalog.queues("mine", 1))
+    }
+
+    @Test
+    fun `a monitoring user is listed EVERY vhost but can read only the permitted ones, the others are NotFound`() = runBlocking<Unit> {
+        val catalog = FakeTopologyCatalog().declareVhost("many")
+        catalog.permittedVhosts = setOf("/")
+        catalog.listsEveryVhost = true
+        assertEquals(listOf("/", "many"), vhostNames(catalog))
+        assertEquals(CatalogResult.NotFound, catalog.queues("many", 1))
+        assertEquals(CatalogResult.NotFound, catalog.exchanges("many"))
+        assertEquals(CatalogResult.NotFound, catalog.bindings("many"))
+        assertEquals(CatalogResult.NotFound, catalog.queueDetail("many", "q"))
+        assertIs<CatalogResult.Success<*>>(catalog.queues("/", 1))
+    }
+
+    @Test
+    fun `without the management tag vhosts is NotAuthorised, unreachable is Unreachable, a failing call fails and is recorded`() = runBlocking<Unit> {
+        val catalog = FakeTopologyCatalog()
+        catalog.hasManagementTag = false
+        assertEquals(CatalogResult.NotAuthorised, catalog.vhosts())
+        catalog.hasManagementTag = true
+        catalog.unreachable = true
+        assertEquals(CatalogResult.Unreachable, catalog.vhosts())
+        catalog.unreachable = false
+        catalog.failCall("vhosts", CatalogResult.Unexpected)
+        assertEquals(CatalogResult.Unexpected, catalog.vhosts())
+        assertIs<CatalogResult.Success<*>>(catalog.queues("/", 1), "the other calls keep working")
+        assertEquals(listOf("vhosts", "vhosts", "vhosts", "queues"), catalog.calls.toList())
+    }
+
     // --- failures ---
 
     @Test

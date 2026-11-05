@@ -67,3 +67,5 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
 internal fun ManagementRequests.queues(vhost: String, page: Int): String = "stub:$vhost:$page"
 
 internal fun ManagementRequests.queueDetail(vhost: String, name: String): String = "stub:$vhost:$name"
+
+internal fun ManagementRequests.vhosts(): String = "stub:vhosts"

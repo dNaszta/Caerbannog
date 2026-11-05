@@ -51,6 +51,23 @@ Spike facts, dev broker `rabbitmq:4-management` = RabbitMQ 4.4.0, management 4.4
 | S-C vhost | a vhost the user has NO permission on (monitor on `many`; a tagged user with its permission on `/` deleted) answers **404** `{"error":"not_found","reason":"Not Found"}`, never 403; a vhost that does not exist is the same 404; a no-tag user gets 401 first. No 403 was seen anywhere | `queues-vhost-not-found-404.json` |
 | S-D | Not run: one node, `online` equals `members`. The offline member is tested on `queues-quorum-offline-member-hand-made.json`, labelled HAND-MADE, NOT MEASURED in the file and the test name. Verified claim not made | open |
 
+### 08a round 2 (test developer, 2026-11-05): spike S-E and the `vhosts()` contract
+
+LOUD: a `monitoring` user is listed EVERY vhost, including ones it has no permission on (those then answer 404 on queues, exchanges, bindings). The brief's fallback (profile vhost plus lazy probing) is NOT needed, because the list exists, but the vhost picker for a `monitoring` user will offer vhosts that open as "not available to this user" (R2). A `management` user is listed only vhosts it has a permission on. No tag: 401. Owner to be told about the monitoring case.
+
+| Id | Fact (measured, dev broker 4.4.0) |
+| --- | --- |
+| S-E administrator | `GET /api/vhosts` lists every vhost (`/`, `many`, two temporary ones). Plain array of objects; keys: `name`, `description`, `tags`, `default_queue_type`, `metadata`, `protected_from_deletion`, `tracing`, `cluster_state`, `messages*`, `message_stats`, `recv_oct`, `send_oct` (+ `_details`). Only `name` is needed. A vhost with no activity has a short object (309 B for one) |
+| S-E monitoring | `monitor` (permissions only on `/`): the SAME list as the administrator, all four vhosts. Its queue/exchange/binding calls on `many` are 404 (S-C) |
+| S-E management | `manager` (only `/`): `["/"]`; `multi` (`/` and `many`): `["/", "many"]`; a one-vhost user whose only permission is on `m208-e-other`: `["m208-e-other"]` (its permission strings were empty and it still sees the vhost) |
+| S-E no tag | 401 `{"error":"not_authorised","reason":"Not management user"}` (as expected) |
+| S-E single | `GET /api/vhosts/{name}` is administrator only (401 "Not administrator user" for `monitor` and the one-vhost user): the app must NOT use it |
+| S-E order | name ascending in every body seen |
+
+Fixtures: `vhosts-administrator.json`, `vhosts-monitoring.json`, `vhosts-management.json`, `vhosts-multi.json`, `vhosts-one-vhost-user.json`, `vhosts-no-tag-401.json`. Temporary vhosts and user deleted on the dev broker.
+
+Contract added: `TopologyCatalog.vhosts(): CatalogResult<List<VhostRow>>`, `VhostRow(name)` (real code in core); `FakeTopologyCatalog.vhosts()` with `permittedVhosts` (null = all) and `listsEveryVhost` (monitoring/administrator), unpermitted vhosts answer NotFound on the vhost calls; call name `vhosts`. data-rabbit stubs (replace as members): `ManagementRequests.vhosts()` = `$base/api/vhosts` (no query), `ManagementJson.parseVhosts(body)` (array, body order, only `name`, a row without a string name or a non-array is `Unexpected`), `ManagementTopologyCatalog.vhosts()` (one GET; 401/403 NotAuthorised; 404 is not expected, map it to `Unexpected`). The guard now also accepts exactly `/api/vhosts` and refuses `/api/vhosts/{x}` and below (tested). Counts: core contract 24 and model 5 green; data-rabbit Json 25 (24 red), Requests 9 (8 red), Catalog 17 (15 red); `RealBrokerTopologyTest` 12 (on a throwaway implementation 51 of 51 data-rabbit unit and 12 of 12 broker green; a mutation to `/api/vhosts/x/permissions` turned 3 tests red incl. the guard). Not run: whole verifyTestDiscovery (red on purpose; source count equals XML count for every new class), ui, desktopApp, acceptance.
+
 Flags that touch the brief's design (architect to rule; none blocks 08a):
 1. 404 is "vhost not visible", so `NotFound` on a list means the vhost or the permission is gone, not a bug; 08b must say it in the screen (the stream list handles it as `Unexpected`; for topology the tests pin `NotFound`). The brief's "NotAuthorised for 401 and 403" stands (403 was never produced).
 2. `policy` comes with the list through `columns`; `queueDetail` is then not needed for the policy. It stays in the interface for the detail sheet (fresh row on selection) and costs nothing now.

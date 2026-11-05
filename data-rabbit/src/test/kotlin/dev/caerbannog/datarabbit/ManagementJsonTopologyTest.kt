@@ -6,6 +6,7 @@ import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
+import dev.caerbannog.core.topology.VhostRow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -265,5 +266,42 @@ class ManagementJsonTopologyTest {
         assertEquals("", (ManagementJson.parseBindingList(ok) as CatalogResult.Success<List<BindingRow>>).value.single().routingKey)
         val odd = """[{"source":"a","vhost":"/","destination":"b","destination_type":"stream","routing_key":"","arguments":{}}]"""
         assertEquals(CatalogResult.Unexpected, ManagementJson.parseBindingList(odd))
+    }
+
+    // --- vhosts (round 2, spike S-E) ---
+    // Contract: `ManagementJson.parseVhosts(body): CatalogResult<List<VhostRow>>`: a plain array, body order kept, only `name` is read (the rest of each
+    // object is the broker's statistics and is ignored); an empty array is an empty list; a row without a string `name`, a non-array and non-JSON are `Unexpected`.
+
+    private fun vhostNames(fixture: String): List<String> {
+        val result = ManagementJson.parseVhosts(FixtureFiles.text(fixture))
+        assertInstanceOf(CatalogResult.Success::class.java, result, "expected the vhosts, got $result")
+        return (result as CatalogResult.Success<List<VhostRow>>).value.map { it.name }
+    }
+
+    @Test
+    fun `an administrator and a monitoring user are listed every vhost, recorded`() {
+        assertEquals(listOf("/", "m208-e-hidden", "m208-e-other", "many"), vhostNames("m2-08/vhosts-administrator.json"))
+        assertEquals(vhostNames("m2-08/vhosts-administrator.json"), vhostNames("m2-08/vhosts-monitoring.json"), "monitoring is listed vhosts it has no permission on")
+    }
+
+    @Test
+    fun `a management user is listed only the vhosts it has a permission on, recorded`() {
+        assertEquals(listOf("/"), vhostNames("m2-08/vhosts-management.json"))
+        assertEquals(listOf("/", "many"), vhostNames("m2-08/vhosts-multi.json"))
+        assertEquals(listOf("m208-e-other"), vhostNames("m2-08/vhosts-one-vhost-user.json"))
+    }
+
+    @Test
+    fun `the no tag 401 body is not a vhost list`() {
+        assertEquals(CatalogResult.Unexpected, ManagementJson.parseVhosts(FixtureFiles.text("m2-08/vhosts-no-tag-401.json")))
+    }
+
+    @Test
+    fun `vhost garbage and an empty list`() {
+        assertEquals(CatalogResult.Success(emptyList<VhostRow>()), ManagementJson.parseVhosts("[]"))
+        assertEquals(CatalogResult.Success(listOf(VhostRow("a b/é"))), ManagementJson.parseVhosts("""[{"name":"a b/é","tags":[]}]"""))
+        listOf("", "<html/>", "{}", """[{"tags":[]}]""", """[{"name":3}]""", """["x"]""", "null").forEach {
+            assertEquals(CatalogResult.Unexpected, ManagementJson.parseVhosts(it), "body: $it")
+        }
     }
 }

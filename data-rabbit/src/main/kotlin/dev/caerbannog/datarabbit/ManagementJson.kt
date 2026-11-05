@@ -220,3 +220,5 @@ internal fun ManagementJson.parseQueueDetail(body: String): CatalogResult<dev.ca
 internal fun ManagementJson.parseExchanges(body: String): CatalogResult<List<dev.caerbannog.core.topology.ExchangeRow>> = CatalogResult.Unexpected
 
 internal fun ManagementJson.parseBindingList(body: String): CatalogResult<List<dev.caerbannog.core.topology.BindingRow>> = CatalogResult.Unexpected
+
+internal fun ManagementJson.parseVhosts(body: String): CatalogResult<List<dev.caerbannog.core.topology.VhostRow>> = CatalogResult.Unexpected

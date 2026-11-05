@@ -76,10 +76,16 @@ class ManagementRequestsTopologyTest {
         assertEquals("http://rabbit.example.com:15672/api/queues/%2F/q", plain.queueDetail("/", "q"))
     }
 
+    @Test
+    fun `the vhost list is the one path without a query, over https or http`() {
+        assertEquals("https://rabbit.example.com:15671/api/vhosts", requests.vhosts())
+        assertEquals("http://rabbit.example.com:15672/api/vhosts", ManagementRequests("http://rabbit.example.com:15672", BrokerTransport.Plain).vhosts())
+    }
+
     // The two paths RabbitMQ has to read messages: POST .../get and DELETE .../contents. A queue NAME may end in "/get" only inside one segment.
     @Test
     fun `no topology URL ends in get or contents or contains purge`() {
-        val urls = listOf(requests.queues("/", 1), requests.queues("many", 3), requests.queueDetail("/", "q"), requests.exchanges("/"), requests.bindings("/"))
+        val urls = listOf(requests.queues("/", 1), requests.queues("many", 3), requests.queueDetail("/", "q"), requests.exchanges("/"), requests.bindings("/"), requests.vhosts())
         urls.forEach { url ->
             val path = url.substringBefore('?')
             assertFalse(path.endsWith("/get"), url)

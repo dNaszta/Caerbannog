@@ -12,6 +12,14 @@ import dev.caerbannog.core.streams.CatalogResult
  */
 interface TopologyCatalog {
     /**
+     * M2-08a round 2 (R3, spike S-E): the virtual hosts the broker lists for this user, in the broker's order (name ascending in practice).
+     * MEASURED: an administrator and a `monitoring` user are listed EVERY vhost (the `monitoring` user can read only those it has a permission
+     * on: the others answer [CatalogResult.NotFound] on the queue, exchange and binding calls), a `management` user only the vhosts it has a
+     * permission on; no tag is [CatalogResult.NotAuthorised].
+     */
+    suspend fun vhosts(): CatalogResult<List<VhostRow>>
+
+    /**
      * One page ([page] is 1-based, [QUEUE_PAGE_SIZE] queues) of the queues of [vhost], name ascending as the broker gives them.
      * Queues of type `stream` are NEVER returned (a stream is no queue here); the page numbers are the broker's, over all queues.
      */

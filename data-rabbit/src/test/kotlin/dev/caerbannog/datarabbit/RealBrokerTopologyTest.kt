@@ -7,6 +7,7 @@ import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.VhostRow
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -284,6 +285,22 @@ class RealBrokerTopologyTest {
             assertInstanceOf(CatalogResult.Success::class.java, runBlocking { catalog.bindings("/") }, user)
             assertInstanceOf(CatalogResult.Success::class.java, runBlocking { catalog.queueDetail("/", q) }, user)
         }
+    }
+
+    // Spike S-E: monitoring and administrator are listed EVERY vhost, management only those it has a permission on; no tag is refused.
+    @Test
+    fun `the vhost list is every vhost for an administrator and a monitoring user, the permitted ones for a management user`() {
+        fun names(catalog: TopologyCatalog): List<String> {
+            val result = runBlocking { catalog.vhosts() }
+            assertInstanceOf(CatalogResult.Success::class.java, result, "got $result")
+            return (result as CatalogResult.Success<List<VhostRow>>).value.map { it.name }
+        }
+        val everyVhost = setOf("/", SECRET_VHOST, MANY_VHOST)
+        assertTrue(names(admin()).containsAll(everyVhost), "administrator: ${names(admin())}")
+        val monitoring = names(catalogFor("m208-mon", "pw-mon"))
+        assertTrue(monitoring.containsAll(everyVhost), "monitoring is listed vhosts it has no permission on: $monitoring")
+        assertEquals(listOf("/"), names(catalogFor("m208-mgmt", "pw-mgmt")))
+        assertEquals(CatalogResult.NotAuthorised, runBlocking { catalogFor("m208-plain", "pw-plain").vhosts() })
     }
 
     @Test
