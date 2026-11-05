@@ -1,6 +1,9 @@
 package dev.caerbannog.ui.streams
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.toAwtImage
@@ -33,6 +36,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.ConsumerRowState
 import dev.caerbannog.core.streams.ConsumerStatus
 import dev.caerbannog.core.streams.StreamClientsTexts
@@ -185,6 +189,12 @@ class StreamClientsLazyUiTest {
             val nearI = x >= iRect.left - 6 && x <= iRect.right + 6 && y >= iRect.top - 6 && y <= iRect.bottom + 6
             if (!nearI && withPopup.getRGB(x, y) != without.getRGB(x, y)) changedOutsideI++
         }
+        var changedInside = 0; var totalInside = 0
+        for (x in rect.left.toInt().coerceIn(0, WIDTH - 1) until rect.right.toInt().coerceIn(0, WIDTH)) for (y in rect.top.toInt().coerceIn(0, HEIGHT - 1) until rect.bottom.toInt().coerceIn(0, HEIGHT)) {
+            totalInside++
+            if (withPopup.getRGB(x, y) != without.getRGB(x, y)) changedInside++
+        }
+        if (totalInside == 0 || changedInside.toDouble() / totalInside < 0.9) problems += "$label ($key): only $changedInside of $totalInside pixels inside the popup bounds $rect differ from the picture without it (partly clipped?)"
         if (changedOutsideI < 1500) problems += "$label ($key): only $changedOutsideI pixels outside the i changed when the popup opened; nothing visible was drawn"
         return problems
     }
@@ -398,5 +408,72 @@ class StreamClientsLazyUiTest {
         }
         val newRows = reached.filter { it.startsWith("consumerCell:") }.map { it.split(":")[1] }.filter { it !in composedBefore }
         assertTrue(newRows.isNotEmpty(), "Tab never reached a row that was not composed at first (from $last); focused: $reached")
+    }
+
+    // --- F-C-03 A, B, C ---------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `after a far sideways scroll in a narrow window and then widening it, the rows are not shifted off the viewport, header out of the composition`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        // The header's own horizontalScroll shrinks the shared ScrollState when the width grows, so the rows' clamp only matters while the
+        // header is not composed: scroll sideways, scroll down until the header leaves the list, then widen the window.
+        var width by androidx.compose.runtime.mutableStateOf(700.dp)
+        clientsScreen(content(consumers = rows(300)), wrap = { c -> androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.width(width)) { c() } })
+        waitForIdle()
+        onNodeWithTag("consumersHeader:Connection", useUnmergedTree = true).performTouchInput {
+            repeat(3) { swipeLeft(startX = right - 1f, endX = 1f, durationMillis = 100) }
+        }
+        waitForIdle()
+        scrollToEnd()
+        assertTrue(!exists("consumersHeader:Status"), "the header is out of the composition")
+        width = 1400.dp // same composition: the ScrollState keeps its large value
+        waitForIdle()
+
+        val view = list().fetchSemanticsNode().boundsInRoot
+        val last = "c299"
+        val name = bounds("consumerCell:$last:Name")
+        assertTrue(name.left >= view.left - 1f && name.right > name.left, "the first column of a row is shifted off the left of the viewport after widening: $name vs $view")
+        assertTrue(bounds("consumerCell:$last:Status").right <= view.right + 1f, "the last column ends inside the viewport: ${bounds("consumerCell:$last:Status")} vs $view")
+        scrollToTop()
+        assertEquals(bounds("consumersHeader:Consumer").left, bounds("consumerCell:c0:Name").left, "header and row line up after coming back")
+    }
+
+    @Test
+    fun `the hint popup of a dimmed stale row is drawn whole, as big as the popup of a fresh row`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        val shown = clientsScreen(content(consumers = rows(40), stale = false))
+        waitForIdle()
+        val behind = visibleBehindRows()
+        assertTrue(behind.size >= 3, "at least three fully visible Behind rows expected: $behind")
+        val keys = behind.take(2)
+        val fresh = keys.map { key ->
+            onNodeWithTag("statusHint:$key", useUnmergedTree = true).requestFocus(); waitForIdle()
+            bounds("statusHintPopup:$key").also { onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }; waitForIdle() }
+        }
+
+        shown.state = content(consumers = rows(40), stale = true)
+        waitForIdle()
+        val without = image()
+        val problems = mutableListOf<String>()
+        keys.forEachIndexed { n, key ->
+            problems += popupProblems("stale", key, without)
+            val rect = bounds("statusHintPopup:$key")
+            if (kotlin.math.abs(rect.height - fresh[n].height) > 1f || kotlin.math.abs(rect.width - fresh[n].width) > 1f) {
+                problems += "stale ($key): popup is ${rect.width} x ${rect.height} but ${fresh[n].width} x ${fresh[n].height} on a fresh row (cut by the row's layer?)"
+            }
+            onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }; waitForIdle()
+        }
+        assertTrue(problems.isEmpty(), "The popup of a stale row is not usable:\n" + problems.joinToString("\n"))
+    }
+
+    @Test
+    fun `a sideways swipe on a data row moves the header and all rows together`() = runDesktopComposeUiTest(700, HEIGHT) {
+        clientsScreen(content(consumers = rows(40)))
+        waitForIdle()
+        val before = bounds("consumersHeader:Connection")
+        onNodeWithTag("consumerCell:c2:Connection", useUnmergedTree = true).performTouchInput { swipeLeft(startX = centerX, endX = centerX - 60f, durationMillis = 200) }
+        waitForIdle()
+        val after = bounds("consumersHeader:Connection")
+        assertTrue(after.left < before.left, "a swipe on a data row scrolled the table: $before -> $after")
+        assertEquals(after.left, bounds("consumerCell:c0:Connection").left, "another row moved with it")
+        assertEquals(after.left, bounds("consumerCell:c5:Connection").left, "a lower row moved with it")
     }
 }

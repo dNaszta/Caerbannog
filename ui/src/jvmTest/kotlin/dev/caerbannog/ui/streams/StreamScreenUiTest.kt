@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  *    the stream name here).
  *  - tabs: `tabList` holds exactly ONE tab `tab:Publishers and consumers` (text "Publishers and consumers", selected). No "Messages"
  *    tab, no disabled one.
- *  - sections (screen Content, and Loading): `publishersSection` / `consumersSection`, each with a caption node
+ *  - sections (screen Content, and Loading): each with a caption node
  *    `publishersCaption` / `consumersCaption` whose text reads "Publishers 2" / "Consumers 3" (name, count) and a table node
  *    `publishersTable` / `consumersTable` whose content description is that same caption (so a reader announces the count), and
  *    which carries state description "Stale" when the state is stale, "Loading" while the screen is Loading. Headers
