@@ -1,0 +1,71 @@
+# Super streams in the stream list
+
+Milestone: M2    Depends on: M2-04 (merged), M2-05 (list screen, on its branch), M2-06 (name link, on its branch)    Size: M (about 3 days: one spike hour, core and data about 1.5 days, screen half a day)
+
+Status: briefed (architect, 2026-11-05, branch `m2-07-super-streams-in-list`). No product decision needed (see Open points). Step 2 (test developer, tests first, begins with spike S-A) is next. Scenarios written by the architect in `06`; the `@needs-M2` tag on "Filter by kind" in `03` is removed by the test developer in step 2.
+
+## Goal
+In the stream list a super stream is one entry (type "Super stream", partition count, summed messages, publishers and consumers) that expands to its partitions, each with its own statistics; partitions never appear as separate top-level entries; the "Super streams" and "Streams" kind filter works; there is no way to open or browse a super stream as one sequence, and the list says why.
+
+## Why
+Spec "Goals and scope" (super streams appear as one entry with their partitions), "Paging model" (one partition at a time, no merge), "Management API facts" row "Super stream"; scenarios in `06` (M2 part) and `03` "Filter by kind". Rule protected: order exists only inside a partition.
+
+## Scope
+In:
+1. **Detection and grouping (data and core).** A super stream is a `direct` exchange with `arguments.x-super-stream == true`; its partitions are the destinations of its bindings (`destination_type` queue), ordered by `arguments.x-stream-partition-order`. Never inferred from names. New gateway method on `StreamCatalog`: `superStreams(vhost): CatalogResult<List<SuperStreamLayout>>` (name free; value type: `name`, `vhost`, `partitions: List<String>` already ordered). Fake and `data-rabbit` implement it. A partition name that is not among the loaded streams is skipped (the count is the partitions found).
+2. **View model.** `StreamListViewModel` loads the layout with each full load (after the stream pages, before offsets), builds entries: stream, super stream (with partitions), and removes grouped partitions from the top level. New events: `toggleExpanded(superStream)` and `setKindFilter(All | Streams | SuperStreams)`. The expanded set is kept in the view model, survives refresh, is dropped when the connection or profile changes.
+3. **Row model (`StreamRow`).** Adds `kind` (stream, super stream, partition), `partitionCount` or the partition rows, `partitionOf` (the super stream name, null otherwise), `expanded`. Cells of a super stream row: messages = sum of its partitions (only when every partition has a count, else `n/a`, never a partial number); first and last offset = a fixed dash (not applicable); publishers = sum, only when every partition count is shown (D8 rule, else `unavailable`); consumers = sum; retention = the common value, or `mixed` when the partitions differ; Size blank as everywhere (N1). Partition rows are ordinary rows plus `partitionOf`.
+4. **Paging, filter, sort count entries.** A super stream is one entry; its partitions never count toward the page size or the "1 to N of M" range and always render under their super stream on the same page. The name filter matches an entry by its own name or by any partition name; it does not auto-expand. The kind filter composes with the name filter. Sort is by entry name; partitions keep the broker's partition order.
+5. **Offsets.** `queryStreamStats` runs only for the visible stream rows and for the partitions of an expanded super stream on the visible page; a collapsed super stream costs no offset call.
+6. **Screen (`ui`, `StreamsScreen`).** Kind chips All, Streams, Super streams (chip row from `docs/ux/Streams.dc.html`, kept hidden until now); expand and collapse control in the name cell of a super stream (keyboard: Enter and Space on the control, accessible name "Expand orders" / "Collapse orders"); indented partition rows; the note row "Messages are ordered only inside a partition. Choose a partition to browse it." shown under an expanded super stream; the super stream name is plain text, not a link (no stream of that name exists, so there is nothing to open); a partition name is the M2-06 name link and opens the Publishers and consumers tab of that partition. All values stay selectable and copyable (UI1).
+7. **Degraded grouping.** If `superStreams` fails (or the user may not read exchanges), the list still loads: the last known grouping is kept (stale, like the rows); with no grouping ever read the streams are listed flat and the banner/notice text "Super stream grouping is unavailable. Partitions are listed as separate streams." is shown. A grouping failure never fails the stream load and never turns into a lost connection by itself (D2 stays driven by `Unreachable` from the stream calls as today).
+
+Out:
+- Browse button and the message browser, "page title says partition of" (M3). The row carries `partitionOf` so M3 only reads it; scenario "Browse one partition" is `@needs-M3`.
+- Global search results for super streams (scenario `@needs-M3`, runs with the search task).
+- Any write: declare, delete, add partition, or any topology call.
+- Publishers and consumers of the super stream as one view, merged message reading, a per-super-stream stream screen (M3 at the earliest, one partition at a time).
+- Super streams in the Topology screen (M2-08).
+- Publisher rows of super stream producers beyond what M2-06 shows (still unverified, spec open question).
+
+## Acceptance
+BDD, `tests/bdd/features/06_super_streams.feature`, all `@fake-broker` unless noted, run by a new `RunSuperStreamsAcceptanceTest` (steps in `acceptance-tests/.../streams`, same runner pattern as `RunStreamListAcceptanceTest`, `@needs-M3` and `@broker` left out):
+- "A super stream is one entry in the list" (@smoke)
+- "Expand a super stream to see its partitions"
+- "There is no merged view of all partitions" (@negative; changed by the architect: it now expands the row and asserts no open or browse action plus the note text)
+- "Partitions are listed in the order the broker defines" (new)
+- "A super stream is found by the name of one of its partitions" (new)
+- "A super stream counts as one entry in paging" (new)
+- "A refresh keeps a super stream expanded" (new)
+- "A partition whose message count is unknown gives no partial total" (new, @negative)
+- "The super stream structure cannot be read" (new, @negative)
+- Not run in M2-07: "Browse one partition" (@needs-M3), "Global search finds partitions under their super stream" (@needs-M3).
+- `@broker`: "A super stream on a real broker is grouped" (new): implemented as a `brokerTest` in `data-rabbit` (a Testcontainers broker, super stream declared with `rabbitmq-streams add_super_stream`, or the definitions shape of M2-12), not in Cucumber.
+
+BDD, `03_stream_list.feature`: "Filter by kind" loses `@needs-M2` and runs in `RunStreamListAcceptanceTest` (its Given needs the super stream step, shared with `06`). The README line about the six skipped scenarios is updated (the skipped count drops by one).
+
+Unit tests (written first, core with `FakeStreamCatalog`): row cells of a super stream (sum, partial counts, `n/a`, publishers when not FULL, consumers sum, retention common and `mixed`, no offsets); `partitionOf` on partition rows; ordering by `x-stream-partition-order`, and the fallback when the order is missing (routing key, then name); partition missing from the stream list skipped; one partition in two super streams (first super stream by name wins, no duplicate row); toggle and expanded survive refresh and are dropped on switch and disconnect; paging counts entries (a page of 5 with an expanded super stream still holds 5 entries); name filter by partition name; kind filter alone and with name filter; offset calls only for visible rows and expanded partitions (count the fake's `firstOffset` calls); grouping failure with and without a last known grouping; the failure is not a lost connection. data-rabbit: `ManagementRequestsTest` (URLs, vhost and name encoding), `ManagementJsonTest` (parser against the new fixtures: marker true, false, absent, non-boolean; bindings with and without the order argument, `destination_type` exchange ignored). ui: `StreamsScreenUiTest` additions (chips, expand control and its keys and accessible names, note row, indentation, super stream name not a link, partition name is a link, copy of a super stream sum yields the displayed text); `StreamsScreenshotTest` (opt-in) expanded and collapsed.
+
+## Design notes
+- Boundaries: `core` holds `SuperStreamLayout`, grouping, the aggregate rules and all texts (one `StreamListTexts` addition each: `SUPER_STREAM`, `PARTITION`, `MIXED`, `NOT_APPLICABLE` dash, the note, the grouping notice); `data-rabbit` only calls and parses; `ui` draws state and sends events. No broker type in `ui`. Everything the list needs about a super stream arrives through `StreamCatalog` so the fake serves the same interface (the fake gets `superStream(name, partitions)` and `failSuperStreams()` helpers).
+- Grouping is a pure function in `core` (summaries + layouts in, entries out), tested without the view model; the view model only holds the expanded set and the kind filter. This is the one place to keep the "entry, not stream" counting rule; do not scatter it across paging, filter and render.
+- Calls per tick. Today a tick is 2 list calls, 1 `publisherCounts` and up to a page of offsets (M2-04: 53 on 1000 queues). This task adds the layout call(s). Spike S-A decides the shape (below); the bound is one call for exchanges plus either one call for all bindings or one per super stream. The brief wants the count reported in Status, like M2-04 did. Offsets get cheaper: partitions of a collapsed super stream cost nothing.
+- Kind filter is a closed enum in the view model state (`StreamKindFilter`), not a boolean. Default All.
+- Super stream publishers and consumers are sums of per-partition counts. They count attachments, not distinct clients: a super stream consumer or producer is attached to every partition, so one application can add 3. The mockup already shows the sum (4 and 6). The column header tooltip for those cells says "Sum over the partitions".
+- Row ids for selection and expanded state use vhost and name, not the display text.
+
+## UX
+`docs/ux/Streams.dc.html` (kind chips, expanded super stream with indented partition rows, dim dashes for offsets). The architect added the note row under the super stream row (2026-11-05). In M2 the Browse buttons drawn on the partition rows stay out, as on every other row (M2-05 ruling, M3). States: collapsed, expanded, grouping unavailable notice (flat list), a partition still loading its first offset (the usual loading cell), a super stream with a partition that has no count (`n/a`), filter matching nothing (table with header, as M2-05).
+
+## Open points
+Verified facts (spec "Management API facts", row "Super stream"; M2-02 spike item 5, fixtures `data-rabbit/src/test/resources/fixtures/m2-02/exchange-super-stream.json`, `bindings-super-stream.json`, `queues-super-stream-partitions.json`; M2-12 spike S-C, `dev/broker/definitions/002-super-streams.json`): marker `arguments.x-super-stream` is boolean true on a `direct` exchange; bindings from `GET /api/exchanges/{vhost}/{name}/bindings/source` carry `destination`, `destination_type` queue, `routing_key`, `arguments.x-stream-partition-order` (0-based number); partition queues have no marker. The dev broker (`task dev:up`, plain or TLS) has super stream `orders` with `orders-0..2`.
+
+Still open (no invention in code or fixtures until step 2 spikes confirm, 1 to 2 hours, on the dev broker or a Testcontainers broker, no product decision):
+- **S-A, how to list the super streams in one go.** Not measured by M2-02: whether `GET /api/exchanges/{vhost}` returns `arguments` for every exchange (to find the marker), whether it pages like queues, and whether `GET /api/bindings/{vhost}` (one call for every binding of the vhost) returns the same `arguments` and `destination_type` fields as the per-exchange path. If both hold, the layout is 2 calls per tick, else 1 + number of super streams. Record real bodies as fixtures. Also record what a `monitoring` user and a `management` user see (exchange visibility follows the vhost permission as queues do; unverified).
+- **S-B, how a hand-made or edited super stream looks** (a binding without `x-stream-partition-order`, a binding to a missing queue, two bindings to one queue). The brief decides the rules above; the spike only confirms the broker allows these shapes and what the fields look like. If the broker rejects them, the corresponding unit tests stay as pure grouping tests.
+- Unverified in the spec and unchanged here: super stream producer rows in the publishers list (M2-06 open point), cluster fields.
+- Decided here (technical, change by a test-first edit if the owner disagrees): sums of publishers and consumers count attachments; retention shows `mixed` when partitions differ; the name filter matches partition names without auto-expanding; a failing grouping call degrades to a flat list with a notice and never fails the load; a partition shared by two super streams is shown under the first by name.
+- Product decisions: none open. FYI for the owner at the hand trial: the sum semantics above and the `mixed` retention word.
+
+## Definition of done
+Tests written first and red for the right reason, then green: unit and acceptance suites, `verifyTestDiscovery`, `brokerTest` for the real-broker scenario, `screenshotTest` compared with the mockup; spike S-A and S-B answered in Status with fixtures and the calls-per-tick number; the spec "Management API facts" row "Super stream" and the "Stream list" screen row updated with the facts and the open items moved; `tests/bdd/README.md` traceability and the M2-07 row updated; no unrelated changes; no write call and no message read anywhere in the new code; hand trial on the dev broker (`orders` expands to three partitions, the filter works, a partition name opens its Publishers and consumers tab, no browse for the super stream).
