@@ -39,18 +39,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.password
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.caerbannog.core.connections.BrokerEndpoints
+import dev.caerbannog.core.connections.BrokerPorts
 import dev.caerbannog.core.connections.CaCertificateValidationResult
+import dev.caerbannog.core.connections.checkResultMessage
+import dev.caerbannog.core.connections.editPanelNotes
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
-import dev.caerbannog.core.connections.ConnectionNotes
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
 import dev.caerbannog.core.connections.ConnectionCheckResult
@@ -63,6 +70,7 @@ import dev.caerbannog.core.connections.PermissionBanner
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.permissionBanner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -114,9 +122,8 @@ fun ConnectionsScreen(
                         }
                     },
                     onDeleteRequest = viewModel::requestDelete,
-                    onValidateCaCertificate = { name, path ->
-                        if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
-                    },
+                    // The file is read off the UI thread; the view model drops a result the user has moved away from.
+                    onValidateCaCertificate = { name, path -> viewModel.validateCaCertificateOffThread(name, path, Dispatchers.IO) },
                     onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
                     modifier = panelModifier,
                 )
@@ -142,7 +149,7 @@ private fun EditPanel(
     state: ConnectionsState,
     onSave: (originalName: String?, input: ConnectionProfileInput) -> Unit,
     onDeleteRequest: (String) -> Unit,
-    onValidateCaCertificate: (name: String?, path: String) -> Unit,
+    onValidateCaCertificate: suspend (name: String?, path: String) -> Unit,
     onCheckConnection: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -156,6 +163,24 @@ private fun EditPanel(
     // Local UI state only: never in the view model or on disk. Masked again when another profile is selected.
     var passwordVisible by remember(selected?.name) { mutableStateOf(false) }
     var caCertificatePath by remember(selected?.name) { mutableStateOf(selected?.caCertificatePath.orEmpty()) }
+    // The TLS switch and the ports that follow it (the ports themselves are read-only, see BrokerEndpoints.afterTlsSwitch).
+    var tls by remember(selected?.name) { mutableStateOf(selected?.tls ?: true) }
+    var ports by remember(selected?.name) {
+        mutableStateOf(
+            selected?.let { BrokerPorts(it.streamPort, it.managementPort) } ?: BrokerEndpoints.defaultsFor(tls = true),
+        )
+    }
+    // The CA path is validated when the field loses focus or on Save, and only if the user changed it since the last validation.
+    var caEdited by remember(selected?.name) { mutableStateOf(false) }
+    var caHadFocus by remember(selected?.name) { mutableStateOf(false) }
+    val panelScope = rememberCoroutineScope()
+    val validateCa: () -> Unit = {
+        val path = caCertificatePath
+        if (caEdited && tls && path.isNotBlank()) {
+            caEdited = false
+            panelScope.launch { onValidateCaCertificate(selected?.name, path) }
+        }
+    }
     // Form state like every other field: applied on Save only. pendingLevel non-null = confirmation open.
     var level by remember(selected?.name) { mutableStateOf(selected?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY) }
     var pendingLevel by remember(selected?.name) { mutableStateOf<TopologyControlLevel?>(null) }
@@ -189,9 +214,9 @@ private fun EditPanel(
                     {
                         OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
                     },
-                    // Read-only in M1: TLS and the standard ports; the profile already stores them.
-                    { ReadOnlyPortField("Stream port (TLS)", selected?.streamPort ?: 5551) },
-                    { ReadOnlyPortField("Management port (HTTPS)", selected?.managementPort ?: 15671) },
+                    // Read-only: the ports follow the TLS switch (P1 of M2-14).
+                    { ReadOnlyPortField(if (tls) "Stream port (TLS)" else "Stream port", ports.stream) },
+                    { ReadOnlyPortField(if (tls) "Management port (HTTPS)" else "Management port", ports.management) },
                     {
                         OutlinedTextField(
                             value = password,
@@ -218,24 +243,33 @@ private fun EditPanel(
                             value = caCertificatePath,
                             onValueChange = { path ->
                                 caCertificatePath = path
-                                if (path.isNotBlank()) onValidateCaCertificate(selected?.name, path)
+                                caEdited = true
                             },
+                            enabled = tls,
                             label = { Text("CA certificate") },
-                            supportingText = { Text("Blank uses the system trust store", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            supportingText = {
+                                Text(
+                                    if (tls) "Blank uses the system trust store" else "Not used without TLS",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
                             trailingIcon = { ConnectionIcon(AppIcon.UploadFile, IconSize) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+                                if (caHadFocus && !focus.isFocused) validateCa()
+                                caHadFocus = focus.isFocused
+                            },
                         )
                     },
                 ),
             )
             // Product decision D7: TLS is checked against the CA, the host name is not. Said where the user sets the CA.
-            Text(
-                ConnectionNotes.HOST_NAME_NOT_VERIFIED,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
+            editPanelNotes(tls).hostNameNotVerified?.let {
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
             val caResult = state.lastCaCertificateValidationResult
-            if (caResult is CaCertificateValidationResult.Invalid) {
+            // The CA is ignored with TLS off, so is a message about it.
+            if (tls && caResult is CaCertificateValidationResult.Invalid) {
                 Text(caResult.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
@@ -276,14 +310,17 @@ private fun EditPanel(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ConnectionIcon(AppIcon.Lock, IconSize)
-                Text("TLS is always on. The app does not connect without it.", style = MaterialTheme.typography.bodySmall)
-            }
+            TlsSwitchRow(
+                tls = tls,
+                onChange = { now ->
+                    tls = now
+                    ports = BrokerEndpoints.afterTlsSwitch(ports, now)
+                },
+            )
 
             state.lastCheckResult?.let { result ->
                 Spacer(modifier = Modifier.height(8.dp))
-                CheckConnectionBanner(result)
+                CheckConnectionBanner(result, tls = selected?.tls ?: tls)
             }
 
             (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
@@ -309,22 +346,37 @@ private fun EditPanel(
                     }
                 }
                 Button(onClick = {
-                    val input = ConnectionProfileInput(
-                        name = name,
-                        host = host,
-                        virtualHost = virtualHost,
-                        username = username,
-                        password = password.ifBlank { null },
-                        streamPort = selected?.streamPort ?: 5551,
-                        managementPort = selected?.managementPort ?: 15671,
-                        topologyControlLevel = level,
-                        declaredPermissions = if (declares) {
-                            DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
-                        } else {
-                            DeclaredPermissionsEdit.Clear
-                        },
-                    )
-                    onSave(selected?.name, input)
+                    val save = {
+                        val input = ConnectionProfileInput(
+                            name = name,
+                            host = host,
+                            virtualHost = virtualHost,
+                            username = username,
+                            password = password.ifBlank { null },
+                            streamPort = ports.stream,
+                            managementPort = ports.management,
+                            tls = tls,
+                            topologyControlLevel = level,
+                            declaredPermissions = if (declares) {
+                                DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
+                            } else {
+                                DeclaredPermissionsEdit.Clear
+                            },
+                        )
+                        onSave(selected?.name, input)
+                    }
+                    // A CA path still being typed is validated first, once; an invalid one does not stop the save (the
+                    // check and Connect report the real problem). Saved after the validation so a valid path is stored first.
+                    if (caEdited && tls && caCertificatePath.isNotBlank()) {
+                        val path = caCertificatePath
+                        caEdited = false
+                        panelScope.launch {
+                            onValidateCaCertificate(selected?.name, path)
+                            save()
+                        }
+                    } else {
+                        save()
+                    }
                 }) {
                     Text("Save")
                 }
@@ -449,17 +501,8 @@ private fun PermissionCheckSection(banner: PermissionBanner) {
 }
 
 @Composable
-private fun CheckConnectionBanner(result: ConnectionCheckResult) {
-    val text = when (result) {
-        is ConnectionCheckResult.BothReachable ->
-            "Connection test passed. The stream endpoint and the management API are both reachable."
-        is ConnectionCheckResult.EndpointUnreachable ->
-            "The ${result.endpoint.name.lowercase()} endpoint could not be reached: ${result.reason}"
-        is ConnectionCheckResult.ManagementPluginMissing ->
-            "Enable the \"${result.pluginName}\" plugin on the broker."
-        is ConnectionCheckResult.TlsRefused ->
-            "The connection was refused. The app does not connect without TLS."
-    }
+private fun CheckConnectionBanner(result: ConnectionCheckResult, tls: Boolean) {
+    val text = checkResultMessage(result, tls)
     if (result is ConnectionCheckResult.BothReachable) {
         Surface(color = MaterialTheme.colorScheme.primaryContainer) {
             Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -486,4 +529,34 @@ private fun DeleteConfirmDialog(name: String, onConfirm: () -> Unit, onCancel: (
         confirmButton = { TextButton(onClick = onConfirm) { Text("Yes") } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
+}
+
+/** The "Use TLS" row; with TLS off the warning sits directly under the switch (colour is never the only signal: icon and text). */
+@Composable
+private fun TlsSwitchRow(tls: Boolean, onChange: (Boolean) -> Unit) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ConnectionIcon(if (tls) AppIcon.Lock else AppIcon.LockOpen, IconSize)
+            Text("Use TLS", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = tls, onCheckedChange = onChange, modifier = Modifier.testTag("tlsSwitch"))
+        }
+        editPanelNotes(tls).notEncrypted?.let { note ->
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shape = RoundedCornerShape(12.dp),
+                // The text is also a property of the tagged node, so a screen reader and a test find it on the warning itself.
+                modifier = Modifier.fillMaxWidth().testTag("notEncryptedWarning").clearAndSetSemantics { text = AnnotatedString(note) },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ConnectionIcon(AppIcon.LockOpen, IconSize)
+                    Text(note, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
 }

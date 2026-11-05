@@ -73,6 +73,7 @@ import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
+import dev.caerbannog.ui.connections.NotEncryptedNote
 import dev.caerbannog.ui.connections.PermissionPillView
 import dev.caerbannog.ui.connections.SmallIconSize
 
@@ -116,6 +117,7 @@ fun ConnectionChip(chip: ConnectionChipState, onClick: () -> Unit, modifier: Mod
         Text(chip.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         chip.stateText?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
         chip.pill?.let { PermissionPillView(it, Modifier.testTag("chipPill")) }
+        if (chip.notEncrypted) NotEncryptedNote("chipNotEncrypted", MaterialTheme.typography.labelMedium)
         ConnectionIcon(AppIcon.ArrowDropDown, IconSize)
     }
 }
@@ -219,6 +221,7 @@ private fun ConnectionRow(row: ConnectionRowState, events: ConnectionControlEven
             row.note?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("popupNote:${row.name}"))
             }
+            if (row.notEncrypted) NotEncryptedNote("popupNotEncrypted:${row.name}", MaterialTheme.typography.labelSmall)
         }
         val action: Pair<String, () -> Unit>? = when (row.action) {
             RowAction.Connect -> ConnectionControlTexts.CONNECT to { events.connect(row.name) }

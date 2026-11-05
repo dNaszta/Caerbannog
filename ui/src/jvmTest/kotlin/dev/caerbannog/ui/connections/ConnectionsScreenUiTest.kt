@@ -492,7 +492,8 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.declarationSwitch(): SemanticsNodeInteraction =
-        onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)).performScrollTo()
+        // M2-14: the form has a second switch, "Use TLS" (tag tlsSwitch); this helper means the declaration switch only.
+        onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch).and(!hasTestTag("tlsSwitch"))).performScrollTo()
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.toggleDeclaration() {
