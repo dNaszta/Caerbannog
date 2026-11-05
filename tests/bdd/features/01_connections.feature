@@ -111,6 +111,19 @@ Feature: Connection profiles
     When I choose a CA certificate file that is not a valid certificate
     Then the file is rejected with a message saying it is not a valid certificate
 
+  @negative @fake-broker
+  Scenario Outline: A CA certificate path that is not a readable file is rejected without an error
+    Given I am editing a connection profile
+    When I type the CA certificate path "<path>"
+    Then the file is rejected with a message saying the file could not be read
+
+    Examples:
+      | path                |
+      | /                   |
+      | the temp folder     |
+      | the temp folder/    |
+      | a file that is gone |
+
   @security
   Scenario: Passwords are not stored in the profile file
     Given a saved connection "uat-eu" with password "s3cret"

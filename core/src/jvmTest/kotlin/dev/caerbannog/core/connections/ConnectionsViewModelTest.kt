@@ -372,4 +372,25 @@ class ConnectionsViewModelTest {
         assertTrue(result is SaveConnectionResult.NameAlreadyExists, "got $result")
         assertEquals(yesYes, repository.list().single { it.name == "prod-eu" }.declaredPermissions)
     }
+
+    // M2-05 round 2, F1: the CA field validates on every keystroke. The view model passes the typed path
+    // to the validator and publishes its typed answer for the field's error text; a validator is not
+    // allowed to throw (the contract lives in data-rabbit's X509CaCertificateValidatorTest).
+    @Test
+    fun `an invalid CA path typed into the field is published as the error text and nothing is thrown`() {
+        val seen = mutableListOf<String>()
+        val validator = object : CaCertificateValidator {
+            override fun validate(filePath: String): CaCertificateValidationResult {
+                seen += filePath
+                return CaCertificateValidationResult.Invalid("the file could not be read")
+            }
+        }
+        val viewModel = ConnectionsViewModel(InMemoryRepository(), InMemorySecretStore(), UncalledReachabilityChecker(), validator)
+
+        val returned = viewModel.validateCaCertificateFile("/")
+
+        assertEquals(listOf("/"), seen)
+        assertEquals(CaCertificateValidationResult.Invalid("the file could not be read"), returned)
+        assertEquals(returned, viewModel.state.value.lastCaCertificateValidationResult)
+    }
 }
