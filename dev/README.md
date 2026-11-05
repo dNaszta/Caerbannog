@@ -7,14 +7,16 @@ and the TLS files are test fixtures, never real, never reuse them anywhere**.
 
 | Command | What it does |
 | --- | --- |
-| `task dev:up` | Starts RabbitMQ (`rabbitmq:4-management`) with TLS and waits until it is healthy. |
+| `task dev:up` | Starts RabbitMQ (`rabbitmq:4-management`) with TLS (default) and plain listeners and waits until it is healthy. |
 | `task dev:seed -- --password dev-password` | Publishes 1000 messages into each of `dev-orders`, `dev-events`, `dev-audit` on `/`, so offsets and counts are not zero. |
+| `task dev:seed:plain -- --password dev-password` | The same seed over plain (no TLS): stream 5552, management HTTP 15672, no CA. Passes `--no-tls` and no `--ca`. |
 | `task dev:seed -- --password dev-password --queues 1000 --vhost many` | Declares 1000 quorum queues in the `many` vhost (the M2-04 refresh-cost trial); declares only queues, no publishing. No `--queues` means no queues. |
 | `task dev:reset` | `docker compose down -v` (container and volume gone), then `up -d --wait`. Run it twice: same result. |
 
 Seed flags: `--password` (required), `--user` (default `admin`), `--host`, `--stream-port`, `--management-port`,
 `--vhost`, `--streams a,b`, `--messages N`, `--queues N`, `--max-age 7D` (RabbitMQ notation; sets a stream
-retention policy `dev-seed-retention`), `--ca` (the Taskfile passes the fixture CA). Messages are **appended on
+retention policy `dev-seed-retention`), `--ca` (the Taskfile passes the fixture CA), `--no-tls` (a switch without a value: plain stream and
+HTTP management, ports default to 5552 and 15672, `--ca` ignored). Messages are **appended on
 every seed run**; queue declarations are idempotent. The password is never logged.
 
 Behaviours worth knowing:
@@ -37,8 +39,8 @@ boot**, in file name order; anything deleted by hand comes back, data is only cl
 
 ## Ports and certificates
 
-Only TLS is published: stream **5551**, management API (HTTPS) **15671**, AMQP **5671**. 5672 and 15672 are not
-published. The CA is `data-rabbit/src/test/resources/tls/ca.pem` (the server cert and key next to it are mounted
+TLS (the default): stream **5551**, management API (HTTPS) **15671**, AMQP **5671**. Plain, not encrypted:
+stream **5552**, management API (HTTP) **15672**; AMQP 5672 is not published. The CA is `data-rabbit/src/test/resources/tls/ca.pem` (the server cert and key next to it are mounted
 read-only from there; one home, no copy). The host name is not verified, so `localhost` works.
 
 ## Users (all passwords: `dev-password`)
@@ -65,4 +67,16 @@ CA file: the absolute path of `data-rabbit/src/test/resources/tls/ca.pem`. Check
 
 ```
 curl --cacert data-rabbit/src/test/resources/tls/ca.pem -u admin:dev-password https://localhost:15671/api/queues/%2F
+```
+
+## The A2 profile for the app (plain, not encrypted)
+
+Host `localhost`, stream port `5552`, management port `15672`, vhost `/`, user `admin`, password `dev-password`,
+**TLS switch off**; no CA file is needed. The app shows "Not encrypted" for this profile (the password travels in
+clear text; fine for this throwaway broker, never for a real one). Seed it with `task dev:seed:plain -- --password
+dev-password`; the TLS profile (A1, above) is seeded with `task dev:seed -- --password dev-password`. Check the list
+without the app:
+
+```
+curl -u admin:dev-password http://localhost:15672/api/queues/%2F
 ```

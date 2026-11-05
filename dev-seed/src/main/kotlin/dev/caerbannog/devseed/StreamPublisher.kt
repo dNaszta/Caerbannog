@@ -11,21 +11,20 @@ internal class StreamPublisher(private val args: SeedArgs) : AutoCloseable {
     private val environment: Environment = build()
 
     private fun build(): Environment {
-        val sslContext = SslContextBuilder.forClient()
-            .trustManager(Tls.trustManagerFactory(args.caPath))
-            .endpointIdentificationAlgorithm(null)
-            .build()
         val address = Address(args.host, args.streamPort)
-        return Environment.builder()
+        val builder = Environment.builder()
             .host(args.host)
             .port(args.streamPort)
             .username(args.user)
             .password(args.password)
             .virtualHost(args.vhost)
             .addressResolver { address }
-            .tls().sslContext(sslContext)
-            .environmentBuilder()
+        if (!args.tls) return builder.build()
+        val sslContext = SslContextBuilder.forClient()
+            .trustManager(Tls.trustManagerFactory(args.caPath))
+            .endpointIdentificationAlgorithm(null)
             .build()
+        return builder.tls().sslContext(sslContext).environmentBuilder().build()
     }
 
     /** Creates the stream when it is missing (an existing one keeps the arguments from the definitions). */
