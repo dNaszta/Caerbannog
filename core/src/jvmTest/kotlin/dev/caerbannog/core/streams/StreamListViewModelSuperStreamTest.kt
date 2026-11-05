@@ -633,6 +633,23 @@ class StreamListViewModelSuperStreamTest {
         }
     }
 
+    // Mutation check (test developer): routing the grouping read through the lost-connection path survived the failure list above.
+    @Test
+    fun `a grouping call that alone is unreachable is no lost connection, the stream calls decide (D2)`() = runTest {
+        val s = StreamListHarness(this)
+        s.ordersSuperStream()
+        s.catalog.failSuperStreams(CatalogResult.Unreachable)
+        s.open()
+
+        assertEquals(LinkState.Connected("uat-eu"), s.h.active.state.value)
+        assertEquals(orders, s.names(), "flat list, still loaded")
+        assertNull(s.state.banner)
+        assertFalse(s.state.stale)
+        assertEquals(StreamListTexts.GROUPING_UNAVAILABLE, s.state.groupingNotice)
+        s.pass(5)
+        assertEquals(LinkState.Connected("uat-eu"), s.h.active.state.value, "also on the next tick")
+    }
+
     @Test
     fun `a broker that is really gone is still a lost connection, driven by the stream calls`() = runTest {
         val s = StreamListHarness(this)
