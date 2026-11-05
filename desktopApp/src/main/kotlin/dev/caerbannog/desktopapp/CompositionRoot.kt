@@ -16,7 +16,9 @@ import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.core.streams.AppSettings
+import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.RefreshTarget
 import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.ui.appframe.AppDestination
@@ -25,6 +27,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
 import java.io.File
 
@@ -55,7 +62,7 @@ class AppComposition(
     val viewModel: ConnectionsViewModel,
     val active: ActiveConnection,
     val streamList: StreamListViewModel,
-    /** The Publishers and consumers tab (M2-06a). COMPILE STUB: created, not yet closed or followed by the control. */
+    /** The Publishers and consumers tab (M2-06a); closed with the composition, followed by the control while a stream is open. */
     val streamClients: StreamClientsViewModel,
     /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
     val control: ConnectionControlModel,
@@ -71,6 +78,7 @@ class AppComposition(
             // The scope cancel is what stops the list (its timer, loads and link follower are children of the scope) and the
             // chip model; the close() calls are for callers that keep the scope alive.
             streamList.close()
+            streamClients.close()
             control.close()
             streamListScope.cancel()
         } finally {
@@ -115,10 +123,19 @@ fun createAppComposition(
         clock = RefreshClock { System.currentTimeMillis() },
         reconnect = viewModel::connect,
     )
-    val control = ConnectionControlModel(
-        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = { navigation.open(AppDestination.Connections) },
-    )
     val streamClients = StreamClientsViewModel(active, appSettings, streamListScope, RefreshClock { System.currentTimeMillis() }, viewModel::connect)
+    // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
+    // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
+    val shownTarget: StateFlow<RefreshTarget> = navigation.selectedStream
+        .map { if (it == null) streamList else streamClients }
+        .stateIn(streamListScope, SharingStarted.Eagerly, if (navigation.selectedStream.value == null) streamList else streamClients)
+    streamListScope.launch {
+        active.state.collect { if (it is LinkState.Disconnected) navigation.closeStream() }
+    }
+    val control = ConnectionControlModel(
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() },
+        onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
+    )
     return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
 }
 

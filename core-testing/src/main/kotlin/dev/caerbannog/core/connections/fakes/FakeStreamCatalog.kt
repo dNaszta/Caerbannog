@@ -28,7 +28,11 @@ import java.util.concurrent.ConcurrentHashMap
  *  - the `name` filter is a substring, or a regex with `useRegex`; an invalid regex is no error and matches nothing;
  *  - no management tag: everything is [CatalogResult.NotAuthorised], and capabilities say visibility NONE and plugin UNKNOWN;
  *  - plugin missing: publishers and consumers are [CatalogResult.PluginMissing];
- *  - a missing stream is [CatalogResult.NotFound].
+ *  - a missing stream is [CatalogResult.NotFound] (also after [deleteStream]).
+ *  - M2-06 publishers and consumers: rows are whatever a test sets, in that order. The fake does NOT model the broker's lag arithmetic (stored offsets
+ *    raising `offset_lag`), the empty `connection_details` of a client that has just attached, or the vhost-wide consumer list that the real
+ *    implementation filters; a test sets those values on purpose (`consumer(...)` with an explicit lag, an empty connection name). What a real
+ *    broker does with them is checked in `RealBrokerClientsTest`.
  *  - M2-04: a name is unique in a vhost, so adding a stream or queue again REPLACES the old one (a test updates statistics that way);
  *    `publisherCounts` groups the publisher rows of the vhost by stream, streams without a publisher are absent.
  * Every call is counted in [calls], so a test can show that something did NOT call the broker. A test can hold the next call
