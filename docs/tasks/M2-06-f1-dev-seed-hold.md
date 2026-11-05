@@ -2,6 +2,8 @@
 
 Milestone: M2    Depends on: M2-12, M2-12b (merged), M2-06 (for the screen to look at)    Size: S
 
+Status: step 2 tests first done (tester, 2026-11-05): 11 red for the right reason, compile stubs only; NEXT: step 3 senior developer.
+
 ## Goal
 `task dev:seed -- --password <pw> --hold` publishes as today, then keeps one named publisher and one named consumer per dev stream connected (consumer stores its offset) until Ctrl+C, so the Publishers and consumers tab has rows to show.
 
@@ -24,3 +26,7 @@ None.
 
 ## Definition of done
 Tests first and passing, no unrelated changes, `dev:seed` description in `Taskfile.yml` mentions `--hold`.
+
+## Test contract (step 2)
+Files in `dev-seed/src/test/.../devseed/`: `SeedArgsHoldTest`, `HoldTest`, `TaskfileHoldTest`. No existing test edited.
+Stubs the developer fills in: `SeedArgs.hold` (parse the valueless `--hold`, show it in `toString`), `Hold.kt` (`HoldConnector` seam: one `openPublisher(stream, "dev-seed-publisher")` and one `openConsumer(stream, "dev-seed-consumer")` per stream; `Hold.run(awaitStop)` opens, waits, always closes, closes the rest when one close or open fails; real connector = `StreamPublisher`, wired in `Main`, shutdown hook calls close), `Taskfile.yml` descriptions of `dev:seed` and `dev:seed:plain` mention `--hold`, `USAGE` and dev README line.

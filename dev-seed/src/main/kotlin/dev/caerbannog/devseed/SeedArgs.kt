@@ -22,6 +22,8 @@ data class SeedArgs(
     val retentionMaxAge: String?,
     /** False with `--no-tls`: plain stream protocol and plain HTTP management, [caPath] is then always null. */
     val tls: Boolean = true,
+    /** M2-06-F-A stub: `--hold` keeps a publisher and a consumer per stream connected until Ctrl+C (no value). */
+    val hold: Boolean = false,
 ) {
     override fun toString(): String =
         "SeedArgs(host=$host, streamPort=$streamPort, managementPort=$managementPort, user=$user, " +
