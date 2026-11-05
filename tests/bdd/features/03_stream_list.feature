@@ -140,6 +140,33 @@ Feature: Stream list
     When I look at the refresh interval
     Then the refresh interval shown is 5 seconds
 
+  # M2-05a: the interval is a per-app setting in settings.json next to the profiles file. "Restart" = a new composition on the same file.
+  @fake-broker
+  Scenario: The refresh interval is kept between runs
+    Given the app keeps its settings in a settings file
+    And I have the stream list open
+    When I set the refresh interval to 30 seconds
+    And I restart the app
+    Then the refresh interval shown is 30 seconds
+
+  # Off is a choice: it must not fall back to the 5 second default of a fresh install (decision D3, amended 2026-11-05).
+  @fake-broker
+  Scenario: The refresh interval Off is kept between runs
+    Given the app keeps its settings in a settings file
+    And I have the stream list open
+    When I set the refresh interval to off
+    And I restart the app
+    Then the refresh interval shown is off
+
+  @fake-broker
+  Scenario: A corrupt settings file falls back to 5 seconds
+    Given the settings file contains "this is { not json"
+    And a stream "orders-events" exists
+    When I start the app
+    And I open the stream list
+    Then the refresh interval shown is 5 seconds
+    And "orders-events" shows first offset 0 and last offset 9
+
   @fake-broker
   Scenario: A broker with no streams
     Given the broker has no streams

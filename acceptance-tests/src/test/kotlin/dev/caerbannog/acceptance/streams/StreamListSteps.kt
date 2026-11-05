@@ -10,6 +10,7 @@ import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.CatalogMessages
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.PublisherRow
@@ -21,6 +22,7 @@ import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.streams.StreamRow
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.core.streams.Visibility
+import dev.caerbannog.datarabbit.JsonFileAppSettings
 import io.cucumber.datatable.DataTable
 import io.cucumber.java.After
 import io.cucumber.java.Before
@@ -37,6 +39,8 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import java.io.File
+import java.nio.file.Files
 import java.util.Locale
 
 /**
@@ -62,7 +66,8 @@ class StreamListSteps {
 
     private lateinit var gateway: FakeConnectionGateway
     private lateinit var active: ActiveConnection
-    private lateinit var settings: FakeAppSettings
+    private lateinit var settings: AppSettings
+    private var settingsDir: File? = null
     private lateinit var test: TestScope
     private lateinit var vm: StreamListViewModel
     private val catalog: FakeStreamCatalog get() = gateway.catalogOf(NAME)
@@ -74,26 +79,48 @@ class StreamListSteps {
 
     @Before
     fun reset() {
+        settingsDir = null
+        buildApp(FakeAppSettings())
+        pageSize = 5
+    }
+
+    // A fresh broker, connection and view model on the given settings: "the app was started". Nothing is connected yet.
+    private fun buildApp(appSettings: AppSettings) {
         gateway = FakeConnectionGateway()
         val secrets = FakeSecretStore().also { it.store(NAME, PASSWORD) }
         active = ActiveConnection(ConnectionSession(FakePermissionChecker(), secrets), gateway)
-        settings = FakeAppSettings()
+        settings = appSettings
         test = TestScope()
-        pageSize = 5
-        vm = StreamListViewModel(
-            active = active,
-            settings = settings,
-            scope = test.backgroundScope,
-            clock = RefreshClock { test.testScheduler.currentTime },
-            reconnect = { active.connect(profile()) },
-            pageSize = pageSize,
-        )
+        vm = newViewModel()
     }
+
+    private fun newViewModel() = StreamListViewModel(
+        active = active,
+        settings = settings,
+        scope = test.backgroundScope,
+        clock = RefreshClock { test.testScheduler.currentTime },
+        reconnect = { active.connect(profile()) },
+        pageSize = pageSize,
+    )
 
     @After
     fun closeEverything() {
         vm.close()
         active.close()
+        settingsDir?.deleteRecursively()
+    }
+
+    private fun settingsFile(): File = File(checkNotNull(settingsDir) { "no settings file in this scenario" }, "settings.json")
+
+    private fun useSettingsDir() {
+        if (settingsDir == null) settingsDir = Files.createTempDirectory("caerbannog-settings-").toFile()
+    }
+
+    // The same connection, a new view model: the app restarts its screen (the view model reads its settings once, at start).
+    private fun startViewModelOn(appSettings: AppSettings) {
+        vm.close()
+        settings = appSettings
+        vm = newViewModel()
     }
 
     private fun profile() = ConnectionProfile(name = NAME, host = "$NAME.example.com", virtualHost = "/", username = "svc")
@@ -202,6 +229,18 @@ class StreamListSteps {
         assertEquals(DEFAULT_REFRESH, settings.streamListRefresh, "a fresh FakeAppSettings is a fresh install")
     }
 
+    @Given("the app keeps its settings in a settings file")
+    fun theAppKeepsItsSettingsInAFile() {
+        useSettingsDir()
+        startViewModelOn(JsonFileAppSettings(settingsFile()))
+    }
+
+    @Given("the settings file contains {string}")
+    fun theSettingsFileContains(text: String) {
+        useSettingsDir()
+        settingsFile().writeText(text)
+    }
+
     @Given("I have the stream list open")
     fun iHaveTheStreamListOpen() = open()
 
@@ -260,6 +299,25 @@ class StreamListSteps {
     @When("{int} minutes pass")
     fun minutesPass(minutes: Int) = pass(minutes * 60_000L)
 
+    @When("I set the refresh interval to {int} seconds")
+    fun iSetTheRefreshIntervalToSeconds(seconds: Int) = theRefreshIntervalIsSeconds(seconds)
+
+    @When("I set the refresh interval to off")
+    fun iSetTheRefreshIntervalToOff() = theRefreshIntervalIsOff()
+
+    @When("I start the app")
+    fun iStartTheApp() = startViewModelOn(JsonFileAppSettings(settingsFile()))
+
+    // The whole composition goes: view model, held connection, broker fake. Only the settings file is left.
+    @When("I restart the app")
+    fun iRestartTheApp() {
+        vm.close()
+        active.close()
+        buildApp(JsonFileAppSettings(settingsFile()))
+        runBlocking { active.connect(profile()) }
+        settle()
+    }
+
     @When("I look at the refresh interval")
     fun iLookAtTheRefreshInterval() {
         // Nothing to do: the interval is state, read by the Then.
@@ -271,6 +329,11 @@ class StreamListSteps {
     }
 
     // --- Then ---
+
+    @Then("the refresh interval shown is off")
+    fun theRefreshIntervalShownIsOff() {
+        assertEquals(RefreshInterval.Off, state.refreshInterval, "refresh interval shown: ${state.refreshInterval}")
+    }
 
     @Then("each stream is shown with its type, approximate messages, first offset, last offset, publishers and consumers")
     fun eachStreamIsShown() {

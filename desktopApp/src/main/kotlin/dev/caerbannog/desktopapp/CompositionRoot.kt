@@ -19,6 +19,7 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.StreamListViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -82,6 +83,9 @@ fun createAppComposition(
     reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
     log: (String) -> Unit = { System.err.println(it) },
     gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
+    // M2-05a step 2: COMPILE STUBS for the tests, both ignored until the senior developer wires them (brief Scope items 1 and 3).
+    @Suppress("UNUSED_PARAMETER") appSettings: AppSettings = InMemoryAppSettings(),
+    @Suppress("UNUSED_PARAMETER") uiDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)

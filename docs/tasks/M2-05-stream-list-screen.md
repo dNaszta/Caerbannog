@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-04 (merged into local `main`), M2-01b    Size: L as one task (about 4 to 5 days); delivered as three parts, 05a, 05b, 05c, each one to two days, each ends green (see Plan)
 
-Status: briefed (architect, 2026-11-05), branch `m2-05-stream-list-screen`, created from the accepted M2-12b head. Step 2 (tests first, test developer) is next. The input note of 2026-11-04 and the M2-04 review follow-ups are kept unchanged at the end of this file under "Inputs (kept as written)"; this brief states what is built and wins where the two differ.
+Status: briefed (architect, 2026-11-05), branch `m2-05-stream-list-screen`, created from the accepted M2-12b head. Step 2, part 05a (tests first, test developer, 2026-11-05): DONE, red for the right reason; see "Step 2 report, 05a" below. Step 2 for 05b and 05c is still to do. The input note of 2026-11-04 and the M2-04 review follow-ups are kept unchanged at the end of this file under "Inputs (kept as written)"; this brief states what is built and wins where the two differ.
 
 ## Goal
 The app shows the stream list for the held connection as designed in `docs/ux/Streams.dc.html`, with every state (not connected, connecting, loading, rows, empty, denied, failed, lost connection); a fixed connection chip with popup in the app bar of every screen connects, disconnects, retries and sets the refresh interval; the interval is stored in `settings.json`; every value in the list is copyable as displayed; and the view model is only ever called from the UI thread.
@@ -87,6 +87,24 @@ Other checks:
 
 ## Definition of done
 Tests written first and failing for the right reason, then passing; every scenario above passes and its `@needs-M2` tag is removed; `./gradlew test --rerun-tasks` and `verifyTestDiscovery` green; screenshot images checked against the mockup; no unrelated change; the spec (the D3 line and the Connection control line) and `docs/tasks/README.md` (D3 "missing = Off" reworded, M2-05 row) updated; Status records the installer size change, the keyboard-copy spike result and the local trial.
+
+## Step 2 report, 05a (test developer, 2026-11-05)
+Written first, run, red for the right reason. Nothing in production code changed except two COMPILE STUBS (no behaviour): `data-rabbit/.../JsonFileAppSettings.kt` (new, never reads or writes) and two ignored parameters on `createAppComposition` (`appSettings`, `uiDispatcher`, in `desktopApp/.../CompositionRoot.kt`). The developer replaces both. No dependency edit was made (the Swing dependency is the developer's, desktopApp only).
+
+| Where | Tests | State now |
+| --- | --- | --- |
+| core `StreamListViewModelThreadTest` | 12: one per mutating method from a plain thread (`setFilter`, `setSort`, `setPage`, `nextPage`, `previousPage`, `setPageSize`, `setRefreshInterval` incl. the `AppSettings` write thread), `setShown`, `refreshNow`/`retry`, `updatedSecondsAgo`, the stress test (8 threads x 150 rounds of every public method but `close`, seeded, then one thread has the last word), 8 threads closing | 8 red (7 per-method + stress), 4 green guards |
+| core `StreamListTextsTest` | exact `LOAD_FAILED` literal; failed first load shows it with Retry | 2 red |
+| data-rabbit `JsonFileAppSettingsTest` | 21: default 5 s, missing/empty/no key/7/-5/6 wrong types/corrupt (6 bodies) read 5 s, reading does not create or repair, `0` is Off, all 5 values round-trip, Off written as 0, folder created, unknown keys survive, no temp file, two quick writes, reader never sees a partial file during 300 writes, failed write does not throw/keeps value/is logged, `defaultFile` | 10 red, 11 green against the stub (the fallback-to-default reads pass trivially) |
+| desktopApp `CompositionRootStreamListWiringTest` | 7: given dispatcher is the one used (queue dispatcher, broker asked from the test thread), default is the Swing UI thread (`AWT-EventQueue-*`), close stops everything, file written on change, file read at start, corrupt file starts with 5 s | 4 red, 3 green |
+| `03_stream_list.feature` (+ steps in `StreamListSteps`) | "The refresh interval is kept between runs", "The refresh interval Off is kept between runs", "A corrupt settings file falls back to 5 seconds" (all `@fake-broker`) | 2 red, 1 green (corrupt) |
+
+Comments: the two D2 wordings in `StreamListViewModelConnectionTest` (lines 17 and 95) are reworded (test file, comments only). The three production ones (`ActiveConnection.kt:146`, `StreamListViewModel.kt:243`, `LinkState.kt:28`) are the developer's.
+
+How the F-2 test sees a race: the scope is a single thread named `ui-sim`; a collector on `Dispatchers.Unconfined` runs on the thread that publishes a state, so any state rendered on a caller thread is recorded; every observed state is also checked for consistency (page in range, rows match the filter, sorted, range text). A throwaway version of choice (a) (every public method hops with `scope.launch`) turned 11 of 12 green (the one red was that throwaway's own stub of `updatedSecondsAgo`) and was stable over 5 runs; it was reverted, not committed.
+
+Notes for the developer: (1) if `updatedSecondsAgo()` goes into `StreamListState` as `updatedAtMillis`, delete its call in `Rig.everyMethod` and the test `updatedSecondsAgo can be read from a plain thread`; (2) `close()` must stay callable from any thread and idempotent; (3) `AppSettings` must be written on the scope thread (the test asserts it); (4) `createAppComposition` tests that pass no `appSettings` will read the real `~/.caerbannog/settings.json` with the planned default; they never set the interval, so they never write; (5) `FakeAppSettings` KDoc ("file is M2-05") is yours; (6) the parameter name `uiDispatcher` is my choice, rename it in the test if you prefer another.
+Not run: `:ui:screenshotTest`, `@broker`, `brokerTest`, `keychainTest`, `verifyTestDiscovery` (red by design now). Not written yet (05b/05c): "Disconnecting stops the refresh", "Switching connection drops the late result of the old one", the `13` app bar scenarios, the Compose UI tests.
 
 ---
 
