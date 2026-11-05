@@ -64,6 +64,13 @@ class HoldTest {
     }
 
     @Test
+    fun `a failing close of the handle closed first still closes all the others`() {
+        val c = FakeConnector(failCloseOf = setOf("consumer:dev-events:dev-seed-consumer"))
+        runCatching { hold(c).run { } }
+        assertEquals(4, c.closed.size, "closed only ${c.closed}")
+    }
+
+    @Test
     fun `close is safe to call twice and closes each handle once`() {
         val c = FakeConnector()
         val h = hold(c)
