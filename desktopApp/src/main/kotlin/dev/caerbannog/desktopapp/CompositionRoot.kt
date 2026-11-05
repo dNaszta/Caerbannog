@@ -18,6 +18,7 @@ import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.StreamListViewModel
+import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -55,9 +56,9 @@ class AppComposition(
     val streamList: StreamListViewModel,
     /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
     val control: ConnectionControlModel,
-    /** COMPILE STUB (M2-05c step 2): which screen the window shows; "Manage connections" must reach it, see `CompositionRootNavigationTest`. */
+    /** Which screen the window shows; "Manage connections" and "New connection" in the chip popup bring Connections back. */
     val navigation: AppNavigation,
-    /** COMPILE STUB (M2-05c step 2): the stream list screen's events, mapped onto [streamList]; see `CompositionRootStreamEventsTest`. */
+    /** The stream list screen's events, mapped onto [streamList]. */
     val streamEvents: StreamListEventsAdapter,
     private val streamListScope: CoroutineScope,
 ) {
@@ -112,7 +113,7 @@ fun createAppComposition(
         reconnect = viewModel::connect,
     )
     val control = ConnectionControlModel(
-        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = {},
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = { navigation.open(AppDestination.Connections) },
     )
     return AppComposition(viewModel, active, streamList, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
 }

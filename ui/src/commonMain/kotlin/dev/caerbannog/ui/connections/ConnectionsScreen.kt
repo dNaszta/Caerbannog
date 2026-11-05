@@ -81,7 +81,7 @@ fun ConnectionsScreen(
     viewModel: ConnectionsViewModel,
     control: ConnectionControlState? = null,
     controlEvents: ConnectionControlEvents? = null,
-    /** COMPILE STUB (M2-05c step 2): not used yet; the drawer reports the chosen destination, see `AppFrameNavigationUiTest`. */
+    /** The drawer reports the destination the user chose. */
     onNavigate: (dev.caerbannog.ui.appframe.AppDestination) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
@@ -90,6 +90,7 @@ fun ConnectionsScreen(
     // The chip is the one place that connects (M2-05b); without a control (null) the frame has no chip.
     AppFrameLayout(
         title = "Connections",
+        onNavigate = onNavigate,
         actions = {
             Button(onClick = viewModel::startNewConnection) {
                 ConnectionIcon(AppIcon.Add, SmallIconSize)

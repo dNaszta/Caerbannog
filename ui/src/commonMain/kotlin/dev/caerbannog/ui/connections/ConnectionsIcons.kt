@@ -12,6 +12,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Stream
@@ -64,6 +68,10 @@ internal enum class AppIcon(val mockupName: String) {
     Stream("stream"),
     Hub("hub"),
     AccountTree("account_tree"),
+    ArrowUpward("arrow_upward"),
+    ArrowDownward("arrow_downward"),
+    ChevronLeft("chevron_left"),
+    ChevronRight("chevron_right"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -90,6 +98,10 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Stream -> Icons.Outlined.Stream
     AppIcon.Hub -> Icons.Outlined.Hub
     AppIcon.AccountTree -> Icons.Outlined.AccountTree
+    AppIcon.ArrowUpward -> Icons.Outlined.ArrowUpward
+    AppIcon.ArrowDownward -> Icons.Outlined.ArrowDownward
+    AppIcon.ChevronLeft -> Icons.Outlined.ChevronLeft
+    AppIcon.ChevronRight -> Icons.Outlined.ChevronRight
 }
 
 /** `.ms.sm` in the mockup. */

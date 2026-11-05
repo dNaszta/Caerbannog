@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -310,7 +311,7 @@ fun ConnectionControl(state: ConnectionControlState, events: ConnectionControlEv
 /**
  * The frame of every screen, including Connections: drawer (brand, search, the four navigation items) and app bar (title, the
  * screen's own [actions], then the fixed [ConnectionControl] last), with the screen's [content] below the bar.
- * The search field and the items are drawn, not wired: their screens come with M2-05c and M2-08 to M4.
+ * The search field is drawn, not wired (M2-08 and later); the items report [onNavigate].
  */
 @Composable
 fun AppFrame(
@@ -318,7 +319,7 @@ fun AppFrame(
     control: ConnectionControlState,
     events: ConnectionControlEvents,
     modifier: Modifier = Modifier,
-    /** COMPILE STUB (M2-05c step 2): not used yet. The drawer items report the destination the user chose; see `AppFrameNavigationUiTest`. */
+    /** The drawer items report the destination the user chose; the app decides what to show (Topology and Migrations have no screen yet). */
     onNavigate: (AppDestination) -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
@@ -338,7 +339,7 @@ internal fun AppFrameLayout(
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
-            AppDrawer(activeItem = title, modifier = Modifier.width(280.dp).fillMaxHeight())
+            AppDrawer(activeItem = title, onNavigate = onNavigate, modifier = Modifier.width(280.dp).fillMaxHeight())
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 AppBar(title, actions, chip)
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
@@ -363,15 +364,15 @@ private fun AppBar(title: String, actions: @Composable RowScope.() -> Unit, chip
 /** The four drawer items. The app decides what to do with each; Topology and Migrations have no screen yet. */
 enum class AppDestination { Connections, Streams, Topology, Migrations }
 
-private val navItems: List<Pair<String, AppIcon>> = listOf(
-    "Connections" to AppIcon.Power,
-    "Streams" to AppIcon.Stream,
-    "Topology" to AppIcon.Hub,
-    "Migrations" to AppIcon.AccountTree,
+private val navItems: List<Pair<AppDestination, AppIcon>> = listOf(
+    AppDestination.Connections to AppIcon.Power,
+    AppDestination.Streams to AppIcon.Stream,
+    AppDestination.Topology to AppIcon.Hub,
+    AppDestination.Migrations to AppIcon.AccountTree,
 )
 
 @Composable
-private fun AppDrawer(activeItem: String, modifier: Modifier = Modifier) {
+private fun AppDrawer(activeItem: String, onNavigate: (AppDestination) -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.testTag("appDrawer").background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -398,21 +399,23 @@ private fun AppDrawer(activeItem: String, modifier: Modifier = Modifier) {
             }
         }
         Spacer(Modifier.padding(4.dp))
-        navItems.forEach { (label, icon) -> NavItem(label, icon, selected = label == activeItem) }
+        navItems.forEach { (destination, icon) -> NavItem(destination, icon, selected = destination.name == activeItem, onClick = { onNavigate(destination) }) }
     }
 }
 
 @Composable
-private fun NavItem(label: String, icon: AppIcon, selected: Boolean) {
+private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolean, onClick: () -> Unit) {
     Surface(
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        // The whole item is the target: focusable, Enter and Space activate it, `selected` is spoken.
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("navItem:${destination.name}")
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
     ) {
         Row(Modifier.padding(start = 16.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ConnectionIcon(icon, IconSize)
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(destination.name, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
