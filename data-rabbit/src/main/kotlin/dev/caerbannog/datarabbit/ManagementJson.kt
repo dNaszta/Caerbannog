@@ -211,3 +211,12 @@ internal object ManagementJson {
     private fun JsonObject.strings(key: String): List<String> =
         (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content } ?: emptyList()
 }
+
+// M2-08a COMPILE STUBS by the test developer (no behaviour): the developer replaces them; the tests in ManagementJsonTopologyTest pin the contract.
+internal fun ManagementJson.parseQueuePage(body: String, vhost: String): CatalogResult<dev.caerbannog.core.topology.QueuePage> = CatalogResult.Unexpected
+
+internal fun ManagementJson.parseQueueDetail(body: String): CatalogResult<dev.caerbannog.core.topology.QueueRow> = CatalogResult.Unexpected
+
+internal fun ManagementJson.parseExchanges(body: String): CatalogResult<List<dev.caerbannog.core.topology.ExchangeRow>> = CatalogResult.Unexpected
+
+internal fun ManagementJson.parseBindingList(body: String): CatalogResult<List<dev.caerbannog.core.topology.BindingRow>> = CatalogResult.Unexpected

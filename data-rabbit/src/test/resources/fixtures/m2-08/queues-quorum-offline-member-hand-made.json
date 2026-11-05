@@ -1,0 +1,47 @@
+{
+ "_note": "HAND-MADE, NOT MEASURED (spike S-D: a single dev node cannot lose a member). Shaped like queues-quorum-classic-stream-columns.json with three members of which one is not in `online`. The real broker's behaviour for an offline member is unverified.",
+ "filtered_count": 3,
+ "item_count": 3,
+ "items": [
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": ["rabbit@node1", "rabbit@node2", "rabbit@node3"],
+   "messages_ready": 5,
+   "messages_unacknowledged": 1,
+   "name": "hand-degraded",
+   "online": ["rabbit@node1", "rabbit@node3"],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  },
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": ["rabbit@node1", "rabbit@node2", "rabbit@node3"],
+   "messages_ready": 0,
+   "messages_unacknowledged": 0,
+   "name": "hand-healthy",
+   "online": ["rabbit@node1", "rabbit@node2", "rabbit@node3"],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  },
+  {
+   "consumers": 0,
+   "leader": null,
+   "members": ["rabbit@node1", "rabbit@node2", "rabbit@node3"],
+   "messages_ready": 2,
+   "messages_unacknowledged": 0,
+   "name": "hand-no-leader",
+   "online": [],
+   "policy": null,
+   "state": "down",
+   "type": "quorum"
+  }
+ ],
+ "page": 1,
+ "page_count": 1,
+ "page_size": 500,
+ "total_count": 3
+}

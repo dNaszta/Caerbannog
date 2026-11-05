@@ -62,3 +62,8 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
         }
     }
 }
+
+// M2-08a COMPILE STUBS by the test developer (no behaviour): the developer replaces them; the tests in ManagementRequestsTopologyTest pin the URLs.
+internal fun ManagementRequests.queues(vhost: String, page: Int): String = "stub:$vhost:$page"
+
+internal fun ManagementRequests.queueDetail(vhost: String, name: String): String = "stub:$vhost:$name"

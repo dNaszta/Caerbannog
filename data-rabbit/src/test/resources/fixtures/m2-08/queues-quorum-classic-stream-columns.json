@@ -1,0 +1,67 @@
+{
+ "filtered_count": 4,
+ "item_count": 4,
+ "items": [
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 3,
+   "messages_unacknowledged": 0,
+   "name": "dev-jobs",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  },
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 0,
+   "messages_unacknowledged": 0,
+   "name": "dev-orders",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": null,
+   "state": "running",
+   "type": "stream"
+  },
+  {
+   "consumers": 0,
+   "messages_ready": 3,
+   "messages_unacknowledged": 0,
+   "name": "spike-m208-classic",
+   "policy": null,
+   "state": "running",
+   "type": "classic"
+  },
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 3,
+   "messages_unacknowledged": 0,
+   "name": "spike-m208-quorum",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": "spike-m208-pol",
+   "state": "running",
+   "type": "quorum"
+  }
+ ],
+ "page": 1,
+ "page_count": 1,
+ "page_size": 500,
+ "total_count": 11
+}

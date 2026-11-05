@@ -1,0 +1,58 @@
+{
+ "filtered_count": 1000,
+ "item_count": 3,
+ "items": [
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 0,
+   "messages_unacknowledged": 0,
+   "name": "many-queue-00000003",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  },
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 0,
+   "messages_unacknowledged": 0,
+   "name": "many-queue-00000004",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  },
+  {
+   "consumers": 0,
+   "leader": "rabbit@node1",
+   "members": [
+    "rabbit@node1"
+   ],
+   "messages_ready": 0,
+   "messages_unacknowledged": 0,
+   "name": "many-queue-00000005",
+   "online": [
+    "rabbit@node1"
+   ],
+   "policy": null,
+   "state": "running",
+   "type": "quorum"
+  }
+ ],
+ "page": 2,
+ "page_count": 334,
+ "page_size": 3,
+ "total_count": 1000
+}
