@@ -505,6 +505,27 @@ class ConnectionsViewModelTest {
     }
 
     @Test
+    fun `a late CA answer for a profile deleted while another one is selected is dropped by the existence check`() {
+        // Deleting a profile that is not selected does not bump the epoch, so only the "still exists" check can drop this answer.
+        val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("b") }
+        val answer = f.answerAfter("a") { f.vm.requestDelete("a"); f.vm.confirmDelete() }
+        assertNull(answer)
+        assertNull(f.vm.state.value.lastCaCertificateValidationResult)
+        assertTrue(f.repository.list().all { it.caCertificatePath == null })
+    }
+
+    @Test
+    fun `renaming a profile and back while a CA validation runs drops the answer`() {
+        val f = LateCaFixture().also { it.add("a"); it.vm.selectConnection("a") }
+        val answer = f.answerAfter("a") {
+            f.vm.updateConnection("a", ConnectionProfileInput("a2", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+            f.vm.updateConnection("a2", ConnectionProfileInput("a", "rabbit-a.example.com", "/", "svc-explorer", password = null))
+        }
+        assertNull(answer, "the name is back, but the profile was renamed meanwhile: the epoch drops the answer")
+        assertNull(f.repository.list().single().caCertificatePath)
+    }
+
+    @Test
     fun `a panel switch still drops the late CA answer`() {
         val f = LateCaFixture().also { it.add("a"); it.add("b"); it.vm.selectConnection("a") }
         val answer = f.answerAfter("a") { f.vm.selectConnection("b") }
