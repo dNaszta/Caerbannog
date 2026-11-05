@@ -19,6 +19,7 @@ fun main(argv: Array<String>) {
         seed(args)
     } catch (e: Exception) {
         System.err.println("Seed failed: ${e::class.simpleName}: ${e.message}")
+        caHint(e.message)?.let { System.err.println(it) }
         exitProcess(1)
     }
 }
