@@ -42,7 +42,6 @@ private fun seed(args: SeedArgs) {
             println("Set stream max-age ${it} on ${args.streams}.")
         }
     }
-    if (args.queues > 0 && args.vhost != "/") return
     if (args.messages == 0 && !args.hold) return
     StreamPublisher(args).use { publisher ->
         for (stream in args.streams) {
@@ -53,6 +52,10 @@ private fun seed(args: SeedArgs) {
     }
 }
 
+// The shutdown hook waits this long for Hold.close; once it returns the JVM may stop before environment.close()
+// runs, which is harmless because the handles are closed first.
+private const val SHUTDOWN_GRACE_SECONDS: Long = 10
+
 /** Blocks until Ctrl+C (SIGINT/SIGTERM); the shutdown hook releases the latch and waits until Hold has closed all. */
 private fun hold(connector: HoldConnector, streams: List<String>) {
     val stop = CountDownLatch(1)
@@ -61,7 +64,7 @@ private fun hold(connector: HoldConnector, streams: List<String>) {
     Runtime.getRuntime().addShutdownHook(
         Thread {
             stop.countDown()
-            closed.await(10, TimeUnit.SECONDS)
+            closed.await(SHUTDOWN_GRACE_SECONDS, TimeUnit.SECONDS)
         },
     )
     try {

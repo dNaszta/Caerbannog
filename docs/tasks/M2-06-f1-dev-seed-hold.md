@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-12, M2-12b (merged), M2-06 (for the screen to look at)    Size: S
 
-Status: step 5 review done (architect, 2026-11-05): Accepted with follow-ups (two minor, one idea), ready to merge into local main on the user's word, nothing pushed; earlier: step 4 verify done (tester, 2026-11-05): pass with findings, see the report; earlier: step 3 build done (developer, 2026-11-05): 11 tests green, real check on the plain dev broker passed; NEXT: step 4 verify (tester), then architect review.
+Status: review fixes 1 and 2 done (developer, 2026-11-05): dead return removed, SHUTDOWN_GRACE_SECONDS named, dev-seed 84 tests green; earlier: step 5 review done (architect, 2026-11-05): Accepted with follow-ups (two minor, one idea), ready to merge into local main on the user's word, nothing pushed; earlier: step 4 verify done (tester, 2026-11-05): pass with findings, see the report; earlier: step 3 build done (developer, 2026-11-05): 11 tests green, real check on the plain dev broker passed; NEXT: step 4 verify (tester), then architect review.
 
 ## Goal
 `task dev:seed -- --password <pw> --hold` publishes as today, then keeps one named publisher and one named consumer per dev stream connected (consumer stores its offset) until Ctrl+C, so the Publishers and consumers tab has rows to show.
