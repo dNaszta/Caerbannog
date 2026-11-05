@@ -7,7 +7,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * M2-14d test double: a [CaCertificateValidator] whose `validate` blocks until [release], so a test can finish a CA check
+ * M2-14e test double: a [CaCertificateValidator] whose `validate` blocks until [release], so a test can finish a CA check
  * "late" (after a rename, a delete or a panel switch) without any sleep. `validate` is not a suspend function (the real one
  * does file IO), so it waits on a latch; call it from a worker thread, as `validateCaCertificateOffThread` does.
  *

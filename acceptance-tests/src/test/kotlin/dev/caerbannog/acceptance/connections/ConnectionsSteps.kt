@@ -509,7 +509,7 @@ class ConnectionsSteps {
         assertEquals(CaCertificateValidationResult.Invalid("the file could not be read"), lastCaCertificateResult)
     }
 
-    // --- M2-14d: a late CA answer for a renamed or deleted profile ----------------------------------------------------------
+    // --- M2-14e: a late CA answer for a renamed or deleted profile ----------------------------------------------------------
 
     private var gatedValidator: GatedCaCertificateValidator? = null
     private var lateCheck: Deferred<CaCertificateValidationResult?>? = null

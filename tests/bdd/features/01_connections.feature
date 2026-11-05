@@ -233,7 +233,7 @@ Feature: Connection profiles
       | the temp folder/    |
       | a file that is gone |
 
-  # M2-14d: the file is read off the UI thread, so the answer can arrive after the user renamed or deleted the profile.
+  # M2-14e: the file is read off the UI thread, so the answer can arrive after the user renamed or deleted the profile.
   # The late answer is dropped: nothing is saved, no message is shown, nothing fails. The ordering needs a validator that is held
   # until the step releases it (core-testing), so the scenario stays deterministic. The panel-switch case is a unit test.
   @negative @fake-broker

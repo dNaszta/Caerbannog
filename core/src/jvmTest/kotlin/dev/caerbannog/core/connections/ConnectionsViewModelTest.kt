@@ -401,7 +401,7 @@ class ConnectionsViewModelTest {
         assertEquals(returned, viewModel.state.value.lastCaCertificateValidationResult)
     }
 
-    // --- M2-14d (F2): a late CA validation answer must not land on the wrong profile -----------------------------------------
+    // --- M2-14e (F2): a late CA validation answer must not land on the wrong profile -----------------------------------------
     // The validator is held at a gate (no sleep); the test changes the state while the file "is being read", then releases it.
 
     private val lateCa = "/some/ca.pem"
