@@ -127,4 +127,14 @@ class RealBrokerPlainTest {
         assertInstanceOf(OpenResult.Failed::class.java, result, "got $result")
         assertTrue(!(result.toString() + lines).contains(rabbit.adminPassword))
     }
+
+    // The real-broker twin of PermissionCheckerPlainTest "TLS on against a plain management port": keeps the local fixture honest
+    // (a real broker answers or closes on a ClientHello, it does not stay silent), so the result must be UNREACHABLE, never TIMEOUT.
+    @Test
+    fun `the permission check with TLS on at the plain management port is unreachable, not a timeout, and has no password`() = runBlocking<Unit> {
+        val result = ManagementApiPermissionChecker().check(tlsOnAtPlainPorts(), rabbit.adminPassword)
+        val unreadable = assertInstanceOf(PermissionCheckResult.Unreadable::class.java, result, "got $result")
+        assertEquals(dev.caerbannog.core.connections.UnreadableCause.UNREACHABLE, unreadable.cause, "got $result")
+        assertTrue(!result.toString().contains(rabbit.adminPassword))
+    }
 }

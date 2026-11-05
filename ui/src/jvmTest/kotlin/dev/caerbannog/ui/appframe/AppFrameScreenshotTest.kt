@@ -84,4 +84,27 @@ class AppFrameScreenshotTest {
         val file = snapshot("appframe-02-popup-open.png")
         assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
     }
+
+    // M2-14a step 4: the "Not encrypted" warning on the chip and in the popup row, for a by-eye check against docs/ux/Streams.dc.html.
+    private val plainState = state.copy(
+        chip = state.chip.copy(
+            accessibleLabel = "Connection prod-eu, Connected, topology locked, Not encrypted. Open connection menu", notEncrypted = true,
+        ),
+        rows = state.rows.mapIndexed { i, r -> if (i < 2) r.copy(notEncrypted = true) else r },
+    )
+
+    @Test
+    fun `screenshot - chip closed with Not encrypted`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { AppFrame("Streams", plainState, events) { Text("the screen") } }
+        val file = snapshot("appframe-03-chip-not-encrypted.png")
+        assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
+    }
+
+    @Test
+    fun `screenshot - popup open with Not encrypted rows`() = runDesktopComposeUiTest(1280, 880) {
+        setContent { AppFrame("Streams", plainState, events) { Text("the screen") } }
+        onNodeWithTag("connectionChip").performClick()
+        val file = snapshot("appframe-04-popup-not-encrypted.png")
+        assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
+    }
 }

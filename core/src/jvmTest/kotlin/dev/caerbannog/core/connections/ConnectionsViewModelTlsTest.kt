@@ -1,5 +1,7 @@
 package dev.caerbannog.core.connections
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
@@ -179,5 +181,71 @@ class ConnectionsViewModelTlsTest {
         ).joinToString("\n")
         assertFalse(exposed.contains(PASSWORD), exposed)
         assertNull(viewModel.state.value.lastCaCertificateValidationResult)
+    }
+
+    // --- CA validation off the UI thread (M2-14, P8): the late-result rule, added by the test developer in step 4 (mutation "result not
+    // dropped" survived the step 2 tests). The validator runs on the dispatcher given; a result for a panel the user left is dropped.
+
+    private class GateValidator : CaCertificateValidator {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        var thread: String? = null
+        override fun validate(filePath: String): CaCertificateValidationResult {
+            thread = Thread.currentThread().name
+            started.countDown()
+            check(release.await(5, java.util.concurrent.TimeUnit.SECONDS)) { "gate never released" }
+            return CaCertificateValidationResult.Invalid("not a certificate")
+        }
+    }
+
+    @Test
+    fun `a late CA validation result is dropped when the user opened another panel meanwhile`() {
+        val gate = GateValidator()
+        val vm = ConnectionsViewModel(repository, h.secrets, Reachable(), gate, h.session, h.active)
+        vm.addConnection(input(name = "a"))
+        vm.addConnection(input(name = "b"))
+        vm.selectConnection("a")
+        val pool = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "ca-validation-test") }
+        try {
+            runBlocking {
+                withTimeout(10_000) {
+                    val result = async(kotlinx.coroutines.Dispatchers.Unconfined) {
+                        vm.validateCaCertificateOffThread("a", "/some/ca.pem", pool.asCoroutineDispatcher())
+                    }
+                    gate.started.await()
+                    vm.selectConnection("b") // the user moves on while the file is still being read
+                    gate.release.countDown()
+                    assertNull(result.await(), "a dropped result is null")
+                }
+            }
+        } finally {
+            pool.shutdownNow()
+        }
+        assertTrue(gate.thread.orEmpty().startsWith("ca-validation-test"), "the validator ran on the given dispatcher, not on the caller; ran on ${gate.thread}")
+        assertNull(vm.state.value.lastCaCertificateValidationResult, "the late answer for panel a must not show on panel b")
+    }
+
+    @Test
+    fun `a CA validation result for the panel still open is applied`() {
+        val gate = GateValidator().also { it.release.countDown() }
+        val vm = ConnectionsViewModel(repository, h.secrets, Reachable(), gate, h.session, h.active)
+        vm.startNewConnection()
+        val result = runBlocking { withTimeout(10_000) { vm.validateCaCertificateOffThread(null, "/some/ca.pem", kotlinx.coroutines.Dispatchers.IO) } }
+        assertEquals(CaCertificateValidationResult.Invalid("not a certificate"), result)
+        assertEquals(result, vm.state.value.lastCaCertificateValidationResult)
+    }
+
+    // KNOWN GAP, characterisation (step 4 finding, not new in M2-14, same on main): ConnectionProfileInput has no CA field, so a NEW
+    // profile saved after typing a CA path in the form stores no CA; the path attaches only through setCaCertificate on a SAVED profile.
+    // If the architect decides to fix it, this test is the one to flip.
+    @Test
+    fun `KNOWN GAP a new connection saved with a CA path typed in the form stores no CA path`() {
+        assertEquals(CaCertificateValidationResult.Valid, viewModel.validateCaCertificateFile("/some/ca.pem"))
+        viewModel.addConnection(input(tls = true))
+        assertNull(saved().caCertificatePath)
+        viewModel.setCaCertificate("uat-eu", "/some/ca.pem")
+        assertEquals("/some/ca.pem", saved().caCertificatePath, "on a saved profile the path attaches")
+        viewModel.updateConnection("uat-eu", input(tls = true))
+        assertEquals("/some/ca.pem", saved().caCertificatePath, "and an edit without touching it keeps it")
     }
 }

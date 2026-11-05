@@ -1,8 +1,6 @@
 package dev.caerbannog.datarabbit
 
-import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.util.Collections
 import java.util.concurrent.CopyOnWriteArrayList
@@ -17,25 +15,55 @@ internal class PlainManagementServer(private val routes: Map<String, Pair<Int, S
     data class Seen(val method: String, val rawPath: String, val authorization: String?)
 
     private val requests = CopyOnWriteArrayList<Seen>()
-    private val server: HttpServer = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
-        createContext("/") { exchange ->
-            requests += Seen(exchange.requestMethod, exchange.requestURI.rawPath, exchange.requestHeaders.getFirst("Authorization"))
+    private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+
+    // A hand-rolled HTTP/1.1 server, not the JDK HttpServer: the JDK one stays silent on bytes that are not an HTTP request line,
+    // so a TLS ClientHello ran into the client's request timeout. A real broker (Cowboy) answers 400 and closes, which a TLS client
+    // sees as a failed handshake. This one closes at once on anything that is not "METHOD /path HTTP/1.x".
+    private val acceptor = Thread {
+        try {
+            while (true) {
+                val socket = server.accept()
+                Thread { serve(socket) }.apply { isDaemon = true; start() }
+            }
+        } catch (_: java.io.IOException) {
+            // closed
+        }
+    }.apply { isDaemon = true; start() }
+
+    private fun serve(socket: java.net.Socket) { socket.use {
+        try {
+            it.soTimeout = 3_000
+            val input = it.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+            val requestLine = input.readLine() ?: return@use
+            val parts = requestLine.split(' ')
+            if (parts.size != 3 || !parts[2].startsWith("HTTP/1.") || !parts[1].startsWith("/") || !parts[0].all { c -> c in 'A'..'Z' }) return@use
+            var authorization: String? = null
+            while (true) {
+                val line = input.readLine() ?: return@use
+                if (line.isEmpty()) break
+                if (line.startsWith("Authorization:", ignoreCase = true)) authorization = line.substringAfter(':').trim()
+            }
+            val rawPath = parts[1].substringBefore('?')
+            requests += Seen(parts[0], rawPath, authorization)
             // The longest registered prefix wins; anything unregistered is a 404 like a missing route.
-            val (status, body) = routes.entries.filter { exchange.requestURI.rawPath.startsWith(it.key) }.maxByOrNull { it.key.length }?.value
+            val (status, body) = routes.entries.filter { e -> rawPath.startsWith(e.key) }.maxByOrNull { e -> e.key.length }?.value
                 ?: (404 to """{"error":"Object Not Found","reason":"Not Found"}""")
             val bytes = body.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(status, if (bytes.isEmpty()) -1 else bytes.size.toLong())
-            if (bytes.isNotEmpty()) exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
+            val head = "HTTP/1.1 $status X\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n"
+            it.getOutputStream().apply { write(head.toByteArray(Charsets.ISO_8859_1)); write(bytes); flush() }
+        } catch (_: java.io.IOException) {
+            // client went away or said nothing
         }
-        start()
-    }
+    } }
 
-    val port: Int get() = server.address.port
+    val port: Int get() = server.localPort
     val seen: List<Seen> get() = requests.toList()
 
-    override fun close() = server.stop(0)
+    override fun close() {
+        server.close()
+        acceptor.join(5_000)
+    }
 }
 
 /** Accepts connections, records the first bytes of each (up to [limit]), then closes the socket. Speaks nothing back. */

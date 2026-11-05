@@ -470,7 +470,7 @@ class ConnectionsScreenUiTest {
 
     // --- Declared permissions (M1-06) -----------------------------------------------------------
     // Contract the screen must follow (proposed by the test developer, see the M1-06 Status block):
-    //  - ONE switch (Role.Switch), labelled "I know what this user may do on the broker", below "Topology control".
+    //  - ONE declaration switch (Role.Switch; since M2-14 the form also has the "Use TLS" switch, tag tlsSwitch), labelled "I know what this user may do on the broker", below "Topology control".
     //  - When on: two yes/no choices, each a pair of RadioButtons in the order Yes, No, labelled
     //    "Can change topology (configure)" and "Can publish (write)". In display order the radios are
     //    0..2 topology level (existing), then 3 configure-Yes, 4 configure-No, 5 write-Yes, 6 write-No.
