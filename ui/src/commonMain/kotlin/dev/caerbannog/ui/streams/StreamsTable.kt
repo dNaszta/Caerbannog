@@ -85,15 +85,15 @@ private const val LOADING_PLACEHOLDER_ROWS = 3
 
 /** The nine columns of the mockup, in order. The enum name is the tag suffix (`cell:<stream>:<name>`). */
 private enum class Column(val header: String, val width: Dp, val numeric: Boolean) {
-    Name("Name", 170.dp, false),
-    Type("Type", 74.dp, false),
-    Retention("Retention", 84.dp, false),
-    Messages("Messages (approx.)", 160.dp, true),
-    FirstOffset("First offset", 98.dp, true),
-    LastOffset("Last offset", 98.dp, true),
-    Size("Size", 50.dp, true),
-    Publishers("Publishers", 100.dp, true),
-    Consumers("Consumers", 96.dp, true),
+    Name("Name", 142.dp, false),
+    Type("Type", 204.dp, false),
+    Retention("Retention", 78.dp, false),
+    Messages("Messages (approx.)", 143.dp, true),
+    FirstOffset("First offset", 83.dp, true),
+    LastOffset("Last offset", 81.dp, true),
+    Size("Size", 38.dp, true),
+    Publishers("Publishers", 86.dp, true),
+    Consumers("Consumers", 86.dp, true),
     ;
 
     fun cell(row: StreamRow): String = when (this) {
@@ -112,7 +112,7 @@ private enum class Column(val header: String, val width: Dp, val numeric: Boolea
 /** The base widths add up to this; a wider window stretches every column by the same factor (a horizontal scroller has no weights). */
 private val TotalWidth: Dp = Column.entries.fold(0.dp) { sum, column -> sum + column.width }
 
-private val CellPadding = 6.dp
+private val CellPadding = 4.dp
 private val ToggleSize = 28.dp
 private val PartitionIndent = 28.dp
 

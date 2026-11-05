@@ -8,9 +8,11 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.NativeClipboard
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
@@ -128,6 +130,15 @@ class StreamsSuperStreamUiTest {
         node("cell:orders:Size").assertTextEquals("\u2014")
         node("cell:orders-0:Name").assertDoesNotExistCompat()
         node("partitionNote:orders").assertDoesNotExistCompat()
+    }
+
+    @Test
+    fun `the Type text of a super stream is not cut at 1280 dp`() = runDesktopComposeUiTest(1280, 800) {
+        screen(collapsed)
+
+        val results = mutableListOf<TextLayoutResult>()
+        node("cell:orders:Type").fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+        assertFalse(results.single().hasVisualOverflow, "the Type cell shows an ellipsis instead of the full text")
     }
 
     @Test

@@ -3,7 +3,7 @@
 Milestone: M2 (item 1) and M3 (items 2 and 3)    Depends on: M2-07 (review done)    Size: S
 
 ## Goal
-1. (Before merging M2-07, same branch.) The Type cell of a super stream reads in full ("Super stream · 3 partitions") at 1280 dp, as in `docs/ux/Streams.dc.html`.
+1. DONE (2026-11-05, same branch). The Type cell of a super stream reads in full ("Super stream · 3 partitions") at 1280 dp, as in `docs/ux/Streams.dc.html`.
 2. (M3, with the Browse button or any row selection.) Rows have an identity that carries the kind, so a plain stream and a super stream with the same name cannot collide.
 3. (M3, F-H split.) `StreamsTable.kt` (389 lines) and `StreamsScreen.kt` (293 lines) are split before more is added.
 

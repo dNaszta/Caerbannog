@@ -49,7 +49,7 @@ data class StreamRow(
     /** The text of the Type cell, what the screen draws and what is copied (UI1): "Super stream \u00b7 3 partitions" for a super stream. */
     val typeText: String
         get() = if (kind == StreamRowKind.SuperStream) {
-            "$type \u00b7 $partitionCount ${if (partitionCount == 1) "partition" else "partitions"}"
+            "$type \u00b7 $partitionCount ${if (partitionCount == 1) StreamListTexts.PARTITION else StreamListTexts.PARTITIONS}"
         } else {
             type
         }
@@ -95,6 +95,7 @@ object StreamListTexts {
     const val LOAD_FAILED: String = "The stream list could not be loaded. Check that the virtual host exists and that this user may use it."
     const val SUPER_STREAM: String = "Super stream"
     const val PARTITION: String = "partition"
+    const val PARTITIONS: String = "partitions"
     const val MIXED: String = "mixed"
     const val NOT_APPLICABLE: String = "\u2013"
     const val PARTITION_ORDER_NOTE: String = "Messages are ordered only inside a partition. Choose a partition to browse it."
