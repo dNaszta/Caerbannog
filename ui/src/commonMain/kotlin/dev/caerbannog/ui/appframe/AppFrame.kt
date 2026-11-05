@@ -95,19 +95,14 @@ private fun ChipIcon.tint(): Color = when (this) {
 
 /** The closed chip: state icon, name (ellipsis when long), optional pill, drop-down arrow. A button, a normal tab stop. */
 @Composable
-fun ConnectionChip(chip: ConnectionChipState, @Suppress("UNUSED_PARAMETER") expanded: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ConnectionChip(chip: ConnectionChipState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val border = if (chip.errorBorder) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
     Row(
         modifier = modifier
             .testTag("connectionChip")
             .widthIn(max = 360.dp)
             .border(BorderStroke(1.dp, border), RoundedCornerShape(8.dp))
-            // Enter and Space open the popup (clickable alone does not take Space); consumed so the click is not run twice.
-            .onPreviewKeyEvent { event ->
-                val opens = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.Spacebar
-                if (opens && event.type == KeyEventType.KeyDown) onClick()
-                opens
-            }
+            // clickable already opens on Enter, NumPadEnter and Space, so no key handler of our own.
             .clickable(role = Role.Button, onClick = onClick)
             // The label is the one spoken description: state and permission as words, not colour (icons are decorative).
             .semantics { contentDescription = chip.accessibleLabel }
@@ -159,8 +154,9 @@ fun ConnectionPopup(state: ConnectionControlState, events: ConnectionControlEven
                 .padding(vertical = 8.dp),
         ) {
             SectionLabel(ConnectionControlTexts.SECTION_CONNECTIONS)
-            if (state.emptyText != null) {
-                EmptyConnections(state.emptyText!!, events)
+            val emptyText = state.emptyText
+            if (emptyText != null) {
+                EmptyConnections(emptyText, events)
             } else {
                 state.rows.forEach { ConnectionRow(it, events, if (it.name == firstAction) Modifier.focusRequester(entry) else Modifier) }
             }
@@ -295,7 +291,6 @@ fun ConnectionControl(state: ConnectionControlState, events: ConnectionControlEv
     Box(modifier) {
         ConnectionChip(
             chip = state.chip,
-            expanded = open,
             onClick = { open = !open },
             modifier = Modifier.focusRequester(chipFocus),
         )

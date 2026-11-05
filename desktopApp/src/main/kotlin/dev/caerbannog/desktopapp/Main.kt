@@ -4,8 +4,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import kotlinx.coroutines.delay
 
@@ -25,7 +28,9 @@ fun main() = application {
             composition.control.tick()
         }
     }
-    Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog") {
+    // 1280 x 800 dp is the size the mockups are drawn for; a smaller default cuts the app bar title next to the drawer.
+    val windowState = rememberWindowState(size = DpSize(1280.dp, 800.dp))
+    Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog", state = windowState) {
         ConnectionsScreen(composition.viewModel, control, composition.control)
     }
 }
