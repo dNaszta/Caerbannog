@@ -209,6 +209,15 @@ class StreamListViewModelThreadTest {
     }
 
     @Test
+    fun `setKindFilter and toggleExpanded from a plain thread render on the scope thread (M2-07)`() {
+        val r = rig()
+        r.fromPlainThread { r.vm.setKindFilter(StreamKindFilter.SuperStreams) }
+        r.await("the kind filter") { it.kindFilter == StreamKindFilter.SuperStreams }
+        r.fromPlainThread { r.vm.toggleExpanded("whatever") }
+        r.assertOnlyUiRendered("setKindFilter and toggleExpanded")
+    }
+
+    @Test
     fun `setPage from a plain thread renders on the scope thread`() {
         val r = rig()
         r.fromPlainThread { r.vm.setPage(3) }
