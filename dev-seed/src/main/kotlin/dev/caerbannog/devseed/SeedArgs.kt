@@ -22,11 +22,13 @@ data class SeedArgs(
     val retentionMaxAge: String?,
     /** False with `--no-tls`: plain stream protocol and plain HTTP management, [caPath] is then always null. */
     val tls: Boolean = true,
+    /** M2-06-F-A: `--hold` keeps a publisher and a consumer per stream connected until Ctrl+C (no value). */
+    val hold: Boolean = false,
 ) {
     override fun toString(): String =
         "SeedArgs(host=$host, streamPort=$streamPort, managementPort=$managementPort, user=$user, " +
             "tls=$tls, caPath=$caPath, vhost=$vhost, streams=$streams, messages=$messages, queues=$queues, " +
-            "retentionMaxAge=$retentionMaxAge)"
+            "retentionMaxAge=$retentionMaxAge, hold=$hold)"
 
     companion object {
         val DEFAULT_STREAMS: List<String> = listOf("dev-orders", "dev-events", "dev-audit")
@@ -37,12 +39,18 @@ data class SeedArgs(
         fun parse(args: List<String>): SeedArgs {
             val values = mutableMapOf<String, String>()
             var tls = true
+            var hold = false
             var i = 0
             while (i < args.size) {
                 val flag = args[i]
                 if (flag == NO_TLS) {
                     // The only switch without a value; a stray token after it is read as the next flag.
                     tls = false
+                    i += 1
+                    continue
+                }
+                if (flag == HOLD) {
+                    hold = true
                     i += 1
                     continue
                 }
@@ -69,6 +77,7 @@ data class SeedArgs(
                 password = password,
                 caPath = if (tls) values["--ca"] else null,
                 tls = tls,
+                hold = hold,
                 vhost = vhost,
                 streams = values["--streams"]?.let(::streamNames) ?: DEFAULT_STREAMS,
                 messages = count(values, "--messages", 1000),
@@ -82,6 +91,7 @@ data class SeedArgs(
         }
 
         private const val NO_TLS = "--no-tls"
+        private const val HOLD = "--hold"
 
         private val FLAGS = setOf(
             "--host", "--stream-port", "--management-port", "--user", "--password", "--ca", "--vhost",

@@ -2,12 +2,13 @@ package dev.caerbannog.devseed
 
 import com.rabbitmq.stream.Address
 import com.rabbitmq.stream.Environment
+import com.rabbitmq.stream.OffsetSpecification
 import io.netty.handler.ssl.SslContextBuilder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /** Publishes the generated messages into streams with the stream client over TLS (appends on every run). */
-internal class StreamPublisher(private val args: SeedArgs) : AutoCloseable {
+internal class StreamPublisher(private val args: SeedArgs) : AutoCloseable, HoldConnector {
     private val environment: Environment = build()
 
     private fun build(): Environment {
@@ -48,6 +49,18 @@ internal class StreamPublisher(private val args: SeedArgs) : AutoCloseable {
         }
         return count
     }
+
+    /** A named producer kept connected (the name shows in the broker's publisher list); it sends nothing. */
+    override fun openPublisher(stream: String, reference: String): AutoCloseable =
+        environment.producerBuilder().stream(stream).name(reference).build()
+
+    /** A named consumer from the first offset that stores its offset on the broker (auto tracking). */
+    override fun openConsumer(stream: String, name: String): AutoCloseable =
+        environment.consumerBuilder().stream(stream).name(name)
+            .offset(OffsetSpecification.first())
+            .autoTrackingStrategy().builder()
+            .messageHandler { _, _ -> }
+            .build()
 
     override fun close() = environment.close()
 }
