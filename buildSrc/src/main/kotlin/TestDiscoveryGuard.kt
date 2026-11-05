@@ -22,8 +22,11 @@ import java.io.File
 //   2. Style (fast, clear message): file, line and name of every @Test function with a declared return type other
 //      than Unit, or an expression body `= runBlocking { ... }` (without <Unit>) whose last statement is a known
 //      value-returning assertion (assertIs, assertFailsWith, assertThrows, assertNotNull, ...).
-// Classes tagged @Tag("broker" | "keychain" | "screenshot") only produce XML in their own task (`<tag>Test`). They
-// are compared when that XML exists and is newer than the source, otherwise reported as "unchecked".
+// Classes tagged @Tag("broker" | "keychain" | "screenshot") only produce XML in their own task (`<tag>Test`) and are
+// optional. No XML, or XML older than the source: "unchecked". Fewer testcases than methods: "unchecked ... partial
+// result N of M", NOT a violation, because a filtered run (`--tests`) and a really incomplete run leave the same XML
+// (Gradle's XML carries no filter). More testcases than methods stays a violation. Plain `test`/`jvmTest` classes stay
+// strict: the guard always runs them in full, so their count check is the real guard.
 // `verifyTestDiscoveryFixtures` runs the same checker over tests/guard-fixtures/ (deliberately bad sources and a
 // result file with a missing testcase) and fails unless the checker rejects exactly what it must: the proof that the
 // guard can fail. No dependencies; configuration cache compatible (file inputs only, no Project at execution).
@@ -200,6 +203,12 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
         if (taskDir != null && (xml == null || (resultFile != null && resultFile.lastModified() < c.lastModified))) {
             unchecked++
             verdict = "unchecked (tag ${c.tag}: run $taskDir to check)"
+        } else if (taskDir != null && xml != null && xml < c.methods) {
+            // A --tests run and a really incomplete run leave the same XML, so for optional tagged tasks this is
+            // reported, not failed. The numbers let a human tell.
+            unchecked++
+            verdict = "unchecked (tag ${c.tag}: partial result $xml of ${c.methods} testcases, probably a --tests run; " +
+                "run $taskDir in full to check)"
         } else if (xml == null) {
             verdict = "FAIL no result: class ${c.fqn} has ${c.methods} test methods but no test run reported any"
             violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods and no XML result at all: " +
@@ -208,9 +217,13 @@ fun runGuard(sources: List<File>, resultDirs: List<File>, rootDir: File): GuardR
             verdict = "ok"
         } else {
             verdict = "FAIL"
-            violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods but the run reported $xml testcases: " +
+            val detail = if (xml > c.methods) {
+                "${xml - c.methods} more testcase(s) than @Test methods (stale XML from an older source, or generated cases)"
+            } else {
                 "${c.methods - xml} test(s) not discovered (a @Test function returning a value, wrong @Test import, " +
-                "private function?)")
+                    "private function?)"
+            }
+            violations.add("${c.file}: ${c.fqn} has ${c.methods} test methods but the run reported $xml testcases: $detail")
         }
         report.add("%-70s %6d %6s  %s".format(c.fqn, c.methods, xml?.toString() ?: "-", verdict))
     }
