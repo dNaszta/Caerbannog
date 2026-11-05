@@ -49,13 +49,13 @@ tasks:
 
   dev:seed:
     silent: true # task would echo the command line, which holds the password
-    desc: "Publish messages into the dev streams. Example: task dev:seed -- --password dev-password [--queues 1000 --vhost many]"
+    desc: "Publish messages into the dev streams. Example: task dev:seed -- --password dev-password [--queues 1000 --vhost many] [--hold]. --hold keeps a named publisher and consumer per stream connected until Ctrl+C"
     cmds:
       - ./gradlew -q :dev-seed:run --args="--ca data-rabbit/src/test/resources/tls/ca.pem {{.CLI_ARGS}}"
 
   dev:seed:plain:
     silent: true # task would echo the command line, which holds the password
-    desc: "Like dev:seed but without TLS (stream 5552, management 15672, no CA). Example: task dev:seed:plain -- --password dev-password"
+    desc: "Like dev:seed but without TLS (stream 5552, management 15672, no CA). --hold keeps a named publisher and consumer per stream connected until Ctrl+C. Example: task dev:seed:plain -- --password dev-password"
     cmds:
       - ./gradlew -q :dev-seed:run --args="--no-tls {{.CLI_ARGS}}"
 

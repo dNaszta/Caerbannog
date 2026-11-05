@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-12, M2-12b (merged), M2-06 (for the screen to look at)    Size: S
 
-Status: step 2 tests first done (tester, 2026-11-05): 11 red for the right reason, compile stubs only; NEXT: step 3 senior developer.
+Status: step 3 build done (developer, 2026-11-05): 11 tests green, real check on the plain dev broker passed; NEXT: step 4 verify (tester), then architect review.
 
 ## Goal
 `task dev:seed -- --password <pw> --hold` publishes as today, then keeps one named publisher and one named consumer per dev stream connected (consumer stores its offset) until Ctrl+C, so the Publishers and consumers tab has rows to show.
