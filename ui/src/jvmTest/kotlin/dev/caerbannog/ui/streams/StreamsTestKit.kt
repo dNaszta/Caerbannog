@@ -13,10 +13,12 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.CreateStreamGate
 import dev.caerbannog.core.connections.RefreshSectionState
 import dev.caerbannog.core.streams.RefreshInterval
+import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListScreen
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.StreamRow
+import dev.caerbannog.core.streams.StreamRowKind
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.ui.appframe.AppDestination
 
@@ -34,6 +36,8 @@ internal class RecordedEvents : StreamListEvents {
     override fun previousPage() { calls += "previousPage" }
     override fun createStream() { calls += "createStream" }
     override fun setShown(shown: Boolean) { calls += "setShown:$shown" }
+    override fun toggleExpanded(name: String) { calls += "toggleExpanded:$name" }
+    override fun setKindFilter(kind: StreamKindFilter) { calls += "setKindFilter:$kind" }
 }
 
 internal fun row(
@@ -45,7 +49,32 @@ internal fun row(
     publishers: String = "2",
     consumers: String = "3",
     retention: String = "7D",
-) = StreamRow(name, type, messages, first, last, publishers, consumers, retention)
+    kind: StreamRowKind = StreamRowKind.Stream,
+    partitionCount: Int = 0,
+    partitionOf: String? = null,
+    expanded: Boolean = false,
+) = StreamRow(name, type, messages, first, last, publishers, consumers, retention, kind, partitionCount, partitionOf, expanded)
+
+/** M2-07: a super stream row as the view model builds it (the mockup's "orders": 96,100 messages, offsets a dash, 4 and 6). */
+internal fun superRow(name: String = "orders", partitionCount: Int = 3, expanded: Boolean = false) = row(
+    name, type = "Super stream", messages = "96,100", first = "\u2013", last = "\u2013", publishers = "4", consumers = "6", retention = "7D",
+    kind = StreamRowKind.SuperStream, partitionCount = partitionCount, expanded = expanded,
+)
+
+/** M2-07: a partition row as the view model builds it. */
+internal fun partitionRow(name: String, of: String = "orders", messages: String = "31,200", last: String = "31199") = row(
+    name, type = "partition", messages = messages, first = "0", last = last, publishers = "1", consumers = "2", retention = "7D",
+    kind = StreamRowKind.Partition, partitionOf = of,
+)
+
+/** The mockup's expanded super stream: orders and its three partitions, behind one plain stream. */
+internal val expandedRows = listOf(
+    row("audit-log", messages = "1,204,000", first = "880000", last = "2083999"),
+    superRow(expanded = true),
+    partitionRow("orders-0", messages = "31,200", last = "31199"),
+    partitionRow("orders-1", messages = "32,900", last = "32899"),
+    partitionRow("orders-2", messages = "32,000", last = "31999"),
+)
 
 /** The state the view model builds for rows (message null, no banner). */
 internal fun rowsState(
@@ -60,10 +89,12 @@ internal fun rowsState(
     banner: String? = null,
     action: String? = null,
     updatedAtMillis: Long? = null,
+    kindFilter: StreamKindFilter = StreamKindFilter.All,
+    groupingNotice: String? = null,
 ) = StreamListState(
     screen = StreamListScreen.Rows, message = null, action = action, rows = rows, filter = filter, sort = sort,
     totalStreams = totalStreams, rangeText = rangeText, hasNextPage = hasNextPage, hasPreviousPage = hasPreviousPage,
-    stale = stale, banner = banner, updatedAtMillis = updatedAtMillis,
+    stale = stale, banner = banner, updatedAtMillis = updatedAtMillis, kindFilter = kindFilter, groupingNotice = groupingNotice,
 )
 
 /** A state without rows, with the message and action the view model gives that screen. */
