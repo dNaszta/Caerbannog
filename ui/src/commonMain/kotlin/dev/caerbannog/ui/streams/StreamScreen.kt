@@ -38,6 +38,20 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -61,6 +75,7 @@ import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
 import dev.caerbannog.core.streams.StreamListTexts
+import dev.caerbannog.core.streams.UpdatedAge
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrame
 import dev.caerbannog.ui.connections.AppIcon
@@ -83,10 +98,8 @@ interface StreamClientsEvents {
     fun back()
 }
 
-private const val MILLIS_PER_SECOND = 1000L
 private const val LOADING_STATE = "Loading"
 private const val STALE_STATE = "Stale"
-private const val NO_USER_NAME = "no user"
 private const val LOADING_PLACEHOLDER_ROWS = 2
 private const val PUBLISHERS_TAB = "Publishers and consumers"
 private val CellPadding = 6.dp
@@ -137,10 +150,9 @@ fun StreamScreen(
 
 @Composable
 private fun RowScope.ClientsActions(state: StreamClientsState, nowMillis: Long, events: StreamClientsEvents) {
-    state.updatedAtMillis?.let { updated ->
-        val seconds = (nowMillis - updated).coerceAtLeast(0) / MILLIS_PER_SECOND
+    UpdatedAge.text(nowMillis, state.updatedAtMillis)?.let { age ->
         Text(
-            "Updated $seconds s ago",
+            age,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("updatedAge"),
@@ -151,7 +163,7 @@ private fun RowScope.ClientsActions(state: StreamClientsState, nowMillis: Long, 
     IconButton(
         onClick = events::refreshNow,
         enabled = canRefresh,
-        modifier = Modifier.testTag("refreshIcon").semantics { contentDescription = "Refresh" },
+        modifier = Modifier.testTag("refreshIcon").semantics { contentDescription = StreamClientsTexts.REFRESH },
     ) { ConnectionIcon(AppIcon.Refresh, IconSize) }
 }
 
@@ -257,24 +269,24 @@ private fun ClientsSections(state: StreamClientsState, loading: Boolean, events:
 private class ClientColumn(val key: String, val header: String, val width: Dp, val numeric: Boolean = false)
 
 private val PublisherColumns = listOf(
-    ClientColumn("Reference", "Reference", 200.dp),
-    ClientColumn("Connection", "Connection (user)", 300.dp),
-    ClientColumn("Published", "Published", 110.dp, numeric = true),
-    ClientColumn("Confirmed", "Confirmed", 110.dp, numeric = true),
-    ClientColumn("Errors", "Errors", 90.dp, numeric = true),
+    ClientColumn("Reference", StreamClientsTexts.HEADER_REFERENCE, 200.dp),
+    ClientColumn("Connection", StreamClientsTexts.HEADER_CONNECTION, 300.dp),
+    ClientColumn("Published", StreamClientsTexts.HEADER_PUBLISHED, 110.dp, numeric = true),
+    ClientColumn("Confirmed", StreamClientsTexts.HEADER_CONFIRMED, 110.dp, numeric = true),
+    ClientColumn("Errors", StreamClientsTexts.HEADER_ERRORS, 90.dp, numeric = true),
 )
 
 private val ConsumerColumns = listOf(
-    ClientColumn("Consumer", "Consumer", 200.dp),
-    ClientColumn("Connection", "Connection (user)", 300.dp),
-    ClientColumn("Offset", "Offset", 110.dp, numeric = true),
-    ClientColumn("Behind", "Messages behind", 150.dp, numeric = true),
-    ClientColumn("Status", "Status", 160.dp),
+    ClientColumn("Consumer", StreamClientsTexts.HEADER_CONSUMER, 200.dp),
+    ClientColumn("Connection", StreamClientsTexts.HEADER_CONNECTION, 300.dp),
+    ClientColumn("Offset", StreamClientsTexts.HEADER_OFFSET, 110.dp, numeric = true),
+    ClientColumn("Behind", StreamClientsTexts.HEADER_MESSAGES_BEHIND, 150.dp, numeric = true),
+    ClientColumn("Status", StreamClientsTexts.HEADER_STATUS, 160.dp),
 )
 
 @Composable
 private fun PublishersSection(rows: List<PublisherRowState>?, stale: Boolean) {
-    ClientsSection("publishers", "Publishers", rows?.size, PublisherColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_PUBLISHERS, stale) { scale ->
+    ClientsSection("publishers", StreamClientsTexts.PUBLISHERS_TITLE, rows?.size, PublisherColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_PUBLISHERS, stale) { scale ->
         rows?.forEachIndexed { index, row -> PublisherRow(index, row, scale) }
     }
 }
@@ -282,7 +294,7 @@ private fun PublishersSection(rows: List<PublisherRowState>?, stale: Boolean) {
 @Composable
 private fun ConsumersSection(rows: List<ConsumerRowState>?, stale: Boolean, state: StreamClientsState) {
     ClientsSection(
-        "consumers", "Consumers", rows?.size, ConsumerColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_CONSUMERS, stale,
+        "consumers", StreamClientsTexts.CONSUMERS_TITLE, rows?.size, ConsumerColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_CONSUMERS, stale,
         captionExtra = { if (rows != null) LastOffset(state) },
     ) { scale ->
         // The key is the row identity (a consumer that disappears or reorders keeps the others' state).
@@ -413,7 +425,7 @@ private fun ConsumerRow(row: ConsumerRowState, scale: Float) {
             ConnectionCell(row.connection, row.user, tag, ConsumerColumns[1], scale)
             ValueCell(row.offset, "$tag:Offset", ConsumerColumns[2], scale)
             ValueCell(row.behind, "$tag:Behind", ConsumerColumns[3], scale)
-            StatusCell(row.status, "$tag:Status", ConsumerColumns[4], scale)
+            StatusCell(row.status, "$tag:Status", row.key, ConsumerColumns[4], scale)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
@@ -427,7 +439,7 @@ private fun ValueCell(text: String, tag: String, column: ClientColumn, scale: Fl
     }
 }
 
-/** The socket pair with the user under it; a missing user is an em dash that screen readers hear as "no user". */
+/** The socket pair with the user under it; a missing user is an em dash that screen readers hear as the NO_USER_NAME text. */
 @Composable
 private fun ConnectionCell(connection: String, user: String, tag: String, column: ClientColumn, scale: Float) {
     Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp)) {
@@ -435,33 +447,41 @@ private fun ConnectionCell(connection: String, user: String, tag: String, column
             CopyableText(connection, "$tag:Connection", MaterialTheme.typography.bodyMedium)
             CopyableText(
                 user, "$tag:User", MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                extra = if (user == StreamClientsTexts.NO_USER) Modifier.semantics { contentDescription = NO_USER_NAME } else Modifier,
+                extra = if (user == StreamClientsTexts.NO_USER) Modifier.semantics { contentDescription = StreamClientsTexts.NO_USER_NAME } else Modifier,
             )
         }
     }
 }
 
 /**
- * Status is text, never colour alone. The stored-offsets hint is a tooltip AND the state description, because a tooltip cannot
- * be reached from a keyboard or a screen reader. "N behind" is neutral on purpose (lag ruling): never amber or red.
+ * Status is text, never colour alone. The stored-offsets hint is a hover tooltip, the state description (screen readers) AND an
+ * "i" control the keyboard can focus, because a tooltip cannot be reached from a keyboard. "N behind" is neutral on purpose
+ * (lag ruling): never amber or red.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun StatusCell(status: ConsumerStatus, tag: String, column: ClientColumn, scale: Float) {
+private fun StatusCell(status: ConsumerStatus, tag: String, rowKey: String, column: ClientColumn, scale: Float) {
     val hint = status.hint
     val cell: @Composable () -> Unit = {
-        Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp)) {
-            CopyableText(
-                status.text, tag, MaterialTheme.typography.bodyMedium,
-                color = if (status == ConsumerStatus.CaughtUp) OkGreen else Color.Unspecified,
-                extra = if (hint != null) Modifier.semantics { stateDescription = hint } else Modifier,
-            )
+        Row(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            // CopyableText fills the width it is given, so the weighted box keeps room for the "i" control.
+            Box(Modifier.weight(1f)) {
+                CopyableText(
+                    status.text, tag, MaterialTheme.typography.bodyMedium,
+                    color = if (status == ConsumerStatus.CaughtUp) OkGreen else Color.Unspecified,
+                    extra = if (hint != null) Modifier.semantics { stateDescription = hint } else Modifier,
+                )
+            }
+            if (hint != null) {
+                Spacer(Modifier.width(6.dp))
+                StatusHintControl(hint, rowKey)
+            }
         }
     }
     if (hint == null) {
         cell()
     } else {
-        // Hover only (the area shows after a delay and never on keyboard focus); the keyboard and screen readers get the state description.
+        // The area shows on hover after a delay and never on keyboard focus; the "i" control covers the keyboard.
         TooltipArea(
             tooltip = {
                 Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
@@ -469,5 +489,57 @@ private fun StatusCell(status: ConsumerStatus, tag: String, column: ClientColumn
                 }
             },
         ) { cell() }
+    }
+}
+
+/**
+ * A focusable "i" that shows [hint] in an INLINE popup while it has keyboard focus (not a Popup window: that would add a second root).
+ * Escape closes the popup and keeps the focus; the popup is drawn above the cell with zero layout size so the row does not move.
+ */
+@Composable
+private fun StatusHintControl(hint: String, rowKey: String) {
+    var focused by remember { mutableStateOf(false) }
+    var dismissed by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(50)
+    Box(
+        Modifier
+            .size(20.dp)
+            .onKeyEvent { event ->
+                if (focused && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
+                    dismissed = true
+                    true
+                } else {
+                    false
+                }
+            }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (!it.isFocused) dismissed = false
+            }
+            .testTag("statusHint:$rowKey")
+            .clip(shape)
+            .border(if (focused) 2.dp else 1.dp, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, shape)
+            .clickable(role = Role.Button, onClickLabel = StreamClientsTexts.HINT_CONTROL_LABEL) { dismissed = !dismissed },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("i", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (focused && !dismissed) {
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                shadowElevation = 4.dp,
+                modifier = Modifier.layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity))
+                    layout(0, 0) { placeable.place(0, -placeable.height - 4.dp.roundToPx()) }
+                },
+            ) {
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.widthIn(max = 320.dp).padding(8.dp).testTag("statusHintPopup:$rowKey"),
+                )
+            }
+        }
     }
 }
