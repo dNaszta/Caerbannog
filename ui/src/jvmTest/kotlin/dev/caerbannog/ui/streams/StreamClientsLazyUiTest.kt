@@ -1,0 +1,322 @@
+package dev.caerbannog.ui.streams
+
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.NativeClipboard
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.DesktopComposeUiTest
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.streams.ConsumerRowState
+import dev.caerbannog.core.streams.ConsumerStatus
+import dev.caerbannog.core.streams.StreamClientsTexts
+import org.junit.jupiter.api.Test
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
+import java.awt.image.BufferedImage
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * F-C step 2: the Publishers and consumers tab composes only the rows near the viewport (one LazyColumn for the whole tab body).
+ * Fake state only, no broker. Written first and red today because the `Column` composes every row.
+ *
+ * Contract the tests pin (so the developer is free in the rest):
+ *  - the page body is ONE node with the semantics action ScrollToIndex (a LazyColumn); no other node of the screen has it. Its tag is free;
+ *  - the row cells keep their tags: `consumerCell:<key>:<Column>`, `statusHint:<key>`, `statusHintPopup:<key>`, `consumersCaption`, `consumersHeader:<key>`;
+ *  - the brief names the count of `consumerRow:*` nodes; no such tag exists today, so the count is of the `consumerCell:*:Name` nodes (one per row).
+ * The viewport is the 1280x800 window of the other client tests.
+ */
+@OptIn(ExperimentalTestApi::class)
+class StreamClientsLazyUiTest {
+
+    private companion object {
+        const val ROWS = 5000
+
+        /** Composed rows allowed at 1280x800 (about 8 are visible): the buffer of the list plus slack. */
+        const val MAX_COMPOSED_ROWS = 100
+        const val WIDTH = 1280
+        const val HEIGHT = 800
+    }
+
+    /** Every third row is Behind (has the "i"), the last row is Behind too, so it can be scrolled to and focused. */
+    private fun rows(n: Int = ROWS, offset: String = "100"): List<ConsumerRowState> = (0 until n).map { i ->
+        val behind = i % 3 == 0 || i == n - 1
+        consumer(
+            "c$i", "c$i", offset = offset, behind = if (behind) "${100 + i}" else "0",
+            status = if (behind) ConsumerStatus.Behind(100L + i) else ConsumerStatus.CaughtUp,
+        )
+    }
+
+    private fun DesktopComposeUiTest.names(): List<String> =
+        onAllNodes(SemanticsMatcher("consumer name cell") { tag(it).let { t -> t.startsWith("consumerCell:") && t.endsWith(":Name") } }, useUnmergedTree = true)
+            .fetchSemanticsNodes().map { tag(it).removePrefix("consumerCell:").removeSuffix(":Name") }
+
+    private fun tag(node: SemanticsNode): String = node.config.getOrNull(SemanticsProperties.TestTag) ?: ""
+
+    private fun DesktopComposeUiTest.exists(tag: String): Boolean = onAllNodes(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    private fun DesktopComposeUiTest.list() = onNode(hasScrollToIndexAction())
+
+    /** The index of the last item of the page list, found by probing (the item structure is the developer's). */
+    private fun DesktopComposeUiTest.lastItemIndex(): Int {
+        fun ok(index: Int) = runCatching { list().performScrollToIndex(index) }.isSuccess
+        var hi = 1
+        while (ok(hi)) hi *= 2
+        var lo = hi / 2 // ok(lo) holds (lo = 0 when hi = 1)
+        while (hi - lo > 1) { val mid = (lo + hi) / 2; if (ok(mid)) lo = mid else hi = mid }
+        return lo
+    }
+
+    private fun DesktopComposeUiTest.scrollToEnd() { list().performScrollToIndex(lastItemIndex()); waitForIdle() }
+    private fun DesktopComposeUiTest.scrollToTop() { list().performScrollToIndex(0); waitForIdle() }
+    private fun DesktopComposeUiTest.bounds(tag: String): Rect = onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun DesktopComposeUiTest.image(): BufferedImage = onAllNodes(isRoot())[0].captureToImage().toAwtImage()
+
+    // --- 1 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `with 5000 consumers only the rows near the viewport are composed and the caption still says 5000`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows()))
+        waitForIdle()
+        val composed = names()
+        assertTrue(composed.size <= MAX_COMPOSED_ROWS, "expected at most $MAX_COMPOSED_ROWS composed consumer rows of $ROWS, but ${composed.size} are composed")
+        assertTrue(composed.isNotEmpty() && composed.first() == "c0", "the first row is shown: $composed")
+        val caption = onNodeWithTag("consumersCaption", useUnmergedTree = true).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.map { it.text }
+        assertEquals(listOf("Consumers", "$ROWS"), caption, "the caption counts all rows, not the composed ones")
+    }
+
+    // --- 2 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `scrolling to the end composes the last row and drops the first, and the caption and header are there again at the top`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows()))
+        waitForIdle()
+        assertTrue(exists("consumerCell:c0:Name"))
+        assertTrue(!exists("consumerCell:c${ROWS - 1}:Name"), "the last row is not composed before the scroll")
+
+        scrollToEnd()
+        consumerCell("c${ROWS - 1}", "Name").assertExists("the last row exists after scrolling to the end")
+        consumerCell("c${ROWS - 1}", "Status").assertTextEquals("5,099 behind")
+        consumerCell("c0", "Name").assertDoesNotExist()
+        assertTrue(names().size <= MAX_COMPOSED_ROWS, "still few rows composed at the end: ${names().size}")
+        onNodeWithTag("clientsFootnote", useUnmergedTree = true).assertExists("the footnote stays at the end of the list")
+
+        scrollToTop()
+        consumerCell("c0", "Name").assertExists()
+        onNodeWithTag("consumersCaption", useUnmergedTree = true).assertExists("the caption is there at the top")
+        onNodeWithTag("consumersHeader:Status", useUnmergedTree = true).assertExists("the header is there at the top")
+        assertTrue(!exists("consumerCell:c${ROWS - 1}:Name"), "the last row left the composition again")
+    }
+
+    // --- 3 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `a Behind row that was not composed first opens its hint on focus and Escape closes it`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows()))
+        waitForIdle()
+        val key = "c${ROWS - 1}"
+        assertTrue(!exists("statusHint:$key"), "the row is not composed before the scroll")
+
+        scrollToEnd()
+        onNodeWithTag("statusHint:$key", useUnmergedTree = true).requestFocus()
+        waitForIdle()
+        onNodeWithTag("statusHint:$key", useUnmergedTree = true).assertIsFocused()
+        onNodeWithTag("statusHintPopup:$key", useUnmergedTree = true).assertTextEquals(HINT_TEXT)
+
+        onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }
+        waitForIdle()
+        onNodeWithTag("statusHintPopup:$key", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    // --- 4 ------------------------------------------------------------------------------------------------------------------
+
+    /** The same bounds rule as [StreamClientsHintPopupUiTest]: inside the window and the list, really drawn; off the header when it is composed. */
+    private fun DesktopComposeUiTest.popupProblems(label: String, key: String, without: BufferedImage): List<String> {
+        val problems = mutableListOf<String>()
+        onNodeWithTag("statusHint:$key", useUnmergedTree = true).requestFocus()
+        waitForIdle()
+        val popup = onNodeWithTag("statusHintPopup:$key", useUnmergedTree = true)
+        popup.assertExists("$label row ($key): popup node exists")
+        val rect = bounds("statusHintPopup:$key")
+        val iRect = bounds("statusHint:$key")
+        val listRect = list().fetchSemanticsNode().boundsInRoot
+        val window = Rect(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
+        runCatching { popup.assertIsDisplayed() }.exceptionOrNull()?.let { problems += "$label ($key): not displayed: ${it.message}" }
+        if (rect.width < 40f || rect.height < 20f) problems += "$label ($key): popup bounds $rect are too small to hold the hint text"
+        if (rect.left < window.left || rect.top < window.top || rect.right > window.right || rect.bottom > window.bottom) problems += "$label ($key): popup $rect leaves the window $window"
+        if (rect.left < listRect.left || rect.right > listRect.right || rect.top < listRect.top || rect.bottom > listRect.bottom) problems += "$label ($key): popup $rect leaves the list viewport $listRect (clipped)"
+        val above = rect.bottom <= iRect.top + 1f
+        val beside = rect.right <= iRect.left + 1f || rect.left >= iRect.right - 1f
+        if (!above && !beside) problems += "$label ($key): popup $rect is neither above nor beside the i $iRect"
+        listOf("Consumer", "Connection", "Offset", "Behind", "Status").mapNotNull { runCatching { bounds("consumersHeader:$it") }.getOrNull() }.forEach { header ->
+            if (rect.overlaps(header)) problems += "$label ($key): popup $rect covers the table header $header"
+        }
+        val withPopup = image()
+        var changedOutsideI = 0
+        for (x in 0 until WIDTH) for (y in 0 until HEIGHT) {
+            val nearI = x >= iRect.left - 6 && x <= iRect.right + 6 && y >= iRect.top - 6 && y <= iRect.bottom + 6
+            if (!nearI && withPopup.getRGB(x, y) != without.getRGB(x, y)) changedOutsideI++
+        }
+        if (changedOutsideI < 1500) problems += "$label ($key): only $changedOutsideI pixels outside the i changed when the popup opened; nothing visible was drawn"
+        return problems
+    }
+
+    /** Behind rows fully inside the list viewport, first and last by position. */
+    private fun DesktopComposeUiTest.visibleBehindRows(): List<String> {
+        val view = list().fetchSemanticsNode().boundsInRoot
+        return onAllNodes(SemanticsMatcher("hint") { tag(it).startsWith("statusHint:") && !tag(it).startsWith("statusHintPopup:") }, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .filter { it.boundsInRoot.top >= view.top + 1 && it.boundsInRoot.bottom <= view.bottom - 1 }
+            .sortedBy { it.boundsInRoot.top }.map { tag(it).removePrefix("statusHint:") }
+    }
+
+    @Test
+    fun `the hint popup is visible for the first and the last fully visible Behind row, at the top and after scrolling to the end`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows()))
+        waitForIdle()
+        val problems = mutableListOf<String>()
+        for ((place, scroll) in listOf<Pair<String, DesktopComposeUiTest.() -> Unit>>("top" to { scrollToTop() }, "end" to { scrollToEnd() })) {
+            scroll()
+            val without = image()
+            val behind = visibleBehindRows()
+            assertTrue(behind.size >= 2, "$place: at least two fully visible Behind rows expected, got $behind")
+            problems += popupProblems("$place first", behind.first(), without)
+            onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }
+            waitForIdle()
+            problems += popupProblems("$place last", behind.last(), without)
+            onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }
+            waitForIdle()
+        }
+        assertTrue(problems.isEmpty(), "The hint popup is not usable in a long list:\n" + problems.joinToString("\n"))
+    }
+
+    // --- 5 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `a refresh with the same keys keeps the first visible row and shows its new number, and a row inserted above does not move the view`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        val shown = clientsScreen(content(consumers = rows(offset = "100")))
+        waitForIdle()
+        list().performScrollToIndex(lastItemIndex() / 2)
+        waitForIdle()
+        val listTop = list().fetchSemanticsNode().boundsInRoot.top
+        val firstVisible = names().filter { bounds("consumerCell:$it:Name").top >= listTop }.minByOrNull { bounds("consumerCell:$it:Name").top }!!
+        val topBefore = bounds("consumerCell:$firstVisible:Name").top
+        assertTrue(firstVisible != "c0", "scrolled away from the top: $firstVisible")
+        consumerCell(firstVisible, "Offset").assertTextEquals("100")
+
+        shown.state = content(consumers = rows(offset = "777"))
+        waitForIdle()
+        consumerCell(firstVisible, "Offset").assertTextEquals("777")
+        assertEquals(topBefore, bounds("consumerCell:$firstVisible:Name").top, "the row did not move on a refresh")
+
+        shown.state = content(consumers = listOf(consumer("new0", "new0", offset = "1"), consumer("new1", "new1", offset = "1")) + rows(offset = "777"))
+        waitForIdle()
+        assertEquals(topBefore, bounds("consumerCell:$firstVisible:Name").top, "rows inserted above the view must not move the row the user looks at")
+        consumerCell("new0", "Name").assertDoesNotExist()
+    }
+
+    // --- 6 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `a refresh with the same keys keeps the focus and the open popup, and a row that scrolled out comes back closed and unfocused`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        val shown = clientsScreen(content(consumers = rows(300)))
+        waitForIdle()
+        onNodeWithTag("statusHint:c0", useUnmergedTree = true).requestFocus()
+        waitForIdle()
+        onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertExists()
+
+        shown.state = content(consumers = rows(300, offset = "555"))
+        waitForIdle()
+        consumerCell("c0", "Offset").assertTextEquals("555")
+        onNodeWithTag("statusHint:c0", useUnmergedTree = true).assertIsFocused()
+        onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertTextEquals(HINT_TEXT)
+
+        scrollToEnd()
+        assertTrue(!exists("statusHint:c0"), "the row scrolled out of the composition")
+        scrollToTop()
+        onNodeWithTag("statusHint:c0", useUnmergedTree = true).assertIsNotFocused()
+        onNodeWithTag("statusHintPopup:c0", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    // --- 7 ------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `the loading placeholder rows and the empty sentences still render`() {
+        runDesktopComposeUiTest(WIDTH, HEIGHT) {
+            clientsScreen(clientsLoading.copy(screen = dev.caerbannog.core.streams.StreamClientsScreen.Loading))
+            waitForIdle()
+            onAllNodes(hasText(StreamClientsTexts.LOADING), useUnmergedTree = true).assertCountEquals(4 * 5)
+            assertEquals("Loading", onNodeWithTag("consumersTable", useUnmergedTree = true).stateDescription())
+        }
+        runDesktopComposeUiTest(WIDTH, HEIGHT) {
+            clientsScreen(content(publishers = emptyList(), consumers = emptyList()))
+            waitForIdle()
+            onNodeWithTag("publishersEmpty", useUnmergedTree = true).assertTextEquals(StreamClientsTexts.NO_PUBLISHERS)
+            onNodeWithTag("consumersEmpty", useUnmergedTree = true).assertTextEquals(StreamClientsTexts.NO_CONSUMERS)
+        }
+    }
+
+    // --- 8 ------------------------------------------------------------------------------------------------------------------
+
+    private class FakeClipboard : Clipboard {
+        var text: String? = null
+        override suspend fun getClipEntry(): ClipEntry? = null
+        override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+            text = (clipEntry?.nativeClipEntry as? Transferable)?.getTransferData(DataFlavor.stringFlavor) as String?
+        }
+        override val nativeClipboard: NativeClipboard get() = error("the test never reads the system clipboard")
+    }
+
+    private val mac = System.getProperty("os.name").lowercase().contains("mac")
+
+    private fun DesktopComposeUiTest.pressCopy() {
+        val modifier = if (mac) Key.MetaLeft else Key.CtrlLeft
+        onRoot().performKeyInput { keyDown(modifier); keyDown(Key.C); keyUp(Key.C); keyUp(modifier) }
+        waitForIdle()
+    }
+
+    @Test
+    fun `a cell copies as displayed, in a row at the top, after a drag and in a row that was scrolled in`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        val clipboard = FakeClipboard()
+        clientsScreen(content(consumers = rows(offset = "47950")), wrap = { c -> CompositionLocalProvider(LocalClipboard provides clipboard) { c() } })
+        waitForIdle()
+        consumerCell("c1", "Offset").performMouseInput {
+            val middle = visibleSize.height / 2f
+            moveTo(Offset(1f, middle)); press(); moveTo(Offset(visibleSize.width - 1f, middle)); release()
+        }
+        pressCopy()
+        assertEquals("47950", clipboard.text, "drag in a visible row")
+
+        scrollToEnd()
+        clipboard.text = null
+        consumerCell("c${ROWS - 1}", "Status").requestFocus()
+        waitForIdle()
+        pressCopy()
+        assertEquals("5,099 behind", clipboard.text, "a row that was not composed first copies as displayed")
+    }
+}
