@@ -115,13 +115,13 @@ class StreamsScreenUiTest {
     }
 
     @Test
-    fun `until M3 there is no Browse button, no more-actions menu and no kind chips`() = runDesktopComposeUiTest(1280, 800) {
+    fun `until M3 there is no Browse button and no more-actions menu, and the kind chips exist since M2-07`() = runDesktopComposeUiTest(1280, 800) {
         screen(rowsState())
 
         onNodeWithText("Browse").assertDoesNotExist()
         onNode(androidx.compose.ui.test.hasContentDescription("More actions"), useUnmergedTree = true).assertDoesNotExist()
-        onNodeWithText("Super streams").assertDoesNotExist()
-        onNodeWithText("All").assertDoesNotExist()
+        onNodeWithText("Super streams").assertExists()
+        onNodeWithText("All").assertExists()
     }
 
     @Test

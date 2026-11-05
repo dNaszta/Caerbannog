@@ -650,8 +650,8 @@ class StreamListSteps {
         assertTrue(members.none { "size" in it || "bytes" in it }, "N1: the row model carries no size, members: $members")
     }
 
-    @Then("the super stream row shows {long} messages in total")
-    fun theSuperStreamRowShowsTotal(total: Long) = assertEquals(grouped(total), row("orders").messages)
+    @Then("^the super stream row shows ([0-9,]+) messages in total$")
+    fun theSuperStreamRowShowsTotal(total: String) = assertEquals(total, row("orders").messages)
 
     @Then("the super stream row shows {string} messages, not a partial total")
     fun theSuperStreamRowShowsNa(text: String) = assertEquals(text, row("orders").messages, "total with a partition without a count")
