@@ -1147,8 +1147,8 @@ class ConnectionsScreenUiTest {
     // Layout is asserted at the mockup's preview size 1280x880.
 
     @OptIn(ExperimentalTestApi::class)
-    private fun DesktopComposeUiTest.nodeBounds(matcher: SemanticsMatcher): Rect =
-        onNode(matcher, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun DesktopComposeUiTest.nodeBounds(matcher: SemanticsMatcher, unmerged: Boolean = true): Rect =
+        onNode(matcher, useUnmergedTree = unmerged).fetchSemanticsNode().boundsInRoot
 
     private val gridLabelsInMockupOrder = listOf(
         "Name", "Virtual host", "Host", "Username", "Stream port (TLS)", "Management port (HTTPS)", "Password", "CA certificate",
@@ -1348,7 +1348,7 @@ class ConnectionsScreenUiTest {
         setContent { ConnectionsScreen(permissionViewModel(prod), control, events) }
 
         onNode(hasTestTag("connectionChip").and(hasAnyAncestor(hasTestTag("appBar")))).assertExists("the chip is in the app bar of the Connections screen")
-        val newConnection = nodeBounds(hasText("New connection").and(hasClickAction()))
+        val newConnection = nodeBounds(hasText("New connection").and(hasClickAction()), unmerged = false) // the button merges its Text; the click action lives on the merged node
         val chipBounds = nodeBounds(hasTestTag("connectionChip"))
         assertTrue(newConnection.right <= chipBounds.left + 0.5f, "the chip is last, after the screen's own action: $newConnection, $chipBounds")
     }
