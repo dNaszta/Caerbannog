@@ -50,6 +50,8 @@ dependencies {
     implementation("com.rabbitmq:stream-client:1.12.0")
 
     testImplementation(kotlin("test"))
+    // M2-14c: ManagementHttp classification tests throw constructed SSL exceptions from a mock engine (no server can produce a cause loop).
+    testImplementation("io.ktor:ktor-client-mock:3.0.3")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
