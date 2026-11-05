@@ -6,19 +6,19 @@ import dev.caerbannog.core.topology.TopologyViewModel
 import dev.caerbannog.ui.topology.TopologyEvents
 
 /**
- * M2-08c COMPILE STUB by the test developer (no behaviour): maps the Topology screen's events onto the [TopologyViewModel]
- * (the screen itself knows no view model). The developer maps every method, like `StreamListEventsAdapter`.
+ * Maps the Topology screen's events onto the [TopologyViewModel] (the screen itself knows no view model). The view model hops onto its
+ * own scope, so every call is safe from the UI thread. No event changes topology (T4).
  */
 class TopologyEventsAdapter(private val viewModel: TopologyViewModel) : TopologyEvents {
-    override fun setShown(shown: Boolean) = Unit
-    override fun refreshNow() = Unit
-    override fun retry() = Unit
-    override fun setTab(tab: TopologyTab) = Unit
-    override fun setQueueFilter(filter: QueueTypeFilter) = Unit
-    override fun setSearch(text: String) = Unit
-    override fun selectVhost(name: String) = Unit
-    override fun selectQueue(name: String?) = Unit
-    override fun setShowDefaultExchange(show: Boolean) = Unit
-    override fun nextPage() = Unit
-    override fun previousPage() = Unit
+    override fun setShown(shown: Boolean) = viewModel.setShown(shown)
+    override fun refreshNow() = viewModel.refreshNow()
+    override fun retry() = viewModel.retry()
+    override fun setTab(tab: TopologyTab) = viewModel.setTab(tab)
+    override fun setQueueFilter(filter: QueueTypeFilter) = viewModel.setQueueFilter(filter)
+    override fun setSearch(text: String) = viewModel.setSearch(text)
+    override fun selectVhost(name: String) = viewModel.selectVhost(name)
+    override fun selectQueue(name: String?) = viewModel.selectQueue(name)
+    override fun setShowDefaultExchange(show: Boolean) = viewModel.setShowDefaultExchange(show)
+    override fun nextPage() = viewModel.nextPage()
+    override fun previousPage() = viewModel.previousPage()
 }

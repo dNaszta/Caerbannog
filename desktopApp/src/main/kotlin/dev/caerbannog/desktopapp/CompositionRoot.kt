@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -76,11 +77,11 @@ class AppComposition(
     val streamEvents: StreamListEventsAdapter,
     /** The stream screen's events, mapped onto [streamClients] and [navigation] (M2-06b). */
     val streamClientsEvents: StreamClientsEventsAdapter,
-    /** The read-only Topology screen's state holder (M2-08b); the screen and the drawer entry come with 08c. */
+    /** The read-only Topology screen's state holder (M2-08b); its screen is drawn by `TopologyScreen` (M2-08c). */
     val topology: TopologyViewModel,
     private val streamListScope: CoroutineScope,
 ) {
-    /** M2-08c COMPILE STUB (test developer): the Topology screen's events, mapped onto [topology]. */
+    /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
 
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
@@ -137,14 +138,6 @@ fun createAppComposition(
         reconnect = viewModel::connect,
     )
     val streamClients = StreamClientsViewModel(active, appSettings, streamListScope, clock, viewModel::connect)
-    // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
-    // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
-    val shownTarget: StateFlow<RefreshTarget> = navigation.selectedStream
-        .map { if (it == null) streamList else streamClients }
-        .stateIn(streamListScope, SharingStarted.Eagerly, if (navigation.selectedStream.value == null) streamList else streamClients)
-    streamListScope.launch {
-        active.state.collect { if (it is LinkState.Disconnected) navigation.closeStream() }
-    }
     val topology = TopologyViewModel(
         active = active,
         settings = appSettings,
@@ -153,6 +146,19 @@ fun createAppComposition(
         reconnect = viewModel::connect,
         context = viewModel.state.map(::topologyContext).stateIn(streamListScope, SharingStarted.Eagerly, topologyContext(viewModel.state.value)),
     )
+    // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
+    // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
+    // M2-08c: the Topology screen is its own target; it is the shown screen, whatever stream was open before.
+    fun targetOf(screen: AppDestination, stream: String?): RefreshTarget = when {
+        screen == AppDestination.Topology -> topology
+        stream == null -> streamList
+        else -> streamClients
+    }
+    val shownTarget: StateFlow<RefreshTarget> = combine(navigation.screen, navigation.selectedStream, ::targetOf)
+        .stateIn(streamListScope, SharingStarted.Eagerly, targetOf(navigation.screen.value, navigation.selectedStream.value))
+    streamListScope.launch {
+        active.state.collect { if (it is LinkState.Disconnected) navigation.closeStream() }
+    }
     val control = ConnectionControlModel(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
