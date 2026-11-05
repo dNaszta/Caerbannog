@@ -90,6 +90,8 @@ fun StreamsScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
+    /** The name cell of a row is a link: click or Enter calls this with the stream name (M2-06b; compile stub, not used yet). */
+    onOpenStream: (String) -> Unit = {},
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {

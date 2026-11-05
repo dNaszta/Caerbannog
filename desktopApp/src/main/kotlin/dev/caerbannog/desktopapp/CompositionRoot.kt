@@ -70,6 +70,8 @@ class AppComposition(
     val navigation: AppNavigation,
     /** The stream list screen's events, mapped onto [streamList]. */
     val streamEvents: StreamListEventsAdapter,
+    /** The stream screen's events, mapped onto [streamClients] and [navigation] (M2-06b). */
+    val streamClientsEvents: StreamClientsEventsAdapter,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
@@ -136,7 +138,7 @@ fun createAppComposition(
         viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() },
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */
