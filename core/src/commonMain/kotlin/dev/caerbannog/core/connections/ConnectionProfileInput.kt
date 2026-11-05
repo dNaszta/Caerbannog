@@ -11,9 +11,8 @@ package dev.caerbannog.core.connections
  * means [TopologyControlLevel.READ_ONLY]; on [ConnectionsViewModel.updateConnection] null means "keep
  * the saved level", so a caller that does not know the field cannot silently lower a saved ceiling.
  *
- * Deliberately does not carry [ConnectionProfile.caCertificatePath]: it has its own dedicated setter,
- * [ConnectionsViewModel.setCaCertificate]. [ConnectionsViewModel.setTopologyControlLevel] stays for
- * programmatic changes of the level on a saved profile.
+ * [caCertificatePath] follows the same keep rule; [ConnectionsViewModel.setCaCertificate] stays for the focus-loss path.
+ * [ConnectionsViewModel.setTopologyControlLevel] stays for programmatic changes of the level on a saved profile.
  */
 data class ConnectionProfileInput(
     val name: String,
@@ -27,7 +26,7 @@ data class ConnectionProfileInput(
     val tls: Boolean? = null,
     val topologyControlLevel: TopologyControlLevel? = null,
     val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
-    /** M2-14a R2 (stub, no behaviour yet): add null = none; update null = keep, blank = clear, non-blank = stored only when Valid. */
+    /** M2-14a R2 (see [ConnectionsViewModel]): add null = none; update null = keep, blank = clear, non-blank = stored only when Valid. */
     val caCertificatePath: String? = null,
 )
 

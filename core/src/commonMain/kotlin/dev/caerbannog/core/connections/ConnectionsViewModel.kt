@@ -68,6 +68,7 @@ class ConnectionsViewModel(
             streamPort = input.streamPort,
             managementPort = input.managementPort,
             tls = input.tls ?: true,
+            caCertificatePath = resolveCaCertificatePath(null, input.caCertificatePath, input.tls ?: true),
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
             declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
@@ -96,6 +97,7 @@ class ConnectionsViewModel(
             streamPort = input.streamPort,
             managementPort = input.managementPort,
             tls = input.tls ?: original.tls,
+            caCertificatePath = resolveCaCertificatePath(original.caCertificatePath, input.caCertificatePath, input.tls ?: original.tls),
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
             declaredPermissions = when (val edit = input.declaredPermissions) {
                 DeclaredPermissionsEdit.Keep -> original.declaredPermissions
@@ -160,6 +162,18 @@ class ConnectionsViewModel(
         // The profile can be deleted or renamed while the reachability check was running.
         val profile = repository.list().firstOrNull { it.name == name } ?: return
         activeSession.open(profile)
+    }
+
+    // The keep rule for the CA path (M2-14a R2): null keeps [current], blank clears, non-blank is stored only when the validator
+    // says Valid. With TLS off the path is kept unused and not validated (O3). An invalid path is never stored; the message is
+    // shown and the save goes on (P8).
+    private fun resolveCaCertificatePath(current: String?, requested: String?, tls: Boolean): String? {
+        if (requested == null) return current
+        if (requested.isBlank()) return null
+        if (!tls) return requested
+        val validation = caCertificateValidator.validate(requested)
+        _state.update { it.copy(lastCaCertificateValidationResult = validation) }
+        return if (validation is CaCertificateValidationResult.Valid) requested else current
     }
 
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {

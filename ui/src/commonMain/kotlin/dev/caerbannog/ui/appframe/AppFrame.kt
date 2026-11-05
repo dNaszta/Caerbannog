@@ -95,14 +95,14 @@ private fun ChipIcon.tint(): Color = when (this) {
     ChipIcon.Sync, ChipIcon.LinkOff -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
-/** The closed chip: state icon, name (ellipsis when long), optional pill, drop-down arrow. A button, a normal tab stop. */
+/** The closed chip: state icon, name (ellipsis when long, never squeezed below 96 dp: the pill and the Not encrypted note give way to nothing), optional pill, drop-down arrow. A button, a normal tab stop. */
 @Composable
 fun ConnectionChip(chip: ConnectionChipState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val border = if (chip.errorBorder) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
     Row(
         modifier = modifier
             .testTag("connectionChip")
-            .widthIn(max = 360.dp)
+            .widthIn(max = 520.dp)
             .border(BorderStroke(1.dp, border), RoundedCornerShape(8.dp))
             // clickable already opens on Enter, NumPadEnter and Space, so no key handler of our own.
             .clickable(role = Role.Button, onClick = onClick)
@@ -114,7 +114,7 @@ fun ConnectionChip(chip: ConnectionChipState, onClick: () -> Unit, modifier: Mod
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ConnectionIcon(chip.icon.appIcon(), SmallIconSize, tint = chip.icon.tint())
-        Text(chip.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(chip.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).widthIn(min = 96.dp))
         chip.stateText?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
         chip.pill?.let { PermissionPillView(it, Modifier.testTag("chipPill")) }
         if (chip.notEncrypted) NotEncryptedNote("chipNotEncrypted", MaterialTheme.typography.labelMedium)

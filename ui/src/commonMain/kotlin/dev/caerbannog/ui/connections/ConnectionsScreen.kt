@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.text
@@ -173,11 +175,13 @@ private fun EditPanel(
     // The CA path is validated when the field loses focus or on Save, and only if the user changed it since the last validation.
     var caEdited by remember(selected?.name) { mutableStateOf(false) }
     var caHadFocus by remember(selected?.name) { mutableStateOf(false) }
+    var caValidatedPath by remember(selected?.name) { mutableStateOf<String?>(null) }
     val panelScope = rememberCoroutineScope()
     val validateCa: () -> Unit = {
         val path = caCertificatePath
         if (caEdited && tls && path.isNotBlank()) {
             caEdited = false
+            caValidatedPath = path
             panelScope.launch { onValidateCaCertificate(selected?.name, path) }
         }
     }
@@ -346,37 +350,30 @@ private fun EditPanel(
                     }
                 }
                 Button(onClick = {
-                    val save = {
-                        val input = ConnectionProfileInput(
-                            name = name,
-                            host = host,
-                            virtualHost = virtualHost,
-                            username = username,
-                            password = password.ifBlank { null },
-                            streamPort = ports.stream,
-                            managementPort = ports.management,
-                            tls = tls,
-                            topologyControlLevel = level,
-                            declaredPermissions = if (declares) {
-                                DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
-                            } else {
-                                DeclaredPermissionsEdit.Clear
-                            },
-                        )
-                        onSave(selected?.name, input)
-                    }
-                    // A CA path still being typed is validated first, once; an invalid one does not stop the save (the
-                    // check and Connect report the real problem). Saved after the validation so a valid path is stored first.
-                    if (caEdited && tls && caCertificatePath.isNotBlank()) {
-                        val path = caCertificatePath
-                        caEdited = false
-                        panelScope.launch {
-                            onValidateCaCertificate(selected?.name, path)
-                            save()
-                        }
-                    } else {
-                        save()
-                    }
+                    // The typed CA path travels in the input: the view model validates it once and stores it only when Valid (R2),
+                    // so there is no validate-then-save detour any more and no stale panel scope can save under an old name (R5).
+                    caEdited = false
+                    // A saved profile whose path is unchanged, or was just validated on focus loss (which stores a valid one), sends null
+                    // (keep) so the file is not read twice; a new profile and any other change send the typed value.
+                    val sendCa = selected == null || (caCertificatePath != selected.caCertificatePath.orEmpty() && caCertificatePath != caValidatedPath)
+                    val input = ConnectionProfileInput(
+                        name = name,
+                        host = host,
+                        virtualHost = virtualHost,
+                        username = username,
+                        password = password.ifBlank { null },
+                        streamPort = ports.stream,
+                        managementPort = ports.management,
+                        tls = tls,
+                        caCertificatePath = if (sendCa) caCertificatePath else null,
+                        topologyControlLevel = level,
+                        declaredPermissions = if (declares) {
+                            DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))
+                        } else {
+                            DeclaredPermissionsEdit.Clear
+                        },
+                    )
+                    onSave(selected?.name, input)
                 }) {
                     Text("Save")
                 }
@@ -412,9 +409,12 @@ private fun DeclaredPermissionsSection(
 ) {
     Column {
         Text("Declared permissions (your own statement)", style = MaterialTheme.typography.titleSmall)
-        Row {
-            Switch(checked = declares, onCheckedChange = onDeclaresChange)
-            Text("I know what this user may do on the broker", modifier = Modifier.padding(start = 8.dp, top = 12.dp))
+        Row(
+            modifier = Modifier.toggleable(value = declares, role = Role.Switch, onValueChange = onDeclaresChange),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Switch(checked = declares, onCheckedChange = null)
+            Text("I know what this user may do on the broker", modifier = Modifier.padding(start = 8.dp))
         }
         Text(
             "Only used when the broker does not let this user read its own permissions. " +
@@ -535,10 +535,15 @@ private fun DeleteConfirmDialog(name: String, onConfirm: () -> Unit, onCancel: (
 @Composable
 private fun TlsSwitchRow(tls: Boolean, onChange: (Boolean) -> Unit) {
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The row is the toggle so the Switch node carries the name "Use TLS" (merged from the Text) for a screen reader.
+        Row(
+            modifier = Modifier.testTag("tlsSwitch").toggleable(value = tls, role = Role.Switch, onValueChange = onChange),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             ConnectionIcon(if (tls) AppIcon.Lock else AppIcon.LockOpen, IconSize)
             Text("Use TLS", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Switch(checked = tls, onCheckedChange = onChange, modifier = Modifier.testTag("tlsSwitch"))
+            Switch(checked = tls, onCheckedChange = null)
         }
         editPanelNotes(tls).notEncrypted?.let { note ->
             Surface(
