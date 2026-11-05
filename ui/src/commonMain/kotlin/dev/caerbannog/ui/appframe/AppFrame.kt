@@ -325,9 +325,13 @@ fun AppFrame(
     /** The drawer items report the destination the user chose; the app decides what to show (Topology and Migrations have no screen yet). */
     onNavigate: (AppDestination) -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
+    /** The drawer item drawn as selected, by [AppDestination] name. Defaults to [title]; a detail screen (the stream screen) passes its parent. */
+    activeItem: String = title,
+    /** Shown before the title (the back arrow of a detail screen). */
+    leading: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    AppFrameLayout(title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, content = content)
+    AppFrameLayout(title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, activeItem = activeItem, leading = leading, content = content)
 }
 
 /** The frame with the chip slot open: [chip] null draws no chip (a caller that has no connection control yet). */
@@ -338,13 +342,15 @@ internal fun AppFrameLayout(
     onNavigate: (AppDestination) -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     chip: (@Composable () -> Unit)?,
+    activeItem: String = title,
+    leading: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
-            AppDrawer(activeItem = title, onNavigate = onNavigate, modifier = Modifier.width(280.dp).fillMaxHeight())
+            AppDrawer(activeItem = activeItem, onNavigate = onNavigate, modifier = Modifier.width(280.dp).fillMaxHeight())
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                AppBar(title, actions, chip)
+                AppBar(title, leading, actions, chip)
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
             }
         }
@@ -352,12 +358,13 @@ internal fun AppFrameLayout(
 }
 
 @Composable
-private fun AppBar(title: String, actions: @Composable RowScope.() -> Unit, chip: (@Composable () -> Unit)?) {
+private fun AppBar(title: String, leading: @Composable RowScope.() -> Unit, actions: @Composable RowScope.() -> Unit, chip: (@Composable () -> Unit)?) {
     Row(
         modifier = Modifier.testTag("appBar").fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 24.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        leading()
         Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         actions()
         chip?.invoke()

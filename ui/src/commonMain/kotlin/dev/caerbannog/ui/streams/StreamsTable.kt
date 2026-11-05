@@ -114,15 +114,15 @@ private val CellPadding = 6.dp
  * so no column is ever dropped; only the rows scroll down, the header stays.
  */
 @Composable
-internal fun StreamsTable(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit) {
+internal fun StreamsTable(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit, onOpen: (String) -> Unit = {}) {
     BoxWithConstraints {
         val scale = if (maxWidth.value.isFinite()) (maxWidth / TotalWidth).coerceAtLeast(1f) else 1f
-        StreamsTableBody(rows, state, onSort, scale)
+        StreamsTableBody(rows, state, onSort, scale, onOpen)
     }
 }
 
 @Composable
-private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit, scale: Float) {
+private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onSort: (StreamSort) -> Unit, scale: Float, onOpen: (String) -> Unit) {
     val horizontal = rememberScrollState()
     Column(
         Modifier
@@ -141,7 +141,7 @@ private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, onS
             } else {
                 // One SelectionContainer for the whole body: mouse selection works as in any text; the focusable cells add the keyboard.
                 SelectionContainer {
-                    Column { rows.forEach { DataRow(it, scale) } }
+                    Column { rows.forEach { DataRow(it, scale, onOpen) } }
                 }
             }
         }
@@ -202,7 +202,7 @@ private fun SizeHeader(scale: Float) {
 }
 
 @Composable
-private fun DataRow(row: StreamRow, scale: Float) {
+private fun DataRow(row: StreamRow, scale: Float, onOpen: (String) -> Unit) {
     Column(Modifier.testTag("streamRow:${row.name}")) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column.entries.forEach { column ->
@@ -212,6 +212,7 @@ private fun DataRow(row: StreamRow, scale: Float) {
                     column = column,
                     scale = scale,
                     style = if (column == Column.Name) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+                    onOpen = if (column == Column.Name) ({ onOpen(row.name) }) else null,
                 )
             }
         }
@@ -219,38 +220,57 @@ private fun DataRow(row: StreamRow, scale: Float) {
     }
 }
 
+/** One list cell. The name cell is a link ([onOpen]); the others only select and copy. */
+@Composable
+private fun CopyableCell(text: String, tag: String, column: Column, scale: Float, style: androidx.compose.ui.text.TextStyle, onOpen: (() -> Unit)? = null) {
+    // The padding is on the box, not on the text node: a mouse drag that starts at the edge of the cell must still start a selection.
+    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 4.dp)) {
+        CopyableText(text, tag, style, if (column.numeric) TextAlign.End else TextAlign.Start, onOpen = onOpen)
+    }
+}
+
 /**
- * One cell: its text node is focusable (Tab, visible outline) and Cmd+C or Ctrl+C copies the WHOLE displayed text, because
+ * One value: its text node is focusable (Tab, visible outline) and Cmd+C or Ctrl+C copies the WHOLE displayed text, because
  * [SelectionContainer] alone gives no keyboard copy of a focused text (spike, M2-05c). The mouse selection still works.
+ * With [onOpen] the same node is also a link (role Button; click or Enter opens; a drag still selects, spike M2-06b item 11).
+ * Shared by the stream list and the publishers and consumers tables (UI1: one copy mechanism).
  */
 @Composable
-private fun CopyableCell(text: String, tag: String, column: Column, scale: Float, style: androidx.compose.ui.text.TextStyle) {
+internal fun CopyableText(
+    text: String,
+    tag: String,
+    style: androidx.compose.ui.text.TextStyle,
+    textAlign: TextAlign = TextAlign.Start,
+    color: Color = Color.Unspecified,
+    extra: Modifier = Modifier,
+    onOpen: (() -> Unit)? = null,
+) {
     var focused by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val outline = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
-    // The padding is on the box, not on the text node: a mouse drag that starts at the edge of the cell must still start a selection.
-    Box(Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = 4.dp)) {
-        Text(
-            text,
-            style = style,
-            textAlign = if (column.numeric) TextAlign.End else TextAlign.Start,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(tag)
-                .onKeyEvent { event ->
-                    val copy = event.type == KeyEventType.KeyDown && event.key == Key.C && (event.isMetaPressed || event.isCtrlPressed)
-                    // `ui` has one target (jvm); the desktop ClipEntry wraps a Transferable. Move this when a second target is added.
-                    if (copy) scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
-                    copy
-                }
-                .onFocusChanged { focused = it.isFocused }
-                .border(BorderStroke(2.dp, outline), RoundedCornerShape(4.dp))
-                .focusable(),
-        )
-    }
+    Text(
+        text,
+        style = style,
+        color = color,
+        textAlign = textAlign,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(tag)
+            .then(extra)
+            .onKeyEvent { event ->
+                val copy = event.type == KeyEventType.KeyDown && event.key == Key.C && (event.isMetaPressed || event.isCtrlPressed)
+                // `ui` has one target (jvm); the desktop ClipEntry wraps a Transferable. Move this when a second target is added.
+                if (copy) scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
+                copy
+            }
+            .onFocusChanged { focused = it.isFocused }
+            .border(BorderStroke(2.dp, outline), RoundedCornerShape(4.dp))
+            // clickable is focusable and opens on Enter; a plain cell only needs the focus.
+            .then(if (onOpen != null) Modifier.clickable(role = Role.Button, onClick = onOpen) else Modifier.focusable()),
+    )
 }
 
 @Composable

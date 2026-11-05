@@ -16,6 +16,7 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
+import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
 import kotlinx.coroutines.delay
 
@@ -39,12 +40,42 @@ fun main() = application {
     val windowState = rememberWindowState(size = DpSize(1280.dp, 800.dp))
     Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog", state = windowState) {
         val screen by composition.navigation.screen.collectAsState()
+        val openStream by composition.navigation.selectedStream.collectAsState()
         when (screen) {
-            AppDestination.Streams -> StreamsWindowContent(composition, control)
+            AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
             // Topology and Migrations have no screen yet: AppNavigation never selects them.
             else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
         }
     }
+}
+
+/** The stream screen (one stream open from the list) with its own one-second clock, which runs only while it is in the composition. */
+@Composable
+private fun StreamWindowContent(composition: AppComposition, control: ConnectionControlState, stream: String) {
+    val clients by composition.streamClients.state.collectAsState()
+    val now = rememberNowMillis()
+    StreamScreen(
+        stream = stream,
+        state = clients,
+        nowMillis = now,
+        events = composition.streamClientsEvents,
+        control = control,
+        controlEvents = composition.control,
+        onNavigate = composition.navigation::open,
+    )
+}
+
+/** One-second clock for "Updated N s ago"; it ticks only while the caller is in the composition and never calls the broker. */
+@Composable
+private fun rememberNowMillis(): Long {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(TICK_MILLIS)
+        }
+    }
+    return now
 }
 
 /** The Streams screen with its own one-second clock; the clock runs only while this is in the composition (screen shown). */
@@ -53,13 +84,7 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
     val list by composition.streamList.state.collectAsState()
     val link by composition.active.state.collectAsState()
     val connections by composition.viewModel.state.collectAsState()
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(TICK_MILLIS)
-        }
-    }
+    val now = rememberNowMillis()
     StreamsScreen(
         state = list,
         nowMillis = now,
@@ -68,6 +93,7 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
+        onOpenStream = composition.navigation::openStream,
     )
 }
 

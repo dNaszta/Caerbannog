@@ -40,7 +40,7 @@ body{margin:0}
 <thead>
 <tr>
 <th>Reference</th>
-<th>Connection</th>
+<th>Connection (user)</th>
 <th class="r">Published</th>
 <th class="r">Confirmed</th>
 <th class="r">Errors</th>
@@ -49,14 +49,14 @@ body{margin:0}
 <tbody>
 <tr>
 <td class="t-ts">checkout-1</td>
-<td class="mono">10.0.4.21:51234 · checkout-service</td>
+<td class="mono">10.0.4.21:51234 -&gt; 10.0.0.5:5551<div class="t-bs dim">checkout</div></td>
 <td class="r">48,100</td>
 <td class="r">48,100</td>
 <td class="r"><span class="pill ok">0</span></td>
 </tr>
 <tr>
 <td class="t-ts">backfill-job</td>
-<td class="mono">10.0.7.8:40022 · backfill</td>
+<td class="mono">10.0.7.8:40022 -&gt; 10.0.0.5:5551</td>
 <td class="r">200</td>
 <td class="r">200</td>
 <td class="r"><span class="pill ok">0</span></td>
@@ -72,7 +72,7 @@ body{margin:0}
 <thead>
 <tr>
 <th>Consumer</th>
-<th>Connection</th>
+<th>Connection (user)</th>
 <th class="r">Offset</th>
 <th class="r">Messages behind</th>
 <th>Status</th>
@@ -81,30 +81,46 @@ body{margin:0}
 <tbody>
 <tr>
 <td class="t-ts">billing</td>
-<td class="mono">10.0.5.14:38812 · billing-service</td>
+<td class="mono">10.0.5.14:38812 -&gt; 10.0.0.5:5551</td>
 <td class="r">48299</td>
 <td class="r">0</td>
 <td><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Caught up</span></td>
 </tr>
 <tr>
 <td class="t-ts">analytics</td>
-<td class="mono">10.0.9.3:52901 · analytics-etl</td>
+<td class="mono">10.0.9.3:52901 -&gt; 10.0.0.5:5551</td>
 <td class="r">47950</td>
 <td class="r">349</td>
-<td><span class="pill warn">Behind</span></td>
+<td><span class="pill" title="Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.">349 behind</span></td>
 </tr>
 <tr>
 <td class="t-ts">audit</td>
-<td class="mono">10.0.6.30:44417 · audit-writer</td>
+<td class="mono">10.0.6.30:44417 -&gt; 10.0.0.5:5551</td>
 <td class="r">48100</td>
 <td class="r">199</td>
-<td><span class="pill warn">Behind</span></td>
+<td><span class="pill" title="Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.">199 behind</span></td>
 </tr>
 </tbody>
 </table>
 </div>
 </section>
-<div class="t-bs dim">Read from the management API (rabbitmq_stream_management). Opening a row can jump the message browser to that consumer's offset.</div>
+<div class="t-bs dim">Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0.</div>
+<div class="banner info" role="note"><span class="ms" aria-hidden="true">info</span><div>Showing only your own connections. The monitoring tag shows all.</div></div>
+<div class="banner warn" role="note"><span class="ms" aria-hidden="true">extension</span><div>Publishers and consumers need the rabbitmq_stream_management plugin. Enable it on the broker.</div></div>
+<div class="t-bs dim" style="display:flex;flex-direction:column;gap:6px;padding:8px 0">
+<div class="t-ts">States and rules (built from this list, M2-06)</div>
+<div>Opening: the name cell of a row in the stream list is a link that opens this screen (back arrow returns to the list). Only the "Publishers and consumers" tab exists in M2; the "Messages" tab is drawn for M3 and is not built yet. The drawer keeps Streams selected.</div>
+<div>Header: stream name, "Updated N s ago" and Refresh, as in the list. The tab refreshes with the app-wide interval of the connection control, only while this tab is shown.</div>
+<div>Loading: the two section frames with "loading..." rows, never a blank page. Not connected / Connecting: "Not connected" or "Connecting...", no sections.</div>
+<div>Empty: "There are no publishers on this stream." and "There are no consumers on this stream." (each section on its own; scenario "A stream nobody uses").</div>
+<div>Plugin missing: the warning banner above in place of both sections; the header and the last offset still show. The banner is the only thing that goes.</div>
+<div>Management tag only (S3b): the info banner above stays on screen even when both lists are empty, so an empty list never reads as "nobody is connected". No management tag (S3a): the message "This user cannot read stream statistics. Ask for the monitoring tag." and no sections.</div>
+<div>Client that has just attached: the broker row has no connection name and zero counters for a few seconds. The Connection cell says "unknown", the counters, offset, behind and status cells say "updating" (not 0), and the next refresh replaces them.</div>
+<div>Consumer status: "Caught up" for 0 behind (green), "N behind" (the broker's number, neutral grey, never amber or red) above 0, with a tooltip: "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.", "Not active" for a consumer that is not the active one of a single-active group (neutral). Unnamed publisher or consumer: the name cell says "unnamed". Offset is plain digits, other counts grouped (same rule as the list). Last offset on the stream is "unavailable" when it cannot be read.</div>
+<div>Stream deleted while open: "This stream no longer exists" and a Back to streams button. Lost connection (D2): banner "Connection lost" with Retry, rows stay dimmed and marked stale. Failed first load: "Publishers and consumers could not be loaded." and Retry.</div>
+<div>Row whose broker user is not known: the user line under the connection shows an em dash (—), no word ("unknown" already means "just attached"). Give the dash an accessible name "no user" (aria-label), the visible text stays the dash.</div>
+<div>Copy: every value in both tables (reference, connection, counts, offset, behind, status) is selectable and copies as displayed. The jump to a consumer's offset is not drawn: it needs the message browser (M3).</div>
+</div>
 </div>
 </main>
 </div>
