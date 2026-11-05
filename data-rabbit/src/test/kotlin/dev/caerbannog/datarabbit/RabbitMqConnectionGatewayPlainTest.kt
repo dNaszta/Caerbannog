@@ -106,6 +106,7 @@ class RabbitMqConnectionGatewayPlainTest {
         listOf("/no/such/ca.pem", "/", "").forEach { ca ->
             val result = open(profile(closedLocalPort(), tls = false, ca = ca))
             assertFalse(result is OpenResult.Failed && result.reason == ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED, "ca='$ca': $result")
+            assertFalse(result is OpenResult.Failed && result.reason == ConnectionFailureReason.NO_TLS_ANSWER, "ca='$ca': the TLS hint with TLS off: $result")
         }
     }
 
@@ -118,6 +119,24 @@ class RabbitMqConnectionGatewayPlainTest {
             assertEquals(emptyList<PlainManagementServer.Seen>(), server.seen, "the plain port saw a request: no fallback, nothing in clear text")
             assertFalse(stringsOf(result).contains(password), stringsOf(result))
         }
+    }
+
+    @Test
+    fun `a TLS profile against a plain broker says the broker may not use TLS, sends nothing and keeps the password out`() {
+        // The plain server answers the ClientHello with 400 like the real broker does (measured against the dev broker, brief M2-14c).
+        PlainManagementServer(mapOf(whoami), answerGarbageWith400 = true).use { server ->
+            val result = open(profile(server.port, tls = true))
+
+            assertEquals(OpenResult.Failed(ConnectionFailureReason.NO_TLS_ANSWER), result)
+            assertEquals(emptyList<PlainManagementServer.Seen>(), server.seen, "no request, so no Authorization header, reached the plain port")
+            assertFalse(stringsOf(result).contains(password), stringsOf(result))
+            assertFalse(lines.joinToString("\n").contains("Basic "), lines.toString())
+        }
+    }
+
+    @Test
+    fun `a TLS profile with nothing listening is broker not reachable, not a TLS hint`() {
+        assertEquals(OpenResult.Failed(ConnectionFailureReason.BROKER_NOT_REACHABLE), open(profile(closedLocalPort(), tls = true)))
     }
 
     @Test

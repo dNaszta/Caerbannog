@@ -10,7 +10,15 @@ import java.util.concurrent.CopyOnWriteArrayList
  * app sent. They are honest in the one way that matters here: they speak NO TLS, so a TLS-on client can only fail its handshake, and
  * they record the bytes, so "nothing is sent" is a fact and not a guess.
  */
-internal class PlainManagementServer(private val routes: Map<String, Pair<Int, String>> = emptyMap()) : AutoCloseable {
+internal class PlainManagementServer(
+    private val routes: Map<String, Pair<Int, String>> = emptyMap(),
+    /**
+     * M2-14c: answer bytes that are not an HTTP request (a TLS ClientHello) with a `400 Bad Request` and close, like the real broker's
+     * Cowboy does (measured: the JDK client then reports `SSLException: Unrecognized SSL message, plaintext connection?`). Off by default:
+     * the older tests rely on the silent close.
+     */
+    private val answerGarbageWith400: Boolean = false,
+) : AutoCloseable {
 
     data class Seen(val method: String, val rawPath: String, val authorization: String?)
 
@@ -34,7 +42,18 @@ internal class PlainManagementServer(private val routes: Map<String, Pair<Int, S
     private fun serve(socket: java.net.Socket) { socket.use {
         try {
             it.soTimeout = 3_000
-            val input = it.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+            val raw = java.io.BufferedInputStream(it.getInputStream())
+            if (answerGarbageWith400) {
+                raw.mark(16)
+                val head = ByteArray(8)
+                val n = raw.read(head)
+                raw.reset()
+                if (n > 0 && head[0].toInt().toChar() !in 'A'..'Z') {
+                    it.getOutputStream().apply { write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".toByteArray()); flush() }
+                    return@use
+                }
+            }
+            val input = raw.bufferedReader(Charsets.ISO_8859_1)
             val requestLine = input.readLine() ?: return@use
             val parts = requestLine.split(' ')
             if (parts.size != 3 || !parts[2].startsWith("HTTP/1.") || !parts[1].startsWith("/") || !parts[0].all { c -> c in 'A'..'Z' }) return@use
