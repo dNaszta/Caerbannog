@@ -16,7 +16,7 @@ import dev.caerbannog.core.connections.TopologyControlLevel
  * profile, so nothing leaks from one profile to the next. Holds no repository and calls no broker; it exists so
  * the "which CA path do I send" rule in [toInput] is testable without a composition.
  */
-class ConnectionFormState(private val selected: ConnectionProfile?) {
+class ConnectionFormState(selected: ConnectionProfile?) {
     var name: String by mutableStateOf(selected?.name.orEmpty())
     var host: String by mutableStateOf(selected?.host.orEmpty())
     var virtualHost: String by mutableStateOf(selected?.virtualHost ?: "/")
@@ -45,14 +45,17 @@ class ConnectionFormState(private val selected: ConnectionProfile?) {
      * it only when it changed and was not just validated on focus loss (which already stored a valid one), otherwise
      * null (keep) so the file is not read twice.
      */
-    private fun caPathToSend(): String? {
-        val send = selected == null ||
-            (caCertificatePath != selected.caCertificatePath.orEmpty() && caCertificatePath != caValidatedPath)
+    private fun caPathToSend(saved: ConnectionProfile?): String? {
+        val send = saved == null ||
+            (caCertificatePath != saved.caCertificatePath.orEmpty() && caCertificatePath != caValidatedPath)
         return if (send) caCertificatePath else null
     }
 
-    /** The Save input; a blank password is null (keep the stored one). */
-    fun toInput(): ConnectionProfileInput = ConnectionProfileInput(
+    /**
+     * The Save input; a blank password is null (keep the stored one). [saved] is the profile as saved now, not as it
+     * was when this form was created (a focus-loss validation may have stored a path since); null = a new profile.
+     */
+    fun toInput(saved: ConnectionProfile?): ConnectionProfileInput = ConnectionProfileInput(
         name = name,
         host = host,
         virtualHost = virtualHost,
@@ -61,7 +64,7 @@ class ConnectionFormState(private val selected: ConnectionProfile?) {
         streamPort = ports.stream,
         managementPort = ports.management,
         tls = tls,
-        caCertificatePath = caPathToSend(),
+        caCertificatePath = caPathToSend(saved),
         topologyControlLevel = level,
         declaredPermissions = if (declares) {
             DeclaredPermissionsEdit.Set(DeclaredPermissions(configure = declaredConfigure, write = declaredWrite))

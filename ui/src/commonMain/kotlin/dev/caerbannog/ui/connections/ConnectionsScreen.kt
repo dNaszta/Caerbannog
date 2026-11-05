@@ -330,7 +330,7 @@ private fun EditPanel(
                     // The typed CA path travels in the input: the view model validates it once and stores it only when Valid (R2),
                     // so there is no validate-then-save detour any more and no stale panel scope can save under an old name (R5).
                     form.caEdited = false
-                    val input = form.toInput()
+                    val input = form.toInput(state.selectedProfile)
                     onSave(selected?.name, input)
                 }) {
                     Text("Save")
