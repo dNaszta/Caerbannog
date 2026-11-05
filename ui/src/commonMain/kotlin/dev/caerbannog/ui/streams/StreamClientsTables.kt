@@ -1,14 +1,18 @@
 package dev.caerbannog.ui.streams
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,20 +20,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -52,6 +59,8 @@ private const val STALE_STATE = "Stale"
 private const val LOADING_PLACEHOLDER_ROWS = 2
 private val CellPadding = 6.dp
 private val CellVerticalPadding = 6.dp
+private val CaptionGap = 12.dp
+private val SectionGap = 16.dp
 private val OkGreen = Color(0xFF386A20)
 
 internal class ClientColumn(val key: String, val header: String, val width: Dp, val numeric: Boolean = false)
@@ -72,31 +81,46 @@ private val ConsumerColumns = listOf(
     ClientColumn("Status", StreamClientsTexts.HEADER_STATUS, 160.dp),
 )
 
+/** The scroll state of the two tables, hoisted so a row that leaves the composition does not lose the sideways position. */
+internal class ClientsScrollStates(val publishers: ScrollState, val consumers: ScrollState)
+
 @Composable
-internal fun PublishersSection(rows: List<PublisherRowState>?, stale: Boolean) {
-    ClientsSection("publishers", StreamClientsTexts.PUBLISHERS_TITLE, rows?.size, PublisherColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_PUBLISHERS, stale) { scale ->
-        rows?.forEachIndexed { index, row -> PublisherRow(index, row, scale) }
+internal fun rememberClientsScrollStates(): ClientsScrollStates {
+    val publishers = rememberScrollState()
+    val consumers = rememberScrollState()
+    return remember(publishers, consumers) { ClientsScrollStates(publishers, consumers) }
+}
+
+internal fun LazyListScope.publishersSection(rows: List<PublisherRowState>?, stale: Boolean, contentWidth: Dp, scroll: ScrollState) {
+    clientsSection(
+        "publishers", StreamClientsTexts.PUBLISHERS_TITLE, rows?.size, PublisherColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_PUBLISHERS,
+        stale, contentWidth, scroll,
+    ) { scale ->
+        rows?.let { list ->
+            itemsIndexed(list, key = { _, row -> "publisher:${row.key}" }) { index, row -> PublisherRow(index, row, scale, scroll, stale) }
+        }
     }
 }
 
-@Composable
-internal fun ConsumersSection(rows: List<ConsumerRowState>?, stale: Boolean, state: StreamClientsState) {
-    ClientsSection(
-        "consumers", StreamClientsTexts.CONSUMERS_TITLE, rows?.size, ConsumerColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_CONSUMERS, stale,
+internal fun LazyListScope.consumersSection(rows: List<ConsumerRowState>?, stale: Boolean, state: StreamClientsState, contentWidth: Dp, scroll: ScrollState) {
+    clientsSection(
+        "consumers", StreamClientsTexts.CONSUMERS_TITLE, rows?.size, ConsumerColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_CONSUMERS,
+        stale, contentWidth, scroll,
         captionExtra = { if (rows != null) LastOffset(state) },
     ) { scale ->
-        // The key is the row identity (a consumer that disappears or reorders keeps the others' state).
-        rows?.forEach { row -> key(row.key) { ConsumerRow(row, scale) } }
+        // The key is the row identity (a consumer that disappears or reorders keeps the others' state); the prefix keeps it apart from
+        // a publisher on the same connection, because both tables live in one list.
+        rows?.let { list -> items(list, key = { "consumer:${it.key}" }) { row -> ConsumerRow(row, scale, scroll, stale) } }
     }
 }
 
 /**
- * One section: caption with the count, the header, and either the rows, "loading..." rows ([count] null) or the empty sentence.
- * The table node announces the caption (so the count is heard) and carries "Loading" or "Stale" as its state description,
- * because dimming alone is a colour-only signal.
+ * One section as list items: caption with the count, the header, and either the rows, "loading..." rows ([count] null) or the empty
+ * sentence, then a gap. The header item carries the table node: it announces the caption (so the count is heard) and "Loading" or
+ * "Stale" as its state description, because dimming alone is a colour-only signal. Every item of the table shares [scroll], so the
+ * columns move together. The rows are in a SelectionContainer around the whole list; everything else is excluded from the selection.
  */
-@Composable
-private fun ClientsSection(
+private fun LazyListScope.clientsSection(
     prefix: String,
     title: String,
     count: Int?,
@@ -104,29 +128,35 @@ private fun ClientsSection(
     empty: Boolean,
     emptyText: String,
     stale: Boolean,
+    contentWidth: Dp,
+    scroll: ScrollState,
     captionExtra: @Composable () -> Unit = {},
-    rows: @Composable (scale: Float) -> Unit,
+    rows: LazyListScope.(scale: Float) -> Unit,
 ) {
     val loading = count == null
     val caption = if (count == null) title else "$title $count"
-    Column(Modifier.testTag("${prefix}Section"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                Modifier.clearAndSetSemantics {
-                    set(SemanticsProperties.TestTag, "${prefix}Caption")
-                    set(SemanticsProperties.Text, listOfNotNull(AnnotatedString(title), count?.let { AnnotatedString(it.toString()) }))
-                },
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                count?.let { Text(it.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    val total = columns.totalWidth()
+    val scale = if (contentWidth.value.isFinite()) (contentWidth / total).coerceAtLeast(1f) else 1f
+    item(key = "$prefix:caption") {
+        DisableSelection {
+            Row(Modifier.padding(bottom = CaptionGap), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.clearAndSetSemantics {
+                        set(SemanticsProperties.TestTag, "${prefix}Caption")
+                        set(SemanticsProperties.Text, listOfNotNull(AnnotatedString(title), count?.let { AnnotatedString(it.toString()) }))
+                    },
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    count?.let { Text(it.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+                captionExtra()
             }
-            captionExtra()
         }
-        val total = columns.fold(0.dp) { sum, column -> sum + column.width }
-        BoxWithConstraints {
-            val scale = if (maxWidth.value.isFinite()) (maxWidth / total).coerceAtLeast(1f) else 1f
+    }
+    item(key = "$prefix:header") {
+        DisableSelection {
             Column(
                 Modifier
                     .testTag("${prefix}Table")
@@ -134,8 +164,7 @@ private fun ClientsSection(
                         contentDescription = caption
                         if (loading) stateDescription = LOADING_STATE else if (stale) stateDescription = STALE_STATE
                     }
-                    .horizontalScroll(rememberScrollState())
-                    .widthIn(min = total),
+                    .tableWidth(scroll, total),
             ) {
                 Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                     columns.forEach { column ->
@@ -149,23 +178,58 @@ private fun ClientsSection(
                     }
                 }
                 HorizontalDivider()
-                when {
-                    loading -> repeat(LOADING_PLACEHOLDER_ROWS) { index -> LoadingRow(columns, scale, first = index == 0) }
-                    empty -> Text(
+            }
+        }
+    }
+    when {
+        loading -> items(LOADING_PLACEHOLDER_ROWS, key = { "$prefix:loading:$it" }) { index ->
+            DisableSelection { Column(Modifier.tableWidth(scroll, total)) { LoadingRow(columns, scale, first = index == 0) } }
+        }
+        empty -> item(key = "$prefix:empty") {
+            DisableSelection {
+                Column(Modifier.tableWidth(scroll, total)) {
+                    Text(
                         emptyText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.testTag("${prefix}Empty").padding(vertical = 16.dp, horizontal = CellPadding),
                     )
-                    // One SelectionContainer per table: mouse selection as in the list; every cell adds the keyboard copy (UI1).
-                    else -> SelectionContainer {
-                        Column(Modifier.alpha(if (stale) 0.6f else 1f)) { rows(scale) }
-                    }
                 }
             }
         }
+        else -> rows(scale)
     }
+    item(key = "$prefix:gap") { Spacer(Modifier.height(SectionGap)) }
 }
+
+/**
+ * The width and sideways scroll of the header and the one-off items of a table (loading rows, the empty sentence). The header is the
+ * item that sets the size limits of [scroll] (a ScrollState takes them from the `horizontalScroll` node that lays it out).
+ */
+private fun Modifier.tableWidth(scroll: ScrollState, total: Dp): Modifier = horizontalScroll(scroll).widthIn(min = total)
+
+/**
+ * The same sideways scroll for a data row, WITHOUT the clip of `horizontalScroll`: that clip is the row's own bounds plus 30 dp, and the
+ * keyboard hint popup of a row is taller than that, so it would be cut off at the next row. Gestures come from `scrollable` on the shared
+ * [scroll], the content is laid out unbounded and shifted by the scroll value (never past its own overflow, in case the header that
+ * set the limits is not composed). Left to right only, like the rest of the app.
+ */
+@Composable
+private fun Modifier.rowScroll(scroll: ScrollState, total: Dp): Modifier {
+    val reverse = ScrollableDefaults.reverseDirection(LocalLayoutDirection.current, Orientation.Horizontal, reverseScrolling = false)
+    return scrollable(scroll, Orientation.Horizontal, reverseDirection = reverse)
+        .layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+            val width = minOf(placeable.width, constraints.maxWidth)
+            layout(width, placeable.height) { placeable.place(-scroll.value.coerceIn(0, placeable.width - width), 0) }
+        }
+        .widthIn(min = total)
+}
+
+/** The stale look (0.6 alpha); a fresh row gets no layer at all, so the hint popup of one row is drawn as before. */
+private fun Modifier.dimWhen(stale: Boolean): Modifier = if (stale) alpha(0.6f) else this
+
+private fun List<ClientColumn>.totalWidth(): Dp = fold(0.dp) { sum, column -> sum + column.width }
 
 @Composable
 private fun LoadingRow(columns: List<ClientColumn>, scale: Float, first: Boolean) {
@@ -190,9 +254,9 @@ private fun LoadingRow(columns: List<ClientColumn>, scale: Float, first: Boolean
 // Cells are top aligned on purpose: the selection container orders its texts by position, and a centred one-line cell next to a
 // two-line connection cell would be ordered after the connection, so a drag over it selected the wrong text.
 @Composable
-private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float) {
+private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
     val tag = "publisherCell:$index"
-    Column {
+    Column(Modifier.dimWhen(stale).rowScroll(scroll, PublisherColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.reference, "$tag:Reference", PublisherColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, PublisherColumns[1], scale)
@@ -205,9 +269,9 @@ private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float) {
 }
 
 @Composable
-private fun ConsumerRow(row: ConsumerRowState, scale: Float) {
+private fun ConsumerRow(row: ConsumerRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
     val tag = "consumerCell:${row.key}"
-    Column {
+    Column(Modifier.dimWhen(stale).rowScroll(scroll, ConsumerColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.name, "$tag:Name", ConsumerColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, ConsumerColumns[1], scale)

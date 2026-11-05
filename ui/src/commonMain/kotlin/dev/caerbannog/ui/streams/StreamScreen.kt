@@ -3,6 +3,8 @@ package dev.caerbannog.ui.streams
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -13,8 +15,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -66,6 +72,7 @@ interface StreamClientsEvents {
     fun back()
 }
 
+private val ClientsHorizontalPadding = 24.dp
 private const val PUBLISHERS_TAB = "Publishers and consumers"
 
 /** A tab of the stream screen. The shell takes a list so the Messages tab (M3) is one more entry, not a redesign. */
@@ -184,7 +191,7 @@ private fun ClientsTab(stream: String, state: StreamClientsState, events: Stream
 @Composable
 private fun ClientsScroll(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = ClientsHorizontalPadding, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) { content() }
 }
@@ -201,30 +208,57 @@ internal fun LastOffset(state: StreamClientsState) {
     }
 }
 
+/**
+ * The tab body: ONE lazy list, so only the rows near the viewport are composed however many clients a stream has. A lazy list cannot
+ * sit inside a scrolling page, hence both tables are items of this list. The header is not sticky (it scrolls away with the page, as
+ * before). The list state and the two sideways scroll states are hoisted here, so a refresh keeps the position.
+ */
 @Composable
 private fun ClientsSections(state: StreamClientsState, loading: Boolean, events: StreamClientsEvents) {
-    ClientsScroll {
-        state.banner?.let { LostConnectionBanner(it, StreamListTexts.RETRY, events::retry, tag = "clientsBanner") }
-        state.ownConnectionsNotice?.let { notice ->
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ConnectionIcon(AppIcon.Info, SmallIconSize)
-                    Text(notice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("ownConnectionsNotice"))
+    val listState = rememberLazyListState()
+    val scrolls = rememberClientsScrollStates()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val contentWidth = maxWidth - ClientsHorizontalPadding * 2
+        // One container for the whole list: mouse selection works in the rows, the other items opt out with DisableSelection.
+        SelectionContainer {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(horizontal = ClientsHorizontalPadding, vertical = 16.dp),
+            ) {
+                state.banner?.let { banner ->
+                    item(key = "banner") { Box(Modifier.padding(bottom = 16.dp)) { DisableSelection { LostConnectionBanner(banner, StreamListTexts.RETRY, events::retry, tag = "clientsBanner") } } }
+                }
+                state.ownConnectionsNotice?.let { notice ->
+                    item(key = "notice") {
+                        Box(Modifier.padding(bottom = 16.dp)) {
+                            DisableSelection {
+                                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        ConnectionIcon(AppIcon.Info, SmallIconSize)
+                                        Text(notice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("ownConnectionsNotice"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                val stale = state.stale && !loading
+                publishersSection(if (loading) null else state.publishers, stale, contentWidth, scrolls.publishers)
+                consumersSection(if (loading) null else state.consumers, stale, state, contentWidth, scrolls.consumers)
+                if (!loading) {
+                    item(key = "footnote") {
+                        DisableSelection {
+                            Text(
+                                StreamClientsTexts.FOOTNOTE,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag("clientsFootnote"),
+                            )
+                        }
+                    }
                 }
             }
-        }
-        val stale = state.stale && !loading
-        val publishers = if (loading) null else state.publishers
-        val consumers = if (loading) null else state.consumers
-        PublishersSection(publishers, stale)
-        ConsumersSection(consumers, stale, state)
-        if (!loading) {
-            Text(
-                StreamClientsTexts.FOOTNOTE,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("clientsFootnote"),
-            )
         }
     }
 }
