@@ -6,7 +6,21 @@ import dev.caerbannog.acceptance.connections.FakeSecretStore
 import dev.caerbannog.acceptance.connections.InMemoryConnectionProfileRepository
 import dev.caerbannog.acceptance.permissions.FakePermissionChecker
 import dev.caerbannog.core.connections.ActiveConnection
+import dev.caerbannog.core.connections.ChipState
+import dev.caerbannog.core.connections.ConnectionChipState
+import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionNotes
+import dev.caerbannog.core.connections.RowAction
+import dev.caerbannog.core.connections.permissionPill
+import dev.caerbannog.core.connections.fakes.FakeAppSettings
+import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.StreamListScreen
+import dev.caerbannog.core.streams.StreamListViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionSession
@@ -45,8 +59,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * Docker, no network, no keychain, no ~/.caerbannog). The whole app side is real core code
  * (ConnectionsViewModel, ConnectionSession, ActiveConnection); only the broker is fake.
  *
- * No steps on purpose: the lost-connection scenario (D2 is decided, the scenario is tagged @needs-M2) and the three
- * app bar scenarios (@needs-M2, M2-05).
+ * M2-05b: the lost-connection scenario (D2) runs here with a real `StreamListViewModel` on the same fakes (a test scheduler,
+ * virtual time, no sleeps), and the three app bar scenarios read the chip state of the real `ConnectionControlModel`. That the
+ * chip and the popup DRAW that state on every screen is pinned by the Compose tests in `ui` (a step cannot see a screen).
+ * "When I open any screen" therefore only lets the model catch up.
  *
  * Part 2 (M2-03b): "A user without the management tag ..." asserts through the held connection's catalog
  * (`Capabilities.visibility` NONE, every list NotAuthorised, the message text from core); "first offsets will
@@ -58,6 +74,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
  *  - "I see the note ..." compares core's ConnectionNotes.HOST_NAME_NOT_VERIFIED with the scenario text; that
  *    the edit panel shows it is pinned by ui ConnectionsScreenUiTest ("the edit panel says the host name is not verified").
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConnectionLifecycleSteps {
 
     private companion object {
@@ -73,6 +90,10 @@ class ConnectionLifecycleSteps {
     private lateinit var active: ActiveConnection
     private lateinit var viewModel: ConnectionsViewModel
     private lateinit var scope: CoroutineScope
+    private lateinit var test: TestScope
+    private var streamList: StreamListViewModel? = null
+    private var control: ConnectionControlModel? = null
+    private var opensBeforeWaiting = 0
 
     private var lastName: String = ""
     private var permissionDoneWhenClientsOpened: Boolean? = null
@@ -92,6 +113,9 @@ class ConnectionLifecycleSteps {
             repository, secretStore, FakeBrokerReachabilityChecker(), FakeCaCertificateValidator(), session, active,
         )
         scope = CoroutineScope(Dispatchers.Default)
+        test = TestScope()
+        streamList = null
+        control = null
         permissionDoneWhenClientsOpened = null
         slowGate = null
         slowConnect = null
@@ -102,6 +126,8 @@ class ConnectionLifecycleSteps {
     @After
     fun closeEverything() {
         slowGate?.release()
+        control?.close()
+        streamList?.close()
         scope.cancel()
         active.close()
     }
@@ -119,6 +145,31 @@ class ConnectionLifecycleSteps {
         viewModel = ConnectionsViewModel(
             repository, secretStore, FakeBrokerReachabilityChecker(), FakeCaCertificateValidator(), session, active,
         )
+        buildStreamListAndControl()
+    }
+
+    // The app side of the app bar: the stream list view model and the connection control model, on the same fakes, in virtual time.
+    private fun buildStreamListAndControl() {
+        control?.close()
+        streamList?.close()
+        val clock = RefreshClock { test.testScheduler.currentTime }
+        val list = StreamListViewModel(
+            active = active, settings = FakeAppSettings(), scope = test.backgroundScope, clock = clock,
+            reconnect = viewModel::connect,
+        )
+        streamList = list
+        control = ConnectionControlModel(viewModel, active, list, test.backgroundScope, clock, onOpenConnections = {})
+    }
+
+    private fun model(): ConnectionControlModel = checkNotNull(control) { "the Background step 'saved connections' did not run" }
+
+    private fun list(): StreamListViewModel = checkNotNull(streamList) { "the Background step 'saved connections' did not run" }
+
+    private fun settle() = test.runCurrent()
+
+    private fun pass(millis: Long) {
+        test.advanceTimeBy(millis)
+        test.runCurrent()
     }
 
     @Given("the broker of {string} answers slowly")
@@ -344,11 +395,126 @@ class ConnectionLifecycleSteps {
         assertEquals(note, ConnectionNotes.HOST_NAME_NOT_VERIFIED)
     }
 
+    // --- M2-05b: the lost connection (D2) and the app bar ---
+
+    @When("the broker stops answering")
+    fun theBrokerStopsAnswering() {
+        val catalog = gateway.catalogOf(lastName)
+        catalog.addStream(stream("orders-events", messages = 10))
+        gateway.offsetsOf(lastName).setFirst("/", "orders-events", 0)
+        list().setShown(true)
+        settle()
+        assertInstanceOf(StreamListScreen.Rows::class.java, list().state.value.screen, "precondition: rows are shown before the broker goes silent")
+        catalog.unreachable = true
+        pass(5_000) // the next tick of the 5 second default asks the broker and finds it gone
+    }
+
+    @Then("the last data stays visible and is marked stale")
+    fun theLastDataStaysVisibleAndStale() {
+        val shown = list().state.value
+        assertEquals(listOf("orders-events"), shown.rows.map { it.name }, "rows must stay; screen ${shown.screen}")
+        assertTrue(shown.stale, "the rows must be marked stale")
+        assertEquals("Connection lost", shown.banner, "banner")
+        assertEquals(RowAction.Retry, model().state.value.rows.first { it.name == lastName }.action, "the app bar offers Retry")
+    }
+
+    @Then("the app does not reconnect by itself")
+    fun theAppDoesNotReconnectByItself() {
+        opensBeforeWaiting = gateway.openCalls.size
+        pass(10 * 60_000L)
+        assertEquals(opensBeforeWaiting, gateway.openCalls.size, "the gateway was asked to open again: ${gateway.log}")
+        assertEquals("Failed", phase(active.stateOf(lastName)), "state after 10 minutes")
+    }
+
+    @When("the broker answers again")
+    fun theBrokerAnswersAgain() {
+        gateway.catalogOf(lastName).unreachable = false
+    }
+
+    @When("I retry")
+    fun iRetry() {
+        list().retry()
+        settle()
+    }
+
+    @Then("the state of {string} is {string} once the broker answers")
+    fun theStateIsOnceTheBrokerAnswers(name: String, expected: String) {
+        assertState(name, expected)
+        val shown = list().state.value
+        assertFalse(shown.stale, "the rows must be fresh again")
+        assertNull(shown.banner, "the banner must be gone")
+    }
+
+    @Given("no connection is current")
+    fun noConnectionIsCurrent() {
+        settle()
+        assertEquals(ChipState.NoConnection, model().state.value.chip.kind, "precondition")
+    }
+
+    @When("I open any screen")
+    fun iOpenAnyScreen() {
+        settle()
+    }
+
+    @When("I open the connection control and press Connect on {string}")
+    fun iPressConnectOn(name: String) {
+        settle()
+        val row = model().state.value.rows.firstOrNull { it.name == name }
+        assertEquals(RowAction.Connect, row?.action, "the popup must offer Connect on $name, rows: ${model().state.value.rows}")
+        lastName = name
+        model().connect(name)
+        settle()
+    }
+
+    @Then("the app bar shows {string}")
+    fun theAppBarShows(text: String) {
+        settle()
+        val chip = model().state.value.chip
+        assertEquals(text, chip.text, "chip text, chip: $chip")
+        if (text == "No connection") assertEquals(ChipState.NoConnection, chip.kind, "chip kind, chip: $chip")
+    }
+
+    @Then("the app bar shows {string} with the state {string} and its permission pill")
+    fun theAppBarShowsWithStateAndPill(name: String, state: String) {
+        val chip = appBarShows(name, state)
+        val expected = permissionPill(session.state.value.statuses[name]).text
+        assertEquals(expected, chip.pill?.text, "permission pill in $chip")
+    }
+
+    @Then("the app bar shows {string} with the state {string}")
+    fun theAppBarShowsWithState(name: String, state: String) {
+        appBarShows(name, state)
+    }
+
+    @Then("opening it lists {string} and {string} with a Connect action each")
+    fun openingItListsWithConnect(first: String, second: String) {
+        settle()
+        val rows = model().state.value.rows
+        assertEquals(listOf(first, second), rows.map { it.name }, "rows")
+        assertTrue(rows.all { it.action == RowAction.Connect }, "every row must offer Connect: $rows")
+    }
+
+    private fun appBarShows(name: String, state: String): ConnectionChipState {
+        settle()
+        val chip = model().state.value.chip
+        assertEquals(name, chip.text, "chip text, chip: $chip")
+        val kind = when (state) {
+            "Connected" -> ChipState.Connected
+            "Connecting" -> ChipState.Connecting
+            "Disconnected" -> ChipState.Disconnected
+            "Failed" -> ChipState.Failed
+            else -> error("Unknown chip state in a scenario: '$state'")
+        }
+        assertEquals(kind, chip.kind, "chip state, chip: $chip")
+        return chip
+    }
+
     // --- helpers ---
 
     private fun connect(name: String) {
         lastName = name
         runBlocking { withTimeout(TIMEOUT_MS) { viewModel.connect(name) } }
+        settle()
     }
 
     private fun assertState(name: String, expected: String) {

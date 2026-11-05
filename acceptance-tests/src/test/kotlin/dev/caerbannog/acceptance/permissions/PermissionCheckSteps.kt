@@ -20,7 +20,17 @@ import dev.caerbannog.core.connections.UnreadableCause
 import dev.caerbannog.core.connections.permissionBanner
 import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
-import dev.caerbannog.core.connections.CurrentConnection
+import dev.caerbannog.core.connections.ActiveConnection
+import dev.caerbannog.core.connections.ChipState
+import dev.caerbannog.core.connections.ConnectionChipState
+import dev.caerbannog.core.connections.ConnectionControlModel
+import dev.caerbannog.core.connections.fakes.FakeAppSettings
+import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
+import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.StreamListViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
@@ -57,6 +67,7 @@ import java.nio.file.Files
  * and, on success, re-runs the check through the session; DeclaredPermissions/UnreadableCause per the
  * brief's "Final contract". Red state: those types do not exist yet.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PermissionCheckSteps {
 
     private lateinit var repository: InMemoryConnectionProfileRepository
@@ -64,6 +75,10 @@ class PermissionCheckSteps {
     private lateinit var broker: FakePermissionChecker
     private lateinit var session: ConnectionSession
     private lateinit var viewModel: ConnectionsViewModel
+    private lateinit var gateway: FakeConnectionGateway
+    private lateinit var active: ActiveConnection
+    private lateinit var test: TestScope
+    private var control: ConnectionControlModel? = null
 
     private lateinit var profile: ConnectionProfile
     private var result: PermissionCheckResult? = null
@@ -85,9 +100,15 @@ class PermissionCheckSteps {
         secretStore = FakeSecretStore()
         broker = FakePermissionChecker()
         session = ConnectionSession(broker, secretStore)
+        // M2-05b: the same wiring as the app (one ActiveConnection), so "connect" and "switch" are the real thing and the app bar
+        // (ConnectionControlModel) can be read. The broker behind the gateway is a fake that lets every connection open.
+        gateway = FakeConnectionGateway()
+        active = ActiveConnection(session, gateway)
         viewModel = ConnectionsViewModel(
-            repository, secretStore, FakeBrokerReachabilityChecker(), FakeCaCertificateValidator(), session,
+            repository, secretStore, FakeBrokerReachabilityChecker(), FakeCaCertificateValidator(), session, active,
         )
+        test = TestScope()
+        control = null
         result = null
         usableWhileChecking = null
         editedProfileName = null
@@ -99,6 +120,8 @@ class PermissionCheckSteps {
 
     @After
     fun deleteTempFiles() {
+        control?.close()
+        active.close()
         tempDir?.deleteRecursively()
         tempDir = null
     }
@@ -239,11 +262,13 @@ class PermissionCheckSteps {
     @When("I connect to {string}")
     fun iConnectTo(name: String) {
         assertEquals(profile.name, name, "the connection being opened must be the saved one")
-        result = runBlocking { session.open(profile) }
+        runBlocking { viewModel.connect(name) }
+        result = session.permissions(name)
     }
 
-    // M2-01: once a connection is current (connect / switch steps), the sidebar shows the current connection and
-    // its status; before that (M1-07 scenarios) it is read per profile name from the session.
+    // M2-01: once a connection is current (connect / switch steps), the app bar shows the current connection and
+    // its status. Only the scenario "The latest check wins ..." never connects (it opens two checks on the session directly),
+    // so nothing is current there and the status is read per profile name from the session; that step is thinner than its wording.
     private fun statusOf(name: String): PermissionCheckStatus {
         val current = viewModel.state.value.currentConnection
         if (current != null) {
@@ -315,15 +340,35 @@ class PermissionCheckSteps {
         runBlocking { viewModel.connect(name) }
     }
 
-    @Then("the sidebar shows {string} as the current connection")
-    fun sidebarShowsCurrent(name: String) {
-        val current: CurrentConnection? = viewModel.state.value.currentConnection
-        assertEquals(name, current?.name, "current connection shown in the sidebar, got $current")
+    private fun appBar(): ConnectionChipState {
+        val model = control ?: ConnectionControlModel(
+            viewModel, active,
+            StreamListViewModel(
+                active = active, settings = FakeAppSettings(), scope = test.backgroundScope,
+                clock = RefreshClock { test.testScheduler.currentTime }, reconnect = viewModel::connect,
+            ),
+            test.backgroundScope, RefreshClock { test.testScheduler.currentTime }, onOpenConnections = {},
+        ).also { control = it }
+        test.runCurrent()
+        return model.state.value.chip
     }
 
-    @Then("the sidebar shows {string} next to {string}")
-    fun theSidebarShows(text: String, name: String) {
-        assertEquals(text, permissionPill(statusOf(name)).text, "pill text next to '$name'")
+    @Then("the app bar shows {string} as the current connection")
+    fun appBarShowsCurrent(name: String) {
+        val chip = appBar()
+        assertEquals(name, chip.text, "connection shown in the app bar, chip: $chip")
+        assertTrue(chip.kind != ChipState.NoConnection, "the app bar says there is no connection: $chip")
+    }
+
+    @Then("the app bar shows {string} next to {string}")
+    fun theAppBarShows(text: String, name: String) {
+        if (viewModel.state.value.currentConnection == null) {
+            assertEquals(text, permissionPill(statusOf(name)).text, "pill text next to '$name' (read from the session, nothing is connected)")
+            return
+        }
+        val chip = appBar()
+        assertEquals(name, chip.text, "connection shown in the app bar, chip: $chip")
+        assertEquals(text, chip.pill?.text, "pill text next to '$name', chip: $chip")
     }
 
     @Then("the edit panel says the broker confirmed that {string} can change topology on virtual host {string}")

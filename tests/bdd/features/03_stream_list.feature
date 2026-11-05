@@ -43,6 +43,18 @@ Feature: Stream list
       | 880000 | 2083999 | 1,204,000 |
       | 0      | 0       | 1         |
 
+  # M2-05c: grouped like the message count, fixed (not locale dependent), so copy gives exactly what is shown.
+  @fake-broker
+  Scenario Outline: Publisher and consumer counts are grouped like the message count
+    Given a stream "busy" with <publishers> publishers and <consumers> consumers
+    When I open the stream list
+    Then the stream "busy" shows "<shown publishers>" publishers and "<shown consumers>" consumers
+
+    Examples:
+      | publishers | consumers | shown publishers | shown consumers |
+      | 999        | 3         | 999              | 3               |
+      | 1000       | 12345     | 1,000            | 12,345          |
+
   @fake-broker
   Scenario: The first offset cannot be read for one stream
     Given a stream "orders-events" whose statistics call is denied
@@ -139,6 +151,61 @@ Feature: Stream list
     Given the app has no saved settings
     When I look at the refresh interval
     Then the refresh interval shown is 5 seconds
+
+  # M2-05a: the interval is a per-app setting in settings.json next to the profiles file. "Restart" = a new composition on the same file.
+  @fake-broker
+  Scenario: The refresh interval is kept between runs
+    Given the app keeps its settings in a settings file
+    And I have the stream list open
+    When I set the refresh interval to 30 seconds
+    And I restart the app
+    Then the refresh interval shown is 30 seconds
+
+  # Off is a choice: it must not fall back to the 5 second default of a fresh install (decision D3, amended 2026-11-05).
+  @fake-broker
+  Scenario: The refresh interval Off is kept between runs
+    Given the app keeps its settings in a settings file
+    And I have the stream list open
+    When I set the refresh interval to off
+    And I restart the app
+    Then the refresh interval shown is off
+
+  @fake-broker
+  Scenario: A corrupt settings file falls back to 5 seconds
+    Given the settings file contains "this is { not json"
+    And a stream "orders-events" exists
+    When I start the app
+    And I open the stream list
+    Then the refresh interval shown is 5 seconds
+    And "orders-events" shows first offset 0 and last offset 9
+
+  # D3, "latest started check wins" (M2-05b): Disconnect ends the timer and a load that is still running cannot bring data back.
+  @fake-broker
+  Scenario: Disconnecting stops the refresh
+    Given a stream "orders-events" with last offset 100
+    And I have the stream list open
+    And the refresh interval is 5 seconds
+    And the broker answers the next stream list call only when released
+    When 5 seconds pass
+    And I disconnect from "uat-eu"
+    And the broker answers the held stream list call
+    And 10 minutes pass
+    Then the list says "Not connected" and shows no streams
+    And the broker was not asked for the stream list again after the disconnect
+
+  # A connection switch is a Connect on the other profile: the first connection is closed, its late answer is dropped.
+  @fake-broker
+  Scenario: Switching connection drops the late result of the old one
+    Given a stream "orders-events" with last offset 100
+    And the connection "prod-eu" has a stream "billing" with last offset 5
+    And I have the stream list open
+    And the refresh interval is 5 seconds
+    And the broker answers the next stream list call only when released
+    When 5 seconds pass
+    And I connect to "prod-eu"
+    And the broker answers the held stream list call
+    Then only "billing" is listed
+    And the list stays that way when 10 minutes pass
 
   @fake-broker
   Scenario: A broker with no streams

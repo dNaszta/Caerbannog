@@ -143,7 +143,7 @@ class ActiveConnection(
     }
 
     /**
-     * D2 (PROPOSED, flagged default, the one place to change): the view model saw the broker unreachable on a data
+     * D2 (decided 2026-11-04, the one place to change): the view model saw the broker unreachable on a data
      * call made with [source]. If [source] is still the current one, the link becomes Failed("Connection lost") and
      * the held connection is closed; otherwise (superseded, already lost) nothing happens. No permission check, no
      * reconnect. Call it from your own coroutine, never from an observer of [state].

@@ -352,6 +352,24 @@ class ConnectionsSteps {
         }
     }
 
+    @When("I type the CA certificate path {string}")
+    fun iTypeTheCaCertificatePath(path: String) {
+        val tempDir = System.getProperty("java.io.tmpdir").trimEnd('/')
+        val typed = when (path) {
+            "the temp folder" -> tempDir
+            "the temp folder/" -> "$tempDir/"
+            "a file that is gone" -> "$tempDir/caerbannog-gone-${System.nanoTime()}.pem"
+            else -> path
+        }
+        // A thrown exception here is the bug (it reaches the AWT thread while typing): let it fail the step.
+        lastCaCertificateResult = viewModel.validateCaCertificateFile(typed)
+    }
+
+    @Then("the file is rejected with a message saying the file could not be read")
+    fun theFileIsRejectedWithAMessageSayingTheFileCouldNotBeRead() {
+        assertEquals(CaCertificateValidationResult.Invalid("the file could not be read"), lastCaCertificateResult)
+    }
+
     // --- Passwords and secrets -----------------------------------------------
 
     @Then("the profile file on disk does not contain {string}")

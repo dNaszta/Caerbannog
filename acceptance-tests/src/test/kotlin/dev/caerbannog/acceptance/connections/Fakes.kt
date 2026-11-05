@@ -153,17 +153,23 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
  */
 class FakeCaCertificateValidator : CaCertificateValidator {
     override fun validate(filePath: String): CaCertificateValidationResult {
-        val file = File(filePath)
-        if (!file.exists() || !file.canRead()) {
-            return CaCertificateValidationResult.Invalid("the file could not be read")
-        }
+        // M2-05 round 2, F1: same rule as the real validator - the field validates per keystroke, so a
+        // directory, a missing or an unreadable file is a typed Invalid, never an exception.
         return try {
+            val file = File(filePath)
+            if (!file.isFile || !file.canRead()) {
+                return CaCertificateValidationResult.Invalid("the file could not be read")
+            }
             file.inputStream().use { input ->
                 CertificateFactory.getInstance("X.509").generateCertificate(input)
             }
             CaCertificateValidationResult.Valid
         } catch (e: CertificateException) {
             CaCertificateValidationResult.Invalid("the file is not a valid certificate")
+        } catch (e: java.io.IOException) {
+            CaCertificateValidationResult.Invalid("the file could not be read")
+        } catch (e: SecurityException) {
+            CaCertificateValidationResult.Invalid("the file could not be read")
         }
     }
 }

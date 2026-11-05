@@ -106,15 +106,17 @@ Feature: Connect and disconnect
     When the window is closed
     Then the app holds no connection to the broker
 
-  # Product decision D2 (confirmed 2026-11-04): no automatic reconnect in M2. Runs when M2-05 builds the screen.
-  @fake-broker @needs-M2
+  # Product decision D2 (confirmed 2026-11-04): no automatic reconnect in M2. Runs at core level (M2-05b): the stream list
+  # view model and the connection control model on the same fakes.
+  @fake-broker
   Scenario: A lost connection offers a retry, not a silent reconnect
     Given I am connected to "uat-eu"
     When the broker stops answering
     Then the state of "uat-eu" is "Failed" with the reason "Connection lost"
     And the last data stays visible and is marked stale
     And the app does not reconnect by itself
-    When I retry
+    When the broker answers again
+    And I retry
     Then the state of "uat-eu" is "Connected" once the broker answers
 
   @fake-broker
@@ -128,23 +130,23 @@ Feature: Connect and disconnect
     When I open the edit panel of "uat-eu"
     Then I see the note "Host name is not verified."
 
-  # The connection control in the app bar (task M2-05, docs/ux/Streams.dc.html). The three scenarios
-  # below are for M2-05; they are left pending until then and are not part of M2-03.
+  # The connection control in the app bar (task M2-05b, docs/ux/Streams.dc.html). The steps drive the core model behind the
+  # chip (ConnectionControlModel); that the chip and popup draw it, on every screen, is pinned by the Compose UI tests in `ui`.
 
-  @fake-broker @needs-M2
+  @fake-broker
   Scenario: The app bar always shows the current connection
     Given I am connected to "uat-eu"
     When I open any screen
     Then the app bar shows "uat-eu" with the state "Connected" and its permission pill
 
-  @fake-broker @needs-M2
+  @fake-broker
   Scenario: With no connection the app bar says so
     Given no connection is current
     When I open any screen
     Then the app bar shows "No connection"
     And opening it lists "uat-eu" and "prod-eu" with a Connect action each
 
-  @fake-broker @needs-M2
+  @fake-broker
   Scenario: I connect to another connection from the app bar
     Given I am connected to "uat-eu"
     When I open the connection control and press Connect on "prod-eu"

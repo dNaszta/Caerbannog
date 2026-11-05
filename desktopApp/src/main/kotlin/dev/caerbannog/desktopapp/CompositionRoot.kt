@@ -2,27 +2,29 @@ package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
+import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
+import dev.caerbannog.datarabbit.JsonFileAppSettings
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
 import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.core.streams.AppSettings
-import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.RefreshClock
-import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.StreamListViewModel
+import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.swing.Swing
 import java.io.File
 
 /**
@@ -52,12 +54,21 @@ class AppComposition(
     val viewModel: ConnectionsViewModel,
     val active: ActiveConnection,
     val streamList: StreamListViewModel,
+    /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
+    val control: ConnectionControlModel,
+    /** Which screen the window shows; "Manage connections" and "New connection" in the chip popup bring Connections back. */
+    val navigation: AppNavigation,
+    /** The stream list screen's events, mapped onto [streamList]. */
+    val streamEvents: StreamListEventsAdapter,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
     fun close() {
         try {
+            // The scope cancel is what stops the list (its timer, loads and link follower are children of the scope) and the
+            // chip model; the close() calls are for callers that keep the scope alive.
             streamList.close()
+            control.close()
             streamListScope.cancel()
         } finally {
             active.close()
@@ -65,14 +76,9 @@ class AppComposition(
     }
 }
 
-// The refresh interval lives in memory until the settings file arrives (M2-05).
-private class InMemoryAppSettings : AppSettings {
-    override var streamListRefresh: RefreshInterval = DEFAULT_REFRESH
-}
-
 /**
  * Like [createConnectionsViewModel], plus the real [ConnectionGateway] behind an [ActiveConnection] that the view
- * model's Connect uses (the interim edit-panel Connect of M2-01 now opens a real held connection). One
+ * model's Connect uses (the chip popup's Connect opens a real held connection). One
  * [ConnectionSession] serves both, so the permission check and the connection cannot disagree.
  */
 fun createAppComposition(
@@ -82,6 +88,9 @@ fun createAppComposition(
     reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
     log: (String) -> Unit = { System.err.println(it) },
     gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
+    appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
+    uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
+    navigation: AppNavigation = AppNavigation(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -93,18 +102,20 @@ fun createAppComposition(
         session = session,
         active = active,
     )
-    // The composition root owns the scope; it ends with the window. The view model needs a serial dispatcher: limitedParallelism(1)
-    // gives that without a new dependency (Dispatchers.Main is not on this classpath). M2-05 may pass the UI dispatcher instead.
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val streamListScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
+    // The composition root owns the scope; it ends with the window. The view model runs on the UI dispatcher (Swing in the app),
+    // so its state can be read by Compose without a thread hop; tests pass their own dispatcher.
+    val streamListScope = CoroutineScope(SupervisorJob() + uiDispatcher)
     val streamList = StreamListViewModel(
         active = active,
-        settings = InMemoryAppSettings(),
+        settings = appSettings,
         scope = streamListScope,
         clock = RefreshClock { System.currentTimeMillis() },
         reconnect = viewModel::connect,
     )
-    return AppComposition(viewModel, active, streamList, streamListScope)
+    val control = ConnectionControlModel(
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = { navigation.open(AppDestination.Connections) },
+    )
+    return AppComposition(viewModel, active, streamList, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

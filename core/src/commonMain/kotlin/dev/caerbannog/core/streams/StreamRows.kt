@@ -38,8 +38,8 @@ internal fun streamRow(summary: StreamSummary, firstOffset: FirstOffset?, publis
         messages = messages?.let(::groupDigits) ?: StreamListTexts.NOT_AVAILABLE,
         firstOffset = first,
         lastOffset = last,
-        publishers = publishers?.toString() ?: StreamListTexts.UNAVAILABLE,
-        consumers = summary.consumers.toString(),
+        publishers = publishers?.let { groupDigits(it.toLong()) } ?: StreamListTexts.UNAVAILABLE,
+        consumers = groupDigits(summary.consumers.toLong()),
         retention = summary.retention.displayMaxAge(),
     )
 }

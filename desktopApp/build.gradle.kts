@@ -26,8 +26,12 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":data-rabbit"))
     implementation(compose.desktop.currentOs)
+    // M2-05a: Dispatchers.Swing is the UI dispatcher the stream list view model runs on (the Compose Desktop UI thread).
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
 
     testImplementation(kotlin("test"))
+    // M2-05c: CompositionRootStreamEventsTest drives the real stream list with the fake gateway and catalog of core-testing.
+    testImplementation(project(":core-testing"))
     // M1-07: CompositionRootTest runs the suspend check with runBlocking.
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")

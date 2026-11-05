@@ -6,10 +6,12 @@ import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.LinkState
+import dev.caerbannog.core.connections.fakes.CallGate
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.CatalogMessages
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.PublisherRow
@@ -21,6 +23,7 @@ import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.streams.StreamRow
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.core.streams.Visibility
+import dev.caerbannog.datarabbit.JsonFileAppSettings
 import io.cucumber.datatable.DataTable
 import io.cucumber.java.After
 import io.cucumber.java.Before
@@ -37,6 +40,8 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import java.io.File
+import java.nio.file.Files
 import java.util.Locale
 
 /**
@@ -62,7 +67,11 @@ class StreamListSteps {
 
     private lateinit var gateway: FakeConnectionGateway
     private lateinit var active: ActiveConnection
-    private lateinit var settings: FakeAppSettings
+    private lateinit var settings: AppSettings
+    private lateinit var secrets: FakeSecretStore
+    private var heldList: CallGate? = null
+    private var listCallsAtDisconnect: Int = -1
+    private var settingsDir: File? = null
     private lateinit var test: TestScope
     private lateinit var vm: StreamListViewModel
     private val catalog: FakeStreamCatalog get() = gateway.catalogOf(NAME)
@@ -74,29 +83,55 @@ class StreamListSteps {
 
     @Before
     fun reset() {
-        gateway = FakeConnectionGateway()
-        val secrets = FakeSecretStore().also { it.store(NAME, PASSWORD) }
-        active = ActiveConnection(ConnectionSession(FakePermissionChecker(), secrets), gateway)
-        settings = FakeAppSettings()
-        test = TestScope()
+        settingsDir = null
+        buildApp(FakeAppSettings())
         pageSize = 5
-        vm = StreamListViewModel(
-            active = active,
-            settings = settings,
-            scope = test.backgroundScope,
-            clock = RefreshClock { test.testScheduler.currentTime },
-            reconnect = { active.connect(profile()) },
-            pageSize = pageSize,
-        )
     }
+
+    // A fresh broker, connection and view model on the given settings: "the app was started". Nothing is connected yet.
+    private fun buildApp(appSettings: AppSettings) {
+        gateway = FakeConnectionGateway()
+        secrets = FakeSecretStore().also { it.store(NAME, PASSWORD) }
+        heldList = null
+        listCallsAtDisconnect = -1
+        active = ActiveConnection(ConnectionSession(FakePermissionChecker(), secrets), gateway)
+        settings = appSettings
+        test = TestScope()
+        vm = newViewModel()
+    }
+
+    private fun newViewModel() = StreamListViewModel(
+        active = active,
+        settings = settings,
+        scope = test.backgroundScope,
+        clock = RefreshClock { test.testScheduler.currentTime },
+        reconnect = { active.connect(profile()) },
+        pageSize = pageSize,
+    )
 
     @After
     fun closeEverything() {
         vm.close()
         active.close()
+        settingsDir?.deleteRecursively()
     }
 
-    private fun profile() = ConnectionProfile(name = NAME, host = "$NAME.example.com", virtualHost = "/", username = "svc")
+    private fun settingsFile(): File = File(checkNotNull(settingsDir) { "no settings file in this scenario" }, "settings.json")
+
+    private fun useSettingsDir() {
+        if (settingsDir == null) settingsDir = Files.createTempDirectory("caerbannog-settings-").toFile()
+    }
+
+    // The same connection, a new view model: the app restarts its screen (the view model reads its settings once, at start).
+    private fun startViewModelOn(appSettings: AppSettings) {
+        vm.close()
+        settings = appSettings
+        vm = newViewModel()
+    }
+
+    private fun profile(name: String = NAME) = ConnectionProfile(name = name, host = "$name.example.com", virtualHost = "/", username = "svc")
+
+    private fun listCalls(): Int = synchronized(catalog.calls) { catalog.calls.count { it == "listStreams" } }
 
     private fun settle() = test.runCurrent()
 
@@ -149,6 +184,10 @@ class StreamListSteps {
         gateway.offsetsOf(NAME).deny("/", name)
     }
 
+    @Given("a stream {string} with {int} publishers and {int} consumers")
+    fun aStreamWithPublishersAndConsumers(name: String, publishers: Int, consumers: Int) =
+        addStream(name, 0, 10, publishers = publishers, consumers = consumers)
+
     @Given("a stream {string} with {int} publishers")
     fun aStreamWithPublishers(name: String, publishers: Int) = addStream(name, 0, 10, publishers = publishers)
 
@@ -200,6 +239,18 @@ class StreamListSteps {
     @Given("the app has no saved settings")
     fun theAppHasNoSavedSettings() {
         assertEquals(DEFAULT_REFRESH, settings.streamListRefresh, "a fresh FakeAppSettings is a fresh install")
+    }
+
+    @Given("the app keeps its settings in a settings file")
+    fun theAppKeepsItsSettingsInAFile() {
+        useSettingsDir()
+        startViewModelOn(JsonFileAppSettings(settingsFile()))
+    }
+
+    @Given("the settings file contains {string}")
+    fun theSettingsFileContains(text: String) {
+        useSettingsDir()
+        settingsFile().writeText(text)
     }
 
     @Given("I have the stream list open")
@@ -260,6 +311,61 @@ class StreamListSteps {
     @When("{int} minutes pass")
     fun minutesPass(minutes: Int) = pass(minutes * 60_000L)
 
+    @When("I set the refresh interval to {int} seconds")
+    fun iSetTheRefreshIntervalToSeconds(seconds: Int) = theRefreshIntervalIsSeconds(seconds)
+
+    @When("I set the refresh interval to off")
+    fun iSetTheRefreshIntervalToOff() = theRefreshIntervalIsOff()
+
+    @When("I start the app")
+    fun iStartTheApp() = startViewModelOn(JsonFileAppSettings(settingsFile()))
+
+    // The whole composition goes: view model, held connection, broker fake. Only the settings file is left.
+    @When("I restart the app")
+    fun iRestartTheApp() {
+        vm.close()
+        active.close()
+        buildApp(JsonFileAppSettings(settingsFile()))
+        runBlocking { active.connect(profile()) }
+        settle()
+    }
+
+    // D3 and M2-05b: a load that the broker answers only later, after the connection it belongs to is gone.
+    @Given("the broker answers the next stream list call only when released")
+    fun theBrokerAnswersTheNextCallOnlyWhenReleased() {
+        // ignoreCancellation: the fake keeps waiting although the view model cancelled the load, so the test proves the late
+        // result is dropped by the view model itself and not only by cancellation.
+        heldList = catalog.holdNext("listStreams", ignoreCancellation = true)
+    }
+
+    @Given("the connection {string} has a stream {string} with last offset {long}")
+    fun theConnectionHasAStream(name: String, stream: String, last: Long) {
+        secrets.store(name, PASSWORD)
+        gateway.catalogOf(name).addStream(stream(stream, messages = last + 1))
+        gateway.offsetsOf(name).setFirst("/", stream, 0)
+    }
+
+    @When("I disconnect from {string}")
+    fun iDisconnectFrom(name: String) {
+        assertEquals(name, active.state.value.name, "precondition: $name is the connection held")
+        active.disconnect()
+        settle()
+        listCallsAtDisconnect = listCalls()
+    }
+
+    @When("I connect to {string}")
+    fun iConnectTo(name: String) {
+        secrets.store(name, PASSWORD)
+        runBlocking { active.connect(profile(name)) }
+        settle()
+    }
+
+    @When("the broker answers the held stream list call")
+    fun theBrokerAnswersTheHeldCall() {
+        checkNotNull(heldList) { "no stream list call was held in this scenario" }.release()
+        settle()
+    }
+
     @When("I look at the refresh interval")
     fun iLookAtTheRefreshInterval() {
         // Nothing to do: the interval is state, read by the Then.
@@ -271,6 +377,30 @@ class StreamListSteps {
     }
 
     // --- Then ---
+
+    @Then("the list says {string} and shows no streams")
+    fun theListSaysAndShowsNoStreams(text: String) {
+        assertEquals(text, state.message, "message; screen ${state.screen}")
+        assertEquals(emptyList<StreamRow>(), state.rows, "rows must be gone")
+    }
+
+    @Then("the broker was not asked for the stream list again after the disconnect")
+    fun theBrokerWasNotAskedAgain() {
+        assertTrue(listCallsAtDisconnect >= 0, "the disconnect step did not run")
+        assertEquals(listCallsAtDisconnect, listCalls(), "stream list calls to the broker after the disconnect")
+    }
+
+    @Then("the list stays that way when {int} minutes pass")
+    fun theListStaysThatWay(minutes: Int) {
+        val before = state.rows
+        pass(minutes * 60_000L)
+        assertEquals(before, state.rows, "rows changed while time passed")
+    }
+
+    @Then("the refresh interval shown is off")
+    fun theRefreshIntervalShownIsOff() {
+        assertEquals(RefreshInterval.Off, state.refreshInterval, "refresh interval shown: ${state.refreshInterval}")
+    }
 
     @Then("each stream is shown with its type, approximate messages, first offset, last offset, publishers and consumers")
     fun eachStreamIsShown() {
@@ -296,6 +426,12 @@ class StreamListSteps {
 
     @Then("^the stream \"([^\"]*)\" shows about (.+) messages$")
     fun theStreamShowsAboutMessages(name: String, count: String) = assertEquals(count, row(name).messages)
+
+    @Then("the stream {string} shows {string} publishers and {string} consumers")
+    fun theStreamShowsPublishersAndConsumers(name: String, publishers: String, consumers: String) {
+        assertEquals(publishers, row(name).publishers, "publishers cell of $name")
+        assertEquals(consumers, row(name).consumers, "consumers cell of $name")
+    }
 
     @Then("{string} is listed with its message count, publishers and consumers")
     fun isListedWithCounts(name: String) {

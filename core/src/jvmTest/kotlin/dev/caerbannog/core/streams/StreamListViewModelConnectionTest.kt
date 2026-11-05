@@ -14,9 +14,9 @@ import kotlin.test.assertTrue
 
 /**
  * M2-04 step 2: the view model follows `ActiveConnection.state` (Disconnected, Connecting, Connected, Failed) and the lost
- * connection rule D2. D2 is PROPOSED, not confirmed by the product owner: it is built as a flagged default in one place, these
- * tests pin that default (an Unreachable data call makes the link Failed("Connection lost"), rows stay stale, no automatic
- * reconnect) and must be changed together with that one place if the owner decides otherwise.
+ * connection rule D2. D2 (decided 2026-11-04) is built in one place, these
+ * tests pin it (an Unreachable data call makes the link Failed("Connection lost"), rows stay stale, no automatic
+ * reconnect) and must be changed together with that one place if the rule changes.
  * Contract: [StreamListHarness]; `ConnectionFailureReason.CONNECTION_LOST`; `ActiveConnection.connectionLost(source)` (see StreamSourceTest).
  */
 class StreamListViewModelConnectionTest {
@@ -92,7 +92,7 @@ class StreamListViewModelConnectionTest {
         assertEquals(emptyList(), s.reconnects)
     }
 
-    // --- D2 (proposed, flagged default) -----------------------------------------------------------------
+    // --- D2 (decided 2026-11-04) -----------------------------------------------------------------
 
     @Test
     fun `an unreachable broker on a tick makes the link Failed Connection lost, keeps the rows stale, no reconnect`() = runTest {

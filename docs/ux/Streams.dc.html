@@ -55,6 +55,7 @@ body{margin:0}
 <tr>
 <th>Name</th>
 <th>Type</th>
+<th>Retention</th>
 <th class="r">Messages (approx.)</th>
 <th class="r">First offset</th>
 <th class="r">Last offset</th>
@@ -67,10 +68,11 @@ body{margin:0}
 <tbody>
 <tr>
 <td class="t-ts">orders-events</td>
-<td>Stream</td>
+<td>stream</td>
+<td>7D</td>
 <td class="r">48,300</td>
 <td class="r">0</td>
-<td class="r">48,299</td>
+<td class="r">48299</td>
 <td class="r">—</td>
 <td class="r">2</td>
 <td class="r">3</td>
@@ -79,6 +81,7 @@ body{margin:0}
 <tr>
 <td class="t-ts"><span style="display:inline-flex;align-items:center;gap:8px"><span class="ms" aria-hidden="true">expand_more</span>orders</span></td>
 <td>Super stream · 3 partitions</td>
+<td>7D</td>
 <td class="r">96,100</td>
 <td class="r dim">–</td>
 <td class="r dim">–</td>
@@ -89,10 +92,11 @@ body{margin:0}
 </tr>
 <tr style="background: var(--sc-low)">
 <td style="padding-left:56px">orders-0</td>
-<td class="dim">Partition</td>
+<td class="dim">partition</td>
+<td>7D</td>
 <td class="r">31,200</td>
 <td class="r">0</td>
-<td class="r">31,199</td>
+<td class="r">31199</td>
 <td class="r">—</td>
 <td class="r">1</td>
 <td class="r">2</td>
@@ -100,10 +104,11 @@ body{margin:0}
 </tr>
 <tr style="background: var(--sc-low)">
 <td style="padding-left:56px">orders-1</td>
-<td class="dim">Partition</td>
+<td class="dim">partition</td>
+<td>7D</td>
 <td class="r">32,900</td>
 <td class="r">0</td>
-<td class="r">32,899</td>
+<td class="r">32899</td>
 <td class="r">—</td>
 <td class="r">2</td>
 <td class="r">2</td>
@@ -111,10 +116,11 @@ body{margin:0}
 </tr>
 <tr style="background: var(--sc-low)">
 <td style="padding-left:56px">orders-2</td>
-<td class="dim">Partition</td>
+<td class="dim">partition</td>
+<td>7D</td>
 <td class="r">32,000</td>
 <td class="r">0</td>
-<td class="r">31,999</td>
+<td class="r">31999</td>
 <td class="r">—</td>
 <td class="r">1</td>
 <td class="r">2</td>
@@ -122,10 +128,11 @@ body{margin:0}
 </tr>
 <tr>
 <td class="t-ts">audit-log</td>
-<td>Stream</td>
+<td>stream</td>
+<td>30D</td>
 <td class="r">1,204,000</td>
-<td class="r">880,000</td>
-<td class="r">2,083,999</td>
+<td class="r">880000</td>
+<td class="r">2083999</td>
 <td class="r">—</td>
 <td class="r">1</td>
 <td class="r">1</td>
@@ -133,10 +140,11 @@ body{margin:0}
 </tr>
 <tr>
 <td class="t-ts">payments-stream</td>
-<td>Stream</td>
+<td>stream</td>
+<td>12h</td>
 <td class="r">7,850</td>
 <td class="r">0</td>
-<td class="r">7,849</td>
+<td class="r">7849</td>
 <td class="r">—</td>
 <td class="r">1</td>
 <td class="r">0</td>
@@ -146,11 +154,22 @@ body{margin:0}
 </table>
 </div>
 <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:16px" class="t-bs dim">
-<span>Message counts are approximate: committed offset minus first offset, plus one.</span>
+<span>Message counts and offsets are approximate.</span>
 <span style="flex-grow:1"></span>
-<span>1–5 of 12 streams</span>
+<span>1 to 5 of 12</span>
 <button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button>
 <button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button>
+</div>
+<div class="t-bs dim" style="display:flex;flex-direction:column;gap:6px;padding:8px 0">
+<div class="t-ts">States and rules (built from this list, M2-05)</div>
+<div>Loading: the table frame with "loading..." in the cells that are not known yet, never a blank table. First offset still loading: that cell says "loading..."; first offset that could not be read: "unavailable", the counts stay.</div>
+<div>Publishers cell "unavailable" when the user has no monitoring or administrator tag (D8) or the stream management plugin is missing.</div>
+<div>Empty broker: no table, "There are no streams on this broker yet." and a Create stream button (disabled without the configure permission).</div>
+<div>Denied (no management tag): no table, no filters, the message "This user cannot read stream statistics. Ask for the monitoring tag."</div>
+<div>Not connected / Connecting: no table, "Not connected" or "Connecting...".</div>
+<div>Failed first load: "The stream list could not be loaded. Check that the virtual host exists and that this user may use it." and a Retry button.</div>
+<div>Lost connection (D2): a banner "Connection lost" with a Retry button above the rows; the rows stay, dimmed, marked stale.</div>
+<div>Number format: offsets are plain digits (2083999); message counts and other counts are grouped (1,204,000). Retention uses the compact form (7D, 12h). Every value in the table (name, type, retention, counts, offsets, publishers, consumers) is selectable text; copy gives exactly the displayed string. A focused cell copies with the platform copy shortcut. Leader and node are not columns in M2 (no detail panel yet).</div>
 </div>
 </div>
 </main>

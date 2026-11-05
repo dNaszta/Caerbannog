@@ -18,7 +18,7 @@ enum class RefreshInterval(val seconds: Int) {
 /** The default interval. A trial (D3): the one place to change it. */
 val DEFAULT_REFRESH: RefreshInterval = RefreshInterval.Every5
 
-/** Per-app settings of the stream list. In memory here; the `settings.json` file is M2-05. */
+/** Per-app settings of the stream list. The real implementation is the `settings.json` file in `data-rabbit`; tests use an in-memory fake. */
 interface AppSettings {
     var streamListRefresh: RefreshInterval
 }

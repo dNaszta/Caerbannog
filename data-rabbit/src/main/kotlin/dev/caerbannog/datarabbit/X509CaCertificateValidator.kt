@@ -3,6 +3,7 @@ package dev.caerbannog.datarabbit
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.CaCertificateValidator
 import java.io.File
+import java.io.IOException
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 
@@ -16,17 +17,21 @@ import java.security.cert.CertificateFactory
 class X509CaCertificateValidator : CaCertificateValidator {
 
     override fun validate(filePath: String): CaCertificateValidationResult {
-        val file = File(filePath)
-        if (!file.exists() || !file.canRead()) {
-            return CaCertificateValidationResult.Invalid("the file could not be read")
-        }
+        // Called on every keystroke with partial paths: it must never throw, whatever the string.
+        val unreadable = CaCertificateValidationResult.Invalid("the file could not be read")
         return try {
+            val file = File(filePath)
+            if (!file.isFile || !file.canRead()) return unreadable
             file.inputStream().use { input ->
                 CertificateFactory.getInstance("X.509").generateCertificate(input)
             }
             CaCertificateValidationResult.Valid
         } catch (e: CertificateException) {
             CaCertificateValidationResult.Invalid("the file is not a valid certificate")
+        } catch (e: IOException) {
+            unreadable
+        } catch (e: SecurityException) {
+            unreadable
         }
     }
 }

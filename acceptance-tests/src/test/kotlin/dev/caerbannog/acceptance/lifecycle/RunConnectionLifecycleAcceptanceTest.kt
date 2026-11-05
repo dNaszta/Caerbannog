@@ -9,8 +9,8 @@ import org.junit.platform.suite.api.Suite
 
 /**
  * M2-03 part 1: runs tests/bdd/features/13_connection_lifecycle.feature against FakeConnectionGateway.
- * Left out by tag: `@needs-M2` (the three app bar scenarios and the lost-connection scenario, D2 decided, M2-05),
- * `@needs-decision` (none now, kept in the filter) and `@broker` (none yet). `@needs-M2-03b` is gone: part 2 runs "without the management tag".
+ * M2-05b: the lost-connection scenario and the three app bar scenarios run now (their `@needs-M2` is gone). Left out by tag:
+ * `@needs-M2` (none now, kept in the filter), `@needs-decision` (none) and `@broker` (none yet).
  */
 @Suite
 @IncludeEngines("cucumber")
