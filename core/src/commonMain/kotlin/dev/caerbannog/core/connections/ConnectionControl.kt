@@ -2,13 +2,16 @@ package dev.caerbannog.core.connections
 
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
+import dev.caerbannog.core.streams.RefreshTarget
 import dev.caerbannog.core.streams.StreamListViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -233,9 +236,11 @@ class ConnectionControlModel(
     private val scope: CoroutineScope,
     private val clock: RefreshClock,
     private val onOpenConnections: () -> Unit,
-    /** The screen on show (list or tab): its age and its Refresh now drive the control. Null: the stream list (M2-05 behaviour). COMPILE STUB, not read yet. */
-    private val shownTarget: kotlinx.coroutines.flow.StateFlow<dev.caerbannog.core.streams.RefreshTarget>? = null,
+    /** The screen on show (list or tab): its age and its Refresh now drive the control. Null: the stream list (M2-05 behaviour). */
+    shownTarget: StateFlow<RefreshTarget>? = null,
 ) : ConnectionControlEvents, AutoCloseable {
+    // Problem solved: the control must age and refresh whichever screen is shown, without a flag per screen (M2-06 brief item 6).
+    private val target: StateFlow<RefreshTarget> = shownTarget ?: MutableStateFlow(streamList)
     private val ticks = MutableStateFlow(0L)
     private val _state = MutableStateFlow(compute())
 
@@ -243,8 +248,9 @@ class ConnectionControlModel(
     val state: StateFlow<ConnectionControlState> = _state.asStateFlow()
 
     // Problem solved: three independent sources (profiles and session, link, stream list) and the clock feed one derived value.
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val following: Job = scope.launch {
-        combine(connections.state, active.state, streamList.state, ticks) { _, _, _, _ -> Unit }
+        combine(connections.state, active.state, streamList.state, target.flatMapLatest { it.updatedAtMillis }, ticks) { _, _, _, _, _ -> Unit }
             .collect { _state.value = compute() }
     }
 
@@ -255,7 +261,7 @@ class ConnectionControlModel(
             current = shown.currentConnection,
             link = active.state.value,
             refreshInterval = streamList.state.value.refreshInterval,
-            updatedAtMillis = streamList.state.value.updatedAtMillis,
+            updatedAtMillis = target.value.updatedAtMillis.value,
             nowMillis = clock.nowMillis(),
         )
     }
@@ -279,7 +285,7 @@ class ConnectionControlModel(
 
     override fun setRefreshInterval(interval: RefreshInterval) = streamList.setRefreshInterval(interval)
 
-    override fun refreshNow() = streamList.refreshNow()
+    override fun refreshNow() = target.value.refreshNow()
 
     override fun openConnections() {
         scope.launch { onOpenConnections() }

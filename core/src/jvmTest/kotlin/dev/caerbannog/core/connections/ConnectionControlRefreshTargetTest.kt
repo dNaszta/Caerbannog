@@ -15,7 +15,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * M2-06a step 2 (brief item 6): the connection control follows the SHOWN screen. `ConnectionControlModel` takes an optional `shownTarget:
@@ -122,7 +121,7 @@ class ConnectionControlRefreshTargetTest {
         r.pass(10)
         r.model.tick()
         r.settle()
-        assertNull(r.note)
+        assertEquals(ConnectionControlTexts.NOT_LOADED_YET, r.note, "no age is the M2-05 note, never null for a connected profile")
     }
 
     @Test

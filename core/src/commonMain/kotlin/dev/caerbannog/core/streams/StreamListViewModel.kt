@@ -43,7 +43,7 @@ class StreamListViewModel(
     private val clock: RefreshClock,
     private val reconnect: suspend (String) -> Unit,
     pageSize: Int = DEFAULT_PAGE_SIZE,
-) : AutoCloseable {
+) : AutoCloseable, RefreshTarget {
     private var link: LinkState = active.state.value
     private var source: StreamSource? = active.source
     private var shown = false
@@ -76,6 +76,8 @@ class StreamListViewModel(
 
     private val _state = MutableStateFlow(StreamListState())
     val state: StateFlow<StreamListState> = _state.asStateFlow()
+    private val _updatedAt = MutableStateFlow<Long?>(null)
+    override val updatedAtMillis: StateFlow<Long?> = _updatedAt.asStateFlow()
 
     private val following: Job
 
@@ -99,7 +101,7 @@ class StreamListViewModel(
     }
 
     /** Loads now, unless a load is already running (then it does nothing). The timer restarts. */
-    fun refreshNow() = onScope { refresh() }
+    override fun refreshNow() = onScope { refresh() }
 
     /** Failed link: connect the profile again (the load follows by itself). Failed first load: load again. */
     fun retry() = onScope {
@@ -341,6 +343,7 @@ class StreamListViewModel(
         val visible = all.drop(start).take(pageSize)
         val screen = screen()
         val counts = publisherCounts
+        _updatedAt.value = lastSuccessMillis
         _state.value = StreamListState(
             screen = screen,
             message = when (screen) {

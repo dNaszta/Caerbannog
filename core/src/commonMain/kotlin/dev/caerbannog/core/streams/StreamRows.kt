@@ -24,14 +24,7 @@ internal fun streamRow(summary: StreamSummary, firstOffset: FirstOffset?, publis
         FirstOffset.Empty -> ""
         FirstOffset.Unavailable -> StreamListTexts.UNAVAILABLE
     }
-    // Last offset = first + messages - 1, only when both are known (the count is approximate, spec "Stream list").
-    val last = when {
-        firstOffset == null -> StreamListTexts.LOADING
-        firstOffset == FirstOffset.Empty -> ""
-        firstOffset !is FirstOffset.Value || messages == null -> StreamListTexts.UNAVAILABLE
-        messages == 0L -> ""
-        else -> (firstOffset.offset + messages - 1).toString()
-    }
+    val last = lastOffsetText(firstOffset, messages)
     return StreamRow(
         name = summary.name,
         type = ROW_TYPE,
@@ -42,4 +35,16 @@ internal fun streamRow(summary: StreamSummary, firstOffset: FirstOffset?, publis
         consumers = groupDigits(summary.consumers.toLong()),
         retention = summary.retention.displayMaxAge(),
     )
+}
+
+/**
+ * Last offset = first + messages - 1, only when both are known (the count is approximate, spec "Stream list"). One rule for the list
+ * row and the stream tab. [firstOffset] null means the call is still running; an empty stream reads blank.
+ */
+internal fun lastOffsetText(firstOffset: FirstOffset?, messages: Long?): String = when {
+    firstOffset == null -> StreamListTexts.LOADING
+    firstOffset == FirstOffset.Empty -> ""
+    firstOffset !is FirstOffset.Value || messages == null -> StreamListTexts.UNAVAILABLE
+    messages == 0L -> ""
+    else -> (firstOffset.offset + messages - 1).toString()
 }

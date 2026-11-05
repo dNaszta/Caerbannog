@@ -88,6 +88,9 @@ object StreamClientsTexts {
     const val UNKNOWN: String = "unknown"
     const val UPDATING: String = "updating"
     const val UNNAMED: String = "unnamed"
+
+    /** Shown for a row whose broker user is not known (an em dash). */
+    const val NO_USER: String = "\u2014"
     const val CAUGHT_UP: String = "Caught up"
     const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything."
     const val NOT_ACTIVE: String = "Not active"
