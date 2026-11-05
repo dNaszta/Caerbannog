@@ -122,6 +122,7 @@ private object StubCatalog : StreamCatalog {
     override suspend fun publishers(vhost: String, stream: String): CatalogResult<List<PublisherRow>> = CatalogResult.Unexpected
     override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> = CatalogResult.Unexpected
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> = CatalogResult.Unexpected
+    override suspend fun superStreams(vhost: String): CatalogResult<List<dev.caerbannog.core.streams.SuperStreamLayout>> = CatalogResult.Unexpected
     override suspend fun capabilities(): CatalogResult<Capabilities> = CatalogResult.Unexpected
 }
 
