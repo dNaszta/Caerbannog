@@ -32,6 +32,7 @@ body{margin:0}
 </header>
 <div class="content">
 <div class="tabs"><span class="tab on">Queues</span><span class="tab">Exchanges</span><span class="tab">Bindings</span></div>
+<!-- Drawn only when the level is not Read-only; at Read-only the level banner (banner-reasons) replaces it. -->
 <div id="banner-no-configure" class="banner err"><span class="ms" aria-hidden="true">lock</span><div><b>Topology is locked on this connection.</b> The permission check found no configure permission for svc-explorer on virtual host /, so queues, exchanges and bindings are read-only.</div></div>
 <div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
 <section style="flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
@@ -162,10 +163,11 @@ body{margin:0}
 </section>
 
 <section id="banner-reasons" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
-<div class="t-ts">Banner reasons above the tabs (one banner, first match wins in this order)</div>
-<div class="t-bs dim">1. No configure permission on the connection's virtual host (top of this page, id banner-no-configure). 2. Declared, not confirmed. 3. Connection level Read-only (T5). 4. Another virtual host (R6). 5. Nothing to say: no banner.</div>
-<div class="banner warn"><span class="ms" aria-hidden="true">info</span><div><b>Topology is locked on this connection.</b> You declared that svc-explorer can change topology; the broker could not confirm the permissions and still enforces its own.</div></div>
+<div class="t-ts">Banner reasons above the tabs (one banner drawn: the first that applies, in this order)</div>
+<div class="t-bs dim">1. Connection level Read-only (T5; only at that level). 2. No configure permission on the connection's virtual host (the banner at the top of this page, id banner-no-configure; drawn only when the level is NOT Read-only, at Read-only reason 1 replaces it). 3. Declared, not confirmed, or permissions unreadable (NotReadable). 4. Another virtual host (R6). 5. Nothing to say: no banner. On another virtual host reasons 2 and 3 are not shown (the check looked at the connection's own virtual host only); reasons 1 and 4 are. The view model keeps every reason in a list; the screen draws the first.</div>
 <div class="banner info"><span class="ms" aria-hidden="true">lock</span><div><b>This connection is set to read-only.</b> Its topology level is Read-only, so nothing here can be changed whatever the broker allows. Change the level in the connection's settings.</div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div><b>Topology is locked on this connection.</b> Permissions could not be read: the user has no administrator tag. (Detail = the permission check's own reason; NotReadable, a non-administrator on a profile with no declaration.)</div></div>
+<div class="banner warn"><span class="ms" aria-hidden="true">info</span><div><b>Topology is locked on this connection.</b> You declared that svc-explorer can change topology; the broker could not confirm the permissions and still enforces its own.</div></div>
 <div class="banner info"><span class="ms" aria-hidden="true">dns</span><div>Permissions were checked on virtual host <b class="mono">/</b> only. This virtual host is shown read-only.</div></div>
 <div class="t-bs dim">The screen is read-only in M2 in every case; the banner only says why. From M5, topology changes are limited to the connection's own virtual host. The texts are the core strings asserted by the scenarios in 02 and 09.</div>
 </section>
