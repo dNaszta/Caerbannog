@@ -157,6 +157,7 @@ class StreamClientsEventsAdapterTest {
             queue.runAll()
             assertTrue(c.streamClients.state.value.screen is StreamClientsScreen.Failed, "precondition: ${c.streamClients.state.value}")
 
+            catalog.clearFailures()
             c.streamClientsEvents.retry()
             queue.runAll()
 

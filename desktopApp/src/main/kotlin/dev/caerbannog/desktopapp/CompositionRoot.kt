@@ -6,8 +6,14 @@ import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
+import dev.caerbannog.core.streams.AppSettings
+import dev.caerbannog.core.streams.RefreshClock
+import dev.caerbannog.core.streams.RefreshTarget
+import dev.caerbannog.core.streams.StreamClientsViewModel
+import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
 import dev.caerbannog.datarabbit.JsonFileAppSettings
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
@@ -15,15 +21,9 @@ import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
-import dev.caerbannog.core.streams.AppSettings
-import dev.caerbannog.core.connections.LinkState
-import dev.caerbannog.core.streams.RefreshClock
-import dev.caerbannog.core.streams.RefreshTarget
-import dev.caerbannog.core.streams.StreamClientsViewModel
-import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.ui.appframe.AppDestination
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -118,14 +118,15 @@ fun createAppComposition(
     // The composition root owns the scope; it ends with the window. The view model runs on the UI dispatcher (Swing in the app),
     // so its state can be read by Compose without a thread hop; tests pass their own dispatcher.
     val streamListScope = CoroutineScope(SupervisorJob() + uiDispatcher)
+    val clock = RefreshClock { System.currentTimeMillis() }
     val streamList = StreamListViewModel(
         active = active,
         settings = appSettings,
         scope = streamListScope,
-        clock = RefreshClock { System.currentTimeMillis() },
+        clock = clock,
         reconnect = viewModel::connect,
     )
-    val streamClients = StreamClientsViewModel(active, appSettings, streamListScope, RefreshClock { System.currentTimeMillis() }, viewModel::connect)
+    val streamClients = StreamClientsViewModel(active, appSettings, streamListScope, clock, viewModel::connect)
     // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
     // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
     val shownTarget: StateFlow<RefreshTarget> = navigation.selectedStream
@@ -135,7 +136,7 @@ fun createAppComposition(
         active.state.collect { if (it is LinkState.Disconnected) navigation.closeStream() }
     }
     val control = ConnectionControlModel(
-        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() },
+        viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
     return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), streamListScope)
