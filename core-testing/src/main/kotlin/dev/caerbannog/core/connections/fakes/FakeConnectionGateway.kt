@@ -1,12 +1,10 @@
 package dev.caerbannog.core.connections.fakes
 
-import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionFailureReason
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.connections.OpenResult
-import dev.caerbannog.core.connections.checkResultMessage
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.Visibility
@@ -39,11 +37,8 @@ class FakeConnectionGateway(
         NO_PASSWORD_STORED(ConnectionFailureReason.NO_PASSWORD_STORED),
         CREDENTIALS_REFUSED(ConnectionFailureReason.CREDENTIALS_REFUSED),
 
-        /**
-         * M2-14c: the broker did not answer the TLS handshake (a plain broker). Its text is the one the Check shows, taken from the same
-         * function, so the two cannot drift; once core has `ConnectionFailureReason.NO_TLS_ANSWER` this entry points at that constant.
-         */
-        NO_TLS_ANSWER(checkResultMessage(ConnectionCheckResult.TlsRefused, tls = true)),
+        /** M2-14c: the broker did not answer the TLS handshake (a plain broker); the text is shared with the Check. */
+        NO_TLS_ANSWER(ConnectionFailureReason.NO_TLS_ANSWER),
         ;
 
         /** True for the two reasons that can only come out of a TLS handshake; the real gateway never raises them for a TLS-off profile. */
