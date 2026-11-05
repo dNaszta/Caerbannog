@@ -129,7 +129,7 @@ class ConnectionsViewModel(
     /**
      * Makes the saved profile [name] the current connection and checks its permissions; with an
      * [ActiveConnection] it also opens the clients and holds the connection. An unknown name does nothing.
-     * Interim entry point until the sidebar connection picker (M2-05).
+     * The Connect (and Retry) of the app bar chip popup.
      */
     suspend fun connect(name: String) {
         val profile = repository.list().firstOrNull { it.name == name } ?: return

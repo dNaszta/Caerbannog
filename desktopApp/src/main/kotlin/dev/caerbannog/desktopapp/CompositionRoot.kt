@@ -53,14 +53,17 @@ class AppComposition(
     val viewModel: ConnectionsViewModel,
     val active: ActiveConnection,
     val streamList: StreamListViewModel,
-    /** M2-05b compile stub: the model behind the app bar chip (the developer wires it for real). */
+    /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
     val control: ConnectionControlModel,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
     fun close() {
         try {
+            // The scope cancel is what stops the list (its timer, loads and link follower are children of the scope) and the
+            // chip model; the close() calls are for callers that keep the scope alive.
             streamList.close()
+            control.close()
             streamListScope.cancel()
         } finally {
             active.close()
@@ -70,7 +73,7 @@ class AppComposition(
 
 /**
  * Like [createConnectionsViewModel], plus the real [ConnectionGateway] behind an [ActiveConnection] that the view
- * model's Connect uses (the interim edit-panel Connect of M2-01 now opens a real held connection). One
+ * model's Connect uses (the chip popup's Connect opens a real held connection). One
  * [ConnectionSession] serves both, so the permission check and the connection cannot disagree.
  */
 fun createAppComposition(
@@ -82,6 +85,7 @@ fun createAppComposition(
     gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
     appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
     uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
+    onOpenConnections: () -> Unit = {},
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -104,7 +108,7 @@ fun createAppComposition(
         reconnect = viewModel::connect,
     )
     val control = ConnectionControlModel(
-        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = {},
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections,
     )
     return AppComposition(viewModel, active, streamList, control, streamListScope)
 }

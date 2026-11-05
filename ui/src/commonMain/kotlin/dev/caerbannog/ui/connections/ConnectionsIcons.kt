@@ -12,6 +12,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Stream
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CrueltyFree
 import androidx.compose.material.icons.outlined.Delete
@@ -28,7 +39,7 @@ import dev.caerbannog.core.connections.PillTone
 // The only file that imports androidx.compose.material.icons: material-icons-extended is frozen at 1.7.3, so a later
 // move to Compose resources replaces this file alone (docs/tasks/M1-12b-connections-icons.md).
 
-/** Icons of the Connections screen, named as in `docs/ux/Main.dc.html` (Material Symbols names). */
+/** Icons of the app frame, the chip and the Connections screen, named as in `docs/ux/Main.dc.html` (Material Symbols names). */
 internal enum class AppIcon(val mockupName: String) {
     CrueltyFree("cruelty_free"),
     Power("power"),
@@ -42,6 +53,17 @@ internal enum class AppIcon(val mockupName: String) {
     UploadFile("upload_file"),
     Visibility("visibility"),
     VisibilityOff("visibility_off"),
+    Link("link"),
+    LinkOff("link_off"),
+    Sync("sync"),
+    Error("error"),
+    ArrowDropDown("arrow_drop_down"),
+    Refresh("refresh"),
+    Check("check"),
+    Search("search"),
+    Stream("stream"),
+    Hub("hub"),
+    AccountTree("account_tree"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -57,6 +79,17 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.UploadFile -> Icons.Outlined.UploadFile
     AppIcon.Visibility -> Icons.Outlined.Visibility
     AppIcon.VisibilityOff -> Icons.Outlined.VisibilityOff
+    AppIcon.Link -> Icons.Outlined.Link
+    AppIcon.LinkOff -> Icons.Outlined.LinkOff
+    AppIcon.Sync -> Icons.Outlined.Sync
+    AppIcon.Error -> Icons.Outlined.Error
+    AppIcon.ArrowDropDown -> Icons.Outlined.ArrowDropDown
+    AppIcon.Refresh -> Icons.Outlined.Refresh
+    AppIcon.Check -> Icons.Outlined.Check
+    AppIcon.Search -> Icons.Outlined.Search
+    AppIcon.Stream -> Icons.Outlined.Stream
+    AppIcon.Hub -> Icons.Outlined.Hub
+    AppIcon.AccountTree -> Icons.Outlined.AccountTree
 }
 
 /** `.ms.sm` in the mockup. */

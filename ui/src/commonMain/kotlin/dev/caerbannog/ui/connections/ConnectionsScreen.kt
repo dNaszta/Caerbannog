@@ -48,7 +48,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.CaCertificateValidationResult
+import dev.caerbannog.core.connections.ConnectionControlEvents
+import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.ConnectionNotes
+import dev.caerbannog.ui.appframe.AppFrameLayout
+import dev.caerbannog.ui.appframe.ConnectionControl
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsState
@@ -75,44 +79,47 @@ import kotlinx.coroutines.launch
 @Composable
 fun ConnectionsScreen(
     viewModel: ConnectionsViewModel,
-    // M2-05b compile stub: the Connections screen is wrapped in the AppFrame, which needs these (null = no chip, for older callers).
-    control: dev.caerbannog.core.connections.ConnectionControlState? = null,
-    controlEvents: dev.caerbannog.core.connections.ConnectionControlEvents? = null,
+    control: ConnectionControlState? = null,
+    controlEvents: ConnectionControlEvents? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
 
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            ConnectionsDrawer(state = state, modifier = Modifier.width(280.dp).fillMaxHeight())
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                ConnectionsAppBar(onNewConnection = viewModel::startNewConnection)
-                ConnectionsContent(
-                    state = state,
-                    onSelect = viewModel::selectConnection,
-                    editPanel = { panelModifier ->
-                        EditPanel(
-                            state = state,
-                            onSave = { originalName, input ->
-                                if (originalName == null) {
-                                    viewModel.addConnection(input)
-                                } else {
-                                    scope.launch { viewModel.saveProfileChanges(originalName, input) }
-                                }
-                            },
-                            onDeleteRequest = viewModel::requestDelete,
-                            onValidateCaCertificate = { name, path ->
-                                if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
-                            },
-                            onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
-                            onConnect = { name -> scope.launch { viewModel.connect(name) } },
-                            modifier = panelModifier,
-                        )
-                    },
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
+    // The chip is the one place that connects (M2-05b); without a control (null) the frame has no chip.
+    AppFrameLayout(
+        title = "Connections",
+        actions = {
+            Button(onClick = viewModel::startNewConnection) {
+                ConnectionIcon(AppIcon.Add, SmallIconSize)
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("New connection")
             }
-        }
+        },
+        chip = if (control != null && controlEvents != null) ({ ConnectionControl(control, controlEvents) }) else null,
+    ) {
+        ConnectionsContent(
+            state = state,
+            onSelect = viewModel::selectConnection,
+            editPanel = { panelModifier ->
+                EditPanel(
+                    state = state,
+                    onSave = { originalName, input ->
+                        if (originalName == null) {
+                            viewModel.addConnection(input)
+                        } else {
+                            scope.launch { viewModel.saveProfileChanges(originalName, input) }
+                        }
+                    },
+                    onDeleteRequest = viewModel::requestDelete,
+                    onValidateCaCertificate = { name, path ->
+                        if (name == null) viewModel.validateCaCertificateFile(path) else viewModel.setCaCertificate(name, path)
+                    },
+                    onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
+                    modifier = panelModifier,
+                )
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 
     val pendingDeleteName = state.pendingDeleteName
@@ -134,7 +141,6 @@ private fun EditPanel(
     onDeleteRequest: (String) -> Unit,
     onValidateCaCertificate: (name: String?, path: String) -> Unit,
     onCheckConnection: (String) -> Unit,
-    onConnect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selected = state.selectedProfile
@@ -293,11 +299,6 @@ private fun EditPanel(
                     }
                 }
                 if (selected != null) {
-                    // Interim (M2-01): the smallest way to make a saved profile current. M2-05 replaces it with
-                    // the sidebar connection picker; do not build on it.
-                    OutlinedButton(onClick = { onConnect(selected.name) }, modifier = Modifier.testTag("connectButton")) {
-                        Text("Connect")
-                    }
                     OutlinedButton(onClick = { onCheckConnection(selected.name) }) {
                         ConnectionIcon(AppIcon.WifiTethering, SmallIconSize)
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
