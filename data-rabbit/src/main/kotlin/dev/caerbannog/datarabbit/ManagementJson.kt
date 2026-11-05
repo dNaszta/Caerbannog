@@ -68,11 +68,15 @@ internal object ManagementJson {
     // A super stream is a `direct` exchange whose marker is the JSON boolean true (spike S-A, S-B: false, "true", fanout are not).
     private fun superStreamNames(exchangesBody: String): CatalogResult<List<String>> = guarded(exchangesBody) { root ->
         val names = root.asArray().map { it.asObject() }.mapNotNull { exchange ->
-            val name = exchange.requiredString("name")
-            val marker = (exchange["arguments"] as? JsonObject)?.get(SUPER_STREAM_MARKER) as? JsonPrimitive
-            name.takeIf { exchange.string("type") == "direct" && marker != null && !marker.isString && marker.booleanOrNull == true }
+            exchange.requiredString("name").takeIf { isSuperStream(exchange) }
         }
         CatalogResult.Success(names)
+    }
+
+    // The one rule for "this exchange is a super stream", shared by the stream list and the Topology Exchanges tab.
+    private fun isSuperStream(exchange: JsonObject): Boolean {
+        val marker = (exchange["arguments"] as? JsonObject)?.get(SUPER_STREAM_MARKER) as? JsonPrimitive
+        return exchange.string("type") == "direct" && marker != null && !marker.isString && marker.booleanOrNull == true
     }
 
     /** M2-07: true when some exchange of `GET /api/exchanges/{vhost}` is a super stream, so the bindings call is worth making. */
@@ -252,6 +256,7 @@ internal object ManagementJson {
                     autoDelete = e.boolean("auto_delete"),
                     internal = e.boolean("internal"),
                     arguments = e.argumentText(),
+                    superStream = isSuperStream(e),
                 )
             },
         )
@@ -288,7 +293,7 @@ internal object ManagementJson {
         type = obj.string("type").orEmpty(),
         readyMessages = obj.long("messages_ready"),
         unackedMessages = obj.long("messages_unacknowledged"),
-        consumers = obj.long("consumers")?.toInt(),
+        consumers = obj.long("consumers")?.coerceIn(0L, Int.MAX_VALUE.toLong())?.toInt(),
         leader = obj.string("leader"),
         members = obj.strings("members"),
         online = obj.strings("online"),

@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.topology.TopologyCatalog.Companion.QUEUE_PAGE_SIZE
 import java.net.URLEncoder
 
 /**
@@ -65,7 +66,6 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 
     companion object {
-        private const val QUEUE_PAGE_SIZE = dev.caerbannog.core.topology.TopologyCatalog.QUEUE_PAGE_SIZE
         private const val QUEUE_COLUMNS = "name,type,messages_ready,messages_unacknowledged,consumers,leader,members,online,policy,state"
         private const val LIST_COLUMNS =
             "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"
