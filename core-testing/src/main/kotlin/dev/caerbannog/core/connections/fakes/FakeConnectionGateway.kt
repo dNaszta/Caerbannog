@@ -78,6 +78,14 @@ class FakeConnectionGateway(
     /** Profile names in the order [open] was called. */
     val openCalls: List<String> get() = synchronized(log) { log.filter { it.startsWith("open:") }.map { it.removePrefix("open:") } }
 
+    private val profilesAsked = Collections.synchronizedList(ArrayList<ConnectionProfile>())
+
+    /**
+     * M2-14: every profile [open] was called with, in order, as the app passed it (so a test can see which TLS mode and which ports
+     * the app asked the gateway for). Like every other value of this fake it never contains a password.
+     */
+    val openedProfiles: List<ConnectionProfile> get() = synchronized(profilesAsked) { profilesAsked.toList() }
+
     /** Called inside [open], before it answers; lets a step look at the app at the moment the broker is asked. */
     @Volatile
     var onOpen: ((ConnectionProfile) -> Unit)? = null
@@ -122,6 +130,7 @@ class FakeConnectionGateway(
     override suspend fun open(profile: ConnectionProfile): OpenResult {
         val name = profile.name
         log += "open:$name"
+        profilesAsked += profile
         onOpen?.invoke(profile)
         gates[name]?.let { gate ->
             started.trySend(name)

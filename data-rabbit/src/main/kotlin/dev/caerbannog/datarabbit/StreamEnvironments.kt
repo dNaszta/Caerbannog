@@ -26,7 +26,7 @@ import javax.net.ssl.TrustManagerFactory
 internal class StreamEnvironments(
     private val profile: ConnectionProfile,
     password: String,
-    private val trust: TrustManagerFactory,
+    private val transport: BrokerTransport,
     // Null builds the real environment; a test passes a failing builder.
     private val environmentFactory: ((vhost: String) -> Environment)? = null,
 ) : FirstOffsetSource, AutoCloseable {
@@ -66,6 +66,7 @@ internal class StreamEnvironments(
 
     private fun build(vhost: String): Environment {
         val secret = checkNotNull(password) { "closed" }
+        val trust = (transport as BrokerTransport.Tls).trust // M2-14 stub: plain is not built yet
         val sslContext = SslContextBuilder.forClient()
             .trustManager(trust)
             .endpointIdentificationAlgorithm(null)

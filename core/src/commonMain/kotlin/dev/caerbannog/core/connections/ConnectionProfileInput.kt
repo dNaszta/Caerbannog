@@ -23,6 +23,8 @@ data class ConnectionProfileInput(
     val password: String?,
     val streamPort: Int = 5551,
     val managementPort: Int = 15671,
+    /** M2-14: null on add means TLS on; on update null means keep the saved value (same "keep" rule as the level). */
+    val tls: Boolean? = null,
     val topologyControlLevel: TopologyControlLevel? = null,
     val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
 )

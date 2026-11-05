@@ -9,7 +9,9 @@ import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.ChipState
 import dev.caerbannog.core.connections.ConnectionChipState
 import dev.caerbannog.core.connections.ConnectionControlModel
+import dev.caerbannog.core.connections.BrokerEndpoints
 import dev.caerbannog.core.connections.ConnectionNotes
+import dev.caerbannog.core.connections.editPanelNotes
 import dev.caerbannog.core.connections.RowAction
 import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
@@ -141,11 +143,58 @@ class ConnectionLifecycleSteps {
             check(repository.add(profile) is SaveConnectionResult.Saved)
             secretStore.store(name, PASSWORD)
         }
-        // The profiles were added behind the view model's back; rebuild it so its list shows them.
+        rebuildApp()
+    }
+
+    // The profiles were added behind the view model's back; rebuild it so its list shows them.
+    private fun rebuildApp() {
         viewModel = ConnectionsViewModel(
             repository, secretStore, FakeBrokerReachabilityChecker(), FakeCaCertificateValidator(), session, active,
         )
         buildStreamListAndControl()
+    }
+
+    // --- M2-14: connections with the TLS switch on or off ---
+
+    private fun tlsFromWord(word: String): Boolean = when (word) {
+        "on" -> true
+        "off" -> false
+        else -> error("TLS is 'on' or 'off' in a scenario, got '$word'")
+    }
+
+    @Given("the connection {string} has TLS {word}")
+    fun theConnectionHasTls(name: String, word: String) {
+        val tls = tlsFromWord(word)
+        val ports = BrokerEndpoints.defaultsFor(tls)
+        val existing = repository.list().firstOrNull { it.name == name }
+        if (existing == null) {
+            val profile = ConnectionProfile(
+                name = name, host = "$name.example.com", virtualHost = "/", username = "svc-$name",
+                streamPort = ports.stream, managementPort = ports.management, tls = tls,
+            )
+            check(repository.add(profile) is SaveConnectionResult.Saved)
+            secretStore.store(name, PASSWORD)
+        } else {
+            repository.update(existing.copy(tls = tls, streamPort = ports.stream, managementPort = ports.management))
+        }
+        rebuildApp()
+    }
+
+    @Given("the connection {string} is in the state {string}")
+    fun theConnectionIsInTheState(name: String, state: String) {
+        when (state) {
+            "Connected" -> connect(name)
+            "Failed" -> {
+                gateway.failWith(name, FakeConnectionGateway.Failure.BROKER_NOT_REACHABLE)
+                connect(name)
+            }
+            "Disconnected" -> {
+                connect(name)
+                active.disconnect()
+            }
+            else -> error("Unknown state in a scenario: '$state'")
+        }
+        assertState(name, state)
     }
 
     // The app side of the app bar: the stream list view model and the connection control model, on the same fakes, in virtual time.
@@ -390,9 +439,79 @@ class ConnectionLifecycleSteps {
         assertFalse(exposed.contains(PASSWORD), "the password is visible in: $exposed")
     }
 
+    private fun selectedProfile(): ConnectionProfile =
+        checkNotNull(viewModel.state.value.selectedProfile) { "no edit panel is open" }
+
     @Then("I see the note {string}")
     fun iSeeTheNote(note: String) {
-        assertEquals(note, ConnectionNotes.HOST_NAME_NOT_VERIFIED)
+        assertEquals(note, editPanelNotes(selectedProfile().tls).hostNameNotVerified, "host name note of the open panel")
+    }
+
+    @Then("I do not see the note {string}")
+    fun iDoNotSeeTheNote(note: String) {
+        assertEquals(ConnectionNotes.HOST_NAME_NOT_VERIFIED, note, "the scenario must name the real note")
+        assertNull(editPanelNotes(selectedProfile().tls).hostNameNotVerified, "host name note of the open panel")
+    }
+
+    @Then("the edit panel shows the warning {string}")
+    fun theEditPanelShowsTheWarning(text: String) {
+        assertEquals(text, editPanelNotes(selectedProfile().tls).notEncrypted, "warning of the open panel")
+        assertEquals(ConnectionNotes.NOT_ENCRYPTED, text)
+    }
+
+    @Then("the edit panel shows no warning")
+    fun theEditPanelShowsNoWarning() {
+        assertNull(editPanelNotes(selectedProfile().tls).notEncrypted, "warning of the open panel")
+    }
+
+    @Then("the app bar chip says {string}")
+    fun theChipSays(text: String) {
+        settle()
+        val chip = model().state.value.chip
+        assertEquals(ConnectionNotes.NOT_ENCRYPTED, text)
+        assertTrue(chip.notEncrypted, "the chip must say $text, chip: $chip")
+    }
+
+    @Then("the app bar chip does not say {string}")
+    fun theChipDoesNotSay(text: String) {
+        settle()
+        assertEquals(ConnectionNotes.NOT_ENCRYPTED, text)
+        assertFalse(model().state.value.chip.notEncrypted, "chip: ${model().state.value.chip}")
+    }
+
+    @Then("the chip's accessible label says {string}")
+    fun theChipLabelSays(text: String) {
+        settle()
+        val label = model().state.value.chip.accessibleLabel
+        assertTrue(label.contains(text), "label: $label")
+    }
+
+    @Then("the chip's accessible label does not say {string}")
+    fun theChipLabelDoesNotSay(text: String) {
+        settle()
+        val label = model().state.value.chip.accessibleLabel
+        assertFalse(label.contains(text, ignoreCase = true), "label: $label")
+    }
+
+    @Then("the popup row of {string} says {string}")
+    fun thePopupRowSays(name: String, text: String) {
+        settle()
+        assertEquals(ConnectionNotes.NOT_ENCRYPTED, text)
+        assertTrue(model().state.value.rows.first { it.name == name }.notEncrypted, "rows: ${model().state.value.rows}")
+    }
+
+    @Then("the popup row of {string} does not say {string}")
+    fun thePopupRowDoesNotSay(name: String, text: String) {
+        settle()
+        assertEquals(ConnectionNotes.NOT_ENCRYPTED, text)
+        assertFalse(model().state.value.rows.first { it.name == name }.notEncrypted, "rows: ${model().state.value.rows}")
+    }
+
+    @Then("^the connection was opened (with|without) TLS$")
+    fun theConnectionWasOpenedWithOrWithoutTls(mode: String) {
+        val asked = gateway.openedProfiles.lastOrNull()
+        assertNotNull(asked, "the gateway was never asked to open")
+        assertEquals(mode == "with", asked!!.tls, "the gateway was asked to open with tls=${asked.tls}")
     }
 
     // --- M2-05b: the lost connection (D2) and the app bar ---

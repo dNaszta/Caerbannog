@@ -36,7 +36,7 @@ class RabbitMqConnectionGateway(
             TlsSupport.buildHttpClient(sslContext, ConnectionTimeouts.MANAGEMENT_MILLIS), profile.username, password,
         )
         val requests = ManagementRequests.forProfile(profile)
-        val environments = StreamEnvironments(profile, password, trust)
+        val environments = StreamEnvironments(profile, password, BrokerTransport.Tls(trust))
         val failure = try {
             probe(http, requests)
         } catch (e: CancellationException) {

@@ -36,4 +36,18 @@ object ConnectionFailureReason {
 object ConnectionNotes {
     const val SETTINGS_CHANGED: String = "Connection settings changed. Connect again."
     const val HOST_NAME_NOT_VERIFIED: String = "Host name is not verified."
+
+    /** M2-14: said wherever a connection with TLS off is shown (edit panel, chip, popup row). Same text everywhere. */
+    const val NOT_ENCRYPTED: String = "Not encrypted"
 }
+
+/**
+ * M2-14 compile stub: the notes of the edit panel for the TLS switch position [tls] (the form's value, saved or not).
+ * [hostNameNotVerified] is [ConnectionNotes.HOST_NAME_NOT_VERIFIED] only with TLS on, otherwise null;
+ * [notEncrypted] is [ConnectionNotes.NOT_ENCRYPTED] only with TLS off, otherwise null. One pure rule, so the BDD
+ * steps and the screen cannot drift.
+ */
+data class EditPanelNotes(val hostNameNotVerified: String?, val notEncrypted: String?)
+
+// Stub = today's behaviour: the host name note always, never a warning.
+fun editPanelNotes(tls: Boolean): EditPanelNotes = EditPanelNotes(hostNameNotVerified = ConnectionNotes.HOST_NAME_NOT_VERIFIED, notEncrypted = null)

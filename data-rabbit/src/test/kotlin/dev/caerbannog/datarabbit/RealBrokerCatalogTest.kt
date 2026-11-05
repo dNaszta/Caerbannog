@@ -485,10 +485,10 @@ class RealBrokerCatalogTest {
         val name = unique("tls-")
         publish(createStream(name), name, 1)
 
-        StreamEnvironments(profile(ca = caPath), rabbit.adminPassword, TlsSupport.trustManagerFactory(caPath)).use {
+        StreamEnvironments(profile(ca = caPath), rabbit.adminPassword, BrokerTransport.Tls(TlsSupport.trustManagerFactory(caPath))).use {
             assertEquals(FirstOffset.Value(0), FirstOffsetMapper.map { it.read("/", name) }, "control: the right CA works on the stream port")
         }
-        StreamEnvironments(profile(ca = wrongCaPath), rabbit.adminPassword, TlsSupport.trustManagerFactory(wrongCaPath)).use {
+        StreamEnvironments(profile(ca = wrongCaPath), rabbit.adminPassword, BrokerTransport.Tls(TlsSupport.trustManagerFactory(wrongCaPath))).use {
             val refused = runCatching { it.read("/", name) }.exceptionOrNull()
             assertTrue(refused != null, "a wrong CA must stop the stream connection, nothing may be read")
             assertEquals(FirstOffset.Unavailable, FirstOffsetMapper.map { it.read("/", name) })

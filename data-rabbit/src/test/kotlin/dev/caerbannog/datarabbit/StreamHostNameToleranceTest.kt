@@ -52,7 +52,7 @@ class StreamHostNameToleranceTest {
             streamPort = server.localPort, managementPort = 1, caCertificatePath = cert.path,
         )
         try {
-            StreamEnvironments(profile, "pw", TlsSupport.trustManagerFactory(cert.path)).use {
+            StreamEnvironments(profile, "pw", BrokerTransport.Tls(TlsSupport.trustManagerFactory(cert.path))).use {
                 runCatching { it.read("/", "s") } // the stream protocol is not spoken, so this fails; only the handshake counts
             }
             assertEquals(true, handshake.get(30, TimeUnit.SECONDS), "the TLS handshake must complete although the certificate names another host (D7)")

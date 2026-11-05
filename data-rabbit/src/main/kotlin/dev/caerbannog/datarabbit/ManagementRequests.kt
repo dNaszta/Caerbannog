@@ -4,8 +4,12 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.streams.StreamListRequest
 import java.net.URLEncoder
 
-/** The URLs of the management API calls the catalog makes. https only: a plain-text base is refused (TLS only). */
-internal class ManagementRequests(baseUrl: String) {
+/**
+ * The URLs of the management API calls the catalog makes. M2-14 (compile stub): the scheme of [baseUrl] must match [transport]
+ * (https for [BrokerTransport.Tls], http for [BrokerTransport.Plain]); a mismatch is refused, so a plain base can only come from a
+ * profile with TLS off. The one-argument form means TLS (https) as before.
+ */
+internal class ManagementRequests(baseUrl: String, private val transport: BrokerTransport? = null) {
     private val base: String = baseUrl.trimEnd('/')
 
     init {

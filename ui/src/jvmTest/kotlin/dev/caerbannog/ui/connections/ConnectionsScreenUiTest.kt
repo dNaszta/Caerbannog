@@ -1863,18 +1863,7 @@ class ConnectionsScreenUiTest {
         }
     }
 
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `the TLS line has a lock icon before the text`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel()) }
-
-        onNode(hasText("TLS is always on", substring = true)).performScrollTo()
-        val text = onNode(hasText("TLS is always on", substring = true), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(text.width > 0f && text.height > 0f, "the TLS text must be laid out (not 0,0,0,0): $text")
-        val locks = iconNodes("lock").map { it.boundsInRoot }
-        val beside = locks.filter { it.right <= text.left + 0.5f && it.top < text.bottom && it.bottom > text.top }
-        assertEquals(1, beside.size, "expected one icon:lock before the TLS line $text, locks found: $locks")
-    }
+    // M2-14: the test `the TLS line has a lock icon before the text` ("TLS is always on") is replaced by `ConnectionsScreenTlsUiTest`.
 
     private fun checkResultCases(): List<Pair<ConnectionCheckResult, Boolean>> = listOf(
         ConnectionCheckResult.BothReachable to true,
