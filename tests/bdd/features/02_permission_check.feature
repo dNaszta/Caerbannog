@@ -66,6 +66,7 @@ Feature: Permission check before the first connection
     When I connect to "prod-eu"
     Then the app bar shows "Topology locked" next to "prod-eu"
 
+  # Built by task M2-08c; remove @needs-M2 there.
   @fake-broker @needs-M2
   Scenario: The topology screen explains why it is locked
     Given the user has no configure permission on "/"
@@ -98,11 +99,18 @@ Feature: Permission check before the first connection
     Then the app bar shows "prod-eu" as the current connection
     And the app bar shows "Topology locked" next to "prod-eu"
 
+  # Split by M2-08 (2026-11-05): the list half is real since M2-05 and runs in M2-08b; the browse half needs the M3 browser.
   @fake-broker @needs-M2
+  Scenario: Listing streams does not need the configure permission
+    Given the user has no configure permission on "/"
+    When I connect to "prod-eu"
+    Then I can list streams
+
+  @fake-broker @needs-M3
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"
-    Then I can list streams and browse their messages
+    Then I can browse the messages of a stream
 
   @fake-broker
   # Spike result: only administrators can read permissions through the management API, so this is the

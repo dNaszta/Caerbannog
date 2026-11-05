@@ -1,4 +1,4 @@
-@M2 @M5 @topology @queues
+@topology @queues
 Feature: Topology and quorum queues
   As an engineer
   I want to see and, where allowed, change the queues, exchanges and bindings of a broker
@@ -7,10 +7,15 @@ Feature: Topology and quorum queues
   The app shows topology and statistics only. It never reads, gets or purges the messages
   of a queue, because reading would remove messages and change the data flow.
 
+  Milestones: the scenarios tagged @M2 are the read-only topology screen (task M2-08): the queues,
+  exchanges and bindings of the connection's virtual host, with statistics. The scenarios tagged @M5
+  change topology (declare, edit, delete, add to a migration) and are built with the migrations.
+  Until then the screen has no control that changes anything.
+
   Background:
     Given I am connected to "uat-eu"
 
-  @smoke @fake-broker
+  @M2 @smoke @fake-broker
   Scenario: List quorum queues with statistics
     Given these quorum queues
       | name          | ready | unacked | consumers | leader        | members online |
@@ -19,57 +24,57 @@ Feature: Topology and quorum queues
     When I open the topology screen on the "Queues" tab
     Then each queue is shown with its ready and unacked counts, consumers, leader and members online
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: A queue with a member offline is flagged
     Given the quorum queue "notifications" has 2 of its 3 members online
     When I open the topology screen on the "Queues" tab
     Then "notifications" is marked as having a member offline
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Queue details
     Given a quorum queue "orders" bound to the exchange "events" with routing key "order.created"
     When I select the queue "orders"
     Then I see its leader, members, ready and unacked counts, consumers, policy and bindings
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: See exchanges and bindings
     When I open the topology screen on the "Exchanges" tab
     Then I see the exchanges of the virtual host
     When I open the "Bindings" tab
     Then I see each binding with its source, destination and routing key
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Other queue types are not the focus
     Given a quorum queue "orders" and a classic queue "legacy"
     When I open the topology screen on the "Queues" tab with the "Quorum" filter
     Then only "orders" is listed
 
-  @negative @safety
+  @M2 @negative @safety
   Scenario: Queue messages cannot be read
     When I select the queue "orders"
     Then there is no control to browse, get, consume or purge its messages
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Declare a quorum queue when allowed
     Given the user has configure permission on "/"
     When I declare a quorum queue "invoices"
     Then the broker is asked to create a quorum queue "invoices"
     And "invoices" appears in the list
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Edit a queue's policy when allowed
     Given the user has configure permission on "/"
     And a quorum queue "orders" with the policy "quorum-default"
     When I change the policy of "orders" to "quorum-strict"
     Then the broker applies "quorum-strict" to "orders"
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Add a binding when allowed
     Given the user has configure permission on "/"
     When I bind the exchange "events" to the queue "orders" with routing key "order.created"
     Then the binding appears in the details of "orders"
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: Deleting a queue needs the name typed to confirm
     Given the user has configure permission on "/"
     When I choose to delete the queue "legacy-orders"
@@ -77,7 +82,7 @@ Feature: Topology and quorum queues
     When I type "legacy-orders" and confirm
     Then the broker is asked to delete the queue "legacy-orders"
 
-  @negative @fake-broker
+  @M5 @negative @fake-broker
   Scenario Outline: Everything that changes topology is locked without configure permission
     Given the user has no configure permission on "/"
     When I select the queue "orders"
@@ -90,15 +95,126 @@ Feature: Topology and quorum queues
       | Delete queue |
       | Add binding |
 
-  @fake-broker
+  @M5 @fake-broker
   Scenario: A locked queue can still be added to a migration file
     Given the user has no configure permission on "/"
     When I choose "Add to migration" for the queue "orders"
     Then a migration file with the queue's declaration is prepared
     And I am told it can be applied on a connection that allows it
 
-  @fake-broker
+  @M2 @fake-broker
   Scenario: Search queues by name
     Given quorum queues "orders", "invoices" and "legacy-orders"
     When I search the queue list for "orders"
     Then "orders" and "legacy-orders" are listed
+
+  # --- Added for task M2-08 (read-only topology screen). Decisions T1 to T5 are in docs/tasks/M2-08-topology-read-only.md. ---
+
+  # Decision T1 (recommended): the screen lists the connection's virtual host only, like the stream list in 03.
+  @M2 @fake-broker
+  Scenario: Another vhost's queues are not listed
+    Given the connection's virtual host has 3 quorum queues
+    And another virtual host has 4 quorum queues
+    When I open the topology screen on the "Queues" tab
+    Then I see queues 1 to 3 of 3
+    And no queue of the other virtual host is listed
+
+  # Streams have their own screen; a stream (or a partition of a super stream) is never listed as a queue here.
+  @M2 @fake-broker
+  Scenario: Streams are not listed as queues
+    Given a quorum queue "orders", a classic queue "legacy" and a stream "audit-log"
+    When I open the topology screen on the "Queues" tab with the "Other types" filter
+    Then only "legacy" is listed
+
+  @M2 @fake-broker
+  Scenario: A vhost with no queues
+    Given the connection's virtual host has no queues
+    When I open the topology screen on the "Queues" tab
+    Then I see a message that there are no queues yet
+
+  @M2 @fake-broker
+  Scenario: Long queue lists are paged
+    Given the connection's virtual host has 12 quorum queues
+    When I open the topology screen on the "Queues" tab with 5 queues per page
+    Then I see queues 1 to 5 of 12
+    And I can move to the next page
+
+  # Decision T2 (recommended): the default exchange and the implicit binding of every queue to it are real on the broker
+  # but noise on screen; they are hidden unless asked for.
+  @M2 @fake-broker
+  Scenario: The default exchange and its bindings are hidden until asked for
+    Given the broker has the default exchange, the exchange "events" and a queue "orders" bound to "events"
+    When I open the topology screen on the "Bindings" tab
+    Then I see only the binding from "events" to "orders"
+    When I choose to show the default exchange
+    Then I also see the implicit binding from the default exchange to "orders"
+
+  @M2 @fake-broker
+  Scenario: A binding to an exchange is shown as such
+    Given the exchange "events" is bound to the exchange "audit" with routing key "#"
+    When I open the topology screen on the "Bindings" tab
+    Then the binding from "events" to "audit" says its destination is an exchange
+
+  @M2 @fake-broker
+  Scenario: A super stream exchange is marked
+    Given a super stream "orders" with 3 partitions
+    When I open the topology screen on the "Exchanges" tab
+    Then the exchange "orders" is marked as a super stream
+
+  # Decision D3 (refresh only while shown) applies to this screen like to the stream list.
+  @M2 @fake-broker
+  Scenario: The topology screen refreshes by itself only while it is shown
+    Given a quorum queue "orders" with 12 ready messages
+    And I have the topology screen open
+    And the refresh interval is 30 seconds
+    When the queue gets 20 more ready messages
+    And 30 seconds pass
+    Then "orders" shows 32 ready messages
+    When I open the stream list
+    And 30 seconds pass
+    Then the topology screen does not ask the broker again
+
+  # Decision D2 (no automatic reconnect), same rule as the stream list in 13.
+  @M2 @fake-broker
+  Scenario: A lost connection keeps the last queues on screen
+    Given the quorum queue "orders" is listed
+    When the broker stops answering
+    Then "orders" stays listed and the screen is marked stale
+    And the app does not reconnect by itself
+
+  @M2 @fake-broker
+  Scenario: A user without the management tag
+    Given the user of "uat-eu" has no management tag
+    When I open the topology screen on the "Queues" tab
+    Then I see the message "This user cannot read topology. Ask for the management tag."
+    And no queue list is shown
+
+  @M2 @fake-broker
+  Scenario: Queue counts are labelled as approximate
+    Given a quorum queue "orders" with 1240 ready messages
+    When I open the topology screen on the "Queues" tab
+    Then the screen says the counts are approximate
+
+  # The only requests the app makes about a queue are reads of its statistics.
+  @M2 @negative @safety @fake-broker
+  Scenario: The app never asks the broker for a queue's messages
+    Given a quorum queue "orders"
+    When I open the topology screen on every tab and select the queue "orders"
+    Then every request the app made to the broker was a read of topology or statistics
+    And none of them was a request for the messages of a queue
+
+  # Decision T4 (recommended): in M2 the screen has no action that changes topology, so none is drawn,
+  # not even a disabled one. The locked actions of the @M5 scenarios come with the migrations.
+  @M2 @fake-broker
+  Scenario: The M2 topology screen offers no action that changes topology
+    Given the user has configure permission on "/"
+    When I select the queue "orders"
+    Then there is no control to edit, delete or bind
+
+  # Decision T5 (recommended): the self-constraint level is a second reason for a read-only screen.
+  @M2 @fake-broker
+  Scenario: The topology screen says the connection is set to read-only
+    Given the user has configure permission on "/"
+    And the connection "uat-eu" is set to the "Read-only" topology level
+    When I open the topology screen on the "Queues" tab
+    Then the topology screen explains that the connection is set to read-only
