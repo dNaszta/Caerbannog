@@ -5,8 +5,11 @@ package dev.caerbannog.devseed
  * so this returns a hint for a null or empty [failureMessage] and null otherwise. It takes only the message, so no
  * password can reach it.
  */
-fun caHint(failureMessage: String?): String? =
-    if (failureMessage.isNullOrEmpty()) {
+fun caHint(failureMessage: String?, tls: Boolean = true): String? =
+    if (failureMessage.isNullOrEmpty() && !tls) {
+        "Hint: the failure has no message. The tool ran with --no-tls (plain); the stream port may be a TLS port " +
+            "(plain is 5552, TLS is 5551). Check --stream-port and --management-port, or drop --no-tls."
+    } else if (failureMessage.isNullOrEmpty()) {
         "Hint: the failure has no message. The --ca file may not be the CA that signed the broker certificate " +
             "(dev:seed passes the fixture CA; check the --ca path and that the broker uses the matching certificate)."
     } else {

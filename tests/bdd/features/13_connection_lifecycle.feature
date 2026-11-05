@@ -6,8 +6,10 @@ Feature: Connect and disconnect
 
   "Connected" means the app holds its connections to the broker until I disconnect.
   Only one connection is held at a time: connecting to another one disconnects the first.
-  Connect runs the permission check first (see 02). TLS: the certificate authority is honoured,
+  Connect runs the permission check first (see 02). With TLS on: the certificate authority is honoured,
   the host name is not verified (product decision D7), and the connection panel says so.
+  With TLS off (M2-14) the connection is not encrypted and the app says "Not encrypted" in the connection panel,
+  the app bar chip (text and accessible label) and the chip popup, in every state of that connection.
 
   Background:
     Given saved connections "uat-eu" and "prod-eu"
@@ -120,15 +122,73 @@ Feature: Connect and disconnect
     Then the state of "uat-eu" is "Connected" once the broker answers
 
   @fake-broker
-  Scenario: The password is never shown
-    Given the connection "uat-eu" fails because the credentials are refused
-    When I connect to "uat-eu"
+  Scenario Outline: The password is never shown, with TLS on or off
+    Given the connection "<name>" has TLS <tls>
+    And the connection "<name>" fails because the credentials are refused
+    When I connect to "<name>"
     Then the failure message does not contain the password
+
+    Examples:
+      | name      | tls |
+      | uat-eu    | on  |
+      | dev-local | off |
 
   @fake-broker
   Scenario: The connection panel says the host name is not verified
+    Given the connection "uat-eu" has TLS on
     When I open the edit panel of "uat-eu"
     Then I see the note "Host name is not verified."
+
+  @fake-broker
+  Scenario: The note about host name verification is shown only with TLS on
+    Given the connection "dev-local" has TLS off
+    When I open the edit panel of "dev-local"
+    Then I do not see the note "Host name is not verified."
+
+  @fake-broker
+  Scenario Outline: Connecting reaches Connected with TLS on and off
+    Given the connection "<name>" has TLS <tls>
+    When I connect to "<name>"
+    Then its state is "Connected"
+    And the connection was opened <mode>
+
+    Examples:
+      | name      | tls | mode        |
+      | uat-eu    | on  | with TLS    |
+      | dev-local | off | without TLS |
+
+  @fake-broker
+  Scenario Outline: A connection without TLS says it is not encrypted in every state
+    Given the connection "dev-local" has TLS off
+    And the connection "dev-local" is in the state "<state>"
+    When I open the edit panel of "dev-local"
+    Then the edit panel shows the warning "Not encrypted"
+    And the app bar chip says "Not encrypted"
+    And the chip's accessible label says "Not encrypted"
+    And the popup row of "dev-local" says "Not encrypted"
+
+    Examples:
+      | state        |
+      | Connected    |
+      | Failed       |
+      | Disconnected |
+
+  @fake-broker
+  Scenario: A connection with TLS on says nothing about encryption
+    Given the connection "uat-eu" has TLS on
+    And the connection "uat-eu" is in the state "Connected"
+    When I open the edit panel of "uat-eu"
+    Then the edit panel shows no warning
+    And the app bar chip does not say "Not encrypted"
+    And the chip's accessible label does not say "Not encrypted"
+    And the popup row of "uat-eu" does not say "Not encrypted"
+
+  @fake-broker
+  Scenario: A plain connection is not encrypted before it is connected
+    Given the connection "dev-local" has TLS off
+    When I open any screen
+    Then the popup row of "dev-local" says "Not encrypted"
+    And the popup row of "uat-eu" does not say "Not encrypted"
 
   # The connection control in the app bar (task M2-05b, docs/ux/Streams.dc.html). The steps drive the core model behind the
   # chip (ConnectionControlModel); that the chip and popup draw it, on every screen, is pinned by the Compose UI tests in `ui`.

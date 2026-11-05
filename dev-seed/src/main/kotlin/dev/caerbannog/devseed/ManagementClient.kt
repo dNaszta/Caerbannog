@@ -9,19 +9,20 @@ import java.time.Duration
 import java.util.Base64
 import javax.net.ssl.SSLParameters
 
-/** The few management API calls the seed needs, over HTTPS with the JDK client (no new library). */
+/** The few management API calls the seed needs, over HTTPS (HTTP with --no-tls) with the JDK client (no new library). */
 internal class ManagementClient(private val args: SeedArgs) : AutoCloseable {
-    private val http: HttpClient = HttpClient.newBuilder()
-        .sslContext(Tls.sslContext(args.caPath))
-        .sslParameters(SSLParameters().apply { endpointIdentificationAlgorithm = "" })
-        .connectTimeout(Duration.ofSeconds(10))
-        .build()
+    private val http: HttpClient = HttpClient.newBuilder().apply {
+        if (args.tls) {
+            sslContext(Tls.sslContext(args.caPath))
+            sslParameters(SSLParameters().apply { endpointIdentificationAlgorithm = "" })
+        }
+    }.connectTimeout(Duration.ofSeconds(10)).build()
 
     // Built per call, never stored in a log line or an exception message.
     private fun authorization(): String =
         "Basic " + Base64.getEncoder().encodeToString("${args.user}:${args.password}".toByteArray(Charsets.UTF_8))
 
-    private fun url(path: String) = URI.create("https://${args.host}:${args.managementPort}/api/$path")
+    private fun url(path: String) = URI.create("${if (args.tls) "https" else "http"}://${args.host}:${args.managementPort}/api/$path")
 
     /** `POST /api/definitions`: the import is idempotent for equal declarations. */
     fun importDefinitions(body: String) {

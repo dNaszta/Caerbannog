@@ -41,8 +41,52 @@ class ManagementRequestsTest {
         assertThrows<IllegalArgumentException> { ManagementRequests("rabbit.example.com:15671") }
     }
 
+    // --- M2-14a step 2: the scheme follows the transport, never the other way round --------------------------------------------
+
+    private val tlsTransport = BrokerTransport.Tls(TlsSupport.trustManagerFactory(null))
+
     @Test
-    fun `the base comes from the profile, always https`() {
+    fun `a TLS transport accepts https and refuses an http base`() {
+        ManagementRequests("https://rabbit.example.com:15671", tlsTransport)
+        assertThrows<IllegalArgumentException> { ManagementRequests("http://rabbit.example.com:15672", tlsTransport) }
+    }
+
+    @Test
+    fun `the plain transport accepts http and refuses an https base`() {
+        assertEquals("http://rabbit.example.com:15672/api/whoami", ManagementRequests("http://rabbit.example.com:15672", BrokerTransport.Plain).whoami())
+        assertThrows<IllegalArgumentException> { ManagementRequests("https://rabbit.example.com:15671", BrokerTransport.Plain) }
+    }
+
+    @Test
+    fun `the plain transport refuses other schemes and a bare host`() {
+        assertThrows<IllegalArgumentException> { ManagementRequests("ws://rabbit.example.com", BrokerTransport.Plain) }
+        assertThrows<IllegalArgumentException> { ManagementRequests("rabbit.example.com:15672", BrokerTransport.Plain) }
+    }
+
+    @Test
+    fun `every URL of a plain base is http`() {
+        val plain = ManagementRequests("http://rabbit.example.com:15672/", BrokerTransport.Plain)
+        val urls = listOf(
+            plain.listStreams(StreamListRequest(vhost = "/")), plain.streamDetail("/", "s"), plain.publishers("/", "s"),
+            plain.publisherCounts("/"), plain.consumers("/"), plain.pluginProbe(), plain.whoami(),
+        )
+        urls.forEach { assertTrue(it.startsWith("http://rabbit.example.com:15672/api/"), it) }
+    }
+
+    @Test
+    fun `the base of a profile with TLS off is http on its management port`() {
+        val profile = ConnectionProfile(name = "p", host = "localhost", virtualHost = "/", username = "u", managementPort = 15672, tls = false)
+        assertEquals("http://localhost:15672/api/whoami", ManagementRequests.forProfile(profile).whoami())
+    }
+
+    @Test
+    fun `the base of a profile with TLS on stays https, whatever its port is`() {
+        val profile = ConnectionProfile(name = "p", host = "localhost", virtualHost = "/", username = "u", managementPort = 15672, tls = true)
+        assertEquals("https://localhost:15672/api/whoami", ManagementRequests.forProfile(profile).whoami())
+    }
+
+    @Test
+    fun `the base comes from the profile, https while TLS is on`() {
         val profile = ConnectionProfile(name = "p", host = "rabbit.example.com", virtualHost = "/", username = "u", managementPort = 15999)
         assertEquals("https://rabbit.example.com:15999/api/whoami", ManagementRequests.forProfile(profile).whoami())
     }

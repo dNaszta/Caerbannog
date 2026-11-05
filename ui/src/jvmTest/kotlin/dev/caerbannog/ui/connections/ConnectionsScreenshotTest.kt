@@ -171,4 +171,20 @@ class ConnectionsScreenshotTest {
 
         assertWritten(snapshot("connections-04-delete-dialog.png"))
     }
+
+    // M2-14a step 4: the edit panel of a profile with TLS off (switch off, ports 5552 / 15672, CA field disabled, "Not encrypted" warning),
+    // by-eye check against docs/ux/Main.dc.html.
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `screenshot - edit panel with TLS off shows the Not encrypted warning`() = runDesktopComposeUiTest(1280, 880) {
+        val plain = ConnectionProfile(
+            name = "dev-local", host = "localhost", virtualHost = "/", username = "guest",
+            streamPort = 5552, managementPort = 15672, tls = false, caCertificatePath = "/certs/ca.pem",
+        )
+        setContent { ConnectionsScreen(viewModel(plain, uatEu)) }
+        selectProfile(0)
+        onNodeWithTag("notEncryptedWarning").performScrollTo().assertExists()
+
+        assertWritten(snapshot("connections-05-tls-off.png"))
+    }
 }

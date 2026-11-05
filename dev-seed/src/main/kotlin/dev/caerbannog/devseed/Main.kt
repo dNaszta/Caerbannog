@@ -4,7 +4,8 @@ import kotlin.system.exitProcess
 
 private const val USAGE =
     "Usage: dev:seed --password <pw> [--user admin] [--host localhost] [--stream-port 5551] [--management-port 15671]\n" +
-        "  [--ca <ca.pem>] [--vhost /] [--streams a,b] [--messages 1000] [--queues N] [--max-age 7D]\n" +
+        "  [--ca <ca.pem>] [--no-tls] [--vhost /] [--streams a,b] [--messages 1000] [--queues N] [--max-age 7D]\n" +
+        "  --no-tls uses plain stream (5552) and HTTP management (15672) and ignores --ca; no value.\n" +
         "  --queues N declares N quorum queues in --vhost (none without the flag); messages are appended on every run."
 
 /** Entry point of the developer seed tool (M2-12). Not part of the product; never prints the password. */
@@ -19,7 +20,7 @@ fun main(argv: Array<String>) {
         seed(args)
     } catch (e: Exception) {
         System.err.println("Seed failed: ${e::class.simpleName}: ${e.message}")
-        caHint(e.message)?.let { System.err.println(it) }
+        caHint(e.message, args.tls)?.let { System.err.println(it) }
         exitProcess(1)
     }
 }

@@ -21,7 +21,7 @@ If these disagree, say so, name the files, and propose which one to change. Neve
 
 # Rules of the product you must protect
 
-- TLS only. Stream protocol on 5551, management API over HTTPS on 15671.
+- TLS is the default (D9a in `docs/spec.md`). Stream protocol on 5551, management API over HTTPS on 15671. A per-profile "Use TLS" switch may turn it off for any host (plain 5552 and 15672, CA ignored); a plain profile must show "Not encrypted" on the panel, the chip and the popup row, and no credential may be sent before the user has chosen the profile. Block any plain path that is not behind that switch.
 - Each connection profile is its own environment. Topology changes are allowed only when the user has the configure permission, checked before the first connection. No configure means read-only. No write permission disables test publishing.
 - Quorum queue messages are never read, got or purged. Publishing a test message is allowed to any stream, exchange or queue.
 - Browsing a stream never changes anything on the broker: short-lived reads with an unnamed consumer. Paging: next = last shown + 1; previous = first shown minus page size, clamped to the first offset. Message count is approximate.
@@ -47,7 +47,7 @@ Review a branch, a diff or a set of files (use `git diff`, `git log` and Read). 
 
 - **Fit:** does it do what the brief's goal says, no more? Is any scope creep or unrelated change present?
 - **Architecture:** module boundaries respected; UI (Compose) free of broker and network code; broker access behind interfaces that the fakes also implement; shared code kept free of JVM-only types unless the module is JVM-only on purpose.
-- **Rule violations (block always):** non-TLS connection paths, any code that reads, gets or purges queue messages, browsing that changes broker state or offsets, topology changes without the configure permission check, secrets in logs or plain files.
+- **Rule violations (block always):** plain (non-TLS) connection paths that are not behind the per-profile "Use TLS" switch (D9a), any code that reads, gets or purges queue messages, browsing that changes broker state or offsets, topology changes without the configure permission check, secrets in logs or plain files.
 - **Code smells:** long methods and classes, god objects, duplicated logic, deep nesting, primitive obsession, feature envy, hidden global state, boolean flags that switch behaviour, broad `catch`, swallowed errors, `!!` on data from the network, blocking calls on the UI thread, leaked coroutines or scopes, mutable state shared across coroutines without a plan, magic numbers and strings.
 - **Clean code:** names that say what and why; small functions with one reason to change; immutable data classes and sealed types for states and results; errors as typed results at boundaries; no commented-out code; comments explain why, not what; consistent Kotlin style (ktlint/detekt once chosen).
 - **Design patterns:** suggest a pattern only when it removes a concrete problem you can point at, and name the problem first. Typical fits here: repository or gateway for the broker clients, strategy for paging or filtering, state machine or sealed states for connection and paging flow, unidirectional data flow (state in, events out) for Compose screens, command for migration actions, adapter around the stream client and management API. Do not add patterns for their own sake.

@@ -25,6 +25,28 @@ Feature: Permission check before the first connection
       | .*        |       | .*   | unlocked | disabled   |
       |           |       | .*   | locked   | disabled   |
 
+  # M2-14: the check reads the permissions over HTTPS with TLS on and over plain HTTP with TLS off; the topology rules (configure, write)
+  # are the same, and the check asks the broker in the mode of the profile.
+  @fake-broker
+  Scenario Outline: The permission check gives the same answer over TLS and over plain
+    Given the connection "prod-eu" has TLS <tls>
+    And the user has these permissions on "/": configure "<configure>", write "<write>", read ".*"
+    When the permission check runs
+    Then the permission check asked the broker <mode>
+    And topology changes are <topology>
+    And test publishing is <publishing>
+
+    Examples:
+      | tls | mode        | configure | write | topology | publishing |
+      | on  | with TLS    | .*        | .*    | unlocked | enabled    |
+      | on  | with TLS    |           | .*    | locked   | enabled    |
+      | on  | with TLS    | .*        |       | unlocked | disabled   |
+      | on  | with TLS    |           |       | locked   | disabled   |
+      | off | without TLS | .*        | .*    | unlocked | enabled    |
+      | off | without TLS |           | .*    | locked   | enabled    |
+      | off | without TLS | .*        |       | unlocked | disabled   |
+      | off | without TLS |           |       | locked   | disabled   |
+
   @fake-broker
   Scenario: The check runs before the first connection is used
     When I connect to "prod-eu" for the first time

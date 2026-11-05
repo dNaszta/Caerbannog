@@ -96,7 +96,9 @@ class FakeSecretStore : SecretStore {
 class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
     var streamReachable: Boolean = true
     var managementReachable: Boolean = true
+    /** M2-14: which listeners the broker has. A TLS profile on a broker without TLS is refused; a plain profile on a broker without plain listeners cannot connect. */
     var tlsOffered: Boolean = true
+    var plainOffered: Boolean = true
     var managementPluginEnabled: Boolean = true
 
     /** Set by "the broker presents a certificate signed by a private CA" to require a matching CA path. */
@@ -104,15 +106,32 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
 
     val checkedEndpoints = mutableListOf<Endpoint>()
 
+    /**
+     * M2-14: one entry per attempt the app made to talk to the broker, true = with TLS. Never cleared, so a scenario can tell "refused
+     * and left it at that" from "refused, then silently tried plain" (the app never falls back, in either direction).
+     */
+    val attempts = mutableListOf<Boolean>()
+
     override suspend fun check(profile: ConnectionProfile): ConnectionCheckResult {
         checkedEndpoints.clear()
+        attempts += profile.tls
 
-        if (!tlsOffered) {
-            return ConnectionCheckResult.TlsRefused
+        if (profile.tls) {
+            if (!tlsOffered) {
+                return ConnectionCheckResult.TlsRefused
+            }
+            // Like the real checker: with TLS on a CA path that cannot be read is a failure; with TLS off the path is never read.
+            profile.caCertificatePath?.let { path ->
+                if (!java.io.File(path).isFile) {
+                    return ConnectionCheckResult.EndpointUnreachable(Endpoint.STREAM, "could not load the CA certificate")
+                }
+            }
+        } else if (!plainOffered) {
+            return ConnectionCheckResult.EndpointUnreachable(Endpoint.STREAM, "connection closed")
         }
 
         val requiredCa = requiredCaCertificatePath
-        if (requiredCa != null && profile.caCertificatePath != requiredCa) {
+        if (profile.tls && requiredCa != null && profile.caCertificatePath != requiredCa) {
             checkedEndpoints += Endpoint.STREAM
             return ConnectionCheckResult.EndpointUnreachable(
                 Endpoint.STREAM,
@@ -152,7 +171,11 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
  * data-rabbit's concrete implementation class, only on core's CaCertificateValidator interface.
  */
 class FakeCaCertificateValidator : CaCertificateValidator {
+    /** M2-14: every path the app asked about, so "the CA is ignored when TLS is off" can show it never asked. */
+    val validated = mutableListOf<String>()
+
     override fun validate(filePath: String): CaCertificateValidationResult {
+        validated += filePath
         // M2-05 round 2, F1: same rule as the real validator - the field validates per keystroke, so a
         // directory, a missing or an unreadable file is a typed Invalid, never an exception.
         return try {

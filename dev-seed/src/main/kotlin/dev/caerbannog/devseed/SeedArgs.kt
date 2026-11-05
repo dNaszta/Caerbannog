@@ -20,10 +20,12 @@ data class SeedArgs(
     val messages: Int,
     val queues: Int,
     val retentionMaxAge: String?,
+    /** False with `--no-tls`: plain stream protocol and plain HTTP management, [caPath] is then always null. */
+    val tls: Boolean = true,
 ) {
     override fun toString(): String =
         "SeedArgs(host=$host, streamPort=$streamPort, managementPort=$managementPort, user=$user, " +
-            "caPath=$caPath, vhost=$vhost, streams=$streams, messages=$messages, queues=$queues, " +
+            "tls=$tls, caPath=$caPath, vhost=$vhost, streams=$streams, messages=$messages, queues=$queues, " +
             "retentionMaxAge=$retentionMaxAge)"
 
     companion object {
@@ -34,9 +36,16 @@ data class SeedArgs(
         /** Parses `--name value` pairs in any order; later occurrences of a flag win. */
         fun parse(args: List<String>): SeedArgs {
             val values = mutableMapOf<String, String>()
+            var tls = true
             var i = 0
             while (i < args.size) {
                 val flag = args[i]
+                if (flag == NO_TLS) {
+                    // The only switch without a value; a stray token after it is read as the next flag.
+                    tls = false
+                    i += 1
+                    continue
+                }
                 if (flag !in FLAGS) throw SeedArgsException("Unknown flag: $flag")
                 if (i + 1 >= args.size) throw SeedArgsException("Flag $flag needs a value")
                 values[flag] = args[i + 1]
@@ -54,11 +63,12 @@ data class SeedArgs(
             }
             return SeedArgs(
                 host = values["--host"] ?: "localhost",
-                streamPort = port(values, "--stream-port", 5551),
-                managementPort = port(values, "--management-port", 15671),
+                streamPort = port(values, "--stream-port", if (tls) 5551 else 5552),
+                managementPort = port(values, "--management-port", if (tls) 15671 else 15672),
                 user = values["--user"] ?: "admin",
                 password = password,
-                caPath = values["--ca"],
+                caPath = if (tls) values["--ca"] else null,
+                tls = tls,
                 vhost = vhost,
                 streams = values["--streams"]?.let(::streamNames) ?: DEFAULT_STREAMS,
                 messages = count(values, "--messages", 1000),
@@ -70,6 +80,8 @@ data class SeedArgs(
                 },
             )
         }
+
+        private const val NO_TLS = "--no-tls"
 
         private val FLAGS = setOf(
             "--host", "--stream-port", "--management-port", "--user", "--password", "--ca", "--vhost",

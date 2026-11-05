@@ -28,7 +28,7 @@ class StreamEnvironmentsFailureTest {
     private val trust: TrustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(null as java.security.KeyStore?) }
 
     private fun environments(factory: (String) -> Environment) =
-        StreamEnvironments(profile, "not-a-real-secret", trust, factory)
+        StreamEnvironments(profile, "not-a-real-secret", BrokerTransport.Tls(trust), factory)
 
     @Test
     fun `a failing build surfaces its own class to the caller that built`() {

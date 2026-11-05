@@ -1,6 +1,16 @@
 package dev.caerbannog.ui.connections
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import dev.caerbannog.core.connections.ConnectionNotes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
@@ -32,6 +42,7 @@ import androidx.compose.material.icons.outlined.CrueltyFree
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Help
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material.icons.outlined.VerifiedUser
@@ -49,6 +60,7 @@ internal enum class AppIcon(val mockupName: String) {
     Power("power"),
     Add("add"),
     Lock("lock"),
+    LockOpen("lock_open"),
     VerifiedUser("verified_user"),
     Help("help"),
     CheckCircle("check_circle"),
@@ -79,6 +91,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Power -> Icons.Outlined.Power
     AppIcon.Add -> Icons.Outlined.Add
     AppIcon.Lock -> Icons.Outlined.Lock
+    AppIcon.LockOpen -> Icons.Outlined.LockOpen
     AppIcon.VerifiedUser -> Icons.Outlined.VerifiedUser
     AppIcon.Help -> Icons.Outlined.Help
     AppIcon.CheckCircle -> Icons.Outlined.CheckCircle
@@ -136,4 +149,20 @@ internal fun ConnectionIcon(
         tint = tint,
         modifier = modifier.size(size).testTag("icon:${icon.mockupName}"),
     )
+}
+
+/**
+ * The "Not encrypted" warning of the chip and the popup rows: icon and text together (colour is never the only signal), one
+ * wording from core. [tag] marks it for tests; the text is also a semantics property of the tagged node.
+ */
+@Composable
+internal fun NotEncryptedNote(tag: String, style: TextStyle, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.testTag(tag).clearAndSetSemantics { text = AnnotatedString(ConnectionNotes.NOT_ENCRYPTED) },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        ConnectionIcon(AppIcon.LockOpen, SmallIconSize, tint = MaterialTheme.colorScheme.error)
+        Text(ConnectionNotes.NOT_ENCRYPTED, style = style, color = MaterialTheme.colorScheme.error, maxLines = 1, softWrap = false)
+    }
 }

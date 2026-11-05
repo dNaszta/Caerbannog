@@ -25,7 +25,7 @@ import java.net.SocketTimeoutException
 import javax.net.ssl.SSLException
 
 /**
- * Reads the connection user's permissions with `GET /api/permissions/{vhost}/{user}` over HTTPS.
+ * Reads the connection user's permissions with `GET /api/permissions/{vhost}/{user}` over HTTPS, or plain HTTP when the profile has TLS off.
  * Spike (M1-03): only administrators may call it; everyone else gets 401, which comes back as
  * [UnreadableCause.NOT_AUTHORIZED] (a wrong password looks the same). Never returns DeclaredByUser.
  * `detail` carries only the status code or exception class: no password, URL or response body.
@@ -35,17 +35,17 @@ class ManagementApiPermissionChecker(
 ) : PermissionChecker {
 
     override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
-        val sslContext = try {
-            TlsSupport.buildSslContext(profile.caCertificatePath)
+        val transport = try {
+            BrokerTransport.from(profile)
         } catch (e: IOException) {
             return unreadable(UnreadableCause.UNREACHABLE, "CA certificate not loadable (${e.javaClass.simpleName})")
         } catch (e: java.security.GeneralSecurityException) {
             return unreadable(UnreadableCause.UNREACHABLE, "CA certificate not loadable (${e.javaClass.simpleName})")
         }
 
-        val client = TlsSupport.buildHttpClient(sslContext, connectTimeoutMillis)
+        val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis)
         try {
-            val response = client.get(permissionsUrl(profile)) { basicAuth(profile.username, password) }
+            val response = client.get(permissionsUrl(profile, transport)) { basicAuth(profile.username, password) }
             return when (response.status) {
                 HttpStatusCode.OK -> parse(response.bodyAsText())
                 HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden ->
@@ -77,8 +77,8 @@ class ManagementApiPermissionChecker(
         }
     }
 
-    private fun permissionsUrl(profile: ConnectionProfile): String =
-        "https://${profile.host}:${profile.managementPort}/api/permissions/${encode(profile.virtualHost)}/${encode(profile.username)}"
+    private fun permissionsUrl(profile: ConnectionProfile, transport: BrokerTransport): String =
+        "${transport.scheme}://${profile.host}:${profile.managementPort}/api/permissions/${encode(profile.virtualHost)}/${encode(profile.username)}"
 
     // URLEncoder makes spaces "+", which a path segment does not understand.
     private fun encode(segment: String): String = URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")

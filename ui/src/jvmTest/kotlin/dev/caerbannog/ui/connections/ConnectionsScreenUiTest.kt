@@ -470,7 +470,7 @@ class ConnectionsScreenUiTest {
 
     // --- Declared permissions (M1-06) -----------------------------------------------------------
     // Contract the screen must follow (proposed by the test developer, see the M1-06 Status block):
-    //  - ONE switch (Role.Switch), labelled "I know what this user may do on the broker", below "Topology control".
+    //  - ONE declaration switch (Role.Switch; since M2-14 the form also has the "Use TLS" switch, tag tlsSwitch), labelled "I know what this user may do on the broker", below "Topology control".
     //  - When on: two yes/no choices, each a pair of RadioButtons in the order Yes, No, labelled
     //    "Can change topology (configure)" and "Can publish (write)". In display order the radios are
     //    0..2 topology level (existing), then 3 configure-Yes, 4 configure-No, 5 write-Yes, 6 write-No.
@@ -492,7 +492,8 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.declarationSwitch(): SemanticsNodeInteraction =
-        onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)).performScrollTo()
+        // M2-14: the form has a second switch, "Use TLS" (tag tlsSwitch); this helper means the declaration switch only.
+        onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch).and(!hasTestTag("tlsSwitch"))).performScrollTo()
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.toggleDeclaration() {
@@ -1863,18 +1864,7 @@ class ConnectionsScreenUiTest {
         }
     }
 
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun `the TLS line has a lock icon before the text`() = runDesktopComposeUiTest(1280, 880) {
-        setContent { ConnectionsScreen(permissionViewModel()) }
-
-        onNode(hasText("TLS is always on", substring = true)).performScrollTo()
-        val text = onNode(hasText("TLS is always on", substring = true), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(text.width > 0f && text.height > 0f, "the TLS text must be laid out (not 0,0,0,0): $text")
-        val locks = iconNodes("lock").map { it.boundsInRoot }
-        val beside = locks.filter { it.right <= text.left + 0.5f && it.top < text.bottom && it.bottom > text.top }
-        assertEquals(1, beside.size, "expected one icon:lock before the TLS line $text, locks found: $locks")
-    }
+    // M2-14: the test `the TLS line has a lock icon before the text` ("TLS is always on") is replaced by `ConnectionsScreenTlsUiTest`.
 
     private fun checkResultCases(): List<Pair<ConnectionCheckResult, Boolean>> = listOf(
         ConnectionCheckResult.BothReachable to true,

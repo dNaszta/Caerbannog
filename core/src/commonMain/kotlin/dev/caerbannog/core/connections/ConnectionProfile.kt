@@ -3,9 +3,9 @@ package dev.caerbannog.core.connections
 /**
  * A saved RabbitMQ broker connection: its own environment, independent of any other profile.
  *
- * TLS is not a setting on this model - it is deliberately the only mode the app can express (see
- * `01_connections.feature`'s "TLS is always on": there must be no field here that could be read as a
- * toggle, not merely one defaulted to on).
+ * [tls] is the per-profile TLS switch (M2-14; it replaces the old "TLS is always on" rule). It defaults to on, and
+ * nothing may fall back from TLS to plain, or the other way, on its own: the profile switch is the only source of the
+ * mode. With it off, [caCertificatePath] is kept but unused.
  *
  * The password is never a field here: it lives in [SecretStore], keyed by [name], so nothing that
  * serializes a ConnectionProfile (the JSON file `data-rabbit` writes, logs, `toString()`) can ever
@@ -19,6 +19,7 @@ data class ConnectionProfile(
     val username: String,
     val streamPort: Int = 5551,
     val managementPort: Int = 15671,
+    val tls: Boolean = true,
     val caCertificatePath: String? = null,
     val topologyControlLevel: TopologyControlLevel = TopologyControlLevel.READ_ONLY,
     /** The user's own claim, used only when permissions cannot be read. Saved with the profile; applied on Save through [ConnectionProfileInput.declaredPermissions]. */

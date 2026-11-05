@@ -1,5 +1,6 @@
 # M2-12: local development broker (developer tooling, not part of the product). Throwaway secrets only.
-# TLS on 5551 (stream), 15671 (management) and 5671 (AMQP); no plain port is published.
+# TLS on 5551 (stream), 15671 (management) and 5671 (AMQP), the default. Plain (not encrypted) 5552 (stream) and
+# 15672 (management) are published too, for the app's "TLS off" profile and `dev-seed --no-tls`.
 # The CA, server certificate, key and listener config are the test fixtures in data-rabbit/src/test/resources/tls,
 # mounted read-only: one home, no copy. Reset: docker compose -f dev/broker/docker-compose.yml down -v, then up -d.
 name: caerbannog-dev
@@ -11,6 +12,8 @@ services:
       - "5551:5551"
       - "15671:15671"
       - "5671:5671"
+      - "5552:5552"
+      - "15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ../../data-rabbit/src/test/resources/tls/rabbitmq.conf:/etc/rabbitmq/conf.d/90-tls.conf:ro

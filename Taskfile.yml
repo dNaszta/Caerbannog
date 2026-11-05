@@ -43,7 +43,7 @@ tasks:
 
   # M2-12: local development broker (developer tooling, see dev/README.md). Throwaway secrets only.
   dev:up:
-    desc: Start the local dev RabbitMQ (TLS, streams, known topology) and wait until it is healthy.
+    desc: Start the local dev RabbitMQ (TLS and plain listeners, streams, known topology) and wait until it is healthy.
     cmds:
       - docker compose -f dev/broker/docker-compose.yml up -d --wait
 
@@ -52,6 +52,12 @@ tasks:
     desc: "Publish messages into the dev streams. Example: task dev:seed -- --password dev-password [--queues 1000 --vhost many]"
     cmds:
       - ./gradlew -q :dev-seed:run --args="--ca data-rabbit/src/test/resources/tls/ca.pem {{.CLI_ARGS}}"
+
+  dev:seed:plain:
+    silent: true # task would echo the command line, which holds the password
+    desc: "Like dev:seed but without TLS (stream 5552, management 15672, no CA). Example: task dev:seed:plain -- --password dev-password"
+    cmds:
+      - ./gradlew -q :dev-seed:run --args="--no-tls {{.CLI_ARGS}}"
 
   dev:reset:
     desc: Remove the dev broker and its volume, then start it again (topology is re-applied from dev/broker/definitions).

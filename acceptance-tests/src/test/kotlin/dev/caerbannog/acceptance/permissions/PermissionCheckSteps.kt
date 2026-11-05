@@ -133,6 +133,24 @@ class PermissionCheckSteps {
         secretStore.store(name, "s3cret-for-$name")
     }
 
+    // M2-14: the profile's TLS switch. The fake broker answers either way; what the scenario checks is that the app asked in the profile's mode.
+    @Given("the connection {string} has TLS {word}")
+    fun theConnectionHasTls(name: String, word: String) {
+        val tls = when (word) { "on" -> true; "off" -> false; else -> error("TLS is 'on' or 'off' in a scenario, got '$word'") }
+        val ports = dev.caerbannog.core.connections.BrokerEndpoints.defaultsFor(tls)
+        assertEquals(profile.name, name)
+        profile = profile.copy(tls = tls, streamPort = ports.stream, managementPort = ports.management)
+        repository.update(profile)
+    }
+
+    @Then("^the permission check asked the broker (with|without) TLS$")
+    fun thePermissionCheckAskedTheBrokerInMode(mode: String) {
+        val asked = broker.calls.lastOrNull()?.first
+        assertTrue(asked != null, "the permission check never asked the broker")
+        assertEquals(mode == "with", asked!!.tls, "the check asked with tls=${asked.tls}")
+        assertEquals(profile.managementPort, asked.managementPort, "the check used the management port of the profile")
+    }
+
     @Given("the user has these permissions on {string}: configure {string}, write {string}, read {string}")
     fun theUserHasPermissions(vhost: String, configure: String, write: String, read: String) {
         assertEquals(profile.virtualHost, vhost, "the permissions must be for the connection's virtual host")

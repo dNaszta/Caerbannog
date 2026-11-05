@@ -46,6 +46,13 @@ data class ConnectionChipState(
     val tooltip: String?,
     val accessibleLabel: String,
     val errorBorder: Boolean,
+    /**
+     * M2-14 the current profile has TLS off. The chip then shows [ConnectionNotes.NOT_ENCRYPTED]
+     * in EVERY state of that profile (decision O1) and the accessible label ends its state part with ", Not encrypted"
+     * (`Connection dev-local, Connected, can change topology, Not encrypted. Open connection menu`). "No connection" has no profile,
+     * so it never shows the warning.
+     */
+    val notEncrypted: Boolean = false,
 )
 
 /** One saved profile in the popup. [stateText] is "Connected", "Disconnected", "Connecting" or "Failed: <reason>". */
@@ -57,6 +64,8 @@ data class ConnectionRowState(
     val current: Boolean,
     /** The settings-changed note of a Disconnected row, otherwise null. */
     val note: String? = null,
+    /** M2-14 the profile of this row has TLS off; the row shows [ConnectionNotes.NOT_ENCRYPTED] in every state. */
+    val notEncrypted: Boolean = false,
 )
 
 /** "Stream list refresh" section. [note] is "Connect to refresh", "Not loaded yet" or "Updated N s ago". */
@@ -124,14 +133,16 @@ fun connectionControlState(
     // Only the current connection can have a state other than Disconnected.
     val currentLink: LinkState? = current?.let { link.takeIf { l -> l.name == it.name } ?: LinkState.Disconnected(it.name) }
     return ConnectionControlState(
-        chip = chipOf(current, currentLink),
-        rows = profiles.map { rowOf(it.name, it.name == current?.name, if (it.name == current?.name) currentLink else null) },
+        chip = chipOf(current, currentLink, notEncrypted = profiles.firstOrNull { it.name == current?.name }?.tls == false),
+        rows = profiles.map {
+            rowOf(it.name, it.name == current?.name, if (it.name == current?.name) currentLink else null).copy(notEncrypted = !it.tls)
+        },
         emptyText = ConnectionControlTexts.NO_SAVED_CONNECTIONS.takeIf { profiles.isEmpty() },
         refresh = refreshOf(currentLink, refreshInterval, updatedAtMillis, nowMillis),
     )
 }
 
-private fun chipOf(current: CurrentConnection?, link: LinkState?): ConnectionChipState {
+private fun chipOf(current: CurrentConnection?, link: LinkState?, notEncrypted: Boolean): ConnectionChipState {
     if (current == null || link == null) {
         return ConnectionChipState(
             kind = ChipState.NoConnection,
@@ -156,6 +167,7 @@ private fun chipOf(current: CurrentConnection?, link: LinkState?): ConnectionChi
         ?.let { permissionPill(it) }
     val word = stateWord(kind)
     val permission = pill?.let { ", " + it.text.replaceFirstChar { c -> c.lowercase() } }.orEmpty()
+    val warning = if (notEncrypted) ", ${ConnectionNotes.NOT_ENCRYPTED}" else ""
     return ConnectionChipState(
         kind = kind,
         icon = iconOf(kind),
@@ -167,8 +179,9 @@ private fun chipOf(current: CurrentConnection?, link: LinkState?): ConnectionChi
             is LinkState.Disconnected -> link.note
             else -> null
         },
-        accessibleLabel = "Connection ${current.name}, $word$permission. ${ConnectionControlTexts.OPEN_MENU}",
+        accessibleLabel = "Connection ${current.name}, $word$permission$warning. ${ConnectionControlTexts.OPEN_MENU}",
         errorBorder = kind == ChipState.Failed,
+        notEncrypted = notEncrypted,
     )
 }
 

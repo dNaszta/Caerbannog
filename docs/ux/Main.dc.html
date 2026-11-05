@@ -102,7 +102,14 @@ body{margin:0}
 <div class="t-bs dim">Banner variants above, top to bottom: verified (green, shown only for a broker-read result, plus the dim line only when the profile also has a declaration), declared (warning colour), could not be read (red, safest mode). While the check runs the panel shows "Checking permissions...". Before any check it shows "Permission check has not run yet."</div>
 <div class="t-bs dim">The check runs before the first connection and again whenever you edit this profile. If the user cannot change topology, the topology screens open read-only.</div>
 </div>
-<div style="display:flex;align-items:center;gap:12px;color:var(--on-surface-variant)"><span class="ms" aria-hidden="true">lock</span><div class="t-bs">TLS is always on. The app does not connect without it.</div></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">lock</span><div class="t-bs" style="flex:1">Use TLS</div><span role="switch" aria-checked="true" aria-label="Use TLS" class="ms">toggle_on</span></div>
+<div class="t-bs dim">TLS on: the CA certificate is used, and the note "Host name is not verified." shows. Ports follow the switch while you have not changed them: stream 5551 and management 15671 with TLS, 5552 and 15672 without.</div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true">lock_open</span><div class="t-bs" style="flex:1">Use TLS</div><span role="switch" aria-checked="false" aria-label="Use TLS" class="ms">toggle_off</span></div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock_open</span><div><b>Not encrypted.</b> The password and all messages travel in clear text. There is no host name note without TLS.</div></div>
+<div class="tf" style="opacity:.38"><span class="l">CA certificate</span><div class="v"><span>/etc/ssl/dev-ca.pem</span></div><span class="t-bs dim">Not used without TLS</span></div>
+<div class="t-bs dim">TLS off: labels read "Stream port" and "Management port" (5552, 15672 by default). The CA field is disabled; its path is kept and comes back when TLS is turned on. Test connection success: "Both endpoints are reachable. This connection is not encrypted."</div>
+</div>
 <div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div>Connection test passed. The stream endpoint and the management API are both reachable.</div></div>
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
 <button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">delete</span>Delete profile</button>

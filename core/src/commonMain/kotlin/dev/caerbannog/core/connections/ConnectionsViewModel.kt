@@ -1,9 +1,11 @@
 package dev.caerbannog.core.connections
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 /**
  * State holder for the Connections screen: [state] flows in, these methods are the events that flow
@@ -21,6 +23,9 @@ class ConnectionsViewModel(
     private val active: ActiveConnection? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
+
+    // Counts panel switches; a late CA validation result compares it to know the user moved on. Touched on the UI thread only.
+    private var panelEpoch: Int = 0
 
     // The session tells this view model after each of its changes; the view model copies the latest session
     // state into its own single MutableStateFlow. No scope or custom StateFlow is needed, and `state.value` is
@@ -62,6 +67,8 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            tls = input.tls ?: true,
+            caCertificatePath = resolveCaCertificatePath(null, input.caCertificatePath, input.tls ?: true),
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
             declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
@@ -89,6 +96,8 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
+            tls = input.tls ?: original.tls,
+            caCertificatePath = resolveCaCertificatePath(original.caCertificatePath, input.caCertificatePath, input.tls ?: original.tls),
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
             declaredPermissions = when (val edit = input.declaredPermissions) {
                 DeclaredPermissionsEdit.Keep -> original.declaredPermissions
@@ -155,6 +164,18 @@ class ConnectionsViewModel(
         activeSession.open(profile)
     }
 
+    // The keep rule for the CA path (M2-14a R2): null keeps [current], blank clears, non-blank is stored only when the validator
+    // says Valid. With TLS off the path is kept unused and not validated (O3). An invalid path is never stored; the message is
+    // shown and the save goes on (P8).
+    private fun resolveCaCertificatePath(current: String?, requested: String?, tls: Boolean): String? {
+        if (requested == null) return current
+        if (requested.isBlank()) return null
+        if (!tls) return requested
+        val validation = caCertificateValidator.validate(requested)
+        _state.update { it.copy(lastCaCertificateValidationResult = validation) }
+        return if (validation is CaCertificateValidationResult.Valid) requested else current
+    }
+
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
         val result = repository.add(updated)
         if (result is SaveConnectionResult.Saved) {
@@ -174,8 +195,10 @@ class ConnectionsViewModel(
     }
 
     /** Validates [filePath] and, only if it is a valid certificate, saves it on the named profile. */
-    fun setCaCertificate(name: String, filePath: String): CaCertificateValidationResult {
-        val validation = caCertificateValidator.validate(filePath)
+    fun setCaCertificate(name: String, filePath: String): CaCertificateValidationResult =
+        applyCaCertificate(name, filePath, caCertificateValidator.validate(filePath))
+
+    private fun applyCaCertificate(name: String, filePath: String, validation: CaCertificateValidationResult): CaCertificateValidationResult {
         if (validation is CaCertificateValidationResult.Valid) {
             repository.update(profileNamed(name).copy(caCertificatePath = filePath))
             _state.update { it.copy(profiles = repository.list(), lastCaCertificateValidationResult = validation) }
@@ -188,10 +211,25 @@ class ConnectionsViewModel(
     }
 
     /** Validates a candidate CA certificate file before any profile exists to attach it to. */
-    fun validateCaCertificateFile(filePath: String): CaCertificateValidationResult {
-        val validation = caCertificateValidator.validate(filePath)
+    fun validateCaCertificateFile(filePath: String): CaCertificateValidationResult =
+        applyCaCertificateFile(caCertificateValidator.validate(filePath))
+
+    private fun applyCaCertificateFile(validation: CaCertificateValidationResult): CaCertificateValidationResult {
         _state.update { it.copy(lastCaCertificateValidationResult = validation) }
         return validation
+    }
+
+    /**
+     * The form's CA validation (M2-14, review item a of M2-05): reads the file on [dispatcher] (the validator does file IO, so
+     * never on the UI thread), then applies the result like [setCaCertificate] ([name] set) or [validateCaCertificateFile]
+     * ([name] null). A result is dropped when the user opened another panel meanwhile, so a late answer for one profile is never
+     * shown on another. Returns null for a dropped result.
+     */
+    suspend fun validateCaCertificateOffThread(name: String?, filePath: String, dispatcher: CoroutineDispatcher): CaCertificateValidationResult? {
+        val panel = panelEpoch
+        val validation = withContext(dispatcher) { caCertificateValidator.validate(filePath) }
+        if (panel != panelEpoch) return null
+        return if (name == null) applyCaCertificateFile(validation) else applyCaCertificate(name, filePath, validation)
     }
 
     /** Proves the named profile's stream and management endpoints are reachable over TLS. */
@@ -239,10 +277,12 @@ class ConnectionsViewModel(
     // rest of this view model - see docs/tasks/M1-02-connection-profiles.md's Design notes, decision 4.
 
     fun selectConnection(name: String) {
+        panelEpoch++
         _state.update { it.copy(selectedProfileName = name).withoutResultBanners() }
     }
 
     fun startNewConnection() {
+        panelEpoch++
         _state.update { it.copy(selectedProfileName = null).withoutResultBanners() }
     }
 

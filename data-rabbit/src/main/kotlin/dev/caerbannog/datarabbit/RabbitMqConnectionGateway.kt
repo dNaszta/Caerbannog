@@ -10,7 +10,8 @@ import java.security.GeneralSecurityException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Opens one held connection to a broker (spec "Connection lifecycle"): TLS only; the management API is probed with
+ * Opens one held connection to a broker (spec "Connection lifecycle"): over TLS or plain as the profile says (one
+ * [BrokerTransport], no fallback); the management API is probed with
  * `GET /api/whoami` (the first thing a user without the management tag or with a wrong password shows); the stream
  * `Environment` is built later, on the first offset call. The password is read from [secretStore] once, here (D6).
  * Failures the user can act on are [OpenResult.Failed] with the texts of [ConnectionFailureReason]; nothing stays
@@ -24,19 +25,18 @@ class RabbitMqConnectionGateway(
     override suspend fun open(profile: ConnectionProfile): OpenResult {
         val password = secretStore.retrieve(profile.name)
             ?: return OpenResult.Failed(ConnectionFailureReason.NO_PASSWORD_STORED)
-        val trust = try {
-            TlsSupport.trustManagerFactory(profile.caCertificatePath)
+        val transport = try {
+            BrokerTransport.from(profile)
         } catch (e: IOException) {
             return OpenResult.Failed(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED)
         } catch (e: GeneralSecurityException) {
             return OpenResult.Failed(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED)
         }
-        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }
         val http = ManagementHttp(
-            TlsSupport.buildHttpClient(sslContext, ConnectionTimeouts.MANAGEMENT_MILLIS), profile.username, password,
+            TlsSupport.buildHttpClient(transport, ConnectionTimeouts.MANAGEMENT_MILLIS), profile.username, password,
         )
-        val requests = ManagementRequests.forProfile(profile)
-        val environments = StreamEnvironments(profile, password, trust)
+        val requests = ManagementRequests.forProfile(profile, transport)
+        val environments = StreamEnvironments(profile, password, transport)
         val failure = try {
             probe(http, requests)
         } catch (e: CancellationException) {

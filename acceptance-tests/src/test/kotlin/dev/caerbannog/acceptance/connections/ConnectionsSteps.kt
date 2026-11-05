@@ -1,5 +1,7 @@
 package dev.caerbannog.acceptance.connections
 
+import dev.caerbannog.core.connections.BrokerEndpoints
+import dev.caerbannog.core.connections.BrokerPorts
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfileInput
@@ -8,6 +10,7 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.Endpoint
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.connections.checkResultMessage
 import io.cucumber.datatable.DataTable
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
@@ -69,12 +72,18 @@ class ConnectionsSteps {
     @When("I add a connection with these settings")
     fun iAddAConnectionWithTheseSettings(table: DataTable) {
         val fields = table.asMap(String::class.java, String::class.java)
+        // Like the form: the ports start at the TLS on defaults and follow the switch while they are still the defaults.
+        val tls = fields["tls"]?.let(::tlsFromWord)
+        val ports = BrokerEndpoints.afterTlsSwitch(BrokerEndpoints.defaultsFor(true), tlsNow = tls ?: true)
         val input = ConnectionProfileInput(
             name = fields.getValue("name"),
             host = fields.getValue("host"),
             virtualHost = fields.getValue("virtual host"),
             username = fields.getValue("username"),
             password = fields["password"],
+            streamPort = ports.stream,
+            managementPort = ports.management,
+            tls = tls,
             // Optional row: absent means "no level given" (null), which on add must become Read-only.
             topologyControlLevel = fields["topology control level"]?.let(::topologyControlLevelFromLabel),
         )
@@ -113,6 +122,79 @@ class ConnectionsSteps {
         check(result is SaveConnectionResult.Saved) {
             "Test setup failed: could not save fixture connection '$name': $result"
         }
+    }
+
+    // --- M2-14: the TLS switch ---------------------------------------------------------------------------------------
+
+    private fun tlsFromWord(word: String): Boolean = when (word) {
+        "on" -> true
+        "off" -> false
+        else -> error("TLS is 'on' or 'off' in a scenario, got '$word'")
+    }
+
+    private fun addConnectionWith(name: String, tls: Boolean, ports: BrokerPorts, ca: String? = null) {
+        val result = viewModel.addConnection(
+            ConnectionProfileInput(
+                name = name, host = "rabbit-$name.example.com", virtualHost = "/", username = "svc-explorer", password = "s3cret",
+                streamPort = ports.stream, managementPort = ports.management, tls = tls,
+            ),
+        )
+        check(result is SaveConnectionResult.Saved) { "Test setup failed: could not save '$name': $result" }
+        lastProfileName = name
+        lastPassword = "s3cret"
+        if (ca != null) {
+            // Seeded behind the view model like a saved file: the form never validates a CA path while TLS is off.
+            repository.update(repository.list().first { it.name == name }.copy(caCertificatePath = ca))
+        }
+    }
+
+    @Given("a saved connection {string} with TLS {word}")
+    fun aSavedConnectionWithTls(name: String, word: String) {
+        val tls = tlsFromWord(word)
+        addConnectionWith(name, tls, BrokerEndpoints.defaultsFor(tls))
+    }
+
+    @Given("a saved connection {string} with TLS {word} and the CA certificate path {string}")
+    fun aSavedConnectionWithTlsAndCa(name: String, word: String, ca: String) {
+        val tls = tlsFromWord(word)
+        addConnectionWith(name, tls, BrokerEndpoints.defaultsFor(tls), ca)
+    }
+
+    @Given("a saved connection {string} with TLS {word}, stream port {int} and management port {int}")
+    fun aSavedConnectionWithTlsAndPorts(name: String, word: String, stream: Int, management: Int) {
+        addConnectionWith(name, tlsFromWord(word), BrokerPorts(stream, management))
+    }
+
+    @When("I turn TLS {word} for {string} and save")
+    fun iTurnTlsAndSave(word: String, name: String) {
+        val tls = tlsFromWord(word)
+        val saved = repository.list().first { it.name == name }
+        lastProfileName = name
+        // What the form does on the switch: the ports follow while they are the default of the old mode; Save sends the form's values.
+        val ports = BrokerEndpoints.afterTlsSwitch(BrokerPorts(saved.streamPort, saved.managementPort), tlsNow = tls)
+        lastSaveResult = viewModel.updateConnection(
+            originalName = name,
+            input = ConnectionProfileInput(
+                name = saved.name, host = saved.host, virtualHost = saved.virtualHost, username = saved.username, password = null,
+                streamPort = ports.stream, managementPort = ports.management, tls = tls,
+            ),
+        )
+    }
+
+    @Then("its TLS switch is {word}")
+    fun itsTlsSwitchIs(word: String) {
+        assertEquals(tlsFromWord(word), currentProfile().tls, "TLS switch of '$lastProfileName'")
+    }
+
+    @Then("the saved CA certificate path of {string} is still {string}")
+    fun theSavedCaPathIsStill(name: String, path: String) {
+        assertEquals(path, repository.list().first { it.name == name }.caCertificatePath)
+    }
+
+    @Then("no message about the CA certificate is shown")
+    fun noMessageAboutTheCa() {
+        assertEquals(null, viewModel.state.value.lastCaCertificateValidationResult, "a CA validation result is on screen")
+        assertEquals(emptyList<String>(), caValidator.validated, "the CA validator was asked about: ${caValidator.validated}")
     }
 
     @When("I try to save another connection named {string}")
@@ -207,6 +289,9 @@ class ConnectionsSteps {
                 virtualHost = saved.virtualHost,
                 username = saved.username,
                 password = null,
+                // The form sends the ports it shows; an edit of the host must not reset them.
+                streamPort = saved.streamPort,
+                managementPort = saved.managementPort,
             ),
         )
     }
@@ -233,6 +318,14 @@ class ConnectionsSteps {
         checker.managementPluginEnabled = true
     }
 
+    @Given("the broker's stream endpoint and management API are both reachable over plain HTTP")
+    fun theBrokerSEndpointsAreReachableOverPlain() {
+        checker.streamReachable = true
+        checker.managementReachable = true
+        checker.plainOffered = true
+        checker.managementPluginEnabled = true
+    }
+
     @Given("the {endpoint} is not reachable")
     fun theEndpointIsNotReachable(endpoint: Endpoint) {
         when (endpoint) {
@@ -252,9 +345,10 @@ class ConnectionsSteps {
         checker.managementPluginEnabled = false
     }
 
-    @Given("the broker only accepts connections without TLS")
-    fun theBrokerOnlyAcceptsConnectionsWithoutTls() {
+    @Given("the broker only offers plain connections")
+    fun theBrokerOnlyOffersPlainConnections() {
         checker.tlsOffered = false
+        checker.plainOffered = true
     }
 
     @Given("the broker presents a certificate signed by a private CA")
@@ -303,34 +397,46 @@ class ConnectionsSteps {
         assertEquals(ConnectionCheckResult.TlsRefused, lastCheckResult)
     }
 
-    @Then("the message says the app does not connect without TLS")
-    fun theMessageSaysTheAppDoesNotConnectWithoutTls() {
-        // The fixed wording ("the app does not connect without TLS", docs/spec.md "Broker
-        // requirements") is a UI-layer banner string, verified by the Compose screen's own UI test
-        // once it exists. At this layer we verify the semantic result the UI renders that banner
-        // from is unambiguously the TLS-refusal case, not a generic failure.
-        assertEquals(ConnectionCheckResult.TlsRefused, lastCheckResult)
+    private fun checkMessage(): String {
+        val result = checkNotNull(lastCheckResult) { "no check result" }
+        return checkResultMessage(result, tls = currentProfile().tls)
+    }
+
+    @Then("the message says the broker may not use TLS")
+    fun theMessageSaysTheBrokerMayNotUseTls() {
+        assertTrue(checkMessage().contains("may not use TLS")) { "message: ${checkMessage()}" }
+    }
+
+    @Then("the message says the switch can be turned off in the connection settings")
+    fun theMessageSaysTheSwitchCanBeTurnedOff() {
+        assertTrue(checkMessage().contains("turn off 'Use TLS' in this connection's settings")) { "message: ${checkMessage()}" }
+    }
+
+    @Then("no attempt without TLS was made")
+    fun noAttemptWithoutTlsWasMade() {
+        assertTrue(checker.attempts.isNotEmpty() && checker.attempts.all { it }) {
+            "every attempt must be with TLS (no fallback), attempts (true = TLS): ${checker.attempts}"
+        }
+    }
+
+    @Then("the message says the connection is not encrypted")
+    fun theMessageSaysTheConnectionIsNotEncrypted() {
+        assertTrue(checkMessage().contains("not encrypted")) { "message: ${checkMessage()}" }
+    }
+
+    @Then("the message does not mention TLS or a certificate")
+    fun theMessageDoesNotMentionTlsOrACertificate() {
+        val text = checkMessage()
+        assertFalse(text.contains("TLS", ignoreCase = true) || text.contains("certificate", ignoreCase = true)) { "message: $text" }
     }
 
     // --- CA certificate -----------------------------------------------------
 
     @Given("I am editing a connection profile")
     fun iAmEditingAConnectionProfile() {
-        // No fixture state needed: "TLS is always on" is asserted against the ConnectionProfile type
-        // itself (no instance required), and "An unreadable CA certificate file is rejected" exercises
+        // No fixture state needed: "An unreadable CA certificate file is rejected" exercises
         // viewModel.validateCaCertificateFile(...) standalone, before any profile is saved - exactly
         // like a user filling in the "New connection" panel. This step only documents that context.
-    }
-
-    @Then("there is no option to turn TLS off")
-    fun thereIsNoOptionToTurnTlsOff() {
-        val tlsRelatedFields = ConnectionProfile::class.java.declaredFields
-            .map { it.name.lowercase() }
-            .filter { it.contains("tls") }
-        assertTrue(tlsRelatedFields.isEmpty()) {
-            "ConnectionProfile must have no TLS-related field at all (TLS is the only mode this app " +
-                "can express, not a toggle) - found: $tlsRelatedFields"
-        }
     }
 
     @When("I set the CA certificate of {string} to the private CA file")
@@ -338,8 +444,31 @@ class ConnectionsSteps {
         lastCaCertificateResult = viewModel.setCaCertificate(name, PRIVATE_CA_FIXTURE_PATH)
     }
 
-    @When("I choose a CA certificate file that is not a valid certificate")
-    fun iChooseACaCertificateFileThatIsNotAValidCertificate() {
+    // "and leave the field": the screen validates on focus loss and on Save, not per keystroke (ConnectionsScreenUiTest pins when and on
+    // which thread); the step calls the same view model method the screen calls then.
+    @When("I add a connection {string} with the private CA file typed in the form")
+    fun iAddAConnectionWithThePrivateCaFileTypedInTheForm(name: String) {
+        val result = viewModel.addConnection(
+            ConnectionProfileInput(
+                name = name, host = "rabbit-$name.example.com", virtualHost = "/", username = "svc-explorer", password = "s3cret",
+                caCertificatePath = PRIVATE_CA_FIXTURE_PATH,
+            ),
+        )
+        check(result is SaveConnectionResult.Saved) { "Test setup failed: could not save '$name': $result" }
+        lastProfileName = name
+        lastPassword = "s3cret"
+    }
+
+    @Then("the saved CA certificate path of {string} is the private CA file")
+    fun theSavedCaCertificatePathIsThePrivateCaFile(name: String) {
+        assertEquals(
+            PRIVATE_CA_FIXTURE_PATH, viewModel.state.value.profiles.first { it.name == name }.caCertificatePath,
+            "the CA path typed in the form was not stored with the new connection",
+        )
+    }
+
+    @When("I enter the path of a file that is not a valid certificate and leave the field")
+    fun iEnterThePathOfAFileThatIsNotAValidCertificate() {
         lastCaCertificateResult = viewModel.validateCaCertificateFile(INVALID_CERTIFICATE_FIXTURE_PATH)
     }
 
@@ -352,7 +481,7 @@ class ConnectionsSteps {
         }
     }
 
-    @When("I type the CA certificate path {string}")
+    @When("I type the CA certificate path {string} and leave the field")
     fun iTypeTheCaCertificatePath(path: String) {
         val tempDir = System.getProperty("java.io.tmpdir").trimEnd('/')
         val typed = when (path) {
