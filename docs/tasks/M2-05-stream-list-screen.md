@@ -2,7 +2,7 @@
 
 Milestone: M2    Depends on: M2-04 (merged into local `main`), M2-01b    Size: L as one task (about 4 to 5 days); delivered as three parts, 05a, 05b, 05c, each one to two days, each ends green (see Plan)
 
-Status: briefed (architect, 2026-11-05), branch `m2-05-stream-list-screen`, created from the accepted M2-12b head. Step 2, part 05a (tests first, test developer, 2026-11-05): DONE, red for the right reason; see "Step 2 report, 05a" below. Step 3, part 05a (senior developer, 2026-11-05): DONE, see "Step 3 report, 05a" below; waiting for test developer step 4 on 05a. Step 2 for 05b and 05c is still to do. The input note of 2026-11-04 and the M2-04 review follow-ups are kept unchanged at the end of this file under "Inputs (kept as written)"; this brief states what is built and wins where the two differ.
+Status: briefed (architect, 2026-11-05), branch `m2-05-stream-list-screen`, created from the accepted M2-12b head. Step 2, part 05a (tests first, test developer, 2026-11-05): DONE, red for the right reason; see "Step 2 report, 05a" below. Step 3, part 05a (senior developer, 2026-11-05): DONE, see "Step 3 report, 05a" below; Step 4, part 05a (test developer, 2026-11-05): DONE, pass with one minor finding, see "Step 4 report, 05a" below; waiting for the architect review of 05a. Step 2 for 05b and 05c is still to do. The input note of 2026-11-04 and the M2-04 review follow-ups are kept unchanged at the end of this file under "Inputs (kept as written)"; this brief states what is built and wins where the two differ.
 
 ## Goal
 The app shows the stream list for the held connection as designed in `docs/ux/Streams.dc.html`, with every state (not connected, connecting, loading, rows, empty, denied, failed, lost connection); a fixed connection chip with popup in the app bar of every screen connects, disconnects, retries and sets the refresh interval; the interval is stored in `settings.json`; every value in the list is copyable as displayed; and the view model is only ever called from the UI thread.
@@ -110,6 +110,26 @@ Not run: `:ui:screenshotTest`, `@broker`, `brokerTest`, `keychainTest`, `verifyT
 Built: `kotlinx-coroutines-swing:1.9.0` in `desktopApp` only; `createAppComposition(uiDispatcher = Dispatchers.Swing, appSettings = JsonFileAppSettings(default file))`, the stream list scope runs on `uiDispatcher`; every public `StreamListViewModel` method hops with `scope.launch` (`close()` idempotent from any thread); `StreamListState.updatedAtMillis` added and `updatedSecondsAgo()` kept as a pure read of the published state (thread-safe, no mutable field read), so no test was deleted: the existing M2-04 refresh and rows tests, the harness and the acceptance steps still use it, and the thread test keeps its call and its guard test; `JsonFileAppSettings` real (atomic write, unknown keys kept, read fallbacks, failure logged); `LOAD_FAILED` text; the three production "D2 proposed" comments and the `FakeAppSettings` and `AppSettings` KDoc reworded.
 One test line changed: `CompositionRootStreamListWiringTest` took the thread name without stripping the " @coroutine" suffix the debug agent adds inside `runBlocking` (the other thread names in the file are stripped); one `substringBefore` added.
 Result: `./gradlew test --continue` BUILD SUCCESSFUL, 792 tests, 0 failed, 11 skipped (broker and keychain tests need Docker or a keychain, not run).
+
+## Step 4 report, 05a (test developer, 2026-11-05)
+Task: M2-05 part 05a    Branch/commit: m2-05-stream-list-screen @ 6d6d563
+Verdict: pass with findings (no blocker, no major)
+Run: `./gradlew test --rerun-tasks` BUILD SUCCESSFUL (verifyTestDiscovery included): 92 acceptance tests (11 skipped, 0 failed), every unit class ok; @fake-broker (incl. the three new `03` settings scenarios) pass; @smoke pass; @broker not run (not asked for in 05a, no Docker needed by 05a); `:ui:screenshotTest`, keychainTest not run (05a has no UI change).
+Scenarios for this part: `03` "The refresh interval is kept between runs", "... Off is kept between runs", "A corrupt settings file falls back to 5 seconds" pass.
+Thread test: `StreamListViewModelThreadTest` (12) run 6 times with `--rerun-tasks`, 6 green, no flake.
+Mutation checks (each reverted, tree clean): no hop in `setFilter` killed (2 tests fail); no hop in `nextPage` killed (2); `JsonFileAppSettings` drops unknown keys killed (1); non-atomic write (plain write instead of move) killed (1); default Off instead of 5 s killed (7); string value `"5"` accepted killed (1). SURVIVED: `updatedSecondsAgo()` reading the plain field `lastSuccessMillis` instead of the state (see finding 1).
+Deviations judged: (1) keeping `updatedSecondsAgo()` as a pure read of `state.updatedAtMillis` is acceptable (thread safe by construction, still covered by the thread test); (2) the `substringBefore(" @coroutine")` change in `CompositionRootStreamListWiringTest:123` is a test-only normalisation of a debug-agent thread name suffix, does not weaken the assertion (still compares to the dispatcher thread name); accepted.
+Swing dependency: `kotlinx-coroutines-swing:1.9.0` only in `desktopApp/build.gradle.kts`; `createDistributable` adds one jar, `kotlinx-coroutines-swing-1.9.0-*.jar`, 9,179 bytes (9 KB; coroutines-core 1.4 MB was already there). App bundle 188 MB.
+Startup: `:desktopApp:run` for 25 s with the real `Dispatchers.Swing`: no exception, only the usual skiko native-access warnings. `~/.caerbannog/settings.json` does not exist after the whole test run and the run (only `connections.json`), so tests do not touch the real home file.
+Findings:
+| # | Severity | Where | What happened | Expected | Steps |
+| --- | --- | --- | --- | --- | --- |
+| 1 | minor | `StreamListViewModelThreadTest` | Mutation: `updatedSecondsAgo()` reads the non-volatile field `lastSuccessMillis` again; all 12 tests stay green | the guard should fail if the method reads a mutable field (brief item 2) | A data race on one Long cannot be shown reliably by a test; a source-level guard (the method body reads only `_state`) would pin it. Not a stopper, architect decides |
+| 2 | minor | `tests/bdd/README.md` row M2-05a | says `CompositionRootStreamListWiringTest` has 7 tests, 4 red; it has 6 | correct count | fixed in the row |
+| 3 | idea | `AppComposition.close()` | `streamList.close()` now hops with `launch` and `streamListScope.cancel()` follows at once, so the close body may never run (`closed` stays false); the scope cancel stops the timer and loads, so behaviour is right, and the wiring test proves no call after close | none | note only |
+Added or changed tests: README row count only (no test code changed in step 4).
+Not tested: @broker suite, `:ui:screenshotTest`, keychain tests, the manual dev:up trial (A1, belongs to 05c), the installer (.dmg) itself (the distributable jar listing was used instead), Windows and Linux Swing start.
+Spec or scenario issues for the architect: none.
 
 ---
 
