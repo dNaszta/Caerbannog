@@ -1,0 +1,79 @@
+{
+  "exchanges": [
+    {
+      "name": "orders",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {
+        "x-super-stream": true
+      }
+    }
+  ],
+  "queues": [
+    {
+      "name": "orders-0",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream",
+        "x-queue-leader-locator": "balanced"
+      }
+    },
+    {
+      "name": "orders-1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream",
+        "x-queue-leader-locator": "balanced"
+      }
+    },
+    {
+      "name": "orders-2",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream",
+        "x-queue-leader-locator": "balanced"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "orders",
+      "vhost": "/",
+      "destination": "orders-0",
+      "destination_type": "queue",
+      "routing_key": "0",
+      "arguments": {
+        "x-stream-partition-order": 0
+      }
+    },
+    {
+      "source": "orders",
+      "vhost": "/",
+      "destination": "orders-1",
+      "destination_type": "queue",
+      "routing_key": "1",
+      "arguments": {
+        "x-stream-partition-order": 1
+      }
+    },
+    {
+      "source": "orders",
+      "vhost": "/",
+      "destination": "orders-2",
+      "destination_type": "queue",
+      "routing_key": "2",
+      "arguments": {
+        "x-stream-partition-order": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "users": [
+    {
+      "name": "admin",
+      "password": "dev-password",
+      "tags": "administrator"
+    },
+    {
+      "name": "monitor",
+      "password": "dev-password",
+      "tags": "monitoring"
+    },
+    {
+      "name": "manager",
+      "password": "dev-password",
+      "tags": "management"
+    },
+    {
+      "name": "notag",
+      "password": "dev-password",
+      "tags": ""
+    },
+    {
+      "name": "multi",
+      "password": "dev-password",
+      "tags": "management"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    },
+    {
+      "name": "many"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "admin",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "admin",
+      "vhost": "many",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "monitor",
+      "vhost": "/",
+      "configure": "",
+      "write": "",
+      "read": ".*"
+    },
+    {
+      "user": "manager",
+      "vhost": "/",
+      "configure": "",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "notag",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "multi",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "multi",
+      "vhost": "many",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "dev.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dev.commands",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dev.fanout",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "many.events",
+      "vhost": "many",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "dev-jobs",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "dev-mail",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "dev-retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "dev-orders",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    },
+    {
+      "name": "dev-events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    },
+    {
+      "name": "dev-audit",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    },
+    {
+      "name": "many-stream-1",
+      "vhost": "many",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    },
+    {
+      "name": "many-stream-2",
+      "vhost": "many",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "dev.events",
+      "vhost": "/",
+      "destination": "dev-jobs",
+      "destination_type": "queue",
+      "routing_key": "job.#",
+      "arguments": {}
+    },
+    {
+      "source": "dev.commands",
+      "vhost": "/",
+      "destination": "dev-mail",
+      "destination_type": "queue",
+      "routing_key": "mail",
+      "arguments": {}
+    },
+    {
+      "source": "dev.fanout",
+      "vhost": "/",
+      "destination": "dev-retry",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "dev.fanout",
+      "vhost": "/",
+      "destination": "dev-jobs",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ]
+}
