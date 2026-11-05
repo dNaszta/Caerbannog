@@ -55,6 +55,10 @@ class AppComposition(
     val streamList: StreamListViewModel,
     /** The model behind the app bar chip and its popup; the window ticks it once a second for "Updated N s ago". */
     val control: ConnectionControlModel,
+    /** COMPILE STUB (M2-05c step 2): which screen the window shows; "Manage connections" must reach it, see `CompositionRootNavigationTest`. */
+    val navigation: AppNavigation,
+    /** COMPILE STUB (M2-05c step 2): the stream list screen's events, mapped onto [streamList]; see `CompositionRootStreamEventsTest`. */
+    val streamEvents: StreamListEventsAdapter,
     private val streamListScope: CoroutineScope,
 ) {
     /** Stops the stream list (its timer and loads), then closes the held connection, if any. Safe to call twice. */
@@ -85,7 +89,7 @@ fun createAppComposition(
     gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
     appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
     uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
-    onOpenConnections: () -> Unit = {},
+    navigation: AppNavigation = AppNavigation(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -108,9 +112,9 @@ fun createAppComposition(
         reconnect = viewModel::connect,
     )
     val control = ConnectionControlModel(
-        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections,
+        viewModel, active, streamList, streamListScope, RefreshClock { System.currentTimeMillis() }, onOpenConnections = {},
     )
-    return AppComposition(viewModel, active, streamList, control, streamListScope)
+    return AppComposition(viewModel, active, streamList, control, navigation, StreamListEventsAdapter(streamList), streamListScope)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

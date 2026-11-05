@@ -184,6 +184,10 @@ class StreamListSteps {
         gateway.offsetsOf(NAME).deny("/", name)
     }
 
+    @Given("a stream {string} with {int} publishers and {int} consumers")
+    fun aStreamWithPublishersAndConsumers(name: String, publishers: Int, consumers: Int) =
+        addStream(name, 0, 10, publishers = publishers, consumers = consumers)
+
     @Given("a stream {string} with {int} publishers")
     fun aStreamWithPublishers(name: String, publishers: Int) = addStream(name, 0, 10, publishers = publishers)
 
@@ -422,6 +426,12 @@ class StreamListSteps {
 
     @Then("^the stream \"([^\"]*)\" shows about (.+) messages$")
     fun theStreamShowsAboutMessages(name: String, count: String) = assertEquals(count, row(name).messages)
+
+    @Then("the stream {string} shows {string} publishers and {string} consumers")
+    fun theStreamShowsPublishersAndConsumers(name: String, publishers: String, consumers: String) {
+        assertEquals(publishers, row(name).publishers, "publishers cell of $name")
+        assertEquals(consumers, row(name).consumers, "consumers cell of $name")
+    }
 
     @Then("{string} is listed with its message count, publishers and consumers")
     fun isListedWithCounts(name: String) {

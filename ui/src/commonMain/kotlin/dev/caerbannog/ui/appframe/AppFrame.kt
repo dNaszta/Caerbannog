@@ -318,10 +318,12 @@ fun AppFrame(
     control: ConnectionControlState,
     events: ConnectionControlEvents,
     modifier: Modifier = Modifier,
+    /** COMPILE STUB (M2-05c step 2): not used yet. The drawer items report the destination the user chose; see `AppFrameNavigationUiTest`. */
+    onNavigate: (AppDestination) -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    AppFrameLayout(title, modifier, actions, chip = { ConnectionControl(control, events) }, content = content)
+    AppFrameLayout(title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, content = content)
 }
 
 /** The frame with the chip slot open: [chip] null draws no chip (a caller that has no connection control yet). */
@@ -329,6 +331,7 @@ fun AppFrame(
 internal fun AppFrameLayout(
     title: String,
     modifier: Modifier = Modifier,
+    onNavigate: (AppDestination) -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     chip: (@Composable () -> Unit)?,
     content: @Composable () -> Unit,
@@ -356,6 +359,9 @@ private fun AppBar(title: String, actions: @Composable RowScope.() -> Unit, chip
         chip?.invoke()
     }
 }
+
+/** The four drawer items. The app decides what to do with each; Topology and Migrations have no screen yet. */
+enum class AppDestination { Connections, Streams, Topology, Migrations }
 
 private val navItems: List<Pair<String, AppIcon>> = listOf(
     "Connections" to AppIcon.Power,

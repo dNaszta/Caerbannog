@@ -1920,4 +1920,17 @@ class ConnectionsScreenUiTest {
         assertTrue(save.width >= textWidth, "Save must not be squeezed: button width ${save.width} < text width $textWidth")
         assertEquals(1, layouts.single().lineCount, "the Save label must stay on one line")
     }
+
+    // M2-05c step 2: the drawer of the Connections screen reports navigation (tags `navItem:<Name>`, see AppFrameNavigationUiTest).
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the Connections screen drawer reports the chosen destination and marks Connections selected`() = runDesktopComposeUiTest {
+        val seen = mutableListOf<dev.caerbannog.ui.appframe.AppDestination>()
+        setContent { ConnectionsScreen(testViewModel(), onNavigate = { seen += it }) }
+
+        onNodeWithTag("navItem:Connections").assertIsSelected()
+        onNodeWithTag("navItem:Streams").performClick()
+
+        assertEquals(listOf(dev.caerbannog.ui.appframe.AppDestination.Streams), seen)
+    }
 }

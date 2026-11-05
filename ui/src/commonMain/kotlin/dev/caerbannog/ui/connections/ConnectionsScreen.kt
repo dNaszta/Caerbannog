@@ -81,6 +81,8 @@ fun ConnectionsScreen(
     viewModel: ConnectionsViewModel,
     control: ConnectionControlState? = null,
     controlEvents: ConnectionControlEvents? = null,
+    /** COMPILE STUB (M2-05c step 2): not used yet; the drawer reports the chosen destination, see `AppFrameNavigationUiTest`. */
+    onNavigate: (dev.caerbannog.ui.appframe.AppDestination) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()

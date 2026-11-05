@@ -127,14 +127,13 @@ Feature: Connection profiles
     When I start deleting the connection "uat-eu" and then cancel
     Then the connection "uat-eu" is still in the saved profiles
 
-  @needs-M2
-  # Deferred to M2: needs a real stream list to assert "the stream list shows the streams of
-  # 'prod-eu'" against. See docs/tasks/M1-02-connection-profiles.md's Acceptance section and
-  # acceptance-tests/.../connections/SwitchBetweenConnectionsSteps.kt. Excluded from the default
-  # Cucumber run via "not @needs-M2" rather than deleted or silently skipped.
+  # Un-skipped in M2-05c (it was @needs-M2, deferred by M1-02 until the stream list existed). Switching means Connect on the other
+  # profile in the chip popup; the steps read the app bar model and the stream list view model
+  # (acceptance-tests/.../connections/SwitchBetweenConnectionsSteps.kt).
+  @fake-broker
   Scenario: Switch between connections
     Given saved connections "uat-eu" and "prod-eu"
     And I am connected to "uat-eu"
     When I switch to "prod-eu"
-    Then the sidebar shows "prod-eu" as the current connection
+    Then the app bar shows "prod-eu" as the current connection
     And the stream list shows the streams of "prod-eu"

@@ -43,6 +43,18 @@ Feature: Stream list
       | 880000 | 2083999 | 1,204,000 |
       | 0      | 0       | 1         |
 
+  # M2-05c: grouped like the message count, fixed (not locale dependent), so copy gives exactly what is shown.
+  @fake-broker
+  Scenario Outline: Publisher and consumer counts are grouped like the message count
+    Given a stream "busy" with <publishers> publishers and <consumers> consumers
+    When I open the stream list
+    Then the stream "busy" shows "<shown publishers>" publishers and "<shown consumers>" consumers
+
+    Examples:
+      | publishers | consumers | shown publishers | shown consumers |
+      | 999        | 3         | 999              | 3               |
+      | 1000       | 12345     | 1,000            | 12,345          |
+
   @fake-broker
   Scenario: The first offset cannot be read for one stream
     Given a stream "orders-events" whose statistics call is denied
