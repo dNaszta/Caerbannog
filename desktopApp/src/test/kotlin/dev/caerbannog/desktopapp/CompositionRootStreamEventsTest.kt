@@ -10,7 +10,9 @@ import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListScreen
+import dev.caerbannog.core.streams.StreamRowKind
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.datarabbit.JsonFileAppSettings
 import kotlinx.coroutines.CoroutineDispatcher
@@ -111,6 +113,40 @@ class CompositionRootStreamEventsTest {
             composition.streamEvents.previousPage()
             queue.runAll()
             assertEquals(1, composition.streamList.state.value.page)
+        } finally {
+            composition.close()
+        }
+    }
+
+    // M2-07: a wrong mapping (toggle dropped, the kind filter mapped to nothing) would pass every Compose test.
+    @Test
+    fun `the expand toggle and the kind chips reach the view model (M2-07)`() {
+        val queue = QueueDispatcher()
+        val composition = compose(queue, streams = 1)
+        try {
+            val catalog = gateway.catalogOf("uat-eu")
+            for (p in listOf("orders-0", "orders-1")) {
+                catalog.addStream(stream(p))
+                gateway.offsetsOf("uat-eu").setFirst("/", p, 0)
+            }
+            catalog.superStream("orders", listOf("orders-0", "orders-1"))
+            composition.connect(queue)
+            composition.streamEvents.setShown(true)
+            queue.runAll()
+            assertEquals(listOf("orders", "s000"), composition.streamList.state.value.rows.map { it.name })
+
+            composition.streamEvents.toggleExpanded("orders")
+            queue.runAll()
+            assertEquals(listOf("orders", "orders-0", "orders-1", "s000"), composition.streamList.state.value.rows.map { it.name })
+
+            composition.streamEvents.setKindFilter(StreamKindFilter.Streams)
+            queue.runAll()
+            assertEquals(StreamKindFilter.Streams, composition.streamList.state.value.kindFilter)
+            assertEquals(listOf("s000"), composition.streamList.state.value.rows.map { it.name })
+
+            composition.streamEvents.setKindFilter(StreamKindFilter.SuperStreams)
+            queue.runAll()
+            assertEquals(StreamRowKind.SuperStream, composition.streamList.state.value.rows.first().kind)
         } finally {
             composition.close()
         }

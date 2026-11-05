@@ -9,7 +9,7 @@ import org.junit.platform.suite.api.Suite
 
 /**
  * M2-04: runs tests/bdd/features/03_stream_list.feature against the fakes (no Docker, no network). Left out by tag:
- * `@needs-M2` ("Filter by kind", needs the super streams of M2-07) and `@broker` (the M2-09 gate scenario).
+ * `@broker` (the M2-09 gate scenario). M2-07: "Filter by kind" lost `@needs-M2` and runs here; the `@needs-M2` exclusion stays as a guard.
  */
 @Suite
 @IncludeEngines("cucumber")

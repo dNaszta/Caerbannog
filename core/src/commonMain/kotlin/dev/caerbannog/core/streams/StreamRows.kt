@@ -48,3 +48,35 @@ internal fun lastOffsetText(firstOffset: FirstOffset?, messages: Long?): String 
     messages == 0L -> ""
     else -> (firstOffset.offset + messages - 1).toString()
 }
+
+/** A partition row: an ordinary stream row with its own cells, typed "partition" and pointing at its super stream. */
+internal fun partitionRow(summary: StreamSummary, firstOffset: FirstOffset?, publishers: Int?, superStream: String): StreamRow =
+    streamRow(summary, firstOffset, publishers).copy(
+        type = StreamListTexts.PARTITION,
+        kind = StreamRowKind.Partition,
+        partitionOf = superStream,
+    )
+
+/**
+ * The row of a super stream, from all its partitions (also while collapsed). Sums are never partial: messages only when every
+ * partition has a count, publishers only when every partition's count is shown (D8, [publisherCounts] null means not shown).
+ * Consumers add up attachments, not distinct clients. Offsets do not apply: order exists only inside a partition.
+ */
+internal fun superStreamRow(group: StreamEntry.Group, publisherCounts: Map<String, Int>?, expanded: Boolean): StreamRow {
+    val partitions = group.partitions
+    val counts = partitions.map { it.messages }
+    val retentions = partitions.map { it.retention.displayMaxAge() }.distinct()
+    return StreamRow(
+        name = group.name,
+        type = StreamListTexts.SUPER_STREAM,
+        messages = if (counts.any { it == null }) StreamListTexts.NOT_AVAILABLE else groupDigits(counts.sumOf { it ?: 0L }),
+        firstOffset = StreamListTexts.NOT_APPLICABLE,
+        lastOffset = StreamListTexts.NOT_APPLICABLE,
+        publishers = publisherCounts?.let { c -> groupDigits(partitions.sumOf { c[it.name] ?: 0 }.toLong()) } ?: StreamListTexts.UNAVAILABLE,
+        consumers = groupDigits(partitions.sumOf { it.consumers }.toLong()),
+        retention = retentions.singleOrNull() ?: StreamListTexts.MIXED,
+        kind = StreamRowKind.SuperStream,
+        partitionCount = partitions.size,
+        expanded = expanded,
+    )
+}

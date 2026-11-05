@@ -51,6 +51,7 @@ class StreamListViewModel(
 
     private var filter = ""
     private var sort = StreamSort.NameAscending
+    private var kindFilter = StreamKindFilter.All
     private var page = 1
     private var pageSize = pageSize.coerceAtLeast(1)
     private var interval: RefreshInterval = settings.streamListRefresh
@@ -60,6 +61,12 @@ class StreamListViewModel(
     private var loaded: List<StreamSummary>? = null
     private var publisherCounts: Map<String, Int>? = null
     private val firstOffsets = mutableMapOf<String, FirstOffset>()
+
+    // M2-07: the last grouping read for this connection (null: never read, the list is flat and says so), the entries built from it
+    // and the loaded streams, and the expanded super streams by name (only a super stream can be in it).
+    private var layouts: List<SuperStreamLayout>? = null
+    private var entries: List<StreamEntry> = emptyList()
+    private val expanded = mutableSetOf<String>()
     private var lastSuccessMillis: Long? = null
     private var stale = false
     private var banner: String? = null
@@ -120,6 +127,20 @@ class StreamListViewModel(
 
     fun setSort(sort: StreamSort) = onScope {
         this.sort = sort
+        page = 1
+        viewChanged()
+    }
+
+    /** Expands or collapses the super stream [name]; anything else (a plain stream, an unknown name) is ignored. The set survives a refresh. */
+    fun toggleExpanded(name: String) = onScope {
+        if (entries.none { it is StreamEntry.Group && it.name == name }) return@onScope
+        if (!expanded.remove(name)) expanded += name
+        viewChanged()
+    }
+
+    /** The kind chips; composes with the name filter and goes back to page 1. */
+    fun setKindFilter(kind: StreamKindFilter) = onScope {
+        kindFilter = kind
         page = 1
         viewChanged()
     }
@@ -199,6 +220,9 @@ class StreamListViewModel(
         loaded = null
         publisherCounts = null
         firstOffsets.clear()
+        layouts = null
+        entries = emptyList()
+        expanded.clear()
         lastSuccessMillis = null
         stale = false
         banner = null
@@ -225,6 +249,12 @@ class StreamListViewModel(
 
         val streams = readAllStreams(src) ?: return
 
+        // M2-07: one grouping read per load. Any failure keeps the last known grouping and never fails the load or loses the connection
+        // (so no [RefreshLoop.ask], which would turn Unreachable into a lost connection); the stream calls drive D2.
+        val grouping = src.catalog.superStreams(src.vhost)
+        if (!loop.alive(src)) return
+        val newLayouts = (grouping as? CatalogResult.Success)?.value ?: layouts
+
         // D8: one call per load, and only when the number is complete; otherwise "unavailable", never a partial number.
         var counts: Map<String, Int>? = null
         if (caps.visibility == Visibility.FULL && caps.streamPlugin == PluginStatus.PRESENT) {
@@ -233,6 +263,8 @@ class StreamListViewModel(
         }
 
         loaded = streams
+        layouts = newLayouts
+        entries = groupStreams(streams, newLayouts.orEmpty())
         publisherCounts = counts
         lastSuccessMillis = clock.nowMillis()
         stale = false
@@ -268,6 +300,7 @@ class StreamListViewModel(
 
     private fun notAllowed() {
         loaded = null
+        entries = emptyList()
         cannotRead = true
         stale = false
         render()
@@ -303,24 +336,53 @@ class StreamListViewModel(
         if (canRun() && !loop.loading) source?.let { src -> loop.stepThenTimer(src) { fetchOffsets(src, refreshAll = false) } }
     }
 
-    private fun filteredSorted(): List<StreamSummary> {
-        val all = loaded.orEmpty()
-        val matching = if (filter.isEmpty()) all else all.filter { it.name.contains(filter, ignoreCase = true) }
-        val byName = compareBy<StreamSummary, String>(String.CASE_INSENSITIVE_ORDER) { it.name }.thenBy { it.name }
-        return when (sort) {
-            StreamSort.NameAscending -> matching.sortedWith(byName)
-            StreamSort.NameDescending -> matching.sortedWith(byName.reversed())
+    private fun matches(entry: StreamEntry): Boolean {
+        val kindOk = when (kindFilter) {
+            StreamKindFilter.All -> true
+            StreamKindFilter.Streams -> entry is StreamEntry.Single
+            StreamKindFilter.SuperStreams -> entry is StreamEntry.Group
         }
+        if (!kindOk) return false
+        if (filter.isEmpty()) return true
+        val own = entry.name.contains(filter, ignoreCase = true)
+        return own || (entry is StreamEntry.Group && entry.partitions.any { it.name.contains(filter, ignoreCase = true) })
+    }
+
+    // Entries (a super stream is one), filtered, then sorted by name; on equal names the plain stream comes first in both directions.
+    private fun filteredSorted(): List<StreamEntry> {
+        val byName = compareBy<StreamEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }.thenBy { it.name }
+        val directed = if (sort == StreamSort.NameAscending) byName else byName.reversed()
+        return entries.filter(::matches).sortedWith(directed.thenBy { it is StreamEntry.Group })
     }
 
     private fun pageCount(total: Int): Int = ((total + pageSize - 1) / pageSize).coerceAtLeast(1)
 
     private fun clampedPage(): Int = page.coerceIn(1, pageCount(filteredSorted().size))
 
-    private fun visibleSummaries(): List<StreamSummary> {
+    private fun visibleEntries(): List<StreamEntry> {
         val all = filteredSorted()
         val current = page.coerceIn(1, pageCount(all.size))
         return all.drop((current - 1) * pageSize).take(pageSize)
+    }
+
+    // The streams whose first offset is shown: plain streams of the page and the partitions of its expanded super streams.
+    private fun visibleSummaries(): List<StreamSummary> = visibleEntries().flatMap { it.shownStreams() }
+
+    private fun StreamEntry.shownStreams(): List<StreamSummary> = when (this) {
+        is StreamEntry.Single -> listOf(stream)
+        is StreamEntry.Group -> if (name in expanded) partitions else emptyList()
+    }
+
+    private fun rowsOf(entry: StreamEntry, counts: Map<String, Int>?): List<StreamRow> = when (entry) {
+        is StreamEntry.Single -> listOf(streamRow(entry.stream, firstOffsets[entry.name], counts?.let { it[entry.name] ?: 0 }))
+        is StreamEntry.Group -> {
+            val open = entry.name in expanded
+            listOf(superStreamRow(entry, counts, open)) + if (open) {
+                entry.partitions.map { partitionRow(it, firstOffsets[it.name], counts?.let { c -> c[it.name] ?: 0 }, entry.name) }
+            } else {
+                emptyList()
+            }
+        }
     }
 
     private fun screen(): StreamListScreen {
@@ -360,7 +422,7 @@ class StreamListViewModel(
                 screen == StreamListScreen.Empty -> StreamListTexts.CREATE_STREAM
                 else -> null
             },
-            rows = visible.map { streamRow(it, firstOffsets[it.name], counts?.let { c -> c[it.name] ?: 0 }) },
+            rows = visible.flatMap { rowsOf(it, counts) },
             filter = filter,
             sort = sort,
             page = current,
@@ -373,6 +435,8 @@ class StreamListViewModel(
             banner = banner,
             refreshInterval = interval,
             updatedAtMillis = lastSuccessMillis,
+            kindFilter = kindFilter,
+            groupingNotice = if (loaded != null && layouts == null) StreamListTexts.GROUPING_UNAVAILABLE else null,
         )
     }
 }

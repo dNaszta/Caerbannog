@@ -10,6 +10,7 @@ import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.streams.SuperStreamLayout
 
 /**
  * What a screen may use of the held connection: its catalog and offsets, and the virtual host of the profile.
@@ -32,6 +33,8 @@ internal class GuardedCatalog(private val inner: StreamCatalog, private val isCu
     override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> = guarded { inner.publisherCounts(vhost) }
 
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> = guarded { inner.consumers(vhost, stream) }
+
+    override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> = guarded { inner.superStreams(vhost) }
 
     override suspend fun capabilities(): CatalogResult<Capabilities> = guarded { inner.capabilities() }
 }

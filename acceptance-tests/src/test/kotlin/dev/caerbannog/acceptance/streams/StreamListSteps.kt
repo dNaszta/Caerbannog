@@ -17,10 +17,13 @@ import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
+import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListScreen
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListViewModel
+import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.StreamRow
+import dev.caerbannog.core.streams.StreamRowKind
 import dev.caerbannog.core.streams.StreamSort
 import dev.caerbannog.core.streams.Visibility
 import dev.caerbannog.datarabbit.JsonFileAppSettings
@@ -52,7 +55,7 @@ import java.util.Locale
  * core jvmTest `StreamListHarness`.
  *
  * What a step is thinner than its wording:
- *  - "the Size cell of each stream is blank": the row model has no size member at all (N1), checked by name; the blank cell is
+ *  - "the Size cell of each stream shows the dash": the row model has no size member at all (N1), checked by name; the blank cell is
  *    drawn by M2-05.
  *  - "I can move to the next page" and "I see streams 1 to 5 of 12" read the state (`hasNextPage`, `rangeText`), not a screen.
  */
@@ -418,7 +421,7 @@ class StreamListSteps {
         }
     }
 
-    @Then("the Size cell of each stream is blank")
+    @Then("the Size cell of each stream shows the dash")
     fun theSizeCellIsBlank() {
         val members = StreamRow::class.java.declaredFields.map { it.name.lowercase() }
         assertTrue(members.none { "size" in it || "bytes" in it }, "N1: the row model carries no size, members: $members")
@@ -517,4 +520,188 @@ class StreamListSteps {
 
     @Then("no quorum queue is listed")
     fun noQuorumQueueIsListed() = assertFalse(state.rows.any { it.name.startsWith("quorum-") }, "rows: ${state.rows.map { it.name }}")
+
+    // --- M2-07 super streams (features 06 and the "Filter by kind" scenario of 03; no DI in this module, so they share this class) ---
+
+    private val note = "Messages are ordered only inside a partition. Choose a partition to browse it."
+    private val superPartitions = mutableMapOf<String, List<String>>() // what each step declared, in the broker's order
+
+    // The partition streams exist (first offset 0, 10 messages unless a step sets them) and the broker's layout names them in this order.
+    private fun addSuperStream(name: String, partitions: List<String>, messages: List<Long?> = partitions.map { 10L }) {
+        partitions.forEachIndexed { i, p -> addStream(p, first = 0, messages = messages[i]) }
+        catalog.superStream(name, partitions)
+        superPartitions[name] = partitions
+    }
+
+    private fun partitionsOf(name: String): List<String> = checkNotNull(superPartitions[name]) { "no super stream $name declared" }
+
+    @Given("a super stream {string} with partitions {string}, {string} and {string}")
+    fun aSuperStreamWithThreePartitions(name: String, a: String, b: String, c: String) = addSuperStream(name, listOf(a, b, c))
+
+    // The streams are added in alphabetical order on purpose: the order that counts is the one the layout (the broker) gives.
+    @Given("the super stream {string} with partitions {string} and {string}, ordered us first")
+    fun aSuperStreamOrderedUsFirst(name: String, us: String, eu: String) {
+        assertTrue(us.endsWith("-us") && eu.endsWith("-eu"), "this step is written for an us and an eu partition")
+        addStream(eu, 0, 10)
+        addStream(us, 0, 10)
+        catalog.superStream(name, listOf(us, eu))
+        superPartitions[name] = listOf(us, eu)
+    }
+
+    @Given("a stream {string} and a super stream {string} with {int} partitions exist")
+    fun aStreamAndASuperStreamExist(stream: String, name: String, count: Int) {
+        addStream(stream, 0, 10)
+        addSuperStream(name, List(count) { "$name-$it" })
+    }
+
+    @Given("the partitions hold {long}, {long} and {long} messages")
+    fun thePartitionsHold(a: Long, b: Long, c: Long) {
+        val partitions = partitionsOf("orders")
+        partitions.zip(listOf(a, b, c)).forEach { (p, messages) -> addStream(p, first = 0, messages = messages) }
+    }
+
+    @Given("the partition {string} has no statistics yet")
+    fun thePartitionHasNoStatistics(name: String) = addStream(name, first = 0, messages = null)
+
+    @Given("{int} plain streams exist besides {string}")
+    fun plainStreamsExistBesides(count: Int, @Suppress("UNUSED_PARAMETER") name: String) {
+        repeat(count) { addStream("plain-%02d".format(it), 0, 10) }
+    }
+
+    @Given("I have the stream list open and {string} is expanded")
+    fun iHaveTheListOpenAndExpanded(name: String) {
+        open()
+        vm.toggleExpanded(name)
+        settle()
+    }
+
+    @Given("the broker refuses to list the exchanges of the virtual host")
+    fun theBrokerRefusesToListTheExchanges() = catalog.failSuperStreams()
+
+    @When("I open the stream list with a page size of {int}")
+    fun iOpenTheListWithAPageSizeOf(size: Int) {
+        vm.setPageSize(size)
+        open()
+    }
+
+    @When("I expand {string}")
+    fun iExpand(name: String) {
+        vm.toggleExpanded(name)
+        settle()
+    }
+
+    @When("the list refreshes")
+    fun theListRefreshes() {
+        vm.refreshNow()
+        settle()
+    }
+
+    @When("I choose the {string} filter")
+    fun iChooseTheFilter(label: String) {
+        open()
+        val kind = when (label) {
+            "Super streams" -> StreamKindFilter.SuperStreams
+            "Streams" -> StreamKindFilter.Streams
+            "All" -> StreamKindFilter.All
+            else -> error("no kind filter called \"$label\"")
+        }
+        vm.setKindFilter(kind)
+        settle()
+    }
+
+    @Then("{string} is listed once, as a {string} with {int} partitions")
+    fun isListedOnceAs(name: String, type: String, partitions: Int) {
+        assertEquals(1, state.rows.count { it.name == name }, "rows named $name in ${state.rows.map { it.name }}")
+        val r = row(name)
+        assertEquals(type, r.type, "type of $name")
+        assertEquals(StreamRowKind.SuperStream, r.kind)
+        assertEquals(partitions, r.partitionCount, "partition count of $name")
+    }
+
+    @Then("^(\"[^\"]*\"(?:, \"[^\"]*\")*) and (\"[^\"]*\") are not listed as separate top-level entries$")
+    fun partitionsAreNotTopLevel(list: String, last: String) {
+        val names = (list.split(", ") + last).map { it.trim('"') }
+        val topLevel = state.rows.filter { it.kind != StreamRowKind.Partition }.map { it.name }
+        assertTrue(names.none { it in topLevel }, "top-level entries are $topLevel, partitions $names must not be among them")
+    }
+
+    @Then("{string} is not listed as a separate top-level entry")
+    fun partitionIsNotTopLevel(name: String) {
+        val topLevel = state.rows.filter { it.kind != StreamRowKind.Partition }.map { it.name }
+        assertFalse(name in topLevel, "top-level entries are $topLevel")
+    }
+
+    @Then("{string} is listed")
+    fun isListed(name: String) = assertTrue(state.rows.any { it.name == name }, "rows ${state.rows.map { it.name }}")
+
+    @Then("I see each partition with its own messages, offsets, publishers and consumers, and the dash in the Size cell")
+    fun iSeeEachPartition() {
+        val partitions = state.rows.filter { it.kind == StreamRowKind.Partition }
+        assertEquals(partitionsOf("orders"), partitions.map { it.name }, "partition rows of orders")
+        val messages = listOf(31_200L, 32_900L, 32_000L)
+        partitions.zip(messages).forEach { (p, count) ->
+            assertEquals(grouped(count), p.messages, "messages of ${p.name}")
+            assertEquals("0", p.firstOffset, "first offset of ${p.name}")
+            assertEquals((count - 1).toString(), p.lastOffset, "last offset of ${p.name}")
+            assertTrue(p.publishers.isNotBlank() && p.consumers.isNotBlank(), "publishers and consumers cells of ${p.name}: <${p.publishers}> <${p.consumers}>")
+            assertEquals("orders", p.partitionOf)
+        }
+        val members = StreamRow::class.java.declaredFields.map { it.name.lowercase() }
+        assertTrue(members.none { "size" in it || "bytes" in it }, "N1: the row model carries no size, members: $members")
+    }
+
+    @Then("^the super stream row shows ([0-9,]+) messages in total$")
+    fun theSuperStreamRowShowsTotal(total: String) = assertEquals(total, row("orders").messages)
+
+    @Then("the super stream row shows {string} messages, not a partial total")
+    fun theSuperStreamRowShowsNa(text: String) = assertEquals(text, row("orders").messages, "total with a partition without a count")
+
+    // The row model has no browse or open member (M3 adds browsing per partition); the super stream is one entry that is not a stream.
+    @Then("the super stream {string} has no option to open or browse it")
+    fun theSuperStreamHasNoOption(name: String) {
+        assertEquals(StreamRowKind.SuperStream, row(name).kind)
+        assertEquals(null, row(name).partitionOf)
+        val members = StreamRow::class.java.declaredFields.map { it.name.lowercase() }
+        assertTrue(members.none { "browse" in it || "open" in it }, "row members $members")
+    }
+
+    @Then("I am told that order only exists inside a partition")
+    fun iAmToldThatOrderOnlyExistsInsideAPartition() {
+        assertTrue(row("orders").expanded, "the note is shown under an expanded super stream")
+        assertEquals(note, StreamListTexts.PARTITION_ORDER_NOTE)
+    }
+
+    @Then("the partitions of {string} are listed as {string}, {string}")
+    fun thePartitionsAreListedAs(name: String, a: String, b: String) {
+        val names = state.rows.map { it.name }
+        assertEquals(listOf(name, a, b), names.dropWhile { it != name }.take(3), "rows $names")
+    }
+
+    @Then("the list says {string}")
+    fun theListSays(range: String) = assertEquals(range, state.rangeText)
+
+    @Then("{string} is still expanded")
+    fun isStillExpanded(name: String) {
+        assertTrue(row(name).expanded, "rows ${state.rows}")
+        assertEquals(3, state.rows.count { it.partitionOf == name }, "partition rows of $name")
+    }
+
+    @Then("^(\"[^\"]*\"(?:, \"[^\"]*\")*) and (\"[^\"]*\") are listed as separate streams$")
+    fun partitionsAreListedAsSeparateStreams(list: String, last: String) {
+        val names = (list.split(", ") + last).map { it.trim('"') }
+        assertEquals(names, state.rows.map { it.name }, "rows")
+        assertTrue(state.rows.all { it.kind == StreamRowKind.Stream }, "kinds ${state.rows.map { it.kind }}")
+    }
+
+    @Then("the list says that super stream grouping is unavailable")
+    fun theListSaysGroupingIsUnavailable() {
+        assertEquals("Super stream grouping is unavailable. Partitions are listed as separate streams.", state.groupingNotice)
+        assertInstanceOf(StreamListScreen.Rows::class.java, state.screen, "the list still loads: ${state.screen}")
+    }
+
+    @Then("only the super stream {string} is listed")
+    fun onlyTheSuperStreamIsListed(name: String) {
+        assertEquals(listOf(name), state.rows.map { it.name })
+        assertEquals(StreamRowKind.SuperStream, state.rows.single().kind)
+    }
 }

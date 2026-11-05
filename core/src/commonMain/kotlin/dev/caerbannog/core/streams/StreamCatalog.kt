@@ -24,6 +24,13 @@ interface StreamCatalog {
     /** Consumers of one stream; the broker has no per-stream path, so the implementation filters on the stream name. */
     suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>>
 
+    /**
+     * M2-07: the super streams of [vhost] and their partitions, in the broker's partition order. A super stream is a `direct` exchange with
+     * `arguments.x-super-stream` = true; its partitions are the queue destinations of its bindings (never inferred from names).
+     * A failure here never fails the stream list (the list falls back to flat, brief M2-07 item 7).
+     */
+    suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>>
+
     /** What this broker and this user allow: plugin present or not, and how much of the lists the user sees. */
     suspend fun capabilities(): CatalogResult<Capabilities>
 }

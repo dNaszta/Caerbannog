@@ -1,0 +1,132 @@
+[
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "amq.direct",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "amq.fanout",
+        "type": "fanout",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "amq.headers",
+        "type": "headers",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "amq.match",
+        "type": "headers",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": true,
+        "name": "amq.rabbitmq.trace",
+        "type": "topic",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {},
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "amq.topic",
+        "type": "topic",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {
+            "x-super-stream": true
+        },
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "fansuper",
+        "type": "fanout",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {
+            "x-super-stream": true
+        },
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "hand",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {
+            "x-super-stream": true
+        },
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "hand2",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {
+            "x-super-stream": false
+        },
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "notsuper",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    },
+    {
+        "arguments": {
+            "x-super-stream": "true"
+        },
+        "auto_delete": false,
+        "durable": true,
+        "internal": false,
+        "name": "strsuper",
+        "type": "direct",
+        "user_who_performed_action": "admin",
+        "vhost": "m207"
+    }
+]

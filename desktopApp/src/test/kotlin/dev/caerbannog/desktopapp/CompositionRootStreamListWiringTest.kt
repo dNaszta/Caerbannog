@@ -91,6 +91,7 @@ class CompositionRootStreamListWiringTest {
         override suspend fun publishers(vhost: String, stream: String): CatalogResult<List<PublisherRow>> = asked()
         override suspend fun publisherCounts(vhost: String): CatalogResult<Map<String, Int>> = asked()
         override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> = asked()
+        override suspend fun superStreams(vhost: String): CatalogResult<List<dev.caerbannog.core.streams.SuperStreamLayout>> = asked()
         override suspend fun capabilities(): CatalogResult<Capabilities> = asked()
     }
 
