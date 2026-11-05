@@ -282,8 +282,16 @@ class StreamManagementApiSpikeTest {
         declareStream(name, args = ""","x-max-age":"7D","x-max-length-bytes":1000000000,"x-stream-max-segment-size-bytes":50000000""")
         publishViaManagement(name, 1000)
         val t0 = System.nanoTime()
-        val r = awaitMessages(name, 1000)
-        println("M2-02 stats lag after the last publish until messages==1000: ${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)} ms")
+        // M2-14b: messages and message_stats.publish are sampled separately and do not update together; wait for both.
+        val r = awaitUntil(
+            "messages == 1000 and message_stats.publish == 1000 on $name",
+            fetch = { queue(name) },
+            done = {
+                it.status == 200 && it.obj["messages"]?.jsonPrimitive?.long == 1000L &&
+                    it.obj["message_stats"]?.jsonObject?.get("publish")?.jsonPrimitive?.long == 1000L
+            },
+        )
+        println("M2-02 stats lag after the last publish until messages==1000 and publish==1000: ${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)} ms")
         fixture("queue-stream-with-data.json", r, listOf(name))
 
         val o = r.obj

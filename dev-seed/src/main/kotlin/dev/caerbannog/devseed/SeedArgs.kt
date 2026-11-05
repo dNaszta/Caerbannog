@@ -20,6 +20,8 @@ data class SeedArgs(
     val messages: Int,
     val queues: Int,
     val retentionMaxAge: String?,
+    /** M2-14b stub: `--no-tls` (no value) sets false; the parser does not read it yet. */
+    val tls: Boolean = true,
 ) {
     override fun toString(): String =
         "SeedArgs(host=$host, streamPort=$streamPort, managementPort=$managementPort, user=$user, " +
