@@ -103,6 +103,7 @@ class ManagementTopologyCatalogTest {
         assertEquals(CatalogResult.NotAuthorised, answer(status, body) { it.vhosts() })
         assertEquals(CatalogResult.NotAuthorised, answer(403) { it.vhosts() })
         assertEquals(CatalogResult.Unexpected, answer(500) { it.vhosts() })
+        assertEquals(CatalogResult.Unexpected, answer(404) { it.vhosts() }, "the vhost list always exists: a 404 is not a missing vhost")
         assertEquals(CatalogResult.Unexpected, answer(200, "<html/>") { it.vhosts() })
         val http = ManagementHttp(TlsSupport.buildHttpClient(BrokerTransport.Plain, 2_000), "svc", "pw")
         try {
@@ -275,6 +276,44 @@ class ManagementTopologyCatalogTest {
                 true
             }
             assertTrue(failed, "the guard accepted ${request.method} ${request.rawPath}")
+        }
+    }
+
+    // --- step 4 exploratory (test developer) ---
+
+    @Test
+    fun `a vhost with a slash and a space and a queue named get or contents are sent as encoded single segments`() {
+        val ok = 404 to "{}"
+        PlainManagementServer(mapOf("/api/queues/" to ok, "/api/exchanges/" to ok, "/api/bindings/" to ok)).use { server ->
+            withCatalog(server) {
+                it.queues("my vhost/x", 1)
+                it.exchanges("my vhost/x")
+                it.bindings("my vhost/x")
+                it.queueDetail("my vhost/x", "a/b c")
+                it.queueDetail("/", "get")
+                it.queueDetail("/", "contents")
+            }
+            assertEquals(
+                listOf(
+                    "GET /api/queues/my%20vhost%2Fx", "GET /api/exchanges/my%20vhost%2Fx", "GET /api/bindings/my%20vhost%2Fx",
+                    "GET /api/queues/my%20vhost%2Fx/a%2Fb%20c", "GET /api/queues/%2F/get", "GET /api/queues/%2F/contents",
+                ),
+                lines(server),
+            )
+            server.seen.forEach(::assertReadOnlyTopologyRequest)
+        }
+    }
+
+    @Test
+    fun `a 500 page of 119 KB of queues parses in one call and a second page is a second call`() {
+        val items = (0 until 500).joinToString(",") { """{"name":"q-$it","type":"quorum","messages_ready":0,"messages_unacknowledged":0,"consumers":0,"leader":"rabbit@n","members":["rabbit@n"],"online":["rabbit@n"],"policy":null,"state":"running"}""" }
+        val body = """{"items":[$items],"page":1,"page_count":2,"page_size":500,"filtered_count":1000,"item_count":500,"total_count":1000}"""
+        PlainManagementServer(mapOf(queuesPath to (200 to body))).use { server ->
+            val (first, second) = withCatalog(server) { it.queues("/", 1) to it.queues("/", 2) }
+            assertEquals(500, (first as CatalogResult.Success<QueuePage>).value.rows.size)
+            assertEquals(2, first.value.pageCount)
+            assertTrue(second is CatalogResult.Success<*>)
+            assertEquals(2, server.seen.size, "one GET per page")
         }
     }
 }

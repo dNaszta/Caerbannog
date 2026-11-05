@@ -304,4 +304,32 @@ class ManagementJsonTopologyTest {
             assertEquals(CatalogResult.Unexpected, ManagementJson.parseVhosts(it), "body: $it")
         }
     }
+
+    // --- step 4 exploratory: what a real broker might send that the fixtures do not show ---
+
+    @Test
+    fun `a queue with a missing type is kept with an empty type, not dropped and not a failure`() {
+        val q = one("""{"name":"notype"}""")
+        assertEquals("", q.type)
+        assertFalse(q.isQuorum)
+    }
+
+    @Test
+    fun `negative or huge counts and a leader that is not a string do not crash`() {
+        val q = one("""{"name":"odd","type":"quorum","messages_ready":-1,"messages_unacknowledged":9223372036854775807,"consumers":2147483648,"leader":5,"members":["a",3,null],"online":"x"}""")
+        assertEquals(-1L, q.readyMessages)
+        assertEquals(Long.MAX_VALUE, q.unackedMessages)
+        assertNull(q.leader)
+        assertEquals(listOf("a"), q.members)
+        assertEquals(emptyList<String>(), q.online)
+    }
+
+    @Test
+    fun `an exchange with no durable flags reads false and a binding with null arguments reads none`() {
+        val e = (ManagementJson.parseExchanges("""[{"name":"x","vhost":"/","type":"direct"}]""") as CatalogResult.Success<List<ExchangeRow>>).value.single()
+        assertFalse(e.durable)
+        assertEquals(emptyMap<String, String>(), e.arguments)
+        val b = (ManagementJson.parseBindingList("""[{"source":"a","vhost":"/","destination":"b","destination_type":"queue","arguments":null}]""") as CatalogResult.Success<List<BindingRow>>).value.single()
+        assertEquals(emptyMap<String, String>(), b.arguments)
+    }
 }
