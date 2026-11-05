@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-private const val LOCKED_HEADLINE = "Topology is locked on this connection."
 private const val RABBIT_NODE_PREFIX = "rabbit@"
 
 /**
@@ -545,7 +544,7 @@ class TopologyViewModel(
             val text = permissionBanner(ctx.profile, PermissionCheckStatus.Done(result))
             TopologyBanner(TopologyBannerKind.DeclaredNotConfirmed, text.headline, text.detail)
         }
-        is PermissionCheckResult.Unreadable -> TopologyBanner(TopologyBannerKind.NotReadable, LOCKED_HEADLINE, result.reason)
+        is PermissionCheckResult.Unreadable -> TopologyBanner(TopologyBannerKind.NotReadable, TopologyTexts.LOCKED_HEADLINE, result.reason)
     }
 }
 

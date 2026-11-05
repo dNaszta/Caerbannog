@@ -154,6 +154,7 @@ object TopologyTexts {
     const val NO_BINDINGS: String = "There are no bindings in this virtual host yet."
     const val LOAD_FAILED: String = "Topology could not be loaded. Check that the broker is reachable and that this user may use it."
     const val APPROXIMATE: String = "Queue counts are approximate: the broker updates them every few seconds."
+    const val LOCKED_HEADLINE: String = "Topology is locked on this connection."
     const val READ_ONLY_HEADLINE: String = "This connection is set to read-only."
     const val READ_ONLY_DETAIL: String =
         "Its topology level is Read-only, so nothing here can be changed whatever the broker allows. Change the level in the connection's settings."
