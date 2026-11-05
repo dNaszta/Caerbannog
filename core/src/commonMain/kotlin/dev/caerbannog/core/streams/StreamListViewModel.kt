@@ -32,8 +32,10 @@ private const val MILLIS = 1000L
  * does nothing. A result is used only if its [StreamSource] is still the current one, compared by reference: the same
  * profile reconnected has an equal `Connected(name)` state but a new source.
  *
- * Threading: [scope] must be confined to one thread (the UI dispatcher, or a test scheduler); all fields are read and
- * written there. Use it for exactly this view model; [close] cancels what it started.
+ * Threading: every public method is safe to call from any thread. Each one hops onto [scope] (`scope.launch`), so all fields are
+ * read and written on the scope's thread only (the UI dispatcher in the app, a test scheduler in tests); the effect of a call
+ * is therefore visible in [state] after the scope has run it, not on return. [scope] must be confined to one thread and used for
+ * exactly this view model; [close] cancels what it started.
  *
  * @param reconnect Retry on a failed link: connect the profile of that name again (the root passes the connections view model).
  */
@@ -87,8 +89,8 @@ class StreamListViewModel(
     }
 
     /** The stream list is on screen. Not shown means no broker call at all (D3). */
-    fun setShown(shown: Boolean) {
-        if (closed || this.shown == shown) return
+    fun setShown(shown: Boolean) = onScope {
+        if (closed || this.shown == shown) return@onScope
         this.shown = shown
         if (shown) {
             if (canRun()) startDriver(Start.LoadNow)
@@ -98,48 +100,43 @@ class StreamListViewModel(
     }
 
     /** Loads now, unless a load is already running (then it does nothing). The timer restarts. */
-    fun refreshNow() {
-        if (canRun() && loadingToken == null) startDriver(Start.LoadNow)
-    }
+    fun refreshNow() = onScope { refresh() }
 
     /** Failed link: connect the profile again (the load follows by itself). Failed first load: load again. */
-    fun retry() {
+    fun retry() = onScope {
         val current = link
         when {
             current is LinkState.Failed -> scope.launch { reconnect(current.name) }
-            _state.value.screen is StreamListScreen.Failed -> refreshNow()
+            _state.value.screen is StreamListScreen.Failed -> refresh()
         }
     }
 
-    fun setFilter(text: String) {
+    fun setFilter(text: String) = onScope {
         filter = text
         page = 1
         viewChanged()
     }
 
-    fun setSort(sort: StreamSort) {
+    fun setSort(sort: StreamSort) = onScope {
         this.sort = sort
         page = 1
         viewChanged()
     }
 
-    fun setPage(page: Int) {
-        this.page = page
-        viewChanged()
-    }
+    fun setPage(page: Int) = onScope { showPage(page) }
 
-    fun nextPage() = setPage(clampedPage() + 1)
+    fun nextPage() = onScope { showPage(clampedPage() + 1) }
 
-    fun previousPage() = setPage(clampedPage() - 1)
+    fun previousPage() = onScope { showPage(clampedPage() - 1) }
 
-    fun setPageSize(size: Int) {
+    fun setPageSize(size: Int) = onScope {
         pageSize = size.coerceAtLeast(1)
         page = 1
         viewChanged()
     }
 
-    /** Writes the app setting and restarts the timer from now. */
-    fun setRefreshInterval(interval: RefreshInterval) {
+    /** Writes the app setting (on the scope's thread) and restarts the timer from now. */
+    fun setRefreshInterval(interval: RefreshInterval) = onScope {
         settings.streamListRefresh = interval
         this.interval = interval
         render()
@@ -147,13 +144,33 @@ class StreamListViewModel(
         if (canRun() && loadingToken == null) startDriver(Start.TimerOnly)
     }
 
-    /** Seconds since the last successful load by the injected clock; null before the first one. */
-    fun updatedSecondsAgo(): Long? = lastSuccessMillis?.let { (clock.nowMillis() - it).coerceAtLeast(0) / MILLIS }
+    /**
+     * Seconds since the last successful load by the injected clock; null before the first one. Reads the published state only
+     * (a thread-safe snapshot), so it can be called from any thread, for example by an "Updated N s ago" ticker.
+     */
+    fun updatedSecondsAgo(): Long? = _state.value.updatedAtMillis?.let { (clock.nowMillis() - it).coerceAtLeast(0) / MILLIS }
 
+    /** Stops the timer and any load. Safe from any thread and safe to call more than once (every step is idempotent). */
     override fun close() {
-        closed = true
-        cancelDriver()
-        following.cancel()
+        onScope {
+            closed = true
+            cancelDriver()
+            following.cancel()
+        }
+    }
+
+    // The one way in from outside: serialised on the scope. A cancelled scope drops the call, which is right after close.
+    private fun onScope(block: () -> Unit) {
+        scope.launch { block() }
+    }
+
+    private fun refresh() {
+        if (canRun() && loadingToken == null) startDriver(Start.LoadNow)
+    }
+
+    private fun showPage(requested: Int) {
+        page = requested
+        viewChanged()
     }
 
     // --- connection ----------------------------------------------------------------------------------
@@ -240,7 +257,7 @@ class StreamListViewModel(
         val result = call()
         if (!alive(src)) return null
         if (result == CatalogResult.Unreachable) {
-            // D2 (PROPOSED, flagged default): the one place that turns an unreachable broker into a lost connection.
+            // D2 (decided 2026-11-04): the one place that turns an unreachable broker into a lost connection.
             // Called from this coroutine, never from an observer of the link.
             active.connectionLost(src)
             return null
@@ -409,6 +426,7 @@ class StreamListViewModel(
             stale = stale,
             banner = banner,
             refreshInterval = interval,
+            updatedAtMillis = lastSuccessMillis,
         )
     }
 }

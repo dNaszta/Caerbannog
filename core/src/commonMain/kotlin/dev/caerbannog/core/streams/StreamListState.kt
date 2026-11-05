@@ -52,6 +52,8 @@ data class StreamListState(
     val stale: Boolean = false,
     val banner: String? = null,
     val refreshInterval: RefreshInterval = DEFAULT_REFRESH,
+    /** Clock time of the last successful load; null before the first one. The screen computes "Updated N s ago" from it. */
+    val updatedAtMillis: Long? = null,
     val approximateNote: String = StreamListTexts.APPROXIMATE,
 )
 
@@ -65,6 +67,6 @@ object StreamListTexts {
     const val NO_STREAMS: String = "There are no streams on this broker yet."
     const val CREATE_STREAM: String = "Create stream"
     const val RETRY: String = "Retry"
-    const val LOAD_FAILED: String = "The stream list could not be loaded."
+    const val LOAD_FAILED: String = "The stream list could not be loaded. Check that the virtual host exists and that this user may use it."
     const val APPROXIMATE: String = "Message counts and offsets are approximate."
 }

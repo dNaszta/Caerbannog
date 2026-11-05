@@ -128,7 +128,7 @@ class CompositionRootStreamListWiringTest {
             composition.streamList.setShown(true)
             queue.runAll()
 
-            val me = Thread.currentThread().name
+            val me = Thread.currentThread().name.substringBefore(" @coroutine")
             assertTrue(catalog.askedOn.isNotEmpty(), "the broker was never asked after runAll(): the stream list does not run on the dispatcher given")
             assertEquals(
                 List(catalog.askedOn.size) { me }, catalog.askedOn.toList(),

@@ -8,22 +8,21 @@ import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
+import dev.caerbannog.datarabbit.JsonFileAppSettings
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
 import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.core.streams.AppSettings
-import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.RefreshClock
-import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.StreamListViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.swing.Swing
 import java.io.File
 
 /**
@@ -66,11 +65,6 @@ class AppComposition(
     }
 }
 
-// The refresh interval lives in memory until the settings file arrives (M2-05).
-private class InMemoryAppSettings : AppSettings {
-    override var streamListRefresh: RefreshInterval = DEFAULT_REFRESH
-}
-
 /**
  * Like [createConnectionsViewModel], plus the real [ConnectionGateway] behind an [ActiveConnection] that the view
  * model's Connect uses (the interim edit-panel Connect of M2-01 now opens a real held connection). One
@@ -83,9 +77,8 @@ fun createAppComposition(
     reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
     log: (String) -> Unit = { System.err.println(it) },
     gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
-    // M2-05a step 2: COMPILE STUBS for the tests, both ignored until the senior developer wires them (brief Scope items 1 and 3).
-    @Suppress("UNUSED_PARAMETER") appSettings: AppSettings = InMemoryAppSettings(),
-    @Suppress("UNUSED_PARAMETER") uiDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
+    uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -97,13 +90,12 @@ fun createAppComposition(
         session = session,
         active = active,
     )
-    // The composition root owns the scope; it ends with the window. The view model needs a serial dispatcher: limitedParallelism(1)
-    // gives that without a new dependency (Dispatchers.Main is not on this classpath). M2-05 may pass the UI dispatcher instead.
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val streamListScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
+    // The composition root owns the scope; it ends with the window. The view model runs on the UI dispatcher (Swing in the app),
+    // so its state can be read by Compose without a thread hop; tests pass their own dispatcher.
+    val streamListScope = CoroutineScope(SupervisorJob() + uiDispatcher)
     val streamList = StreamListViewModel(
         active = active,
-        settings = InMemoryAppSettings(),
+        settings = appSettings,
         scope = streamListScope,
         clock = RefreshClock { System.currentTimeMillis() },
         reconnect = viewModel::connect,
