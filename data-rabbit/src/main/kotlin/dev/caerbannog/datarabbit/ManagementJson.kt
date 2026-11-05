@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
@@ -55,13 +56,60 @@ internal object ManagementJson {
         )
     }
 
+    private const val SUPER_STREAM_MARKER = "x-super-stream"
+    private const val PARTITION_ORDER = "x-stream-partition-order"
+
+    // A super stream is a `direct` exchange whose marker is the JSON boolean true (spike S-A, S-B: false, "true", fanout are not).
+    private fun superStreamNames(exchangesBody: String): CatalogResult<List<String>> = guarded(exchangesBody) { root ->
+        val names = root.asArray().map { it.asObject() }.mapNotNull { exchange ->
+            val name = exchange.requiredString("name")
+            val marker = (exchange["arguments"] as? JsonObject)?.get(SUPER_STREAM_MARKER) as? JsonPrimitive
+            name.takeIf { exchange.string("type") == "direct" && marker != null && !marker.isString && marker.booleanOrNull == true }
+        }
+        CatalogResult.Success(names)
+    }
+
+    /** M2-07: true when some exchange of `GET /api/exchanges/{vhost}` is a super stream, so the bindings call is worth making. */
+    fun hasSuperStreamExchange(exchangesBody: String): CatalogResult<Boolean> = when (val names = superStreamNames(exchangesBody)) {
+        is CatalogResult.Success -> CatalogResult.Success(names.value.isNotEmpty())
+        is CatalogResult.Failure -> names
+    }
+
+    private class Binding(val source: String, val destination: String, val routingKey: String, val order: Double?)
+
     /**
-     * M2-07 COMPILE STUB (no behaviour). Contract (pinned by `ManagementJsonSuperStreamTest`): [exchangesBody] is `GET /api/exchanges/{vhost}`,
-     * [bindingsBody] is `GET /api/bindings/{vhost}`; a super stream is a `direct` exchange with the JSON boolean `true` in `arguments.x-super-stream`.
+     * M2-07: the super streams of a vhost from `GET /api/exchanges/{vhost}` and `GET /api/bindings/{vhost}`. Partitions are the queue
+     * destinations of the bindings of the exchange, numbered ones first by `x-stream-partition-order` (a value that is not a number
+     * counts as none), then the rest by routing key and destination; a queue bound twice appears once, at its first place.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun parseSuperStreams(vhost: String, exchangesBody: String, bindingsBody: String): CatalogResult<List<SuperStreamLayout>> =
-        CatalogResult.Unexpected
+    fun parseSuperStreams(vhost: String, exchangesBody: String, bindingsBody: String): CatalogResult<List<SuperStreamLayout>> {
+        val names = when (val parsed = superStreamNames(exchangesBody)) {
+            is CatalogResult.Success -> parsed.value
+            is CatalogResult.Failure -> return parsed
+        }
+        val bindings = when (val parsed = parseBindings(bindingsBody)) {
+            is CatalogResult.Success -> parsed.value
+            is CatalogResult.Failure -> return parsed
+        }
+        val byOrder = compareBy<Binding, Double?>(nullsLast()) { it.order }.thenBy { it.routingKey }.thenBy { it.destination }
+        return CatalogResult.Success(
+            names.map { name ->
+                val partitions = bindings.filter { it.source == name }.sortedWith(byOrder).map { it.destination }.distinct()
+                SuperStreamLayout(name, vhost, partitions)
+            },
+        )
+    }
+
+    private fun parseBindings(body: String): CatalogResult<List<Binding>> = guarded(body) { root ->
+        val queueBindings = root.asArray().map { it.asObject() }.filter { it.requiredString("destination_type") == "queue" }
+        CatalogResult.Success(
+            queueBindings.map { binding ->
+                val order = ((binding["arguments"] as? JsonObject)?.get(PARTITION_ORDER) as? JsonPrimitive)
+                    ?.takeIf { !it.isString }?.doubleOrNull
+                Binding(binding.requiredString("source"), binding.requiredString("destination"), binding.string("routing_key").orEmpty(), order)
+            },
+        )
+    }
 
     fun parseStreamDetail(body: String): CatalogResult<StreamSummary> = guarded(body) { root ->
         val obj = root.asObject()

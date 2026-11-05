@@ -33,8 +33,21 @@ internal class ManagementStreamCatalog(
     override suspend fun consumers(vhost: String, stream: String): CatalogResult<List<ConsumerRow>> =
         callPerStream(requests.consumers(vhost)) { ManagementJson.parseConsumers(it, stream) }
 
-    /** M2-07 COMPILE STUB (no behaviour): the real one calls `requests.exchanges` and `requests.bindings` and parses with `ManagementJson.parseSuperStreams`. */
-    override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> = CatalogResult.Unexpected
+    /**
+     * Two GETs (exchanges, then every binding of the vhost, spike S-A); the bindings call is skipped when no exchange carries the
+     * marker, so a broker without super streams costs one. Either call failing fails the whole answer, never half a layout.
+     */
+    override suspend fun superStreams(vhost: String): CatalogResult<List<SuperStreamLayout>> {
+        val exchanges = when (val reply = http.get(requests.exchanges(vhost))) {
+            is ManagementReply.Response -> if (reply.status == 200) reply.body else return ManagementErrors.map(reply.status, CatalogResult.Unexpected)
+            ManagementReply.Unreachable, ManagementReply.TlsRefused -> return CatalogResult.Unreachable
+        }
+        when (val any = ManagementJson.hasSuperStreamExchange(exchanges)) {
+            is CatalogResult.Failure -> return any
+            is CatalogResult.Success -> if (!any.value) return CatalogResult.Success(emptyList())
+        }
+        return call(requests.bindings(vhost), on404 = CatalogResult.Unexpected) { ManagementJson.parseSuperStreams(vhost, exchanges, it) }
+    }
 
     override suspend fun capabilities(): CatalogResult<Capabilities> {
         val whoami = when (val reply = http.get(requests.whoami())) {
