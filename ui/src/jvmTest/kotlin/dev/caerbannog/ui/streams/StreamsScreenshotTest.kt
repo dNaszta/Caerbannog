@@ -49,12 +49,12 @@ class StreamsScreenshotTest {
     // M2-07: compared by eye with the super stream rows of docs/ux/Streams.dc.html (chip row, expand control, indented partitions, note row).
     @Test
     fun `screenshot - super stream collapsed`() = runDesktopComposeUiTest(1280, 880) {
-        shot(rowsState(mockupRows + superRow(), totalStreams = 5, updatedAtMillis = 1_000), "streams-06-super-collapsed.png")
+        shot(rowsState(mockupRows + superRow(), totalStreams = 5, rangeText = "1 to 5 of 5", updatedAtMillis = 1_000), "streams-06-super-collapsed.png")
     }
 
     @Test
     fun `screenshot - super stream expanded`() = runDesktopComposeUiTest(1280, 880) {
-        shot(rowsState(expandedRows, totalStreams = 2, updatedAtMillis = 1_000), "streams-07-super-expanded.png")
+        shot(rowsState(expandedRows, totalStreams = 2, rangeText = "1 to 2 of 2", updatedAtMillis = 1_000), "streams-07-super-expanded.png")
     }
 
     @Test
