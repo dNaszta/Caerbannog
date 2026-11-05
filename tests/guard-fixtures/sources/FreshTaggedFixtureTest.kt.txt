@@ -1,0 +1,19 @@
+package fixture
+
+// Tagged class whose result XML is NEWER than this source (the self-test sets the file times explicitly) but holds
+// fewer testcases than there are test methods. A fresh result with a missing testcase must still be rejected: the
+// proof that the stale-result rule does not turn the guard off.
+@Tag("broker")
+class FreshTaggedFixtureTest {
+    @Test
+    fun `fresh a`() {
+    }
+
+    @Test
+    fun `fresh b`() {
+    }
+
+    @Test
+    fun `fresh c`() {
+    }
+}

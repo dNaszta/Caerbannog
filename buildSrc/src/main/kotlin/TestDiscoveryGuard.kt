@@ -248,11 +248,19 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
     @TaskAction
     fun verify() {
         val base = fixtureRoot.get().asFile
-        val sources = base.resolve("sources").listFiles { f -> f.name.endsWith(".kt.txt") }!!.toList()
-        // Age a copy of the stale-case XML: file times from a git checkout are arbitrary, so the fixture sets its own.
-        val staleDir = temporaryDir.resolve("brokerTest").apply { deleteRecursively(); mkdirs() }
-        base.resolve("results/brokerTest").listFiles()!!.forEach { it.copyTo(staleDir.resolve(it.name)).setLastModified(1000L) }
-        val r = runGuard(sources, listOf(base.resolve("results/test"), staleDir), rootDirectory.get().asFile)
+        // File times from a git checkout are arbitrary, so the fixture sets its own, explicitly (no wall clock):
+        // sources 5000, stale result XML 1000 (older than its class), fresh result XML 9000 (newer).
+        val stagedSources = temporaryDir.resolve("sources").apply { deleteRecursively(); mkdirs() }
+        val sources = base.resolve("sources").listFiles { f -> f.name.endsWith(".kt.txt") }!!
+            .map { it.copyTo(stagedSources.resolve(it.name)).apply { setLastModified(5000L) } }
+        fun staged(name: String, mtime: (File) -> Long): File {
+            val dir = temporaryDir.resolve(name).apply { deleteRecursively(); mkdirs() }
+            base.resolve("results/$name").listFiles()!!.forEach { it.copyTo(dir.resolve(it.name)).setLastModified(mtime(it)) }
+            return dir
+        }
+        val staleDir = staged("brokerTest") { if (it.name.contains("Stale")) 1000L else 9000L }
+        val testDir = staged("test") { 9000L }
+        val r = runGuard(sources, listOf(testDir, staleDir), rootDirectory.get().asFile)
         // Every bad test below must be named by the guard; the good one must not be.
         val mustFlag = listOf(
             "declared return type is rejected",
@@ -260,6 +268,7 @@ abstract class VerifyTestDiscoveryFixtures : DefaultTask() {
             "runBlocking ending in assertFailsWith is rejected",
             "BadNonUnitFixtureTest has 3 test methods but the run reported 0 testcases",
             "HiddenCountFixtureTest has 3 test methods but the run reported 2 testcases",
+            "FreshTaggedFixtureTest has 3 test methods but the run reported 2 testcases",
         )
         val mustNotFlag = listOf("a fine test returns Unit", "runBlocking Unit is accepted", "block body is accepted")
         val text = r.violations.joinToString("\n")

@@ -1,5 +1,7 @@
 # Test discovery guard: ignore stale XML and fix the task wiring
 
+Status: step 2 tests first done (test developer, 2026-11-05). Fixtures added, but NOT red: the guard already treats a tagged class whose XML is older than its SOURCE as unchecked (existing StaleTaggedFixtureTest), so (a) (b) (c) pass on current code. The failure in M2-14b is therefore not reproduced by the mtime-vs-source rule; architect to say whether the reference must be the compiled class file (needs a new runGuard input) or what the failing case was. Wiring (mustRunAfter) untouched, for the developer.
+
 Milestone: M2 (hygiene)    Depends on: M2-TESTHYGIENE-01    Size: S
 
 ## Goal
