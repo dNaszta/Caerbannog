@@ -93,10 +93,11 @@ body{margin:0}
 <div class="t-bs dim" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px"><span>Queue messages are never read here. The app shows topology and statistics only. Counts are approximate.</span><span style="flex-grow:1"></span><span>1 to 4 of 4</span><button class="iconbtn" type="button" aria-label="Previous page"><span class="ms" aria-hidden="true">chevron_left</span></button><button class="iconbtn" type="button" aria-label="Next page"><span class="ms" aria-hidden="true">chevron_right</span></button></div>
 </section>
 <aside class="sheet">
-<div style="display:flex;align-items:center;gap:8px"><span class="t-tm" style="flex-grow:1">orders</span><span class="pill">Quorum queue</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="t-tm" style="flex-grow:1">orders</span><span class="pill">Quorum queue</span><button class="iconbtn" type="button" aria-label="Close details"><span class="ms" aria-hidden="true">close</span></button></div>
 <div>
 <div class="kv"><span>Leader</span><span class="mono">rabbit@node-1</span></div>
 <div class="kv"><span>Members</span><span class="mono">node-1, node-2, node-3</span></div>
+<div class="kv"><span>Members online</span><span>3 of 3</span></div>
 <div class="kv"><span>Ready / unacked</span><span>1,240 / 12</span></div>
 <div class="kv"><span>Consumers</span><span>3</span></div>
 <div class="kv"><span>Policy</span><span>quorum-default</span></div>
@@ -153,6 +154,28 @@ body{margin:0}
 <div class="t-ts">Virtual host not available (R2)</div>
 <div class="banner warn"><span class="ms" aria-hidden="true">block</span><div><b>Virtual host billing is not available to this user.</b> It may have been deleted, or the user may have no permission on it.</div></div>
 <div class="t-bs dim">The broker answers 404 for both cases. No table and no filters; the virtual host switch stays so the user can choose another one. The rows of that virtual host are dropped, not dimmed: dimming is only for a lost connection. Exact text: "Virtual host billing is not available to this user. It may have been deleted, or the user may have no permission on it."</div>
+</section>
+
+<section id="detail-and-other-types" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
+<div class="t-ts">Queue detail: how it opens and closes, member offline, Other types (08c rulings)</div>
+<div class="t-bs dim">Opening: a click or Enter on a queue row selects it (the row is marked selected, state description "Selected") and opens the detail block BELOW the table (the block at the top of this page is drawn beside the table when the window is wide; the build puts it under the table at every width, owner decision O2). Closing: the close button in the block header, or Escape; the row is then not selected. Choosing another row replaces the detail. Switching tab or virtual host closes it.</div>
+<div class="tscroll" style="min-width:0"><table class="tbl" style="min-width:760px"><thead><tr><th>Name</th><th class="r">Ready</th><th class="r">Unacked</th><th class="r">Consumers</th><th>Leader</th><th>Members online</th></tr></thead><tbody>
+<tr class="sel"><td class="t-ts">notifications</td><td class="r">86</td><td class="r">4</td><td class="r">1</td><td class="mono">rabbit@node-3</td><td><span class="pill warn"><span class="ms sm" aria-hidden="true">warning</span>2 of 3 (1 member offline)</span></td></tr>
+</tbody></table></div>
+<div class="sheet" style="width:auto">
+<div style="display:flex;align-items:center;gap:8px"><span class="t-tm" style="flex-grow:1">notifications</span><span class="pill">Quorum queue</span><button class="iconbtn" type="button" aria-label="Close details"><span class="ms" aria-hidden="true">close</span></button></div>
+<div class="kv"><span>Members online</span><span>2 of 3</span></div>
+<div class="kv" style="border-bottom:0"><span>Members</span><span class="mono">node-1, node-2, <span class="pill warn"><span class="ms sm" aria-hidden="true">warning</span>node-3: Member offline</span></span></div>
+</div>
+<div class="t-bs dim">A member that is not online is marked by an icon plus the words "Member offline" (content description and visible text), never by colour alone. The row says "2 of 3" with the same icon.</div>
+<div class="t-ts">Other types chip on (classic queues): a Type column after Name</div>
+<div class="tscroll"><table class="tbl" style="min-width:760px"><thead><tr><th>Name</th><th>Type</th><th class="r">Ready</th><th class="r">Unacked</th><th class="r">Consumers</th><th>Leader</th><th>Members online</th></tr></thead><tbody>
+<tr><td class="t-ts">legacy-jobs</td><td>classic</td><td class="r">12</td><td class="r">0</td><td class="r">1</td><td>-</td><td>-</td></tr>
+<tr><td class="t-ts">orders</td><td>quorum</td><td class="r">1,240</td><td class="r">12</td><td class="r">3</td><td class="mono">rabbit@node-1</td><td><span class="pill ok">3 of 3</span></td></tr>
+</tbody></table></div>
+<div class="t-bs dim">With only Quorum on, the Type column is not drawn (all rows are quorum). With Other types on it is drawn right after Name; leader and members are dashes where the broker gives none. Streams are never listed.</div>
+<div class="t-ts">Rules of the frame (08c rulings)</div>
+<div class="t-bs dim">Tab row: drawn when the screen is Ready, Empty, Loading or Virtual host not available; NOT drawn for Not connected, Connecting, the no-tag message or Failed (message and Retry only). Each tab has its own search field. Choosing the virtual host that is already chosen only closes the menu (no reload). The Refresh icon is disabled while a Connection lost banner or a load shows. Nothing in this screen changes topology.</div>
 </section>
 
 <section id="state-stale" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px">
