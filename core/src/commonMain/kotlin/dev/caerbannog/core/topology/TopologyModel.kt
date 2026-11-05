@@ -46,6 +46,12 @@ data class ExchangeRow(
     val autoDelete: Boolean,
     val internal: Boolean,
     val arguments: Map<String, String> = emptyMap(),
+    /**
+     * M2-08b ruling 6: a super stream exchange. Set by the management parser with ONE rule, the one of the stream list (M2-07): a `direct`
+     * exchange whose `x-super-stream` argument is the JSON boolean `true` (the string "true", false and a fanout are not). The text in
+     * [arguments] cannot tell the boolean from the string, so screens read this flag and never the argument.
+     */
+    val superStream: Boolean = false,
 ) {
     /** The default exchange has the name `""`. */
     val isDefault: Boolean get() = name.isEmpty()

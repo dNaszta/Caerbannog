@@ -288,7 +288,7 @@ class TopologySteps {
 
     @Given("a super stream {string} with {int} partitions")
     fun superStream(name: String, partitions: Int) {
-        topology.addExchange(exchange(name, "direct", arguments = mapOf("x-super-stream" to "true")))
+        topology.addExchange(exchange(name, "direct", superStream = true))
         repeat(partitions) {
             topology.addStream("$name-$it")
             topology.addBinding(binding(name, "$name-$it", routingKey = "$it", arguments = mapOf("x-stream-partition-order" to "$it")))

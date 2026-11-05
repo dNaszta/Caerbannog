@@ -231,17 +231,27 @@ class TopologyViewModelTabsTest {
         assertEquals(ExchangeRowView("amq.trace", "topic", "no", "yes", "yes", superStream = false, isDefault = false), s.state.exchanges.last())
     }
 
+    // The parser owns the rule (JSON boolean true on a direct exchange, `ManagementJsonTopologyTest`); the view model only shows the flag.
     @Test
-    fun `a direct exchange with the super stream marker is marked, a fanout with the marker is not`() = runTest {
+    fun `an exchange with the super stream flag is marked and one without is not`() = runTest {
         val s = TopologyHarness(this, pageSize = 50)
-        s.topology.addExchange(exchange("orders", "direct", arguments = mapOf("x-super-stream" to "true")))
-        s.topology.addExchange(exchange("fan", "fanout", arguments = mapOf("x-super-stream" to "true")))
+        s.topology.addExchange(exchange("orders", "direct", superStream = true))
         s.topology.addExchange(exchange("plain", "direct"))
-        s.topology.addExchange(exchange("off", "direct", arguments = mapOf("x-super-stream" to "false")))
         s.open()
         s.vm.setTab(TopologyTab.Exchanges)
         s.settle()
         assertEquals(setOf("orders"), s.state.exchanges.filter { it.superStream }.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `the view model reads the flag, never the arguments text`() = runTest {
+        val s = TopologyHarness(this, pageSize = 50)
+        s.topology.addExchange(exchange("textonly", "direct", arguments = mapOf("x-super-stream" to "true")))
+        s.topology.addExchange(exchange("flagonly", "direct", superStream = true))
+        s.open()
+        s.vm.setTab(TopologyTab.Exchanges)
+        s.settle()
+        assertEquals(setOf("flagonly"), s.state.exchanges.filter { it.superStream }.map { it.name }.toSet())
     }
 
     @Test
@@ -312,7 +322,7 @@ class TopologyViewModelTabsTest {
     @Test
     fun `binding arguments read as a braced list, keys quoted, values as given`() = runTest {
         val s = TopologyHarness(this, pageSize = 50)
-        s.topology.addExchange(exchange("orders", "direct", arguments = mapOf("x-super-stream" to "true")))
+        s.topology.addExchange(exchange("orders", "direct", superStream = true))
         s.topology.addQueue(quorum("orders-0"))
         s.topology.addBinding(binding("orders", "orders-0", routingKey = "0", arguments = mapOf("x-stream-partition-order" to "0")))
         s.open()

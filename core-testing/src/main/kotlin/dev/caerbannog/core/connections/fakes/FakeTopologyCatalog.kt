@@ -223,7 +223,8 @@ class FakeTopologyCatalog : TopologyCatalog {
             vhost: String = "/",
             arguments: Map<String, String> = emptyMap(),
             internal: Boolean = false,
-        ) = ExchangeRow(name, vhost, type, durable = true, autoDelete = false, internal = internal, arguments = arguments)
+            superStream: Boolean = false,
+        ) = ExchangeRow(name, vhost, type, durable = true, autoDelete = false, internal = internal, arguments = arguments, superStream = superStream)
 
         fun binding(
             source: String,

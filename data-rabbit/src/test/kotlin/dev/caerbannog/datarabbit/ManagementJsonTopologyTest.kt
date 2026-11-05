@@ -332,4 +332,54 @@ class ManagementJsonTopologyTest {
         val b = (ManagementJson.parseBindingList("""[{"source":"a","vhost":"/","destination":"b","destination_type":"queue","arguments":null}]""") as CatalogResult.Success<List<BindingRow>>).value.single()
         assertEquals(emptyMap<String, String>(), b.arguments)
     }
+
+    // --- M2-08b ruling 6: `ExchangeRow.superStream`, ONE rule with the stream list (`superStreamNames`): `direct` and the JSON boolean true ---
+
+    private fun superStreamOf(type: String, arguments: String): Boolean {
+        val body = """[{"name":"x","vhost":"/","type":"$type","durable":true,"auto_delete":false,"internal":false,"arguments":$arguments}]"""
+        return (ManagementJson.parseExchanges(body) as CatalogResult.Success<List<ExchangeRow>>).value.single().superStream
+    }
+
+    @Test
+    fun `a direct exchange with the JSON boolean true marker is a super stream`() {
+        assertTrue(superStreamOf("direct", """{"x-super-stream":true}"""))
+    }
+
+    @Test
+    fun `the string true, false, a number and null are not a super stream`() {
+        assertFalse(superStreamOf("direct", """{"x-super-stream":"true"}"""))
+        assertFalse(superStreamOf("direct", """{"x-super-stream":false}"""))
+        assertFalse(superStreamOf("direct", """{"x-super-stream":1}"""))
+        assertFalse(superStreamOf("direct", """{"x-super-stream":null}"""))
+    }
+
+    @Test
+    fun `a fanout or topic exchange with the boolean marker is not a super stream`() {
+        assertFalse(superStreamOf("fanout", """{"x-super-stream":true}"""))
+        assertFalse(superStreamOf("topic", """{"x-super-stream":true}"""))
+    }
+
+    @Test
+    fun `no arguments and no marker are not a super stream`() {
+        assertFalse(superStreamOf("direct", "{}"))
+        assertFalse(superStreamOf("direct", """{"other":true}"""))
+        val noArguments = """[{"name":"x","vhost":"/","type":"direct"}]"""
+        assertFalse((ManagementJson.parseExchanges(noArguments) as CatalogResult.Success<List<ExchangeRow>>).value.single().superStream)
+    }
+
+    @Test
+    fun `the recorded dev vhost marks orders and no other exchange, the same exchange the stream list groups`() {
+        val rows = (ManagementJson.parseExchanges(FixtureFiles.text("m2-07/exchanges-vhost-root.json")) as CatalogResult.Success<List<ExchangeRow>>).value
+        assertEquals(listOf("orders"), rows.filter { it.superStream }.map { it.name })
+        // The two screens must agree about every recorded exchange file.
+        for (file in listOf("m2-07/exchanges-vhost-regions.json", "m2-07/exchanges-vhost-hand-made.json")) {
+            val body = FixtureFiles.text(file)
+            val mine = (ManagementJson.parseExchanges(body) as? CatalogResult.Success<List<ExchangeRow>>)?.value?.filter { it.superStream }?.map { it.name }?.toSet()
+            val streamList = (ManagementJson.parseSuperStreams("/", body, "[]") as CatalogResult.Success<*>).let { r ->
+                @Suppress("UNCHECKED_CAST")
+                (r.value as List<dev.caerbannog.core.streams.SuperStreamLayout>).map { it.name }.toSet()
+            }
+            if (mine != null) assertEquals(streamList, mine, "the topology and the stream list disagree about $file")
+        }
+    }
 }
