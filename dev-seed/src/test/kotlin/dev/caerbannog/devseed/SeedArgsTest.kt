@@ -43,7 +43,7 @@ class SeedArgsTest {
         val a = parse(
             "--host", "broker.test", "--stream-port", "6551", "--management-port", "16671", "--user", "alice",
             "--password", "pw", "--ca", "/tmp/ca.pem", "--vhost", "many", "--streams", "s1,s2,s3",
-            "--messages", "25", "--queues", "1000", "--max-age", "7D",
+            "--messages", "25", "--queues", "1000",
         )
         assertEquals("broker.test", a.host)
         assertEquals(6551, a.streamPort)
@@ -55,7 +55,9 @@ class SeedArgsTest {
         assertEquals(listOf("s1", "s2", "s3"), a.streams)
         assertEquals(25, a.messages)
         assertEquals(1000, a.queues)
-        assertEquals("7D", a.retentionMaxAge)
+        assertNull(a.retentionMaxAge)
+        // --max-age cannot be combined with --queues N off '/' (M2-12b), so it is read in a second call.
+        assertEquals("7D", parse("--password", "pw", "--vhost", "many", "--max-age", "7D").retentionMaxAge)
     }
 
     @Test
@@ -144,5 +146,46 @@ class SeedArgsTest {
     fun `the password does not appear in toString`() {
         val a = parse("--password", "s3cret-dev-value")
         assertFalse(a.toString().contains("s3cret-dev-value"), "toString leaked the password: $a")
+    }
+
+    // M2-12b: --max-age is silently ignored with --queues N on another vhost, so the mix is rejected.
+
+    @Test
+    fun `max-age with queues on another vhost is rejected and names both flags`() {
+        val e = assertFailsWith<SeedArgsException> {
+            parse("--password", "pw", "--max-age", "7D", "--queues", "1000", "--vhost", "many")
+        }
+        val message = e.message.orEmpty()
+        assertTrue("--max-age" in message, "message must name --max-age, was: $message")
+        assertTrue("--queues" in message, "message must name --queues, was: $message")
+    }
+
+    @Test
+    fun `max-age with queues on the default vhost is allowed`() {
+        val a = parse("--password", "pw", "--max-age", "7D", "--queues", "10", "--vhost", "/")
+        assertEquals("7D", a.retentionMaxAge)
+        assertEquals(10, a.queues)
+    }
+
+    @Test
+    fun `max-age with queues on the default vhost by default is allowed`() {
+        assertEquals("7D", parse("--password", "pw", "--max-age", "7D", "--queues", "10").retentionMaxAge)
+    }
+
+    @Test
+    fun `max-age without queues on another vhost is allowed`() {
+        val a = parse("--password", "pw", "--max-age", "7D", "--vhost", "many")
+        assertEquals("7D", a.retentionMaxAge)
+        assertEquals("many", a.vhost)
+    }
+
+    @Test
+    fun `max-age with queues zero on another vhost is allowed`() {
+        assertEquals("7D", parse("--password", "pw", "--max-age", "7D", "--queues", "0", "--vhost", "many").retentionMaxAge)
+    }
+
+    @Test
+    fun `queues on another vhost without max-age is still allowed`() {
+        assertEquals(1000, parse("--password", "pw", "--queues", "1000", "--vhost", "many").queues)
     }
 }

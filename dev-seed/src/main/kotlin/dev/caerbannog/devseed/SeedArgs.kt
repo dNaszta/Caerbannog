@@ -44,6 +44,14 @@ data class SeedArgs(
             }
             val password = values["--password"]
             if (password.isNullOrEmpty()) throw SeedArgsException("Flag --password is required")
+            val queues = count(values, "--queues", 0)
+            val vhost = values["--vhost"] ?: "/"
+            if ("--max-age" in values && queues > 0 && vhost != "/") {
+                throw SeedArgsException(
+                    "Flag --max-age cannot be combined with --queues N on vhost '$vhost': a --queues run on another " +
+                        "vhost only declares queues and would ignore --max-age. Run them separately.",
+                )
+            }
             return SeedArgs(
                 host = values["--host"] ?: "localhost",
                 streamPort = port(values, "--stream-port", 5551),
@@ -51,10 +59,10 @@ data class SeedArgs(
                 user = values["--user"] ?: "admin",
                 password = password,
                 caPath = values["--ca"],
-                vhost = values["--vhost"] ?: "/",
+                vhost = vhost,
                 streams = values["--streams"]?.let(::streamNames) ?: DEFAULT_STREAMS,
                 messages = count(values, "--messages", 1000),
-                queues = count(values, "--queues", 0),
+                queues = queues,
                 retentionMaxAge = values["--max-age"]?.also {
                     if (!MAX_AGE.matches(it)) {
                         throw SeedArgsException("Flag --max-age takes a number and a unit Y, M, D, h, m or s, such as 7D")

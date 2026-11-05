@@ -17,6 +17,21 @@ Seed flags: `--password` (required), `--user` (default `admin`), `--host`, `--st
 retention policy `dev-seed-retention`), `--ca` (the Taskfile passes the fixture CA). Messages are **appended on
 every seed run**; queue declarations are idempotent. The password is never logged.
 
+Behaviours worth knowing:
+
+- `--streams x` **creates the stream when it does not exist**, then publishes into it.
+- `--queues 0 --vhost many` declares no queues and **publishes into the streams of that vhost, creating them**.
+- `--max-age` together with `--queues N` on a vhost other than `/` is **rejected** (such a run only declares queues
+  and would ignore the retention policy); run them separately.
+- **Practical maximum of `--queues`** (one import request, measured once on the dev broker): 10,000 queues take
+  about 34 s, 50,000 about 3 min (the broker is busy for a while afterwards; a seed right after got a connect
+  timeout), 100,000 fails with `400 Exceeded HTTP request body size limit` (so does 5,000,000). Treat **50,000** as
+  the ceiling and use `task dev:reset` afterwards.
+- A wrong `--ca` file shows up as `StreamException: null`; the tool then prints a hint that the file may not be the
+  CA that signed the broker certificate.
+- The image tag `rabbitmq:4-management` is **floating on purpose**: the dev broker should follow the current 4.x
+  release, so a breaking change shows up here early. It is not pinned by digest.
+
 The definitions in `dev/broker/definitions/` (`001-base.json`, `002-super-streams.json`) are **re-applied at every
 boot**, in file name order; anything deleted by hand comes back, data is only cleared by `dev:reset`.
 
