@@ -28,7 +28,12 @@ import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
 import androidx.compose.material.icons.outlined.Search
@@ -88,6 +93,11 @@ internal enum class AppIcon(val mockupName: String) {
     ArrowDownward("arrow_downward"),
     ChevronLeft("chevron_left"),
     ChevronRight("chevron_right"),
+    Close("close"),
+    Dns("dns"),
+    Block("block"),
+    Inbox("inbox"),
+    Warning("warning"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -121,6 +131,11 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.ArrowDownward -> Icons.Outlined.ArrowDownward
     AppIcon.ChevronLeft -> Icons.Outlined.ChevronLeft
     AppIcon.ChevronRight -> Icons.Outlined.ChevronRight
+    AppIcon.Close -> Icons.Outlined.Close
+    AppIcon.Dns -> Icons.Outlined.Dns
+    AppIcon.Block -> Icons.Outlined.Block
+    AppIcon.Inbox -> Icons.Outlined.Inbox
+    AppIcon.Warning -> Icons.Outlined.Warning
 }
 
 /** `.ms.sm` in the mockup. */
