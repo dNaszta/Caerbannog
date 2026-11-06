@@ -21,8 +21,17 @@ class PermissionCheckerFailureTest {
     private val password = "s3cr3t-pw-Zq9"
     private val base = ConnectionProfile(name = "p", host = "localhost", virtualHost = "/", username = "svc")
 
-    private fun check(profile: ConnectionProfile, timeoutMillis: Long = 2_000): PermissionCheckResult =
-        runBlocking { ManagementApiPermissionChecker(connectTimeoutMillis = timeoutMillis).check(profile, password) }
+    private fun check(
+        profile: ConnectionProfile,
+        connectTimeoutMillis: Long = 2_000,
+        requestTimeoutMillis: Long = connectTimeoutMillis,
+    ): PermissionCheckResult =
+        runBlocking {
+            ManagementApiPermissionChecker(
+                connectTimeoutMillis = connectTimeoutMillis,
+                requestTimeoutMillis = requestTimeoutMillis,
+            ).check(profile, password)
+        }
 
     private fun assertUnreadable(expected: UnreadableCause, result: PermissionCheckResult) {
         assertTrue(result is PermissionCheckResult.Unreadable, "expected Unreadable($expected), got $result")
@@ -62,7 +71,11 @@ class PermissionCheckerFailureTest {
                 start()
             }
             try {
-                val result = check(base.copy(host = "127.0.0.1", managementPort = server.localPort), timeoutMillis = 300)
+                val result = check(
+                    base.copy(host = "127.0.0.1", managementPort = server.localPort, tls = false),
+                    connectTimeoutMillis = 5_000,
+                    requestTimeoutMillis = 300,
+                )
                 assertUnreadable(UnreadableCause.TIMEOUT, result)
             } finally {
                 server.close()
