@@ -29,12 +29,16 @@ import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.TableChart
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
@@ -102,6 +106,10 @@ internal enum class AppIcon(val mockupName: String) {
     Warning("warning"),
     TableChart("table_chart"),
     SwapHoriz("swap_horiz"),
+    FilterList("filter_list"),
+    ContentCopy("content_copy"),
+    Tag("tag"),
+    Clear("clear"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -142,6 +150,10 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Warning -> Icons.Outlined.Warning
     AppIcon.TableChart -> Icons.Outlined.TableChart
     AppIcon.SwapHoriz -> Icons.Outlined.SwapHoriz
+    AppIcon.FilterList -> Icons.Outlined.FilterList
+    AppIcon.ContentCopy -> Icons.Outlined.ContentCopy
+    AppIcon.Tag -> Icons.Outlined.Tag
+    AppIcon.Clear -> Icons.Outlined.Clear
 }
 
 /** `.ms.sm` in the mockup. */

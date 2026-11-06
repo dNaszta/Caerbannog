@@ -42,6 +42,9 @@ class MessageBrowserUiTest {
         override fun jumpToNearestValidOffset() { calls += "jumpToNearestValidOffset" }
         override fun setPageSize(size: Int) { calls += "setPageSize:$size"; lastPageSize = size }
         override fun selectMessage(offset: Long?) { calls += "selectMessage:$offset"; lastSelected = offset }
+        override fun filter(query: String) { calls += "filter:$query" }
+        override fun cancelScan() { calls += "cancelScan" }
+        override fun clearFilter() { calls += "clearFilter" }
         override fun retry() { calls += "retry" }
     }
 
@@ -58,7 +61,10 @@ class MessageBrowserUiTest {
         messages: List<StreamMessage> = listOf(sampleMessage(100), sampleMessage(101)),
         canGoNext: Boolean = true,
         canGoPrevious: Boolean = true,
+        selectedMessage: StreamMessage? = null,
         retentionNotice: String? = null,
+        filterNotice: String? = null,
+        isFilterActive: Boolean = false,
     ): MessageBrowserState.Loaded = MessageBrowserState.Loaded(
         vhost = "/",
         stream = "events",
@@ -70,8 +76,10 @@ class MessageBrowserUiTest {
         startMode = BrowseStart.First,
         canGoNext = canGoNext,
         canGoPrevious = canGoPrevious,
-        selectedMessage = null,
+        selectedMessage = selectedMessage,
         retentionShiftNotice = retentionNotice,
+        filterNotice = filterNotice,
+        isFilterActive = isFilterActive,
     )
 
     @Test
@@ -211,5 +219,85 @@ class MessageBrowserUiTest {
         // Switch back to Messages
         onNodeWithTag("tab:Messages").performClick()
         onNodeWithTag("tab:Messages").assertIsSelected()
+    }
+
+    @Test
+    fun `filter bar renders input, scan limit chip, and triggers filter and cancel`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        setContent {
+            MessageBrowserView(
+                state = sampleLoadedState(),
+                events = events,
+            )
+        }
+
+        onNodeWithTag("browserFilterBar").assertExists()
+        onNodeWithTag("scanLimitChip").assertExists()
+        onNodeWithText("Scan limit: 10,000").assertExists()
+
+        onNodeWithTag("browserFilterInput").performTextInput("tenant=eu")
+        onNodeWithTag("applyFilterButton").performClick()
+        assertTrue(events.calls.contains("filter:tenant=eu"))
+
+        onNodeWithTag("cancelScanButton").performClick()
+        assertTrue(events.calls.contains("cancelScan"))
+    }
+
+    @Test
+    fun `selecting a message displays detail sheet with tabs and close button`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val msg = sampleMessage(1202, """{"orderId":"A-1202","status":"created"}""")
+        setContent {
+            MessageBrowserView(
+                state = sampleLoadedState(selectedMessage = msg),
+                events = events,
+            )
+        }
+
+        onNodeWithTag("messageDetailsSheet").assertExists()
+        onNodeWithText("Message at offset 1202").assertExists()
+
+        onNodeWithTag("viewerTab:JSON").assertExists()
+        onNodeWithTag("viewerTab:Text").assertExists()
+        onNodeWithTag("viewerTab:Hex").assertExists()
+
+        onNodeWithTag("copyBodyButton").assertExists()
+        onNodeWithTag("copyOffsetButton").assertExists()
+
+        onNodeWithTag("closeDetailsButton").performClick()
+        assertEquals(listOf("selectMessage:null"), events.calls)
+    }
+
+    @Test
+    fun `details sheet switches view tabs between Text, JSON, and Hex`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val msg = sampleMessage(1204, "heartbeat")
+        setContent {
+            MessageBrowserView(
+                state = sampleLoadedState(selectedMessage = msg),
+                events = events,
+            )
+        }
+
+        onNodeWithTag("viewerTab:Text").performClick()
+        onNodeWithTag("viewerTab:Text").assertIsSelected()
+
+        onNodeWithTag("viewerTab:Hex").performClick()
+        onNodeWithTag("viewerTab:Hex").assertIsSelected()
+    }
+
+    @Test
+    fun `details sheet displays truncated large body and expands on Show all`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val largeMsg = sampleMessage(1300, "A".repeat(80_000))
+        setContent {
+            MessageBrowserView(
+                state = sampleLoadedState(selectedMessage = largeMsg),
+                events = events,
+            )
+        }
+
+        onNodeWithTag("showAllButton").assertExists()
+        onNodeWithTag("showAllButton").performClick()
     }
 }

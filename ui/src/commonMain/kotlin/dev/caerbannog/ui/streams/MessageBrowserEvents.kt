@@ -12,6 +12,9 @@ interface MessageBrowserEvents {
     fun jumpToNearestValidOffset()
     fun setPageSize(size: Int)
     fun selectMessage(offset: Long?)
+    fun filter(query: String)
+    fun cancelScan()
+    fun clearFilter()
     fun retry()
 }
 
@@ -26,5 +29,8 @@ object EmptyMessageBrowserEvents : MessageBrowserEvents {
     override fun jumpToNearestValidOffset() {}
     override fun setPageSize(size: Int) {}
     override fun selectMessage(offset: Long?) {}
+    override fun filter(query: String) {}
+    override fun cancelScan() {}
+    override fun clearFilter() {}
     override fun retry() {}
 }
