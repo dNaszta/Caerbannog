@@ -94,9 +94,9 @@ Step 5: architect review (solution-architect, 2026-11-06): ACCEPTED.
 - Architecture: Stdio transport with line-delimited JSON-RPC; reuses existing `:core` interfaces and `:data-rabbit` gateway without UI coupling.
 - Safety: Architectural constraints strictly upheld (zero queue message reading tools, secrets excluded from outputs, TLS toggle honored).
 
-Branch: `m-mcp-01-stdio-server`
+Branch: `m-mcp-01-stdio-server` (merged into local `main`, not pushed)
 Round: 0
-Verdict: accepted
+Verdict: accepted, merged
 
 ## Antigravity / Claude Configuration
 

@@ -55,7 +55,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M2-06-f1-dev-seed-hold | `task dev:seed -- --hold`: one named publisher and one named consumer per dev stream stay connected until Ctrl+C, so the Publishers and consumers tab has rows | M2 | step 3 done (developer, 2026-11-05): 11 tests green, real check passed; step 4 verify (tester): pass with findings, 83 dev-seed tests green, real plain and TLS checks; step 5 (architect): Accepted with follow-ups, ready to merge into local main, nothing pushed |
 | M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (optional, needs bump approval); no hurry |
 | M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | input note (`M2-09-gate-stats-match.md`); needs Docker |
-| M-MCP-01-stdio-server | Headless MCP stdio server exposing connection profiles, streams, and topology tools to AI agents | Tooling / M2 | done (accepted, solution-architect 2026-11-06; branch `m-mcp-01-stdio-server`, not merged; 7 BDD scenarios green, 5 unit tests green) |
+| M-MCP-01-stdio-server | Headless MCP stdio server exposing connection profiles, streams, and topology tools to AI agents | Tooling / M2 | done (accepted, solution-architect 2026-11-06; merged into local `main`, not pushed; branch `m-mcp-01-stdio-server` kept; 7 BDD scenarios green, 5 unit tests green) |
 
 ## Later milestones (planned)
 
