@@ -5,8 +5,10 @@ import io.ktor.client.engine.mock.MockEngine
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
 import java.security.cert.CertificateException
+import java.time.Duration
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 
@@ -45,19 +47,23 @@ class ManagementHttpClassificationTest {
 
     @Test
     fun `a cause loop without a certificate ends and is NoTlsAnswer`() {
-        val a = SSLException("a")
-        val b = RuntimeException("b")
-        a.initCause(b)
-        b.initCause(a) // a -> b -> a -> ...
-        assertEquals(ManagementReply.NoTlsAnswer, replyTo(a))
+        assertTimeoutPreemptively(Duration.ofSeconds(2)) {
+            val a = SSLException("a")
+            val b = RuntimeException("b")
+            a.initCause(b)
+            b.initCause(a) // a -> b -> a -> ...
+            assertEquals(ManagementReply.NoTlsAnswer, replyTo(a))
+        }
     }
 
     @Test
     fun `a very deep chain ends, whatever sits at the bottom`() {
-        var cause: Throwable = CertificateException("too deep to matter or not, but the walk must end")
-        repeat(10_000) { cause = RuntimeException("level $it", cause) }
-        val reply = replyTo(SSLHandshakeException("top").apply { initCause(cause) })
-        // The depth limit decides which; only termination and a typed answer are pinned.
-        assert(reply == ManagementReply.NoTlsAnswer || reply == ManagementReply.CertificateRejected) { "got $reply" }
+        assertTimeoutPreemptively(Duration.ofSeconds(2)) {
+            var cause: Throwable = CertificateException("too deep to matter or not, but the walk must end")
+            repeat(10_000) { cause = RuntimeException("level $it", cause) }
+            val reply = replyTo(SSLHandshakeException("top").apply { initCause(cause) })
+            // The depth limit decides which; only termination and a typed answer are pinned.
+            assert(reply == ManagementReply.NoTlsAnswer || reply == ManagementReply.CertificateRejected) { "got $reply" }
+        }
     }
 }

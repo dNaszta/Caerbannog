@@ -32,6 +32,7 @@ import javax.net.ssl.SSLException
  */
 class ManagementApiPermissionChecker(
     private val connectTimeoutMillis: Long = 5_000,
+    private val requestTimeoutMillis: Long = connectTimeoutMillis,
 ) : PermissionChecker {
 
     override suspend fun check(profile: ConnectionProfile, password: String): PermissionCheckResult {
@@ -43,7 +44,7 @@ class ManagementApiPermissionChecker(
             return unreadable(UnreadableCause.UNREACHABLE, "CA certificate not loadable (${e.javaClass.simpleName})")
         }
 
-        val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis)
+        val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis, requestTimeoutMillis)
         try {
             val response = client.get(permissionsUrl(profile, transport)) { basicAuth(profile.username, password) }
             return when (response.status) {

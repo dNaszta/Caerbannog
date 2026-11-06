@@ -24,7 +24,11 @@ import javax.net.ssl.X509TrustManager
 internal object TlsSupport {
 
     /** The HTTP client for [transport]: TLS with the profile trust, or plain HTTP with no TLS settings at all. */
-    fun buildHttpClient(transport: BrokerTransport, timeoutMillis: Long): HttpClient = HttpClient(Java) {
+    fun buildHttpClient(
+        transport: BrokerTransport,
+        timeoutMillis: Long,
+        requestTimeoutMillis: Long = timeoutMillis,
+    ): HttpClient = HttpClient(Java) {
         expectSuccess = false
         engine {
             config {
@@ -36,7 +40,7 @@ internal object TlsSupport {
         }
         install(HttpTimeout) {
             connectTimeoutMillis = timeoutMillis
-            requestTimeoutMillis = timeoutMillis
+            this.requestTimeoutMillis = requestTimeoutMillis
         }
     }
 
