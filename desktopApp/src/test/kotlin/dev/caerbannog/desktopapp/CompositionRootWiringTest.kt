@@ -181,6 +181,58 @@ class CompositionRootWiringTest {
         assertEquals(listOf("exit"), log.toList())
     }
 
+    // --- M2-11: Shutdown hook for Cmd+Q, app menu, and SIGTERM ----------------------------------------------------
+
+    @Test
+    fun `shutdown hook registers an unstarted thread and closes the held connection on exit`() = runBlocking<Unit> {
+        val composition = compose(LoggingGateway())
+        composition.viewModel.connect("uat-eu")
+
+        var registeredHook: Thread? = null
+        val returnedHook = registerShutdownHook(composition) { hook -> registeredHook = hook }
+
+        assertEquals(returnedHook, registeredHook)
+        assertEquals("caerbannog-shutdown", registeredHook?.name)
+        assertFalse(registeredHook?.isAlive == true, "hook should be registered unstarted")
+
+        // Simulate JVM invoking the hook on SIGTERM / Cmd+Q
+        registeredHook?.run()
+
+        assertEquals(listOf("open:uat-eu", "close:uat-eu"), log.toList())
+        assertIs<LinkState.Disconnected>(composition.active.state.value)
+    }
+
+    @Test
+    fun `shutdown hook tolerates a second call without error or duplicate closing`() = runBlocking<Unit> {
+        val composition = compose(LoggingGateway())
+        composition.viewModel.connect("uat-eu")
+
+        var registeredHook: Thread? = null
+        registerShutdownHook(composition) { hook -> registeredHook = hook }
+
+        registeredHook?.run()
+        registeredHook?.run()
+
+        assertEquals(listOf("open:uat-eu", "close:uat-eu"), log.toList())
+        assertIs<LinkState.Disconnected>(composition.active.state.value)
+    }
+
+    @Test
+    fun `shutdown hook after normal close request is idempotent`() = runBlocking<Unit> {
+        val composition = compose(LoggingGateway())
+        composition.viewModel.connect("uat-eu")
+
+        var registeredHook: Thread? = null
+        registerShutdownHook(composition) { hook -> registeredHook = hook }
+
+        handleCloseRequest(composition) { log += "exit" }
+        registeredHook?.run()
+
+        assertEquals(listOf("open:uat-eu", "close:uat-eu", "exit"), log.toList())
+        assertIs<LinkState.Disconnected>(composition.active.state.value)
+    }
+
+
     @Test
     fun `the default gateway is the real one and reads the password from the injected store, not the keychain`() = runBlocking<Unit> {
         val closed = ServerSocket(0).use { it.localPort }
