@@ -15,5 +15,18 @@ class MessageBrowserEventsAdapter(private val vm: MessageBrowserViewModel) : Mes
     override fun jumpToNearestValidOffset() = vm.jumpToNearestValidOffset()
     override fun setPageSize(size: Int) = vm.setPageSize(size)
     override fun selectMessage(offset: Long?) = vm.selectMessage(offset)
+    override fun filter(query: String) {
+        val criteria = if (query.isBlank()) {
+            dev.caerbannog.core.browser.MessageFilterCriteria.None
+        } else if (query.contains("=")) {
+            val parts = query.split("=", limit = 2)
+            dev.caerbannog.core.browser.MessageFilterCriteria.ApplicationProperty(parts[0].trim(), parts[1].trim())
+        } else {
+            dev.caerbannog.core.browser.MessageFilterCriteria.Text(query.trim())
+        }
+        vm.filter(criteria)
+    }
+    override fun cancelScan() = vm.cancelScan()
+    override fun clearFilter() = vm.clearFilter()
     override fun retry() = vm.browseFirst()
 }

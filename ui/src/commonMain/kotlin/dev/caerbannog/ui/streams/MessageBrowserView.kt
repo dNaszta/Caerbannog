@@ -1,18 +1,20 @@
 package dev.caerbannog.ui.streams
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,12 +22,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,22 +38,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
+import dev.caerbannog.core.browser.PayloadFormatter
+import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.browser.StreamMessage
+import dev.caerbannog.ui.connections.AppIcon
+import dev.caerbannog.ui.connections.ConnectionIcon
+import dev.caerbannog.ui.connections.IconSize
+import dev.caerbannog.ui.connections.SmallIconSize
+import kotlinx.coroutines.launch
+import java.awt.datatransfer.StringSelection
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -131,8 +143,106 @@ fun MessageBrowserView(
                     }
 
                     ControlCard(state, events)
-                    MessagesTable(state, events, Modifier.weight(1f))
+                    FilterBar(state, events)
+
+                    Row(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        MessagesTable(
+                            state = state,
+                            events = events,
+                            modifier = Modifier.weight(1f),
+                        )
+
+                        state.selectedMessage?.let { selected ->
+                            MessageDetailsSheet(
+                                message = selected,
+                                events = events,
+                                modifier = Modifier.width(420.dp),
+                            )
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterBar(state: MessageBrowserState.Loaded, events: MessageBrowserEvents) {
+    var query by remember { mutableStateOf("") }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().testTag("browserFilterBar"),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Filter by text, property or application property") },
+                    singleLine = true,
+                    leadingIcon = {
+                        ConnectionIcon(AppIcon.FilterList, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    query = ""
+                                    events.clearFilter()
+                                },
+                                modifier = Modifier.testTag("clearFilterButton"),
+                            ) {
+                                ConnectionIcon(AppIcon.Clear, SmallIconSize)
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f).testTag("browserFilterInput"),
+                )
+
+                Button(
+                    onClick = { events.filter(query) },
+                    modifier = Modifier.testTag("applyFilterButton"),
+                ) {
+                    Text("Filter")
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("scanLimitChip"),
+                ) {
+                    Text(
+                        "Scan limit: 10,000",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = events::cancelScan,
+                    modifier = Modifier.testTag("cancelScanButton"),
+                ) {
+                    Text("Cancel scan")
+                }
+            }
+
+            state.filterNotice?.let { notice ->
+                Text(
+                    notice,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag("filterStatusNotice"),
+                )
             }
         }
     }
@@ -303,11 +413,9 @@ private fun MessagesTable(
     events: MessageBrowserEvents,
     modifier: Modifier = Modifier,
 ) {
-    val hScroll = rememberScrollState()
-
     Surface(
         shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth().testTag("messagesTable"),
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -406,6 +514,205 @@ private fun MessagesTable(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MessageDetailsSheet(
+    message: StreamMessage,
+    events: MessageBrowserEvents,
+    modifier: Modifier = Modifier,
+) {
+    val formatter = remember { PayloadFormatter() }
+    var requestedKind by remember(message.offset) { mutableStateOf<PayloadViewKind?>(null) }
+    var showAll by remember(message.offset) { mutableStateOf(false) }
+
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val inspection = remember(message, requestedKind, showAll) {
+        formatter.inspect(message, requestedKind = requestedKind, showAll = showAll)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.fillMaxHeight().testTag("messageDetailsSheet"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Header: title and close button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Message at offset ${message.offset}",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.testTag("detailsTitle"),
+                )
+                IconButton(
+                    onClick = { events.selectMessage(null) },
+                    modifier = Modifier.testTag("closeDetailsButton"),
+                ) {
+                    ConnectionIcon(AppIcon.Close, IconSize)
+                }
+            }
+
+            // Tabs: Text, JSON, Hex
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+            ) {
+                val currentKind = inspection.currentKind
+                listOf(PayloadViewKind.TEXT, PayloadViewKind.JSON, PayloadViewKind.HEX).forEach { kind ->
+                    val isSelected = currentKind == kind
+                    val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                    val fg = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    val label = when (kind) {
+                        PayloadViewKind.TEXT -> "Text"
+                        PayloadViewKind.JSON -> "JSON"
+                        PayloadViewKind.HEX -> "Hex"
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(bg)
+                            .clickable { requestedKind = kind }
+                            .selectable(selected = isSelected, role = Role.Tab, onClick = { requestedKind = kind })
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .testTag("viewerTab:$label"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = fg)
+                    }
+                }
+            }
+
+            // Validation warning if any (e.g. malformed JSON)
+            inspection.validationWarning?.let { warning ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("validationWarningBanner"),
+                ) {
+                    Text(
+                        warning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+            }
+
+            // Body preview box
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                Column(Modifier.fillMaxSize().padding(12.dp)) {
+                    val scrollState = rememberScrollState()
+                    Box(Modifier.weight(1f).verticalScroll(scrollState)) {
+                        Text(
+                            text = inspection.displayText,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            modifier = Modifier.testTag("detailsBodyText"),
+                        )
+                    }
+
+                    if (inspection.canShowAll && inspection.isCapped) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { showAll = true },
+                            modifier = Modifier.fillMaxWidth().testTag("showAllButton"),
+                        ) {
+                            Text("Show all")
+                        }
+                    }
+                }
+            }
+
+            // Key-values list
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                KeyValueRow("Timestamp", formatTimestamp(message.timestamp))
+                for ((k, v) in inspection.properties) {
+                    KeyValueRow(k, v)
+                }
+                for ((k, v) in inspection.applicationProperties) {
+                    KeyValueRow("$k (app property)", v)
+                }
+            }
+
+            // Copy buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Button(
+                    onClick = {
+                        val bodyText = formatter.copyBody(message)
+                        coroutineScope.launch {
+                            try {
+                                clipboard.setClipEntry(ClipEntry(StringSelection(bodyText)))
+                            } catch (_: Exception) {
+                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(bodyText), null)
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("copyBodyButton"),
+                ) {
+                    ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Copy body")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val offsetText = formatter.copyOffset(message)
+                        coroutineScope.launch {
+                            try {
+                                clipboard.setClipEntry(ClipEntry(StringSelection(offsetText)))
+                            } catch (_: Exception) {
+                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(offsetText), null)
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("copyOffsetButton"),
+                ) {
+                    ConnectionIcon(AppIcon.Tag, SmallIconSize)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Copy offset")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeyValueRow(key: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            key,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            textAlign = TextAlign.End,
+        )
     }
 }
 
