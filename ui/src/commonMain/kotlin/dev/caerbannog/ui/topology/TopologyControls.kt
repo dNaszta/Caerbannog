@@ -97,7 +97,7 @@ internal fun TopologyTabs(current: TopologyTab, onSelect: (TopologyTab) -> Unit)
 @Composable
 internal fun TopologyControls(state: TopologyState, events: TopologyEvents, searchAndFilters: Boolean) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (state.showVhostSwitch) VhostSwitch(state.vhost, state.vhosts, events::selectVhost)
+        if (state.showVhostSwitch) VhostSwitch(state.vhost, state.vhosts, state.homeVhost, events::selectVhost)
         if (searchAndFilters) {
             when (state.tab) {
                 TopologyTab.Queues -> {

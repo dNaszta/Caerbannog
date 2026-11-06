@@ -166,5 +166,7 @@ class TopologyVhostSwitchUiTest {
         node("vhostMenu").assertExists()
         assertTrue(text("vhostItem:/").contains(TopologyTexts.HOME_VHOST_CAPTION), "expected caption on home vhost: ${text("vhostItem:/")}")
         assertFalse(text("vhostItem:billing").contains(TopologyTexts.HOME_VHOST_CAPTION), "caption should not appear on non-home vhost: ${text("vhostItem:billing")}")
+        assertEquals(listOf("/, ${TopologyTexts.HOME_VHOST_CAPTION}"), node("vhostItem:/").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(listOf("billing"), node("vhostItem:billing").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
     }
 }

@@ -496,6 +496,7 @@ class TopologyViewModel(
             vhost = vhost,
             vhosts = offeredVhosts,
             showVhostSwitch = offeredVhosts.isNotEmpty(),
+            homeVhost = if (screen != TopologyScreen.CannotRead && offeredVhosts.contains(home)) home else null,
             queues = shownQueues,
             exchanges = shownExchanges,
             bindings = shownBindings,

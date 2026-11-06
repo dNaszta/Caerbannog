@@ -68,7 +68,7 @@ class TopologyViewModelVhostTest {
 
     @Test
     fun `homeVhost is null when the connection's virtual host is not offered`() = runTest {
-        val s = TopologyHarness(this, vhost = "missing")
+        val s = TopologyHarness(this, vhost = "missing", declareProfileVhost = false)
         s.open()
         assertEquals(null, s.state.homeVhost)
     }
