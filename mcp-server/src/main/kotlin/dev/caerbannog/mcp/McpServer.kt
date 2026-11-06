@@ -2,7 +2,11 @@ package dev.caerbannog.mcp
 
 import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
+import dev.caerbannog.core.browser.MessageFilterCriteria
+import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.browser.StreamMessageReader
+import dev.caerbannog.core.browser.StreamScanner
+import kotlinx.coroutines.flow.toList
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -203,6 +207,18 @@ class McpServer(
                     putJsonObject("limit") {
                         put("type", "integer")
                         put("description", "Maximum messages to return (1..100, default 20)")
+                    }
+                    putJsonObject("filterText") {
+                        put("type", "string")
+                        put("description", "Filter by text within payload (case-insensitive substring match)")
+                    }
+                    putJsonObject("appPropertyKey") {
+                        put("type", "string")
+                        put("description", "Application property key to filter by")
+                    }
+                    putJsonObject("appPropertyValue") {
+                        put("type", "string")
+                        put("description", "Application property value to filter by")
                     }
                 }
                 putJsonArray("required") {
@@ -592,6 +608,56 @@ class McpServer(
             }
             startStr.toLongOrNull() != null -> BrowseStart.Offset(startStr.toLong())
             else -> return McpCallToolResult(listOf(McpContent(text = "Unknown start specification '$startStr'. Use 'first', 'last', numeric offset, or '@<epochMs>'")), isError = true)
+        }
+
+        val filterText = args["filterText"]?.jsonPrimitive?.content
+        val appPropKey = args["appPropertyKey"]?.jsonPrimitive?.content
+        val appPropVal = args["appPropertyValue"]?.jsonPrimitive?.content
+
+        val criteria = when {
+            filterText != null -> MessageFilterCriteria.Text(filterText)
+            appPropKey != null && appPropVal != null -> MessageFilterCriteria.ApplicationProperty(appPropKey, appPropVal)
+            else -> MessageFilterCriteria.None
+        }
+        if (criteria !is MessageFilterCriteria.None) {
+            val startOffset = when (startSpec) {
+                is BrowseStart.Offset -> startSpec.offset
+                else -> 0L
+            }
+            val updates = StreamScanner(reader).scan(vhost, stream, startOffset, criteria, scanLimit = 10_000).toList()
+            val final = updates.lastOrNull()
+            val matches = (final?.matches ?: emptyList()).take(limit)
+            val jsonResult = buildJsonObject {
+                put("stream", stream)
+                put("vhost", vhost)
+                put("count", matches.size)
+                put("scannedCount", final?.scannedCount ?: 0)
+                put("limitReached", final?.limitReached ?: false)
+                final?.notice?.let { put("notice", it) }
+                putJsonArray("messages") {
+                    for (msg in matches) {
+                        add(buildJsonObject {
+                            put("offset", msg.offset)
+                            put("timestamp", msg.timestamp)
+                            putJsonObject("properties") {
+                                for ((k, v) in msg.properties) {
+                                    put(k, v?.toString() ?: "")
+                                }
+                            }
+                            putJsonObject("applicationProperties") {
+                                for ((k, v) in msg.applicationProperties) {
+                                    put(k, v?.toString() ?: "")
+                                }
+                            }
+                            val (preview, truncated) = formatPayload(msg.payload)
+                            put("payload", preview)
+                            put("payloadSize", msg.payload.size)
+                            put("truncated", truncated)
+                        })
+                    }
+                }
+            }
+            return McpCallToolResult(listOf(McpContent(text = json.encodeToString(jsonResult))))
         }
 
         return when (val result = reader.readPage(vhost, stream, startSpec, limit)) {

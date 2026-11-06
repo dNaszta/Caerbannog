@@ -75,6 +75,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
 | M4-01-payload-viewer-core-and-formatting | Payload viewer core, formatting, and BDD scenarios | M4 | done (architect: Accepted, 2026-11-06; branch `m4-01-payload-viewer-core-and-formatting`; 12 unit tests green, 7 BDD scenarios green) |
+| M4-02-filter-scan-engine | Bounded client-side stream scanner and filter engine | M4 | done (architect: Accepted, 2026-11-06; branch `m4-02-filter-scan-engine`; 5 unit tests green, 11 BDD scenarios green) |
 
 ## Later milestones (planned)
 
