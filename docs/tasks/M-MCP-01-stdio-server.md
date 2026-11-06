@@ -85,7 +85,32 @@ None.
 
 ## Status
 
-Step 1: brief written by solution-architect (2026-11-06). Ready for step 2 (test-developer).
+Step 1: brief written by solution-architect (2026-11-06).
+Step 2: tests first done (test-developer, 2026-11-06). BDD feature `14_mcp_server.feature`, runner `RunMcpAcceptanceTest`, and `McpSteps` written; confirmed red on compile stubs.
+Step 3: build done (senior-developer, 2026-11-06). Module `:mcp-server` created with `McpProtocol`, `McpServer`, and `Main.kt`; unit tests in `McpServerTest` and acceptance steps green.
+Step 4: verified (test-developer, 2026-11-06). All 7 BDD scenarios pass; 5 unit tests pass; stdio communication verified via smoke execution; zero log lines on stdout; no queue message reading paths exist.
+Step 5: architect review (solution-architect, 2026-11-06): ACCEPTED.
+- Fit: Vertical slice matches the goal; clean `:mcp-server` CLI application.
+- Architecture: Stdio transport with line-delimited JSON-RPC; reuses existing `:core` interfaces and `:data-rabbit` gateway without UI coupling.
+- Safety: Architectural constraints strictly upheld (zero queue message reading tools, secrets excluded from outputs, TLS toggle honored).
+
 Branch: `m-mcp-01-stdio-server`
 Round: 0
-Verdict: in progress
+Verdict: accepted
+
+## Antigravity / Claude Configuration
+
+To connect this MCP server to Antigravity CLI or Claude Code, add the following to `~/.gemini/config/mcp_config.json` or `.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "caerbannog": {
+      "command": "./gradlew",
+      "args": [":mcp-server:run", "--quiet"],
+      "cwd": "/Users/dnaszta/Projects/Caerbannog"
+    }
+  }
+}
+```
+
