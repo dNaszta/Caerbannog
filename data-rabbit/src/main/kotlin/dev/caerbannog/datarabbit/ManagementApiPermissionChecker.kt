@@ -79,7 +79,7 @@ class ManagementApiPermissionChecker(
     }
 
     private fun permissionsUrl(profile: ConnectionProfile, transport: BrokerTransport): String =
-        "${transport.scheme}://${profile.host}:${profile.managementPort}/api/permissions/${encode(profile.virtualHost)}/${encode(profile.username)}"
+        "${transport.scheme}://${ManagementRequests.formatAuthority(profile.host, profile.managementPort)}/api/permissions/${encode(profile.virtualHost)}/${encode(profile.username)}"
 
     // URLEncoder makes spaces "+", which a path segment does not understand.
     private fun encode(segment: String): String = URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")

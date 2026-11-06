@@ -83,8 +83,9 @@ class StreamAndManagementReachabilityChecker(
 
     private suspend fun checkManagementEndpoint(profile: ConnectionProfile, transport: BrokerTransport): ConnectionCheckResult {
         val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis)
+        val authority = ManagementRequests.formatAuthority(profile.host, profile.managementPort)
         try {
-            client.get("${transport.scheme}://${profile.host}:${profile.managementPort}/api/overview")
+            client.get("${transport.scheme}://$authority/api/overview")
         } catch (e: SSLException) {
             return ConnectionCheckResult.TlsRefused
         } catch (e: IOException) {
@@ -109,8 +110,9 @@ class StreamAndManagementReachabilityChecker(
      */
     private suspend fun checkStreamManagementPlugin(profile: ConnectionProfile, transport: BrokerTransport): ConnectionCheckResult {
         val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis)
+        val authority = ManagementRequests.formatAuthority(profile.host, profile.managementPort)
         try {
-            val response = client.get("${transport.scheme}://${profile.host}:${profile.managementPort}/api/stream/connections")
+            val response = client.get("${transport.scheme}://$authority/api/stream/connections")
             return if (response.status == HttpStatusCode.NotFound) {
                 ConnectionCheckResult.ManagementPluginMissing("rabbitmq_stream_management")
             } else {
