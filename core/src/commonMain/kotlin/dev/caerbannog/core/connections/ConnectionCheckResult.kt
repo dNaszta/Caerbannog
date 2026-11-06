@@ -16,6 +16,10 @@ sealed interface ConnectionCheckResult {
     /** The management API answered, but [pluginName] is not enabled on the broker. */
     data class ManagementPluginMissing(val pluginName: String) : ConnectionCheckResult
 
+    /** The broker's certificate was rejected (untrusted or wrong CA). */
+    data object CertificateRejected : ConnectionCheckResult
+
     /** The broker does not offer TLS at all; the app never connects without it. */
     data object TlsRefused : ConnectionCheckResult
+
 }

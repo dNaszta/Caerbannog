@@ -46,6 +46,17 @@ class ConnectionCheckTextsTest {
         )
     }
 
+    // --- M2-14f: untrusted certificate on Check says "The certificate was not trusted" --------------------------
+
+    @Test
+    fun `untrusted certificate on Check says certificate was not trusted and does not suggest turning TLS off`() {
+        val text = checkResultMessage(ConnectionCheckResult.CertificateRejected, tls = true)
+        assertEquals(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED, text)
+        assertFalse(text.contains("may not use TLS"), "should not suggest turning off TLS for a certificate failure: $text")
+        assertFalse(text.contains("turn off 'Use TLS'"), "should not suggest turning off TLS: $text")
+    }
+
+
     @Test
     fun `the old refusal text is gone`() {
         assertFalse(checkResultMessage(ConnectionCheckResult.TlsRefused, tls = true).contains("does not connect without TLS"))

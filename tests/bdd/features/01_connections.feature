@@ -110,6 +110,16 @@ Feature: Connection profiles
     And the message says the switch can be turned off in the connection settings
     And no attempt without TLS was made
 
+  @negative @security @fake-broker
+  Scenario: A certificate that is not trusted does not suggest turning TLS off on the Check
+    Given a saved connection "untrusted-ca" with TLS on
+    And the broker presents an untrusted certificate
+    When I check the connection "untrusted-ca"
+    Then the check reports the certificate was not trusted
+    And the check message does not mention turning TLS off
+    And no attempt without TLS was made
+
+
   @fake-broker
   Scenario: A connection can be saved with TLS off
     When I add a connection with these settings

@@ -68,10 +68,8 @@ class StreamAndManagementReachabilityChecker(
             }
             return null
         } catch (e: SSLException) {
-            // Covers both a failed handshake (SSLHandshakeException, a subtype) and a peer that spoke
-            // back something that was not TLS at all (e.g. a plain, non-TLS socket). Only reachable with
-            // TLS on; the result then carries the "may not use TLS" hint (core `checkResultMessage`).
-            return ConnectionCheckResult.TlsRefused
+            // M2-14f: distinguish untrusted certificate from plain endpoint / no TLS answer.
+            return classifyTlsRefused(e)
         } catch (e: ConnectException) {
             return ConnectionCheckResult.EndpointUnreachable(Endpoint.STREAM, e.message ?: "connection refused")
         } catch (e: SocketTimeoutException) {
@@ -81,13 +79,17 @@ class StreamAndManagementReachabilityChecker(
         }
     }
 
+    private fun classifyTlsRefused(error: SSLException): ConnectionCheckResult =
+        if (TlsExceptionClassifier.hasCertificateCause(error)) ConnectionCheckResult.CertificateRejected
+        else ConnectionCheckResult.TlsRefused
+
     private suspend fun checkManagementEndpoint(profile: ConnectionProfile, transport: BrokerTransport): ConnectionCheckResult {
         val client = TlsSupport.buildHttpClient(transport, connectTimeoutMillis)
         val authority = ManagementRequests.formatAuthority(profile.host, profile.managementPort)
         try {
             client.get("${transport.scheme}://$authority/api/overview")
         } catch (e: SSLException) {
-            return ConnectionCheckResult.TlsRefused
+            return classifyTlsRefused(e)
         } catch (e: IOException) {
             return ConnectionCheckResult.EndpointUnreachable(Endpoint.MANAGEMENT, e.message ?: "unreachable")
         } finally {

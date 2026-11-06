@@ -27,3 +27,49 @@ Whether the stream-leg `SSLSocket` gives the same shapes as the HTTP client (pla
 
 ## Definition of done
 Tests first and red for the right reason, passing; spec D9a text unchanged except the Check sentence; README row.
+
+## Status
+
+### Step 2: Tests first (test developer, 2026-11-06)
+- Declared `ConnectionCheckResult.CertificateRejected` in `core/src/commonMain/kotlin/dev/caerbannog/core/connections/ConnectionCheckResult.kt`.
+- Added unit test in `core/src/jvmTest/kotlin/dev/caerbannog/core/connections/ConnectionCheckTextsTest.kt`:
+  - `untrusted certificate on Check says certificate was not trusted and does not suggest turning TLS off`: asserts `ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED` and no mentions of "may not use TLS" or "turn off 'Use TLS'".
+- Added BDD acceptance scenario in `tests/bdd/features/01_connections.feature`:
+  - `A certificate that is not trusted does not suggest turning TLS off on the Check`: exercises untrusted CA, verifies Check reports certificate not trusted without suggesting turning TLS off.
+- Extended `RealBrokerReachabilityTest.kt` with `a real BrokerReachabilityChecker reports CertificateRejected for a wrong CA`.
+- Added unit test `data-rabbit/src/test/kotlin/dev/caerbannog/datarabbit/ReachabilityCheckerWrongCaTest.kt`:
+  - `an untrusted certificate is reported as CertificateRejected on the Check`: asserts `StreamAndManagementReachabilityChecker` returns `CertificateRejected` against an untrusted local TLS server.
+- Verified RED state:
+  - `:core:jvmTest`: failed on `TODO("M2-14f stub")` in `ConnectionCheckTexts.kt`.
+  - `:data-rabbit:test`: failed in `ReachabilityCheckerWrongCaTest`: `expected: <CertificateRejected> but was: <TlsRefused>`.
+
+### Step 3: Build (senior developer, 2026-11-06)
+- Extracted shared `TlsExceptionClassifier` in `data-rabbit/src/main/kotlin/dev/caerbannog/datarabbit/TlsExceptionClassifier.kt`:
+  - Walks cause chain up to `MAX_CAUSE_DEPTH = 20` for `java.security.cert.CertificateException`.
+- Updated `ManagementHttp.Companion.classify(error: SSLException)`: delegates to `TlsExceptionClassifier.hasCertificateCause(error)`.
+- Updated `StreamAndManagementReachabilityChecker.kt`:
+  - Uses `classifyTlsRefused(e)` for both stream-leg `SSLSocket` and management-leg HTTP client.
+  - Returns `ConnectionCheckResult.CertificateRejected` if a certificate cause is detected, otherwise `ConnectionCheckResult.TlsRefused`.
+- Updated `ConnectionCheckTexts.kt`: maps `ConnectionCheckResult.CertificateRejected -> ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED`.
+- Updated `mcp-server/src/main/kotlin/dev/caerbannog/mcp/McpServer.kt`: exhaustive handling for `CertificateRejected`.
+- Verified GREEN state: all unit and BDD tests pass.
+
+### Step 4: Verification (test developer, 2026-11-06)
+- **Mutation check:**
+  - Mutated `TlsExceptionClassifier.hasCertificateCause` to always return false.
+  - Result: 2 unit tests (`ManagementHttpClassificationTest` and `ReachabilityCheckerWrongCaTest`) failed immediately (`AssertionFailedError`), killing the mutation.
+- **Full test suite & guard check:**
+  - `./gradlew test verifyTestDiscovery`: 46 tasks successful, 0 failures across all modules.
+- Verdict: **PASS**. Ready for Step 5 architect review.
+
+### Step 5: Architect review (solution architect, 2026-11-06)
+- **Review:**
+  - Typed split: `ConnectionCheckResult.CertificateRejected` cleanly separates an untrusted certificate from a broker that does not answer TLS (plain listener).
+  - Single source of truth: `TlsExceptionClassifier` unifies the cause-chain classification between `ManagementHttp` and `StreamAndManagementReachabilityChecker`.
+  - Consistent user messaging: "Test connection" and "Connect" now both report "The certificate was not trusted" for wrong/missing CA without misleading hints.
+  - Headless MCP check: Verified (no new MCP tools needed; existing profile tools benefit directly).
+  - Quorum queue safety: Verified.
+- **Decision:** **ACCEPTED**. Ready to merge into local `main`.
+
+
+
