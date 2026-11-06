@@ -7,6 +7,7 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.OpenResult
@@ -92,6 +93,7 @@ class CompositionRootWiringTest {
                 override val catalog = NoCatalog
                 override val offsets = NoOffsets
                 override val topology = FakeTopologyCatalog()
+                override val messages = FakeStreamMessageReader()
                 override fun close() { log += "close:${profile.name}" }
             })
         }
@@ -156,6 +158,7 @@ class CompositionRootWiringTest {
                     override val catalog = NoCatalog
                     override val offsets = NoOffsets
                     override val topology = FakeTopologyCatalog()
+                    override val messages = FakeStreamMessageReader()
                     override fun close() { log += "close:${profile.name}" }
                 })
             }

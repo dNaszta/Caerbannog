@@ -38,7 +38,7 @@ internal class StreamEnvironments(
     override fun read(vhost: String, stream: String): Long =
         environmentFor(vhost).queryStreamStats(stream).firstOffset()
 
-    private fun environmentFor(vhost: String): Environment {
+    internal fun environmentFor(vhost: String): Environment {
         check(!closed.get()) { "closed" }
         val mine = CompletableFuture<Environment>()
         val existing = environments.putIfAbsent(vhost, mine)

@@ -46,7 +46,8 @@ fun main() {
         connectionChecker = reachabilityChecker,
         streamCatalogProvider = { profile, _ -> getHeldConnection(profile).catalog },
         streamOffsetsProvider = { profile, _ -> getHeldConnection(profile).offsets },
-        topologyCatalogProvider = { profile, _ -> getHeldConnection(profile).topology }
+        topologyCatalogProvider = { profile, _ -> getHeldConnection(profile).topology },
+        streamMessageReaderProvider = { profile, _ -> getHeldConnection(profile).messages }
     )
 
     Runtime.getRuntime().addShutdownHook(Thread {

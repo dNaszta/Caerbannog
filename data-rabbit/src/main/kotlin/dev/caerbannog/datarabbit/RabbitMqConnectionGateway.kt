@@ -50,11 +50,13 @@ class RabbitMqConnectionGateway(
             environments.close()
             return OpenResult.Failed(failure)
         }
+        val catalog = ManagementStreamCatalog(http, requests)
         return OpenResult.Opened(
             RabbitMqHeldConnection(
-                catalog = ManagementStreamCatalog(http, requests),
+                catalog = catalog,
                 offsets = RabbitMqStreamOffsets(environments),
                 topology = ManagementTopologyCatalog(http, requests),
+                messages = RabbitMqStreamMessageReader(environments, catalog),
                 resources = listOf(environments, http),
                 log = log,
             ),

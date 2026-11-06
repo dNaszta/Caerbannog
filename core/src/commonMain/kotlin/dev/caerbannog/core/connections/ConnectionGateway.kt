@@ -1,5 +1,6 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.topology.TopologyCatalog
@@ -34,4 +35,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M2-08b: queues, exchanges, bindings and vhosts over the management API of this connection (read-only). */
     val topology: TopologyCatalog
+
+    /** M3-01: stream message browser reader over the stream protocol of this connection. */
+    val messages: StreamMessageReader
 }

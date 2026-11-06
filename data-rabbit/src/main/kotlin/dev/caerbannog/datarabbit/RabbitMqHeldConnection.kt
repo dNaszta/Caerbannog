@@ -1,5 +1,6 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
@@ -15,6 +16,7 @@ class RabbitMqHeldConnection(
     override val catalog: StreamCatalog,
     override val offsets: StreamOffsets,
     override val topology: TopologyCatalog,
+    override val messages: StreamMessageReader,
     private val resources: List<AutoCloseable>,
     private val log: (String) -> Unit,
 ) : HeldConnection {
