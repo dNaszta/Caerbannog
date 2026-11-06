@@ -153,7 +153,7 @@ class PayloadFormatter(
         showAll: Boolean = false,
     ): PayloadInspection {
         val binary = isBinary(message.payload)
-        val contentType = message.properties["content-type"]?.toString().orEmpty()
+        val contentType = (message.properties["content-type"] ?: message.properties["contentType"])?.toString().orEmpty()
         val claimsJson = contentType.contains("json", ignoreCase = true)
 
         val availableKinds: Set<PayloadViewKind>

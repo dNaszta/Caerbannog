@@ -77,7 +77,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M4-01-payload-viewer-core-and-formatting | Payload viewer core, formatting, and BDD scenarios | M4 | done (architect: Accepted, 2026-11-06; branch `m4-01-payload-viewer-core-and-formatting`; 12 unit tests green, 7 BDD scenarios green) |
 | M4-02-filter-scan-engine | Bounded client-side stream scanner and filter engine | M4 | done (architect: Accepted, 2026-11-06; branch `m4-02-filter-scan-engine`; 5 unit tests green, 11 BDD scenarios green) |
 | M4-03-viewer-and-filter-ui | Message browser detail side sheet, viewer tabs, filter bar, and UI tests | M4 | done (architect: Accepted, 2026-11-07; branch `m4-03-viewer-and-filter-ui`; 11 Compose UI tests green) |
-| M4-04-gate-large-bodies-and-safety | Real broker responsiveness gate and ephemeral read-only safety verification | M4 | in progress (branch `m4-04-gate-large-bodies-and-safety`) |
+| M4-04-gate-large-bodies-and-safety | Real broker responsiveness gate and ephemeral read-only safety verification | M4 | done (architect: Accepted, 2026-11-07; branch `m4-04-gate-large-bodies-and-safety`; 2 broker tests green) |
 
 ## Later milestones (planned)
 
