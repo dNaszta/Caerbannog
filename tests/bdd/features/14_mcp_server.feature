@@ -7,7 +7,7 @@ Feature: Model Context Protocol (MCP) server
   Background:
     Given the app holds a profile "dev-local" for host "localhost" vhost "/" with TLS on
     And the app holds a profile "prod-plain" for host "prod.internal" vhost "/" with TLS off
-    And the stream "orders" on vhost "/" has 1500 messages, first offset 0, last offset 1499, retention 7D
+    And the stream "orders" on vhost "/" has 1500 messages, first offset 0, last offset 1499, retention "7D"
     And the queue "orders-dlq" on vhost "/" is a "quorum" queue with 42 messages
     And the exchange "amq.direct" on vhost "/" is a "direct" exchange
     And the binding from "amq.direct" to "orders-dlq" with routing key "failed-order" exists

@@ -244,13 +244,13 @@ class McpSteps {
     @Then("the tool result lists profile {string} with TLS on")
     fun assertProfileTlsOn(profile: String) {
         assertTrue(lastToolResultText.contains(profile))
-        assertTrue(lastToolResultText.contains("\"tls\": true") || lastToolResultText.contains("TLS: on") || lastToolResultText.contains("\"useTls\": true"))
+        assertTrue(lastToolResultText.contains("\"tls\":true") || lastToolResultText.contains("\"tls\": true") || lastToolResultText.contains("TLS: on"))
     }
 
     @Then("the tool result lists profile {string} with TLS off")
     fun assertProfileTlsOff(profile: String) {
         assertTrue(lastToolResultText.contains(profile))
-        assertTrue(lastToolResultText.contains("\"tls\": false") || lastToolResultText.contains("TLS: off") || lastToolResultText.contains("\"useTls\": false"))
+        assertTrue(lastToolResultText.contains("\"tls\":false") || lastToolResultText.contains("\"tls\": false") || lastToolResultText.contains("TLS: off"))
     }
 
     @Then("the tool result contains no passwords or secret tokens")
