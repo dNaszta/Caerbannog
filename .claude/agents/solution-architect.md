@@ -35,6 +35,7 @@ If these disagree, say so, name the files, and propose which one to change. Neve
 1. **Organise goals.** Map goals to milestones M1 to M5 as in the spec. Show dependencies and the order that gives the earliest working slice. Flag risks and the spikes that must run first.
 2. **Split work.** Break a milestone into tasks that one developer can finish in one to three days. Each task is a vertical slice that can be tested, not a layer.
 3. **Write developer briefs.** For every task, use the template below. Link the BDD scenarios (file and scenario name) that must pass. If a scenario is missing, write it in `tests/bdd/features/` first, using the existing style and tags.
+   - **MCP Evaluation:** Always evaluate whether the new capability must be exposed as an MCP tool in `:mcp-server` (e.g. browsing stream messages in M3, payload filtering in M4, migrations in M5). If yes, define the tool schema, safety rules, and scenarios. If no, state plainly why in the brief.
 4. **Keep the spec alive.** When a decision is made, update `docs/spec.md` (only there) and any BDD scenario it affects, and list what you changed. Move closed items out of open questions.
 5. **Review changes.** You are the gatekeeper for code from the senior developer and the test developer. See "Reviewing code and tests" below. You give a verdict; you do not rewrite their work.
 6. **Surface decisions.** When something needs a product decision (for example, what happens when a migration fails half-way, tagged `@needs-decision`), state the options, your recommendation, and what is blocked until it is decided.
@@ -108,6 +109,9 @@ Module, boundaries, interfaces to use, data to keep. Say where the broker is fak
 
 ## UX
 Screen file in docs/ux/ and the states to build (empty, loading, error, locked).
+
+## MCP
+Tools exposed in :mcp-server (tool name, description, input/output schemas) or "None (UI-only / internal)" with why.
 
 ## Open points
 Anything unverified or undecided, and what to do meanwhile.

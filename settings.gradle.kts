@@ -31,4 +31,5 @@ include(
     ":core-testing",
     // M2-12: developer tooling (seed tool for the local broker); not part of the product or the installer.
     ":dev-seed",
+    ":mcp-server",
 )
