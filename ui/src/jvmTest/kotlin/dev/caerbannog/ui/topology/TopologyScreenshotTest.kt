@@ -114,9 +114,8 @@ class TopologyScreenshotTest {
             ExchangeRow("orders", "/", "direct", durable = true, autoDelete = false, internal = false),
         )
         val queues = listOf(
-            QueueRow("dev-jobs", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
+            QueueRow("dev-jobs", "/", "quorum", readyMessages = 1240, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
             QueueRow("dev-mail", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
-            QueueRow("orders-0", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
         )
         val bindings = listOf(
             BindingRow("dev.events", "/", "dev-jobs", BindingDestinationType.QUEUE, "job.#"),

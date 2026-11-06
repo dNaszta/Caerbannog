@@ -487,7 +487,10 @@ class TopologyViewModel(
         val computedGraph = if (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph && !cannotRead) {
             val ex = exchanges.orEmpty()
             val q = queues.orEmpty()
-            val b = bindings.orEmpty()
+            val b = bindings.orEmpty().filter { row ->
+                val src = if (row.source.isEmpty()) TopologyTexts.DEFAULT_EXCHANGE else row.source
+                matches(src) || matches(row.destination) || matches(row.routingKey)
+            }
             buildBindingGraph(ex, q, b, showDefaultExchange)
         } else null
         val graphTooLargeMsg = if (computedGraph?.isTooLarge == true) {

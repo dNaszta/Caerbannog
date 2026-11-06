@@ -365,6 +365,30 @@ class TopologyViewModelTabsTest {
     }
 
     @Test
+    fun `search on the Bindings tab filters the graph in Graph view`() = runTest {
+        val s = TopologyHarness(this, pageSize = 50).wired()
+        s.topology.addExchange(exchange("audit", "fanout"))
+        s.topology.addQueue(quorum("audit-log"))
+        s.topology.addBinding(binding("audit", "audit-log", routingKey = "#"))
+        s.open()
+        s.vm.setTab(TopologyTab.Bindings)
+        s.vm.setBindingsView(BindingsViewMode.Graph)
+        s.settle()
+        assertEquals(4, s.state.graph?.nodes?.size)
+        assertEquals(2, s.state.graph?.edges?.size)
+
+        s.vm.setSearch("order.created")
+        s.settle()
+        assertEquals(listOf("events", "orders"), s.state.graph?.nodes?.map { it.node.name }?.sorted())
+        assertEquals(listOf("order.created"), s.state.graph?.edges?.map { it.edge.routingKey })
+
+        s.vm.setSearch("audit")
+        s.settle()
+        assertEquals(listOf("audit", "audit-log"), s.state.graph?.nodes?.map { it.node.name }?.sorted())
+        assertEquals(listOf("#"), s.state.graph?.edges?.map { it.edge.routingKey })
+    }
+
+    @Test
     fun `a tab switch goes back to page 1 and keeps the vhost`() = runTest {
         val s = TopologyHarness(this, pageSize = 2).wired()
         s.quorumQueues(6, prefix = "x-")

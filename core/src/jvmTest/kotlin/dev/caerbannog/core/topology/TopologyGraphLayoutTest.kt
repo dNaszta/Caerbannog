@@ -105,4 +105,57 @@ class TopologyGraphLayoutTest {
         val layer1Names = graph.nodes.filter { it.layer == 1 }.map { it.node.name }
         assertEquals(listOf("q-a", "q-z"), layer1Names)
     }
+
+    @Test
+    fun `crossing edges between the same layers receive non-overlapping label anchors that lie on their bezier curves`() {
+        val exchanges = listOf(exchange("dev.commands", "direct"), exchange("dev.events", "topic"))
+        val queues = listOf(queue("dev-jobs", ready = 10), queue("dev-mail", ready = 5))
+        val bindings = listOf(
+            binding("dev.commands", "dev-mail", BindingDestinationType.QUEUE, "mail"),
+            binding("dev.events", "dev-jobs", BindingDestinationType.QUEUE, "job.#"),
+        )
+
+        val graph = buildBindingGraph(exchanges, queues, bindings, showDefaultExchange = false)
+        assertEquals(2, graph.edges.size)
+        val e1 = graph.edges.first { it.edge.routingKey == "mail" }
+        val e2 = graph.edges.first { it.edge.routingKey == "job.#" }
+
+        // Both edges share the exact same geometric midpoint, so their label anchors must be staggered apart
+        val dx = kotlin.math.abs(e1.labelX - e2.labelX)
+        val dy = kotlin.math.abs(e1.labelY - e2.labelY)
+        assertTrue(
+            dx >= 40f || dy >= 16f,
+            "Crossing edges must not share overlapping label anchors: e1=(${e1.labelX}, ${e1.labelY}), e2=(${e2.labelX}, ${e2.labelY})",
+        )
+
+        // Each (labelX, labelY) must lie on its own cubic bezier curve B(t) for some t in [0.15, 0.85]
+        for (edge in listOf(e1, e2)) {
+            val minDist = (15..85).minOf { pct ->
+                val t = pct / 100f
+                val u = 1f - t
+                val midX = (edge.fromX + edge.toX) / 2f
+                val bx = u * u * u * edge.fromX + 3f * u * t * midX + t * t * t * edge.toX
+                val by = (u * u * u + 3f * u * u * t) * edge.fromY + (3f * u * t * t + t * t * t) * edge.toY
+                kotlin.math.hypot((edge.labelX - bx).toDouble(), (edge.labelY - by).toDouble())
+            }
+            assertTrue(minDist <= 2.5, "Label (${edge.labelX}, ${edge.labelY}) for '${edge.edge.routingKey}' must lie on its bezier curve (minDist=$minDist)")
+        }
+    }
+
+    @Test
+    fun `stream partition destinations absent from queues have empty detail while known queues format ready count with digit grouping`() {
+        val exchanges = listOf(exchange("orders", "direct"), exchange("events", "topic"))
+        val queues = listOf(queue("dev-jobs", ready = 1240))
+        val bindings = listOf(
+            binding("orders", "orders-0", BindingDestinationType.QUEUE, "0"),
+            binding("events", "dev-jobs", BindingDestinationType.QUEUE, "job.#"),
+        )
+
+        val graph = buildBindingGraph(exchanges, queues, bindings, showDefaultExchange = false)
+        val partitionNode = graph.nodes.first { it.node.name == "orders-0" }.node
+        val quorumNode = graph.nodes.first { it.node.name == "dev-jobs" }.node
+
+        assertEquals("", partitionNode.detail, "Stream partition absent from queues must not show fake (0 ready)")
+        assertEquals("(1,240 ready)", quorumNode.detail, "Known queue must format readyMessages with groupDigits")
+    }
 }
