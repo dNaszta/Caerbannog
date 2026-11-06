@@ -69,27 +69,27 @@ Feature: Payload viewer and filter
       | Copy offset | the offset 1202                      |
       | Copy body   | the body exactly as published        |
 
-  @fake-broker @needs-M4-02
+  @fake-broker
   Scenario: Filter by text within the scan
     Given the next 500 messages contain 3 messages with "A-1202" in the body
     When I filter by the text "A-1202"
     Then only those 3 messages are listed
     And the page says how many messages were scanned
 
-  @fake-broker @needs-M4-02
+  @fake-broker
   Scenario: Filter by an application property
     Given messages with application property "tenant" set to "eu" and to "us"
     When I filter by application property "tenant" equal to "eu"
     Then only messages with "tenant" equal to "eu" are listed
 
-  @fake-broker @needs-M4-02
+  @fake-broker
   Scenario: The scan stops at its limit
     Given a stream with 50,000 messages and no match for "needle"
     When I filter by the text "needle"
     Then the scan stops after 10,000 messages
     And the page says the scan limit was reached and the rest was not searched
 
-  @fake-broker @needs-M4-02
+  @fake-broker
   Scenario: A scan can be cancelled
     Given a long scan is running
     When I choose "Cancel scan"

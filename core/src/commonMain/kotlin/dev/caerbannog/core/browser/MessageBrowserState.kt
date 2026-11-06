@@ -53,6 +53,8 @@ sealed interface MessageBrowserState {
         val canGoPrevious: Boolean,
         val selectedMessage: StreamMessage? = null,
         val retentionShiftNotice: String? = null,
+        val filterNotice: String? = null,
+        val isFilterActive: Boolean = false,
     ) : MessageBrowserState {
         val summaryText: String
             get() {

@@ -288,4 +288,35 @@ class McpServerTest {
         assertTrue(text.contains("\"truncated\":true") || text.contains("\"truncated\": true"))
         assertTrue(text.contains("\"payloadSize\":10000") || text.contains("\"payloadSize\": 10000"))
     }
+
+    @Test
+    fun `browse stream with filterText returns only matching messages`() {
+        repo.add(
+            ConnectionProfile(
+                name = "reader-prof-filter",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true
+            )
+        )
+        streamReader.seed(
+            "/",
+            "search-stream",
+            listOf(
+                StreamMessage(0L, 1000L, "first order".toByteArray(), emptyMap(), emptyMap()),
+                StreamMessage(1L, 1001L, "second order with TARGET".toByteArray(), emptyMap(), emptyMap()),
+                StreamMessage(2L, 1002L, "third order".toByteArray(), emptyMap(), emptyMap()),
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 23, "method": "tools/call", "params": {"name": "caerbannog_browse_stream", "arguments": {"profile": "reader-prof-filter", "stream": "search-stream", "filterText": "TARGET"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("\"count\":1") || text.contains("\"count\": 1"))
+        assertTrue(text.contains("TARGET"))
+        assertFalse(text.contains("third order"))
+    }
 }

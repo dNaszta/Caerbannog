@@ -1,15 +1,27 @@
 package dev.caerbannog.acceptance.viewer
 
-import dev.caerbannog.core.browser.JsonFormatResult
+import dev.caerbannog.core.browser.MessageBrowserState
+import dev.caerbannog.core.browser.MessageBrowserViewModel
+import dev.caerbannog.core.browser.MessageFilterCriteria
 import dev.caerbannog.core.browser.PayloadFormatter
 import dev.caerbannog.core.browser.PayloadInspection
 import dev.caerbannog.core.browser.PayloadViewKind
+import dev.caerbannog.core.browser.ScanProgressUpdate
 import dev.caerbannog.core.browser.StreamMessage
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import io.cucumber.datatable.DataTable
+import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -26,6 +38,12 @@ class PayloadViewerSteps {
     private var clipboardContent: String? = null
     private var lastInspection: PayloadInspection? = null
 
+    private val reader = FakeStreamMessageReader()
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var viewModel: MessageBrowserViewModel? = null
+    private var lastScanProgress: ScanProgressUpdate? = null
+    private var listedMessages: List<StreamMessage> = emptyList()
+
     @Before
     fun setUp() {
         messages.clear()
@@ -34,6 +52,32 @@ class PayloadViewerSteps {
         showAll = false
         clipboardContent = null
         lastInspection = null
+        lastScanProgress = null
+        listedMessages = emptyList()
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        viewModel = null
+    }
+
+    @After
+    fun tearDown() {
+        scope.cancel()
+    }
+
+    private fun ensureViewModel(stream: String = "orders-events"): MessageBrowserViewModel = runBlocking {
+        val existing = viewModel
+        if (existing != null && existing.stream == stream) {
+            return@runBlocking existing
+        }
+        MessageBrowserViewModel(
+            reader = reader,
+            vhost = "/",
+            stream = stream,
+            scope = scope,
+        ).also { vm ->
+            viewModel = vm
+            vm.browseFirst()
+            vm.state.first { it !is MessageBrowserState.Loading }
+        }
     }
 
     @Given("I am connected to {string}")
@@ -43,7 +87,7 @@ class PayloadViewerSteps {
 
     @Given("I am browsing the stream {string}")
     fun iAmBrowsingTheStream(stream: String) {
-        // Stream context setup
+        ensureViewModel(stream)
     }
 
     @Given("^the message at offset (\\d+) has the JSON body (.*)$")
@@ -70,12 +114,11 @@ class PayloadViewerSteps {
 
     @Given("^the message at offset (\\d+) has a binary body of (.*)$")
     fun messageHasBinaryBody(offset: Long, sizeDesc: String) {
-        // 2.1 KB of non-text binary bytes
         val size = 2150
         val binaryBytes = ByteArray(size) { idx -> (idx % 256).toByte() }
         binaryBytes[0] = 0x00
         binaryBytes[1] = 0x1F.toByte()
-        binaryBytes[2] = 0x8B.toByte() // gzip header bytes
+        binaryBytes[2] = 0x8B.toByte()
         val msg = StreamMessage(
             offset = offset,
             timestamp = 1700000000000L,
@@ -97,7 +140,7 @@ class PayloadViewerSteps {
 
     @Given("^the message at offset (\\d+) has a body larger than the display cap$")
     fun messageHasBodyLargerThanDisplayCap(offset: Long) {
-        val largeText = "Large message body content. ".repeat(3000) // ~84 KB
+        val largeText = "Large message body content. ".repeat(3000)
         val msg = StreamMessage(
             offset = offset,
             timestamp = 1700000000000L,
@@ -155,17 +198,26 @@ class PayloadViewerSteps {
 
     @When("^I choose \"(.*)\"$")
     fun iChooseAction(action: String) {
-        val msg = checkNotNull(selectedMessage) { "No message selected" }
         when (action) {
             "Show all" -> {
                 showAll = true
                 updateInspection()
             }
             "Copy offset" -> {
+                val msg = checkNotNull(selectedMessage) { "No message selected" }
                 clipboardContent = formatter.copyOffset(msg)
             }
             "Copy body" -> {
+                val msg = checkNotNull(selectedMessage) { "No message selected" }
                 clipboardContent = formatter.copyBody(msg)
+            }
+            "Cancel scan" -> {
+                viewModel?.cancelScan()
+                lastScanProgress = viewModel?.scanProgress?.value
+                val loaded = viewModel?.state?.value as? MessageBrowserState.Loaded
+                if (loaded != null) {
+                    listedMessages = loaded.messages
+                }
             }
             else -> error("Unknown action: $action")
         }
@@ -275,5 +327,147 @@ class PayloadViewerSteps {
     fun clipboardContainsBodyAsPublished() {
         val msg = checkNotNull(selectedMessage)
         assertEquals(msg.payload.decodeToString(), clipboardContent)
+    }
+
+    // --- Filter Scenarios (M4-02) ---
+
+    @Given("^the next (\\d+) messages contain (\\d+) messages with \"(.*)\" in the body$")
+    fun nextMessagesContainMatches(total: Int, matchCount: Int, needle: String) {
+        val msgs = (0 until total).map { i ->
+            val offset = 1000L + i
+            val body = if (i < matchCount) "message-$offset with $needle" else "message-$offset"
+            StreamMessage(
+                offset = offset,
+                timestamp = 1700000000000L + i * 1000L,
+                payload = body.encodeToByteArray(),
+            )
+        }
+        reader.seed("/", "orders-events", msgs)
+        viewModel = null
+        ensureViewModel("orders-events")
+    }
+
+    @When("^I filter by the text \"(.*)\"$")
+    fun iFilterByText(text: String) = runBlocking {
+        val vm = ensureViewModel("orders-events")
+        vm.filter(MessageFilterCriteria.Text(text))
+        kotlinx.coroutines.withTimeout(5000) {
+            vm.scanProgress.filterNotNull().first { !it.isRunning }
+        }
+        val loaded = vm.state.value as MessageBrowserState.Loaded
+        listedMessages = loaded.messages
+        lastScanProgress = vm.scanProgress.value
+    }
+
+    @Then("^only those (\\d+) messages are listed$")
+    fun onlyThoseMessagesListed(count: Int) {
+        assertEquals(count, listedMessages.size)
+    }
+
+    @Then("^the page says how many messages were scanned$")
+    fun pageSaysHowManyMessagesScanned() {
+        val progress = checkNotNull(lastScanProgress)
+        assertTrue(progress.scannedCount > 0)
+        val loaded = viewModel?.state?.value as? MessageBrowserState.Loaded
+        val notice = loaded?.filterNotice ?: progress.notice
+        assertNotNull(notice)
+        assertTrue(notice!!.contains("scanned", ignoreCase = true) || notice.contains("${progress.scannedCount}"))
+    }
+
+    @Given("^messages with application property \"(.*)\" set to \"(.*)\" and to \"(.*)\"$")
+    fun messagesWithAppPropertySetTo(prop: String, val1: String, val2: String) {
+        val msgs = (0 until 20).map { i ->
+            val offset = 2000L + i
+            val value = if (i % 2 == 0) val1 else val2
+            StreamMessage(
+                offset = offset,
+                timestamp = 1700000000000L + i * 1000L,
+                payload = "body-$offset".encodeToByteArray(),
+                applicationProperties = mapOf(prop to value),
+            )
+        }
+        reader.seed("/", "orders-events", msgs)
+        viewModel = null
+        ensureViewModel("orders-events")
+    }
+
+    @When("^I filter by application property \"(.*)\" equal to \"(.*)\"$")
+    fun iFilterByApplicationProperty(prop: String, value: String) = runBlocking {
+        val vm = ensureViewModel("orders-events")
+        vm.filter(MessageFilterCriteria.ApplicationProperty(prop, value))
+        kotlinx.coroutines.withTimeout(5000) {
+            vm.scanProgress.filterNotNull().first { !it.isRunning }
+        }
+        val loaded = vm.state.value as MessageBrowserState.Loaded
+        listedMessages = loaded.messages
+        lastScanProgress = vm.scanProgress.value
+    }
+
+    @Then("^only messages with \"(.*)\" equal to \"(.*)\" are listed$")
+    fun onlyMessagesWithAppPropListed(prop: String, value: String) {
+        assertTrue(listedMessages.isNotEmpty())
+        assertTrue(listedMessages.all { it.applicationProperties[prop] == value })
+    }
+
+    @Given("^a stream with ([\\d,]+) messages and no match for \"(.*)\"$")
+    fun streamWithMessagesAndNoMatch(countStr: String, needle: String) {
+        val count = countStr.replace(",", "").toInt()
+        val msgs = (0 until count).map { i ->
+            StreamMessage(
+                offset = i.toLong(),
+                timestamp = 1700000000000L + i * 1000L,
+                payload = "noise-$i".encodeToByteArray(),
+            )
+        }
+        reader.seed("/", "orders-events", msgs)
+        ensureViewModel("orders-events")
+    }
+
+    @Then("^the scan stops after ([\\d,]+) messages$")
+    fun scanStopsAfterMessages(countStr: String) {
+        val expected = countStr.replace(",", "").toInt()
+        val progress = checkNotNull(lastScanProgress)
+        assertEquals(expected, progress.scannedCount)
+    }
+
+    @Then("^the page says the scan limit was reached and the rest was not searched$")
+    fun pageSaysScanLimitReached() {
+        val progress = checkNotNull(lastScanProgress)
+        assertTrue(progress.limitReached)
+        val loaded = viewModel?.state?.value as? MessageBrowserState.Loaded
+        val notice = loaded?.filterNotice ?: progress.notice
+        assertNotNull(notice)
+        assertTrue(notice!!.contains("limit", ignoreCase = true))
+        assertTrue(notice.contains("not searched", ignoreCase = true))
+    }
+
+    @Given("^a long scan is running$")
+    fun longScanIsRunning() = runBlocking {
+        val msgs = (0 until 20_000).map { i ->
+            StreamMessage(
+                offset = i.toLong(),
+                timestamp = 1700000000000L + i * 1000L,
+                payload = if (i == 5) "needle-5".encodeToByteArray() else "noise-$i".encodeToByteArray(),
+            )
+        }
+        reader.seed("/", "orders-events", msgs)
+        val vm = ensureViewModel("orders-events")
+        vm.filter(MessageFilterCriteria.Text("needle"))
+        kotlinx.coroutines.withTimeout(5000) {
+            vm.scanProgress.filterNotNull().first { it.scannedCount > 0 }
+        }
+    }
+
+    @Then("^the scan stops at once$")
+    fun scanStopsAtOnce() {
+        val progress = viewModel?.scanProgress?.value
+        assertFalse(progress?.isRunning == true)
+    }
+
+    @Then("^the messages found so far stay on screen$")
+    fun messagesFoundStayOnScreen() {
+        val loaded = viewModel?.state?.value as? MessageBrowserState.Loaded
+        assertNotNull(loaded)
+        assertTrue(loaded!!.messages.isNotEmpty())
     }
 }

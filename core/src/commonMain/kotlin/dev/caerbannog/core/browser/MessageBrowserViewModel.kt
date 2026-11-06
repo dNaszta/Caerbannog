@@ -1,13 +1,14 @@
 package dev.caerbannog.core.browser
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * M3-02: View model driving the message browser's paging state machine.
+ * M3-02, M4-02: View model driving the message browser's paging and bounded scanning state machine.
  *
  * Implements unidirectional data flow over [StreamMessageReader] without mutating
  * broker state or consumer offsets.
@@ -28,7 +29,65 @@ class MessageBrowserViewModel(
     )
     val state: StateFlow<MessageBrowserState> = _state.asStateFlow()
 
+    private val scanner = StreamScanner(reader)
+    private var scanJob: Job? = null
+
+    private val _scanProgress = MutableStateFlow<ScanProgressUpdate?>(null)
+    val scanProgress: StateFlow<ScanProgressUpdate?> = _scanProgress.asStateFlow()
+
     private var pendingRetentionNotice: String? = null
+
+    fun filter(criteria: MessageFilterCriteria, scanLimit: Int = StreamScanner.DEFAULT_SCAN_LIMIT) {
+        scanJob?.cancel()
+        if (criteria is MessageFilterCriteria.None) {
+            clearFilter()
+            return
+        }
+        val currentLoaded = _state.value as? MessageBrowserState.Loaded
+        val startOffset = currentLoaded?.streamFirstOffset ?: 0L
+
+        scanJob = scope.launch {
+            scanner.scan(vhost, stream, startOffset, criteria, scanLimit).collect { update ->
+                _scanProgress.value = update
+                val latest = _state.value as? MessageBrowserState.Loaded
+                if (latest != null) {
+                    _state.value = latest.copy(
+                        messages = update.matches,
+                        filterNotice = update.notice,
+                        isFilterActive = true,
+                        selectedMessage = if (update.matches.any { it.offset == latest.selectedMessage?.offset }) latest.selectedMessage else null,
+                    )
+                } else {
+                    _state.value = MessageBrowserState.Loaded(
+                        vhost = vhost,
+                        stream = stream,
+                        messages = update.matches,
+                        streamFirstOffset = startOffset,
+                        streamLastOffset = update.matches.lastOrNull()?.offset ?: startOffset,
+                        approximateTotal = update.scannedCount.toLong(),
+                        pageSize = pageSize,
+                        startMode = BrowseStart.First,
+                        canGoNext = false,
+                        canGoPrevious = false,
+                        filterNotice = update.notice,
+                        isFilterActive = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun cancelScan() {
+        scanJob?.cancel()
+        val currentProgress = _scanProgress.value ?: return
+        _scanProgress.value = currentProgress.copy(isRunning = false)
+    }
+
+    fun clearFilter() {
+        scanJob?.cancel()
+        _scanProgress.value = null
+        browse(BrowseStart.First)
+    }
 
     fun browseFirst() {
         browse(BrowseStart.First)
@@ -91,6 +150,8 @@ class MessageBrowserViewModel(
     }
 
     private fun browse(start: BrowseStart) {
+        scanJob?.cancel()
+        _scanProgress.value = null
         _state.value = MessageBrowserState.Loading(vhost, stream, start, pageSize)
         scope.launch {
             when (val result = reader.readPage(vhost, stream, start, pageSize)) {
