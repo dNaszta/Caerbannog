@@ -16,5 +16,6 @@ fun checkResultMessage(result: ConnectionCheckResult, tls: Boolean): String = wh
         "The ${result.endpoint.name.lowercase()} endpoint could not be reached: ${result.reason}"
     is ConnectionCheckResult.ManagementPluginMissing ->
         "Enable the \"${result.pluginName}\" plugin on the broker."
+    is ConnectionCheckResult.CertificateRejected -> ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED
     is ConnectionCheckResult.TlsRefused -> ConnectionFailureReason.NO_TLS_ANSWER
 }

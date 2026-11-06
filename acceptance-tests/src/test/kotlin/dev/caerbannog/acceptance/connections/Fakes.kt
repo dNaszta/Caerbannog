@@ -100,6 +100,7 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
     var tlsOffered: Boolean = true
     var plainOffered: Boolean = true
     var managementPluginEnabled: Boolean = true
+    var certificateTrusted: Boolean = true
 
     /** Set by "the broker presents a certificate signed by a private CA" to require a matching CA path. */
     var requiredCaCertificatePath: String? = null
@@ -119,6 +120,9 @@ class FakeBrokerReachabilityChecker : BrokerReachabilityChecker {
         if (profile.tls) {
             if (!tlsOffered) {
                 return ConnectionCheckResult.TlsRefused
+            }
+            if (!certificateTrusted) {
+                return ConnectionCheckResult.CertificateRejected
             }
             // Like the real checker: with TLS on a CA path that cannot be read is a failure; with TLS off the path is never read.
             profile.caCertificatePath?.let { path ->

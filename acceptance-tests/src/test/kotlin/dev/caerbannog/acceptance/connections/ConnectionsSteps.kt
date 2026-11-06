@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.BrokerEndpoints
 import dev.caerbannog.core.connections.BrokerPorts
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.ConnectionCheckResult
+import dev.caerbannog.core.connections.ConnectionFailureReason
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -366,6 +367,12 @@ class ConnectionsSteps {
         checker.requiredCaCertificatePath = PRIVATE_CA_FIXTURE_PATH
     }
 
+    @Given("the broker presents an untrusted certificate")
+    fun theBrokerPresentsAnUntrustedCertificate() {
+        checker.certificateTrusted = false
+    }
+
+
     @When("I check the connection {string}")
     fun iCheckTheConnection(name: String) {
         lastProfileName = name
@@ -421,6 +428,19 @@ class ConnectionsSteps {
     fun theMessageSaysTheSwitchCanBeTurnedOff() {
         assertTrue(checkMessage().contains("turn off 'Use TLS' in this connection's settings")) { "message: ${checkMessage()}" }
     }
+
+    @Then("the check reports the certificate was not trusted")
+    fun theCheckReportsTheCertificateWasNotTrusted() {
+        assertEquals(ConnectionCheckResult.CertificateRejected, lastCheckResult)
+        assertEquals(ConnectionFailureReason.CERTIFICATE_NOT_TRUSTED, checkMessage())
+    }
+
+    @Then("the check message does not mention turning TLS off")
+    fun theCheckMessageDoesNotMentionTurningTlsOff() {
+        assertFalse(checkMessage().contains("turn off 'Use TLS'")) { "message: ${checkMessage()}" }
+        assertFalse(checkMessage().contains("may not use TLS")) { "message: ${checkMessage()}" }
+    }
+
 
     @Then("no attempt without TLS was made")
     fun noAttemptWithoutTlsWasMade() {

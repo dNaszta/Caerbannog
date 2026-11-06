@@ -79,8 +79,6 @@ internal class ManagementHttp(
     }
 
     internal companion object {
-        private const val MAX_CAUSE_DEPTH = 20
-
         /**
          * One place that tells the two user actions apart (set the CA, or turn TLS off). Rule: a CertificateException
          * anywhere in the cause chain (walked to a depth limit, so a cause loop ends) means the certificate was rejected;
@@ -89,15 +87,9 @@ internal class ManagementHttp(
          * handshake, a fatal alert, a required client certificate) fall into NoTlsAnswer on purpose: the hint is
          * conditional and changes nothing.
          */
-        fun classify(error: SSLException): ManagementReply {
-            var cause: Throwable? = error
-            var depth = 0
-            while (cause != null && depth < MAX_CAUSE_DEPTH) {
-                if (cause is CertificateException) return ManagementReply.CertificateRejected
-                cause = cause.cause
-                depth++
-            }
-            return ManagementReply.NoTlsAnswer
-        }
+        fun classify(error: SSLException): ManagementReply =
+            if (TlsExceptionClassifier.hasCertificateCause(error)) ManagementReply.CertificateRejected
+            else ManagementReply.NoTlsAnswer
     }
+
 }

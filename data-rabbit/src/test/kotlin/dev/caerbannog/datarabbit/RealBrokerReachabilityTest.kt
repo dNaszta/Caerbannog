@@ -96,4 +96,26 @@ class RealBrokerReachabilityTest {
 
         assertEquals(ConnectionCheckResult.BothReachable, result)
     }
+
+    // --- M2-14f: Wrong CA reports CertificateRejected on the real broker Check ---
+
+    @Test
+    fun `a real BrokerReachabilityChecker reports CertificateRejected for a wrong CA`() = runBlocking {
+        val wrongCaPath = javaClass.classLoader.getResource("certs/valid-certificate.pem")!!.toURI().let { java.io.File(it).absolutePath }
+        val profile = ConnectionProfile(
+            name = "testcontainers-broker-wrong-ca",
+            host = rabbit.host,
+            virtualHost = "/",
+            username = rabbit.adminUsername,
+            streamPort = rabbit.getMappedPort(5551),
+            managementPort = rabbit.httpsPort,
+            caCertificatePath = wrongCaPath,
+        )
+
+        val checker = StreamAndManagementReachabilityChecker()
+        val result = checker.check(profile)
+
+        assertEquals(ConnectionCheckResult.CertificateRejected, result)
+    }
 }
+

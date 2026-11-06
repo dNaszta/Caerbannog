@@ -321,9 +321,13 @@ class McpServer(
                 is ConnectionCheckResult.ManagementPluginMissing -> {
                     append("- Management Plugin Missing: ${result.pluginName}\n")
                 }
+                is ConnectionCheckResult.CertificateRejected -> {
+                    append("- Certificate Rejected: Certificate was not trusted\n")
+                }
                 is ConnectionCheckResult.TlsRefused -> {
                     append("- TLS Refused: Broker did not answer TLS handshake\n")
                 }
+
             }
         }
         return McpCallToolResult(
