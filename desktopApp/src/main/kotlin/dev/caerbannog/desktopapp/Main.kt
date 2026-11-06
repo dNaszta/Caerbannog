@@ -12,7 +12,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.runtime.rememberCoroutineScope
+import dev.caerbannog.core.browser.BrowseStart
+import dev.caerbannog.core.browser.MessageBrowserState
+import dev.caerbannog.core.browser.MessageBrowserViewModel
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
+import kotlinx.coroutines.flow.MutableStateFlow
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
@@ -56,6 +62,31 @@ fun main() = application {
 @Composable
 private fun StreamWindowContent(composition: AppComposition, control: ConnectionControlState, stream: String) {
     val clients by composition.streamClients.state.collectAsState()
+    val initialOffset by composition.navigation.initialOffset.collectAsState()
+    val scope = rememberCoroutineScope()
+    val source = composition.active.source
+    val browserVm = remember(stream, source) {
+        source?.let { src ->
+            MessageBrowserViewModel(
+                reader = src.messages,
+                vhost = src.vhost,
+                stream = stream,
+                scope = scope,
+            ).also { vm ->
+                val jump = initialOffset
+                if (jump != null) {
+                    vm.browseOffset(jump)
+                } else {
+                    vm.browseFirst()
+                }
+            }
+        }
+    }
+    val fallbackState = remember(stream) {
+        MessageBrowserState.Loading(source?.vhost.orEmpty(), stream, BrowseStart.First, 100)
+    }
+    val browserState = browserVm?.state?.collectAsState()?.value ?: fallbackState
+    val browserEvents = remember(browserVm) { browserVm?.let(::MessageBrowserEventsAdapter) ?: EmptyMessageBrowserEvents }
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -65,6 +96,8 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
+        browserState = browserState,
+        browserEvents = browserEvents,
     )
 }
 

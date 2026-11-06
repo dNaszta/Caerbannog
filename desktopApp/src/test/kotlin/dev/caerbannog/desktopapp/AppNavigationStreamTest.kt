@@ -118,4 +118,16 @@ class AppNavigationStreamTest {
         assertNull(nav.selectedStream.value)
         assertEquals(AppDestination.Topology, nav.screen.value)
     }
+
+    @Test
+    fun `openStream with offset records the initial offset and clear on close`() {
+        val nav = onStreams()
+        nav.openStream("orders-events", 47950L)
+        assertEquals("orders-events", nav.selectedStream.value)
+        assertEquals(47950L, nav.initialOffset.value)
+
+        nav.closeStream()
+        assertNull(nav.selectedStream.value)
+        assertNull(nav.initialOffset.value)
+    }
 }

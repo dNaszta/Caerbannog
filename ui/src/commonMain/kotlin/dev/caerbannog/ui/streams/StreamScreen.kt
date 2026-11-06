@@ -74,13 +74,14 @@ interface StreamClientsEvents {
 }
 
 private val ClientsHorizontalPadding = 24.dp
+private const val MESSAGES_TAB = "Messages"
 private const val PUBLISHERS_TAB = "Publishers and consumers"
 
 /** A tab of the stream screen. The shell takes a list so the Messages tab (M3) is one more entry, not a redesign. */
 private class StreamTab(val title: String, val content: @Composable () -> Unit)
 
 /**
- * The stream screen (`docs/ux/Clients.dc.html`): app frame with the back arrow, the tab list, and the tab content. It draws the
+ * The stream screen (`docs/ux/Clients.dc.html` and `docs/ux/Browser.dc.html`): app frame with the back arrow, the tab list, and the tab content. It draws the
  * strings of [state] and decides none. [nowMillis] is the clock for "Updated N s ago" (ticked by the caller only while this is shown).
  * The Publishers and consumers tab reports [StreamClientsEvents.show] on entering and `hide` on leaving the composition (D3).
  */
@@ -94,9 +95,21 @@ fun StreamScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
+    browserState: dev.caerbannog.core.browser.MessageBrowserState? = null,
+    browserEvents: MessageBrowserEvents = EmptyMessageBrowserEvents,
+    initialTab: Int = 0,
 ) {
-    val tabs = listOf(StreamTab(PUBLISHERS_TAB) { ClientsTab(stream, state, events) })
-    var selected by remember { mutableIntStateOf(0) }
+    val tabs = remember(stream, state, events, browserState, browserEvents) {
+        if (browserState != null) {
+            listOf(
+                StreamTab(MESSAGES_TAB) { MessageBrowserView(browserState, browserEvents) },
+                StreamTab(PUBLISHERS_TAB) { ClientsTab(stream, state, events) },
+            )
+        } else {
+            listOf(StreamTab(PUBLISHERS_TAB) { ClientsTab(stream, state, events) })
+        }
+    }
+    var selected by remember(stream, initialTab, tabs.size) { mutableIntStateOf(initialTab.coerceIn(0, tabs.lastIndex)) }
     AppFrame(
         title = stream,
         control = control,

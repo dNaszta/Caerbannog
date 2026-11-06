@@ -43,7 +43,7 @@ Feature: Publishers and consumers of a stream
       | audit     | 48100  | 199    | 199 behind |
       | reports   | 48297  | 2      | 2 behind   |
 
-  @needs-M3 @fake-broker
+  @fake-broker
   Scenario: Jump from a consumer to its offset in the browser
     Given a consumer "analytics" on "orders-events" at offset 47950
     When I open the "Publishers and consumers" tab of "orders-events"

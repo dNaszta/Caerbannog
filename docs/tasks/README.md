@@ -67,6 +67,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | --- | --- | --- | --- |
 | M3-01-browser-gateway-and-reader | Message browser gateway, stream reader, ephemeral consumer safety (`noTrackingStrategy`), and MCP browse tool | M3 | done (architect: Accepted, 2026-11-06; branch `m3-01-browser-gateway-and-reader`) |
 | M3-02-browser-view-model-and-paging | MessageBrowserViewModel state machine, paging logic, and BDD scenarios | M3 | done (architect: Accepted, 2026-11-06; branch `m3-02-browser-view-model-and-paging`; 12 unit tests green, 16 BDD scenarios green, mutations killed) |
+| M3-03-browser-screen-and-navigation | Message browser screen, table, controls, and navigation | M3 | done (architect: Accepted, 2026-11-06; branch `m3-03-browser-screen-and-navigation`; UI tests green, BDD scenarios unskipped and green, mutations killed) |
 
 ## Later milestones (planned)
 

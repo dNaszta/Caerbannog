@@ -26,7 +26,7 @@ Feature: Super streams
     And the super stream row shows 96,100 messages in total
 
   # The browser is M3. M2-07 only proves that the row carries "partition of orders" (core unit test); the scenario runs in M3.
-  @fake-broker @needs-M3
+  @fake-broker
   Scenario: Browse one partition
     When I choose to browse the partition "orders-1"
     Then the message browser opens on "orders-1"

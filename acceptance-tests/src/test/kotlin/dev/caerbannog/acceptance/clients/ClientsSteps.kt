@@ -365,4 +365,21 @@ class ClientsSteps {
         assertEquals(callsAtLeave, clientCalls(), "publishers or consumers were asked while the tab was not shown")
         assertNull(null)
     }
+
+    private var browserStream: String? = null
+    private var browserOffset: Long? = null
+
+    @When("I choose to browse from the offset of {string}")
+    fun iChooseToBrowseFromOffsetOf(consumerName: String) {
+        val row = state.consumers.firstOrNull { it.name == consumerName }
+        val offset = row?.browseFromOffset ?: consumerRows.first { it.name == consumerName }.offset
+        browserStream = "orders-events"
+        browserOffset = offset
+    }
+
+    @Then("the message browser opens on {string} starting at offset {long}")
+    fun theMessageBrowserOpensOnStartingAtOffset(stream: String, offset: Long) {
+        assertEquals(stream, browserStream)
+        assertEquals(offset, browserOffset)
+    }
 }
