@@ -44,6 +44,10 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M2-07 (S-A): every exchange of the vhost, unpaged (a plain array, `arguments` present on each). */
     fun exchanges(vhost: String): String = "$base/api/exchanges/${encode(vhost)}"
 
+    /** M5-01: publish a message to an exchange on the vhost. */
+    fun publishExchange(vhost: String, exchange: String): String =
+        "$base/api/exchanges/${encode(vhost)}/${encode(exchange)}/publish"
+
     /** M2-07 (S-A): every binding of the vhost in one unpaged call (a plain array; includes the default exchange's bindings). */
     fun bindings(vhost: String): String = "$base/api/bindings/${encode(vhost)}"
 

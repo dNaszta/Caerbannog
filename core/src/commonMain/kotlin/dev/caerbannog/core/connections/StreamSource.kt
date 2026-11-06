@@ -3,6 +3,10 @@ package dev.caerbannog.core.connections
 import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.StreamMessageReader
+import dev.caerbannog.core.publish.MessagePublisher
+import dev.caerbannog.core.publish.PublishMessageRequest
+import dev.caerbannog.core.publish.PublishOutcome
+import dev.caerbannog.core.publish.UnavailableMessagePublisher
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
@@ -34,6 +38,8 @@ class StreamSource(
     val topology: TopologyCatalog,
     /** M3-01: the stream message browser reader of the same held connection, guarded like [catalog]. */
     val messages: StreamMessageReader,
+    /** M5-01: the test message publisher of the same held connection, guarded like [catalog]. */
+    val publisher: MessagePublisher = UnavailableMessagePublisher,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -82,4 +88,12 @@ internal class GuardedMessageReader(
 ) : StreamMessageReader {
     override suspend fun readPage(vhost: String, stream: String, start: BrowseStart, pageSize: Int): BrowseResult =
         if (isCurrent()) inner.readPage(vhost, stream, start, pageSize) else BrowseResult.Failed("Connection closed")
+}
+
+internal class GuardedPublisher(
+    private val inner: MessagePublisher,
+    private val isCurrent: () -> Boolean,
+) : MessagePublisher {
+    override suspend fun publish(request: PublishMessageRequest): PublishOutcome =
+        if (isCurrent()) inner.publish(request) else PublishOutcome.Failed("Connection closed")
 }

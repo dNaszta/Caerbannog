@@ -6,6 +6,11 @@ import dev.caerbannog.core.browser.MessageFilterCriteria
 import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.browser.StreamScanner
+import dev.caerbannog.core.publish.MessagePublisher
+import dev.caerbannog.core.publish.PublishMessageRequest
+import dev.caerbannog.core.publish.PublishOutcome
+import dev.caerbannog.core.publish.PublishTarget
+import dev.caerbannog.core.publish.PublishTargetKind
 import kotlinx.coroutines.flow.toList
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
@@ -54,6 +59,7 @@ class McpServer(
     val streamOffsetsProvider: (profile: ConnectionProfile, vhost: String) -> StreamOffsets,
     val topologyCatalogProvider: (profile: ConnectionProfile, vhost: String) -> TopologyCatalog,
     val streamMessageReaderProvider: ((profile: ConnectionProfile, vhost: String) -> StreamMessageReader)? = null,
+    val messagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MessagePublisher)? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -226,6 +232,57 @@ class McpServer(
                     add(JsonPrimitive("stream"))
                 }
             }
+        ),
+        McpTool(
+            name = "caerbannog_publish_test_message",
+            description = "Publish a single test message to a RabbitMQ stream, exchange, or queue on a configured profile.",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("profile") {
+                        put("type", "string")
+                        put("description", "Connection profile name")
+                    }
+                    putJsonObject("targetKind") {
+                        put("type", "string")
+                        put("description", "Target kind: 'stream', 'exchange', or 'queue'")
+                    }
+                    putJsonObject("targetName") {
+                        put("type", "string")
+                        put("description", "Target stream, exchange, or queue name")
+                    }
+                    putJsonObject("vhost") {
+                        put("type", "string")
+                        put("description", "Virtual host (defaults to profile's configured virtual host)")
+                    }
+                    putJsonObject("routingKey") {
+                        put("type", "string")
+                        put("description", "Routing key (for exchanges, optional)")
+                    }
+                    putJsonObject("payload") {
+                        put("type", "string")
+                        put("description", "Message body payload")
+                    }
+                    putJsonObject("messageId") {
+                        put("type", "string")
+                        put("description", "Standard message-id property (optional)")
+                    }
+                    putJsonObject("contentType") {
+                        put("type", "string")
+                        put("description", "Standard content-type property (optional, default 'application/json')")
+                    }
+                    putJsonObject("applicationProperties") {
+                        put("type", "object")
+                        put("description", "Key-value application properties (optional)")
+                    }
+                }
+                putJsonArray("required") {
+                    add(JsonPrimitive("profile"))
+                    add(JsonPrimitive("targetKind"))
+                    add(JsonPrimitive("targetName"))
+                    add(JsonPrimitive("payload"))
+                }
+            }
         )
     )
 
@@ -318,6 +375,7 @@ class McpServer(
             "caerbannog_list_exchanges" -> listExchanges(args)
             "caerbannog_list_bindings" -> listBindings(args)
             "caerbannog_browse_stream" -> browseStream(args)
+            "caerbannog_publish_test_message" -> publishTestMessage(args)
             else -> McpCallToolResult(
                 content = listOf(McpContent(text = "Unknown tool: $name")),
                 isError = true
@@ -746,6 +804,101 @@ class McpServer(
             showAll = false,
         )
         return inspection.displayText to inspection.isCapped
+    }
+
+    private suspend fun publishTestMessage(args: JsonObject): McpCallToolResult {
+        val profileName = args["profile"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'profile' argument")), isError = true)
+        val profile = profileRepository.list().firstOrNull { it.name == profileName }
+            ?: return McpCallToolResult(listOf(McpContent(text = "Profile '$profileName' not found")), isError = true)
+
+        val targetKindStr = args["targetKind"]?.jsonPrimitive?.content?.uppercase()
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'targetKind' argument")), isError = true)
+        val targetKind = try {
+            PublishTargetKind.valueOf(targetKindStr)
+        } catch (_: Exception) {
+            return McpCallToolResult(listOf(McpContent(text = "Invalid targetKind: '$targetKindStr'. Must be 'stream', 'exchange', or 'queue'")), isError = true)
+        }
+
+        val targetName = args["targetName"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'targetName' argument")), isError = true)
+        val payloadStr = args["payload"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'payload' argument")), isError = true)
+
+        val vhost = args["vhost"]?.jsonPrimitive?.content ?: profile.virtualHost
+        val routingKey = args["routingKey"]?.jsonPrimitive?.content
+        val messageId = args["messageId"]?.jsonPrimitive?.content
+        val contentType = args["contentType"]?.jsonPrimitive?.content ?: "application/json"
+
+        val appProps = buildMap<String, String> {
+            args["applicationProperties"]?.let { elem ->
+                if (elem is JsonObject) {
+                    elem.forEach { (k, v) -> put(k, v.jsonPrimitive.content) }
+                }
+            }
+        }
+
+        // Guardrails: verify control level and reachability
+        if (profile.topologyControlLevel == TopologyControlLevel.READ_ONLY) {
+            return McpCallToolResult(
+                content = listOf(McpContent(text = "Publishing refused: profile '${profile.name}' is set to Read-only topology control level.")),
+                isError = true,
+            )
+        }
+        if (profile.declaredPermissions != null && !profile.declaredPermissions!!.write) {
+            return McpCallToolResult(
+                content = listOf(McpContent(text = "Publishing refused: profile '${profile.name}' has no write permission declared.")),
+                isError = true,
+            )
+        }
+
+        val check = connectionChecker.check(profile)
+        if (check !is ConnectionCheckResult.BothReachable) {
+            return McpCallToolResult(
+                content = listOf(McpContent(text = "Publishing refused: broker connection is unreachable.")),
+                isError = true,
+            )
+        }
+
+        val publisherProvider = messagePublisherProvider
+            ?: return McpCallToolResult(listOf(McpContent(text = "Publisher not configured on this MCP server")), isError = true)
+        val publisher = publisherProvider(profile, vhost)
+
+        val props = buildMap<String, String> {
+            if (!messageId.isNullOrBlank()) put("messageId", messageId)
+            if (contentType.isNotBlank()) put("contentType", contentType)
+        }
+
+        val request = PublishMessageRequest(
+            vhost = vhost,
+            target = PublishTarget(kind = targetKind, name = targetName, routingKey = routingKey),
+            payload = payloadStr.encodeToByteArray(),
+            properties = props,
+            applicationProperties = appProps,
+        )
+
+        val outcome = publisher.publish(request)
+        return when (outcome) {
+            is PublishOutcome.Success -> McpCallToolResult(
+                content = listOf(McpContent(text = json.encodeToString(buildJsonObject {
+                    put("success", true)
+                    put("message", outcome.message)
+                    putJsonObject("target") {
+                        put("kind", targetKind.name.lowercase())
+                        put("name", targetName)
+                        if (routingKey != null) put("routingKey", routingKey)
+                    }
+                })))
+            )
+            is PublishOutcome.Refused -> McpCallToolResult(
+                content = listOf(McpContent(text = "Broker refused publish: ${outcome.reason}")),
+                isError = true,
+            )
+            is PublishOutcome.Failed -> McpCallToolResult(
+                content = listOf(McpContent(text = "Publish failed: ${outcome.error}")),
+                isError = true,
+            )
+        }
     }
 
     fun runStdio(input: InputStream, output: PrintStream) {

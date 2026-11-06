@@ -141,6 +141,7 @@ class ActiveConnection(
             vhost = vhost,
             topology = GuardedTopology(connection.topology, isCurrent),
             messages = GuardedMessageReader(connection.messages, isCurrent),
+            publisher = GuardedPublisher(connection.publisher, isCurrent),
         )
     }
 
