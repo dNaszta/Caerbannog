@@ -26,6 +26,7 @@ tests/bdd/
     11_global_search.feature
     12_stream_management.feature
     13_connection_lifecycle.feature
+    14_mcp_server.feature
 ```
 
 ## Tags

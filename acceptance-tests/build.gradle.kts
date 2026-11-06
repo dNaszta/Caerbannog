@@ -33,10 +33,12 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(project(":core"))
     testImplementation(project(":core-testing"))
+    testImplementation(project(":mcp-server"))
     // Guard: acceptance steps must not instantiate the keychain-backed JavaKeyringSecretStore.
     // Keyring and JNA native libs are on the classpath only because the file repository needs data-rabbit.
     // The real-keychain tests run only via :data-rabbit:keychainTest.
     testImplementation(project(":data-rabbit"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     // M2-04: the stream list steps run the view model in virtual time ("30 seconds pass" advances a test scheduler).
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
