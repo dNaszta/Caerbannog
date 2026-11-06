@@ -71,6 +71,6 @@ Step 5: architect review (solution-architect, 2026-11-06): ACCEPTED.
 - Safety & Invariants: Pure UI presentation refactor, zero logic changes. MCP evaluation confirmed none needed.
 - Quality: Idiomatic Compose, clean imports.
 
-Branch: `m2-08f2-shared-components`
+Branch: `m2-08f2-shared-components` (merged into local `main`, not pushed)
 Round: 0
-Verdict: accepted, awaiting merge permission
+Verdict: accepted, merged
