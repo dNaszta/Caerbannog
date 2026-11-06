@@ -70,10 +70,25 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
         private const val LIST_COLUMNS =
             "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"
 
+        /**
+         * Formats a host for use in a URI authority (RFC 3986 section 3.2.2). IPv6 literal addresses containing
+         * colons (e.g. `::1` or `2001:db8::1`) are enclosed in square brackets `[::1]`. Already bracketed inputs
+         * `[::1]` are kept as-is. Host names and IPv4 addresses remain unbracketed.
+         *
+         * Scoped IPv6 addresses with zone identifiers (e.g. `fe80::1%eth0`) are not supported.
+         */
+        fun formatHost(host: String): String = when {
+            host.startsWith("[") && host.endsWith("]") -> host
+            host.contains(":") -> "[$host]"
+            else -> host
+        }
+
+        fun formatAuthority(host: String, port: Int): String = "${formatHost(host)}:$port"
+
         fun forProfile(profile: ConnectionProfile, transport: BrokerTransport? = null): ManagementRequests {
             val resolved = transport ?: if (profile.tls) null else BrokerTransport.Plain
             val scheme = resolved?.scheme ?: "https"
-            return ManagementRequests("$scheme://${profile.host}:${profile.managementPort}", resolved)
+            return ManagementRequests("$scheme://${formatAuthority(profile.host, profile.managementPort)}", resolved)
         }
     }
 }

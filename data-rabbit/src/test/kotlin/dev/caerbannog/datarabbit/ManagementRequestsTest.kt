@@ -91,6 +91,74 @@ class ManagementRequestsTest {
         assertEquals("https://rabbit.example.com:15999/api/whoami", ManagementRequests.forProfile(profile).whoami())
     }
 
+    // --- M2-14d: IPv6 literal hosts on the management path --------------------------------------------------------
+
+    @Test
+    fun `an IPv6 literal host is bracketed for TLS and plain profiles`() {
+        val tlsProfile = ConnectionProfile(name = "p", host = "::1", virtualHost = "/", username = "u", managementPort = 15671, tls = true)
+        val plainProfile = ConnectionProfile(name = "p", host = "::1", virtualHost = "/", username = "u", managementPort = 15672, tls = false)
+
+        val tlsUrl = ManagementRequests.forProfile(tlsProfile).whoami()
+        val plainUrl = ManagementRequests.forProfile(plainProfile).whoami()
+
+        assertEquals("https://[::1]:15671/api/whoami", tlsUrl)
+        assertEquals("http://[::1]:15672/api/whoami", plainUrl)
+
+        // Valid URI parser must not throw URLParserException or URISyntaxException
+        val tlsUri = URI(tlsUrl)
+        assertEquals("[::1]:15671", tlsUri.rawAuthority)
+        assertEquals("[::1]", tlsUri.host)
+        val plainUri = URI(plainUrl)
+        assertEquals("[::1]:15672", plainUri.rawAuthority)
+        assertEquals("[::1]", plainUri.host)
+    }
+
+    @Test
+    fun `a full IPv6 address literal is bracketed`() {
+        val full = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+        val profile = ConnectionProfile(name = "p", host = full, virtualHost = "/", username = "u", managementPort = 15671)
+        val url = ManagementRequests.forProfile(profile).whoami()
+
+        assertEquals("https://[$full]:15671/api/whoami", url)
+        val uri = URI(url)
+        assertEquals("[$full]:15671", uri.rawAuthority)
+        assertEquals("[$full]", uri.host)
+    }
+
+    @Test
+    fun `an already bracketed IPv6 address is kept as is and not double-bracketed`() {
+        val profile = ConnectionProfile(name = "p", host = "[::1]", virtualHost = "/", username = "u", managementPort = 15671)
+        val url = ManagementRequests.forProfile(profile).whoami()
+
+        assertEquals("https://[::1]:15671/api/whoami", url)
+        val uri = URI(url)
+        assertEquals("[::1]:15671", uri.rawAuthority)
+        assertEquals("[::1]", uri.host)
+    }
+
+
+
+    @Test
+    fun `host names and IPv4 addresses remain unbracketed`() {
+        val hostProfile = ConnectionProfile(name = "p", host = "rabbit.example.com", virtualHost = "/", username = "u", managementPort = 15671)
+        val ipv4Profile = ConnectionProfile(name = "p", host = "127.0.0.1", virtualHost = "/", username = "u", managementPort = 15671)
+
+        assertEquals("https://rabbit.example.com:15671/api/whoami", ManagementRequests.forProfile(hostProfile).whoami())
+        assertEquals("https://127.0.0.1:15671/api/whoami", ManagementRequests.forProfile(ipv4Profile).whoami())
+    }
+
+    @Test
+    fun `formatHost brackets IPv6 literals and leaves hostnames and IPv4 unchanged`() {
+        assertEquals("[::1]", ManagementRequests.formatHost("::1"))
+        assertEquals("[2001:db8::1]", ManagementRequests.formatHost("2001:db8::1"))
+        assertEquals("[::1]", ManagementRequests.formatHost("[::1]"))
+        assertEquals("localhost", ManagementRequests.formatHost("localhost"))
+        assertEquals("127.0.0.1", ManagementRequests.formatHost("127.0.0.1"))
+        assertEquals("rabbit.example.com", ManagementRequests.formatHost("rabbit.example.com"))
+    }
+
+
+
     @Test
     fun `the list asks for the vhost of the request, path-encoded`() {
         assertEquals("/api/queues/orders%20v2", URI(requests.listStreams(StreamListRequest(vhost = "orders v2"))).rawPath)
