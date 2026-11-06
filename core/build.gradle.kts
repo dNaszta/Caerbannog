@@ -18,6 +18,7 @@ kotlin {
         // or network code, so it stays within core's "zero RabbitMQ/network imports" rule.
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
         }
         jvmTest.dependencies {
             implementation(project(":core-testing"))

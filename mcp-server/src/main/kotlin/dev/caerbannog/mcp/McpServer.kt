@@ -667,17 +667,19 @@ class McpServer(
         }
     }
 
+    private val payloadFormatter = dev.caerbannog.core.browser.PayloadFormatter()
+
     private fun formatPayload(payload: ByteArray, maxChars: Int = 4096): Pair<String, Boolean> {
-        val text = try {
-            payload.decodeToString()
-        } catch (_: Exception) {
-            payload.joinToString("") { "%02x".format(it) }
-        }
-        return if (text.length > maxChars) {
-            text.take(maxChars) to true
-        } else {
-            text to false
-        }
+        val inspection = payloadFormatter.inspect(
+            dev.caerbannog.core.browser.StreamMessage(
+                offset = 0L,
+                timestamp = 0L,
+                payload = payload,
+            ),
+            capLimit = maxChars,
+            showAll = false,
+        )
+        return inspection.displayText to inspection.isCapped
     }
 
     fun runStdio(input: InputStream, output: PrintStream) {
