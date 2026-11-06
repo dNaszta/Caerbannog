@@ -77,6 +77,7 @@ One Gradle project (Kotlin Multiplatform and Compose Multiplatform Gradle plugin
 | `data-rabbit` | jvmMain | Stream client wrapper, management API client, connection profile storage |
 | `ui` | commonMain | Compose screens, theme, payload viewers (text, JSON, hex) |
 | `desktopApp` | jvmMain | `main()`, window, menus, packaging |
+| `mcp-server` | jvmMain | Headless Model Context Protocol (MCP) server over stdio for AI agent tool integrations |
 
 | Concern | Choice |
 | --- | --- |
@@ -91,6 +92,12 @@ One Gradle project (Kotlin Multiplatform and Compose Multiplatform Gradle plugin
 | Local dev commands | `Taskfile.yml` at the repo root (go-task, https://taskfile.dev) wraps the Gradle commands above — `task test`, `task test:broker`, `task test:keychain`, `task test:screenshots`, `task run`, `task package:dmg`, `task package:msi` — as thin one-line aliases (`task test:keychain` touches the real OS keychain and may prompt, so it is run on demand: before a release, or after changing `JavaKeyringSecretStore`, on a machine with an unlocked keychain; the default `task test` never touches it; `task test:screenshots` writes Connections screen PNGs to `ui/build/screenshots/` for a by-eye comparison with the UX mockup and is excluded from `task test`), so developers do not need to recall exact `./gradlew` invocations. `task test` must run every module's fast tests, including the Kotlin Multiplatform modules `core` and `ui` (their tests are `jvmTest`; a `test` task registered in each of those modules delegates to `jvmTest`, so plain `./gradlew test` reaches them; see `M1-TASKFILE-02-test-task-runs-all-modules`). Installed separately (e.g. `brew install go-task` on macOS); not used by any CI pipeline, since none exists yet (project is local-development-only for now) |
 
 The `data-rabbit` module sits behind repository interfaces in `core`, so a future gateway-backed implementation can replace it without touching the UI.
+
+### Model Context Protocol (MCP) server & architectural rule
+
+The `:mcp-server` module exposes Caerbannog's connection profiles, stream catalogs, and topology inspection to external AI developer agents (such as Antigravity and Claude Code) via the Model Context Protocol over `stdio`.
+
+**Architectural rule:** For every new capability introduced to the product (such as browsing messages in M3, payload inspection in M4, or publishing and migrations in M5), the **solution architect is responsible for evaluating** whether the capability should be exposed to AI agents as an MCP tool. If yes, the architect must specify the tool schema, permissions, and safety scenarios in the task brief; if no, the brief must explicitly record why. The MCP server must always uphold Caerbannog's safety rules: no queue message reading, ephemeral stream reads, and no secret leakage.
 
 ## Paging model
 
