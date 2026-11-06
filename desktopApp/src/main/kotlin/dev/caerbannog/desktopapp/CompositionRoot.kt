@@ -181,3 +181,24 @@ fun handleCloseRequest(composition: AppComposition, exitApplication: () -> Unit)
         exitApplication()
     }
 }
+
+/**
+ * Registers a JVM shutdown hook that closes the held connection and stops background tasks on abnormal termination
+ * (e.g. Cmd+Q on macOS, SIGTERM). [register] is an injection seam for unit tests to avoid touching [Runtime.addShutdownHook].
+ */
+fun registerShutdownHook(
+    composition: AppComposition,
+    register: (Thread) -> Unit = { hook ->
+        try {
+            Runtime.getRuntime().addShutdownHook(hook)
+        } catch (_: IllegalStateException) {
+            // JVM is already shutting down
+        }
+    },
+): Thread {
+    val hook = Thread({ composition.close() }, "caerbannog-shutdown")
+    register(hook)
+    return hook
+}
+
+
