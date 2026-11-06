@@ -130,14 +130,14 @@ Feature: Message browser with paging
     When I browse "empty-stream" starting from "First"
     Then I see a message that the stream has no messages yet
 
-  @broker @safety
+  @broker @safety @gate-M3
   Scenario: Browsing never changes any consumer's stored offset
     Given a real broker with a stream "events" and a named consumer "billing" at offset 50
     When I browse "events" starting from "First" and then from "Last page"
     Then the stored offset of "billing" is still 50
     And no new consumer name appears on the stream
 
-  @broker
+  @broker @gate-M3
   Scenario: Read real messages in order
     Given a real broker where "events" holds 250 messages published in order
     When I browse "events" starting from "First" and choose "Next" twice
