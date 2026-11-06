@@ -8,7 +8,7 @@
 version: '3'
 
 vars:
-  CONTAINER_ENGINE: '{{.CONTAINER_ENGINE | default "podman"}}'
+  CONTAINER_ENGINE: '{{.CONTAINER_ENGINE | default (ternary "podman" "docker" (eq OS "linux"))}}'
 
 tasks:
   test:
@@ -57,9 +57,9 @@ tasks:
       - ./gradlew :desktopApp:packageMsi
 
   # M2-12 / M2-15: local development broker (developer tooling, see dev/README.md). Throwaway secrets only.
-  # Defaults to `podman compose` (`CONTAINER_ENGINE=podman`); pass `CONTAINER_ENGINE=docker` or use `:docker` tasks for Docker.
+  # Defaults to `podman compose` on Linux and `docker compose` on macOS/Windows; pass `CONTAINER_ENGINE=podman|docker` or use `:podman` / `:docker` tasks to override.
   dev:up:
-    desc: "Start the local dev RabbitMQ via {{.CONTAINER_ENGINE}} compose (default: podman) and wait until it is healthy."
+    desc: "Start the local dev RabbitMQ via {{.CONTAINER_ENGINE}} compose (default: podman on Linux, docker on macOS/Windows) and wait until it is healthy."
     cmds:
       - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml up -d --wait'
 
@@ -86,7 +86,7 @@ tasks:
       - ./gradlew -q :dev-seed:run --args="--no-tls {{.CLI_ARGS}}"
 
   dev:reset:
-    desc: "Remove the dev broker and its volume via {{.CONTAINER_ENGINE}} compose (default: podman), then start it again."
+    desc: "Remove the dev broker and its volume via {{.CONTAINER_ENGINE}} compose (default: podman on Linux, docker on macOS/Windows), then start it again."
     cmds:
       - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml down -v'
       - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml up -d --wait'

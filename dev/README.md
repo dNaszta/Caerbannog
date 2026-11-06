@@ -7,7 +7,7 @@ and the TLS files are test fixtures, never real, never reuse them anywhere**.
 
 On Fedora, the `go-task` package installs the binary as `go-task` (run `go-task ...` or add `alias task=go-task`), and rootless `podman compose` and `@broker` Testcontainers require the user socket active (`systemctl --user enable --now podman.socket`) with the 5-second idle timeout disabled (`~/.config/systemd/user/podman.service.d/override.conf` setting `ExecStart=/usr/bin/podman $LOGGING system service --time=0`, followed by `systemctl --user daemon-reload && systemctl --user restart podman.socket podman.service`). See `docs/DEVELOPING_ON_FEDORA.md` for full Fedora setup.
 
-`Taskfile.yml` defaults to `podman compose` (`CONTAINER_ENGINE=podman`). To use Docker instead, either pass `CONTAINER_ENGINE=docker` or run the `:docker` task variants (`dev:up:docker`, `dev:reset:docker`).
+`Taskfile.yml` defaults `CONTAINER_ENGINE` to `podman` (`podman compose`) on Linux (Fedora) and `docker` (`docker compose`) on macOS/Windows. To override the engine on any OS, pass `CONTAINER_ENGINE=podman|docker` or run the explicit `:podman` / `:docker` task variants (`dev:up:podman`, `dev:up:docker`, `dev:reset:podman`, `dev:reset:docker`).
 
 | Command | What it does |
 | --- | --- |

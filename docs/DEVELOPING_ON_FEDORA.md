@@ -156,7 +156,7 @@ go-task test:broker:podman
 
 ## 6. Local RabbitMQ Development Environment (`podman compose`)
 
-`Taskfile.yml` defaults to `podman compose` (`CONTAINER_ENGINE=podman`). The compose file (`dev/broker/docker-compose.yml`) is pre-configured for Fedora with SELinux `Enforcing`:
+On Linux (Fedora), `Taskfile.yml` defaults `CONTAINER_ENGINE` to `podman` (`podman compose`), while on macOS and Windows it defaults to `docker` (`docker compose`), and provides explicit `:podman` and `:docker` task variants on every platform. The compose file (`dev/broker/docker-compose.yml`) is pre-configured for Fedora with SELinux `Enforcing`:
 - Uses the fully qualified image `docker.io/library/rabbitmq:4-management` (satisfying Fedora's `short-name-mode="enforcing"`).
 - Mounts all 7 configuration, TLS certificate, definitions, and plugin files with `:ro,z` so SELinux labels them with the shared `container_file_t` context.
 - Runs the healthcheck via `gosu rabbitmq rabbitmq-diagnostics -q check_port_connectivity` so Podman's initial root healthcheck never creates a `root`-owned `/var/lib/rabbitmq/.erlang.cookie`.
