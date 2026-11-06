@@ -1,5 +1,8 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.browser.BrowseResult
+import dev.caerbannog.core.browser.BrowseStart
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
@@ -52,7 +55,7 @@ class RabbitMqHeldConnectionTest {
     private val lines: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     private fun holder(vararg resources: AutoCloseable) =
-        RabbitMqHeldConnection(StubCatalog, StubOffsets, StubTopology, resources.toList()) { lines += it }
+        RabbitMqHeldConnection(StubCatalog, StubOffsets, StubTopology, StubMessageReader, resources.toList()) { lines += it }
 
     @Test
     fun `close closes every resource once`() {
@@ -143,4 +146,9 @@ private object StubTopology : TopologyCatalog {
     override suspend fun exchanges(vhost: String): CatalogResult<List<ExchangeRow>> = CatalogResult.Unexpected
     override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = CatalogResult.Unexpected
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = CatalogResult.Unexpected
+}
+
+private object StubMessageReader : StreamMessageReader {
+    override suspend fun readPage(vhost: String, stream: String, start: BrowseStart, pageSize: Int): BrowseResult =
+        BrowseResult.Failed("Stub")
 }

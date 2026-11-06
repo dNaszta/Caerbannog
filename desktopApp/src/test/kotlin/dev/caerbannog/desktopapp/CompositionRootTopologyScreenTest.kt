@@ -11,6 +11,7 @@ import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog.Companion.quorum
 import dev.caerbannog.core.streams.FirstOffset
@@ -65,6 +66,7 @@ class CompositionRootTopologyScreenTest {
                 override suspend fun firstOffset(vhost: String, stream: String) = FirstOffset.Unavailable
             }
             override val topology = this@CompositionRootTopologyScreenTest.topology
+            override val messages = FakeStreamMessageReader()
             override fun close() = Unit
         })
     }

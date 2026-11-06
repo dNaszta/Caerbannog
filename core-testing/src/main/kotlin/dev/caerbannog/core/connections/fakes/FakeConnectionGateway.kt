@@ -1,5 +1,6 @@
 package dev.caerbannog.core.connections.fakes
 
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.ConnectionFailureReason
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -59,6 +60,7 @@ class FakeConnectionGateway(
         override val catalog: StreamCatalog,
         override val offsets: StreamOffsets,
         override val topology: TopologyCatalog,
+        override val messages: StreamMessageReader = FakeStreamMessageReader(),
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -90,6 +92,7 @@ class FakeConnectionGateway(
     private val catalogs = ConcurrentHashMap<String, FakeStreamCatalog>()
     private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
     private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
+    private val messageReaders = ConcurrentHashMap<String, FakeStreamMessageReader>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -149,6 +152,9 @@ class FakeConnectionGateway(
     /** The first-offset source every connection opened for [profileName] exposes. */
     fun offsetsOf(profileName: String): FakeStreamOffsets = offsetSources.getOrPut(profileName) { FakeStreamOffsets() }
 
+    /** M3-01: the stream message reader every connection opened for [profileName] exposes. */
+    fun messagesOf(profileName: String): FakeStreamMessageReader = messageReaders.getOrPut(profileName) { FakeStreamMessageReader() }
+
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
@@ -187,7 +193,16 @@ class FakeConnectionGateway(
             return OpenResult.Failed(it.reason)
         }
         logins.incrementAndGet()
-        val held = Held(name, numbers.incrementAndGet(), name !in silentStreamPort, log, catalogOf(name), offsetsOf(name), topologyOf(name))
+        val held = Held(
+            profileName = name,
+            number = numbers.incrementAndGet(),
+            streamPortAnswers = name !in silentStreamPort,
+            log = log,
+            catalog = catalogOf(name),
+            offsets = offsetsOf(name),
+            topology = topologyOf(name),
+            messages = messagesOf(name),
+        )
         opened += held
         log += "opened:$name#${held.number}"
         return OpenResult.Opened(held)

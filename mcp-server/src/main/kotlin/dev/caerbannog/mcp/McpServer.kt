@@ -1,5 +1,8 @@
 package dev.caerbannog.mcp
 
+import dev.caerbannog.core.browser.BrowseResult
+import dev.caerbannog.core.browser.BrowseStart
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -46,6 +49,7 @@ class McpServer(
     val streamCatalogProvider: (profile: ConnectionProfile, vhost: String) -> StreamCatalog,
     val streamOffsetsProvider: (profile: ConnectionProfile, vhost: String) -> StreamOffsets,
     val topologyCatalogProvider: (profile: ConnectionProfile, vhost: String) -> TopologyCatalog,
+    val streamMessageReaderProvider: ((profile: ConnectionProfile, vhost: String) -> StreamMessageReader)? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -173,6 +177,39 @@ class McpServer(
                 }
                 putJsonArray("required") { add(JsonPrimitive("profile")) }
             }
+        ),
+        McpTool(
+            name = "caerbannog_browse_stream",
+            description = "Browse messages of a RabbitMQ stream page-by-page starting from first, last, offset, or timestamp without disturbing real consumers. Uses an ephemeral consumer with noTrackingStrategy.",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("profile") {
+                        put("type", "string")
+                        put("description", "Connection profile name")
+                    }
+                    putJsonObject("stream") {
+                        put("type", "string")
+                        put("description", "Stream name")
+                    }
+                    putJsonObject("vhost") {
+                        put("type", "string")
+                        put("description", "Virtual host (defaults to profile's configured virtual host)")
+                    }
+                    putJsonObject("start") {
+                        put("type", "string")
+                        put("description", "Start position: 'first', 'last', numeric offset (e.g. '100'), or timestamp in ms. Default: 'first'")
+                    }
+                    putJsonObject("limit") {
+                        put("type", "integer")
+                        put("description", "Maximum messages to return (1..100, default 20)")
+                    }
+                }
+                putJsonArray("required") {
+                    add(JsonPrimitive("profile"))
+                    add(JsonPrimitive("stream"))
+                }
+            }
         )
     )
 
@@ -264,6 +301,7 @@ class McpServer(
             "caerbannog_list_queues" -> listQueues(args)
             "caerbannog_list_exchanges" -> listExchanges(args)
             "caerbannog_list_bindings" -> listBindings(args)
+            "caerbannog_browse_stream" -> browseStream(args)
             else -> McpCallToolResult(
                 content = listOf(McpContent(text = "Unknown tool: $name")),
                 isError = true
@@ -519,6 +557,126 @@ class McpServer(
             else -> {
                 McpCallToolResult(listOf(McpContent(text = "Failed to list bindings: $result")), isError = true)
             }
+        }
+    }
+
+    private suspend fun browseStream(args: JsonObject): McpCallToolResult {
+        val profileName = args["profile"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'profile' argument")), isError = true)
+        val stream = args["stream"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'stream' argument")), isError = true)
+
+        val profile = profileRepository.list().firstOrNull { it.name == profileName }
+            ?: return McpCallToolResult(listOf(McpContent(text = "Profile '$profileName' not found")), isError = true)
+
+        val vhost = args["vhost"]?.jsonPrimitive?.content ?: profile.virtualHost
+        val readerProvider = streamMessageReaderProvider
+            ?: return McpCallToolResult(listOf(McpContent(text = "Stream message reader is not configured on this server")), isError = true)
+        val reader = readerProvider(profile, vhost)
+
+        val limit = args["limit"]?.jsonPrimitive?.content?.toIntOrNull()?.coerceIn(1, 100) ?: 20
+        val startStr = args["start"]?.jsonPrimitive?.content?.trim()?.lowercase()
+
+        val startSpec = when {
+            startStr == null || startStr.isBlank() || startStr == "first" -> BrowseStart.First
+            startStr == "last" -> BrowseStart.LastPage(pageSize = limit)
+            startStr.startsWith("ts:") -> {
+                val ms = startStr.removePrefix("ts:").toLongOrNull()
+                    ?: return McpCallToolResult(listOf(McpContent(text = "Invalid timestamp: $startStr")), isError = true)
+                BrowseStart.Timestamp(ms)
+            }
+            startStr.startsWith("@") -> {
+                val ms = startStr.removePrefix("@").toLongOrNull()
+                    ?: return McpCallToolResult(listOf(McpContent(text = "Invalid timestamp: $startStr")), isError = true)
+                BrowseStart.Timestamp(ms)
+            }
+            startStr.toLongOrNull() != null -> BrowseStart.Offset(startStr.toLong())
+            else -> return McpCallToolResult(listOf(McpContent(text = "Unknown start specification '$startStr'. Use 'first', 'last', numeric offset, or '@<epochMs>'")), isError = true)
+        }
+
+        return when (val result = reader.readPage(vhost, stream, startSpec, limit)) {
+            is BrowseResult.Success -> {
+                val jsonResult = buildJsonObject {
+                    put("stream", stream)
+                    put("vhost", vhost)
+                    put("streamFirstOffset", result.streamFirstOffset)
+                    put("streamLastOffset", result.streamLastOffset)
+                    put("count", result.messages.size)
+                    putJsonArray("messages") {
+                        for (msg in result.messages) {
+                            add(buildJsonObject {
+                                put("offset", msg.offset)
+                                put("timestamp", msg.timestamp)
+                                putJsonObject("properties") {
+                                    for ((k, v) in msg.properties) {
+                                        put(k, v?.toString() ?: "")
+                                    }
+                                }
+                                putJsonObject("applicationProperties") {
+                                    for ((k, v) in msg.applicationProperties) {
+                                        put(k, v?.toString() ?: "")
+                                    }
+                                }
+                                val (preview, truncated) = formatPayload(msg.payload)
+                                put("payload", preview)
+                                put("payloadSize", msg.payload.size)
+                                put("truncated", truncated)
+                            })
+                        }
+                    }
+                }
+                McpCallToolResult(listOf(McpContent(text = json.encodeToString(jsonResult))))
+            }
+            is BrowseResult.Empty -> {
+                val emptyResult = buildJsonObject {
+                    put("stream", stream)
+                    put("vhost", vhost)
+                    put("empty", true)
+                    put("streamFirstOffset", result.streamFirstOffset)
+                    put("streamLastOffset", result.streamLastOffset)
+                    putJsonArray("messages") {}
+                }
+                McpCallToolResult(listOf(McpContent(text = json.encodeToString(emptyResult))))
+            }
+            is BrowseResult.OutsideRange -> {
+                McpCallToolResult(
+                    listOf(McpContent(text = "Requested offset ${result.offset} is outside range ${result.validRange.first}..${result.validRange.last}")),
+                    isError = true
+                )
+            }
+            is BrowseResult.NoMessagesAtOrAfterTime -> {
+                val noMsgResult = buildJsonObject {
+                    put("stream", stream)
+                    put("vhost", vhost)
+                    put("timestampEpochMs", result.epochMs)
+                    put("streamFirstOffset", result.streamFirstOffset)
+                    put("streamLastOffset", result.streamLastOffset)
+                    putJsonArray("messages") {}
+                }
+                McpCallToolResult(listOf(McpContent(text = json.encodeToString(noMsgResult))))
+            }
+            is BrowseResult.NotFound -> {
+                McpCallToolResult(listOf(McpContent(text = "Stream '$stream' not found in vhost '$vhost'")), isError = true)
+            }
+            is BrowseResult.AccessDenied -> {
+                McpCallToolResult(listOf(McpContent(text = "Access denied for stream '$stream' in vhost '$vhost'")), isError = true)
+            }
+            is BrowseResult.Failed -> {
+                McpCallToolResult(listOf(McpContent(text = "Failed to browse stream '$stream': ${result.reason}")), isError = true)
+            }
+        }
+    }
+
+    private fun formatPayload(payload: ByteArray, maxChars: Int = 4096): Pair<String, Boolean> {
+        val text = try {
+            payload.decodeToString()
+        } catch (_: Exception) {
+            payload.joinToString("") { "%02x".format(it) }
+        }
+        return if (text.length > maxChars) {
+            text.take(maxChars) to true
+        } else {
+            text to false
         }
     }
 

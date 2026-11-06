@@ -1,5 +1,6 @@
 package dev.caerbannog.mcp
 
+import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -7,6 +8,7 @@ import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.streams.Retention
@@ -53,13 +55,15 @@ class McpServerTest {
     private val streamCatalog = FakeStreamCatalog()
     private val streamOffsets = FakeStreamOffsets()
     private val topologyCatalog = FakeTopologyCatalog()
+    private val streamReader = FakeStreamMessageReader()
 
     private val server = McpServer(
         profileRepository = repo,
         connectionChecker = checker,
         streamCatalogProvider = { _, _ -> streamCatalog },
         streamOffsetsProvider = { _, _ -> streamOffsets },
-        topologyCatalogProvider = { _, _ -> topologyCatalog }
+        topologyCatalogProvider = { _, _ -> topologyCatalog },
+        streamMessageReaderProvider = { _, _ -> streamReader },
     )
 
     @Test
@@ -92,6 +96,7 @@ class McpServerTest {
         assertTrue(toolNames.contains("caerbannog_list_queues"))
         assertTrue(toolNames.contains("caerbannog_list_exchanges"))
         assertTrue(toolNames.contains("caerbannog_list_bindings"))
+        assertTrue(toolNames.contains("caerbannog_browse_stream"))
 
         for (name in toolNames) {
             val lower = name.orEmpty().lowercase()
@@ -184,5 +189,103 @@ class McpServerTest {
             val jsonElement = json.parseToJsonElement(line).jsonObject
             assertEquals("2.0", jsonElement["jsonrpc"]?.jsonPrimitive?.content)
         }
+    }
+
+    @Test
+    fun `browse stream returns paged messages and bounds`() {
+        repo.add(
+            ConnectionProfile(
+                name = "reader-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true
+            )
+        )
+        streamReader.seed(
+            "/",
+            "invoices",
+            (0 until 50).map { i ->
+                StreamMessage(
+                    offset = i.toLong(),
+                    timestamp = 1700000000000L + i * 1000L,
+                    payload = """{"invoiceId": "INV-$i"}""".toByteArray(),
+                    properties = mapOf("contentType" to "application/json"),
+                    applicationProperties = mapOf("traceId" to "trc-$i")
+                )
+            }
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 20, "method": "tools/call", "params": {"name": "caerbannog_browse_stream", "arguments": {"profile": "reader-prof", "stream": "invoices", "start": "first", "limit": 10}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+
+        assertTrue(text.contains("\"count\":10") || text.contains("\"count\": 10"))
+        assertTrue(text.contains("\"streamFirstOffset\":0") || text.contains("\"streamFirstOffset\": 0"))
+        assertTrue(text.contains("\"streamLastOffset\":49") || text.contains("\"streamLastOffset\": 49"))
+        assertTrue(text.contains("INV-0"))
+        assertTrue(text.contains("INV-9"))
+        assertFalse(text.contains("INV-10"))
+    }
+
+    @Test
+    fun `browse stream with offset outside range returns error`() {
+        repo.add(
+            ConnectionProfile(
+                name = "reader-prof-2",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true
+            )
+        )
+        streamReader.seed(
+            "/",
+            "invoices",
+            listOf(
+                StreamMessage(0L, 1000L, "hello".toByteArray(), emptyMap(), emptyMap())
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 21, "method": "tools/call", "params": {"name": "caerbannog_browse_stream", "arguments": {"profile": "reader-prof-2", "stream": "invoices", "start": "100"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val isError = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("isError")?.jsonPrimitive?.booleanOrNull
+        assertTrue(isError == true)
+        val text = json.parseToJsonElement(resp).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("outside range"))
+    }
+
+    @Test
+    fun `browse stream payload is truncated safely when exceeding max length`() {
+        repo.add(
+            ConnectionProfile(
+                name = "reader-prof-3",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true
+            )
+        )
+        val bigPayload = "X".repeat(10_000)
+        streamReader.seed(
+            "/",
+            "big-stream",
+            listOf(
+                StreamMessage(0L, 1000L, bigPayload.toByteArray(), emptyMap(), emptyMap())
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 22, "method": "tools/call", "params": {"name": "caerbannog_browse_stream", "arguments": {"profile": "reader-prof-3", "stream": "big-stream"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("\"truncated\":true") || text.contains("\"truncated\": true"))
+        assertTrue(text.contains("\"payloadSize\":10000") || text.contains("\"payloadSize\": 10000"))
     }
 }

@@ -1,5 +1,8 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.browser.BrowseResult
+import dev.caerbannog.core.browser.BrowseStart
+import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.streams.Capabilities
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
@@ -29,6 +32,8 @@ class StreamSource(
     val vhost: String,
     /** M2-08b: the read-only topology of the same held connection, guarded like [catalog]. */
     val topology: TopologyCatalog,
+    /** M3-01: the stream message browser reader of the same held connection, guarded like [catalog]. */
+    val messages: StreamMessageReader,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -69,4 +74,12 @@ internal class GuardedTopology(private val inner: TopologyCatalog, private val i
     override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = guarded { inner.bindings(vhost) }
 
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = guarded { inner.queueDetail(vhost, name) }
+}
+
+internal class GuardedMessageReader(
+    private val inner: StreamMessageReader,
+    private val isCurrent: () -> Boolean,
+) : StreamMessageReader {
+    override suspend fun readPage(vhost: String, stream: String, start: BrowseStart, pageSize: Int): BrowseResult =
+        if (isCurrent()) inner.readPage(vhost, stream, start, pageSize) else BrowseResult.Failed("Connection closed")
 }

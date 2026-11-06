@@ -140,6 +140,7 @@ class ActiveConnection(
             offsets = GuardedOffsets(connection.offsets, isCurrent),
             vhost = vhost,
             topology = GuardedTopology(connection.topology, isCurrent),
+            messages = GuardedMessageReader(connection.messages, isCurrent),
         )
     }
 

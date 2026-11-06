@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.PermissionCheckResult
@@ -105,6 +106,7 @@ class CompositionRootStreamListWiringTest {
                 override suspend fun firstOffset(vhost: String, stream: String) = FirstOffset.Unavailable
             }
             override val topology = FakeTopologyCatalog()
+            override val messages = FakeStreamMessageReader()
             override fun close() = Unit
         })
     }
