@@ -290,7 +290,9 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 **Milestone status**
 
 - M1 Skeleton and connection: accepted by the product owner on 2026-11-04 ("merge, accept, start M2"), after the team's task reports and architect reviews (tasks `M1-01` to `M1-12b`, `M1-TASKFILE-01/02`, index in `docs/tasks/README.md`). The acceptance rests on those reports and the automated tests; it does not mean the items below were checked. Carried forward, never run by the team and not reported run by the product owner, so still open and unverified: (1) a manual `:desktopApp:run` against a real broker and the real OS keychain (the Connections screen, the permission pill and the save flow have only been exercised by automated tests and the opt-in screenshot task); (2) the Windows keychain (Credential Manager) and `:desktopApp:packageMsi`, which cannot be built from macOS; (3) the `:desktopApp:packageDmg` installer size check after the icon library was added (about 38 MB jar, see `docs/tasks/M1-12b-connections-icons.md`). They are to be done before the M5 gate (installers run on macOS and Windows); item (1) should be done as early as M2 has a screen worth looking at.
-- M2 Stream list and stats: in progress, started 2026-11-04. Tasks in `docs/tasks/README.md`. M2-02 spike accepted with follow-ups on 2026-11-04 (not merged); its findings are in "Management API facts".
+- M2 Stream list and stats: accepted by the product owner on 2026-11-06; gate passed (`@gate-M2` stats match real broker in `RealBrokerStatsMatchTest`).
+- M3 Message browser: accepted by the product owner on 2026-11-06; gate passed (`@gate-M3` paging across real broker chunk boundaries, edge handling, and consumer offset safety in `RealBrokerMessageBrowserTest`).
+- M4 Payload viewer and filter: next milestone (text, JSON, and hex views; bounded client-side filter).
 
 **Risks**
 
