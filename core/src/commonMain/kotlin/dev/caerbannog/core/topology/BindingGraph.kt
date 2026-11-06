@@ -1,5 +1,7 @@
 package dev.caerbannog.core.topology
 
+import dev.caerbannog.core.streams.groupDigits
+
 enum class BindingsViewMode { Table, Graph }
 
 enum class GraphNodeKind { Exchange, Queue }
@@ -37,6 +39,8 @@ data class PositionedEdge(
     val fromY: Float,
     val toX: Float,
     val toY: Float,
+    val labelX: Float = (fromX + toX) / 2f,
+    val labelY: Float = (fromY + toY) / 2f,
 )
 
 data class BindingGraph(
@@ -124,14 +128,18 @@ fun buildBindingGraph(
 
     activeQueueNames.forEach { name ->
         val q = queueMap[name]
-        val ready = q?.readyMessages ?: 0
+        val detail = if (q == null) {
+            ""
+        } else {
+            q.readyMessages?.let { "(${groupDigits(it)} ready)" } ?: "(${TopologyTexts.NOT_AVAILABLE})"
+        }
         val id = "q:$name"
         rawNodes.add(
             GraphNode(
                 id = id,
                 name = name,
                 kind = GraphNodeKind.Queue,
-                detail = "($ready ready)",
+                detail = detail,
                 bindingCount = bindingCounts[id] ?: 0,
             )
         )
@@ -234,7 +242,7 @@ fun buildBindingGraph(
     val nodeMapById = positionedNodes.associateBy { it.node.id }
 
     // Position edges
-    val positionedEdges = mutableListOf<PositionedEdge>()
+    val initialEdges = mutableListOf<PositionedEdge>()
     filteredBindings.forEachIndexed { i, b ->
         val srcId = "e:${b.source}"
         val dstId = if (b.destinationType == BindingDestinationType.EXCHANGE) "e:${b.destination}" else "q:${b.destination}"
@@ -245,7 +253,7 @@ fun buildBindingGraph(
             val fromY = fromNode.y + NODE_HEIGHT / 2f
             val toX = toNode.x
             val toY = toNode.y + NODE_HEIGHT / 2f
-            positionedEdges.add(
+            initialEdges.add(
                 PositionedEdge(
                     edge = GraphEdge(
                         id = "edge-$i",
@@ -263,10 +271,89 @@ fun buildBindingGraph(
         }
     }
 
+    val positionedEdges = resolveEdgeLabelPositions(initialEdges)
+
     return BindingGraph(
         nodes = positionedNodes,
         edges = positionedEdges,
         totalBindings = totalBindings,
         isTooLarge = false,
     )
+}
+
+private const val LABEL_COLLISION_DX = 60f
+private const val LABEL_COLLISION_DY = 18f
+
+/**
+ * Evaluates X on the horizontal-tangent cubic bezier curve from [fromX] to [toX] at parameter [t] in `[0, 1]`.
+ * Control points are `P1x = P2x = (fromX + toX) / 2`.
+ */
+private fun bezierX(fromX: Float, toX: Float, t: Float): Float {
+    val u = 1f - t
+    val midX = (fromX + toX) / 2f
+    return u * u * u * fromX + 3f * u * t * midX + t * t * t * toX
+}
+
+/**
+ * Evaluates Y on the horizontal-tangent cubic bezier curve from [fromY] to [toY] at parameter [t] in `[0, 1]`.
+ * Control points are `P1y = fromY` and `P2y = toY`.
+ */
+private fun bezierY(fromY: Float, toY: Float, t: Float): Float {
+    val u = 1f - t
+    return (u * u * u + 3f * u * u * t) * fromY + (3f * u * t * t + t * t * t) * toY
+}
+
+/**
+ * Staggers routing-key label anchors along their cubic bezier curves whenever two or more labeled edges
+ * would collide near their midpoints (such as crossing edges between the same layers).
+ */
+private fun resolveEdgeLabelPositions(edges: List<PositionedEdge>): List<PositionedEdge> {
+    val labeledIndices = edges.indices.filter { edges[it].edge.routingKey.isNotEmpty() }
+    if (labeledIndices.size <= 1) return edges
+
+    val result = edges.toMutableList()
+    val visited = BooleanArray(edges.size)
+
+    for (idx in labeledIndices) {
+        if (visited[idx]) continue
+        // Build a connected component of labeled edges whose default midpoint anchors collide
+        val cluster = mutableListOf<Int>()
+        val queue = ArrayDeque<Int>()
+        visited[idx] = true
+        queue.add(idx)
+        while (queue.isNotEmpty()) {
+            val curr = queue.removeFirst()
+            cluster.add(curr)
+            val eCurr = edges[curr]
+            for (other in labeledIndices) {
+                if (!visited[other]) {
+                    val eOther = edges[other]
+                    if (kotlin.math.abs(eCurr.labelX - eOther.labelX) < LABEL_COLLISION_DX &&
+                        kotlin.math.abs(eCurr.labelY - eOther.labelY) < LABEL_COLLISION_DY
+                    ) {
+                        visited[other] = true
+                        queue.add(other)
+                    }
+                }
+            }
+        }
+
+        if (cluster.size > 1) {
+            val count = cluster.size
+            cluster.forEachIndexed { k, edgeIdx ->
+                val e = edges[edgeIdx]
+                val t = 0.25f + (0.50f * k) / (count - 1).toFloat()
+                val newX = bezierX(e.fromX, e.toX, t)
+                val newY = if (e.fromY == e.toY) {
+                    // Horizontal parallel edges: stagger t along X and nudge Y slightly if identical
+                    e.fromY + (k - (count - 1) / 2f) * 18f
+                } else {
+                    bezierY(e.fromY, e.toY, t)
+                }
+                result[edgeIdx] = e.copy(labelX = newX, labelY = newY)
+            }
+        }
+    }
+
+    return result
 }

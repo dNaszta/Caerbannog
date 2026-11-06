@@ -26,8 +26,10 @@ import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.streams.StreamClientsTexts
 import dev.caerbannog.core.streams.UpdatedAge
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.TopologyScreen as Screen
 import dev.caerbannog.core.topology.TopologyState
+import dev.caerbannog.core.topology.TopologyTab
 import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrame
@@ -128,7 +130,9 @@ private fun TabbedBody(state: TopologyState, events: TopologyEvents) {
             else -> {
                 TopologyControls(state, events, searchAndFilters = true)
                 Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = false) }
-                TopologyFooter(state, events)
+                if (!(state.tab == TopologyTab.Bindings && state.bindingsView == BindingsViewMode.Graph)) {
+                    TopologyFooter(state, events)
+                }
             }
         }
     }

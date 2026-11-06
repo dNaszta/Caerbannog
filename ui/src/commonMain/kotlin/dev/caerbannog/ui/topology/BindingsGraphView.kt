@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -100,28 +101,37 @@ internal fun BindingsGraphView(state: TopologyState, loading: Boolean) {
             // Edges canvas
             val edgeColor = MaterialTheme.colorScheme.outline
             Canvas(Modifier.fillMaxSize()) {
+                val strokeWidthPx = 1.5.dp.toPx()
                 edges.forEach { edge ->
+                    val fromX = edge.fromX.dp.toPx()
+                    val fromY = edge.fromY.dp.toPx()
+                    val toX = edge.toX.dp.toPx()
+                    val toY = edge.toY.dp.toPx()
+                    val dx = (toX - fromX) / 2f
                     val path = Path().apply {
-                        moveTo(edge.fromX, edge.fromY)
-                        val dx = (edge.toX - edge.fromX) / 2f
+                        moveTo(fromX, fromY)
                         cubicTo(
-                            edge.fromX + dx, edge.fromY,
-                            edge.toX - dx, edge.toY,
-                            edge.toX, edge.toY,
+                            fromX + dx, fromY,
+                            toX - dx, toY,
+                            toX, toY,
                         )
                     }
-                    drawPath(path, color = edgeColor, style = Stroke(width = 1.5f.dp.toPx()))
+                    drawPath(path, color = edgeColor, style = Stroke(width = strokeWidthPx))
                 }
             }
 
             // Routing key pills
             edges.forEach { edge ->
                 if (edge.edge.routingKey.isNotEmpty()) {
-                    val midX = (edge.fromX + edge.toX) / 2f
-                    val midY = (edge.fromY + edge.toY) / 2f
                     Box(
                         Modifier
-                            .offset(x = (midX - 30f).dp, y = (midY - 10f).dp)
+                            .offset(x = edge.labelX.dp, y = edge.labelY.dp)
+                            .layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints)
+                                layout(placeable.width, placeable.height) {
+                                    placeable.place(-placeable.width / 2, -placeable.height / 2)
+                                }
+                            }
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -166,12 +176,15 @@ private fun GraphNodeCard(pNode: PositionedNode) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
+            Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ConnectionIcon(icon, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f)) {
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(
                     node.name,
                     style = MaterialTheme.typography.labelMedium,
@@ -180,12 +193,14 @@ private fun GraphNodeCard(pNode: PositionedNode) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    node.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                if (node.detail.isNotEmpty()) {
+                    Text(
+                        node.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
