@@ -57,6 +57,7 @@ class RabbitMqConnectionGateway(
                 offsets = RabbitMqStreamOffsets(environments),
                 topology = ManagementTopologyCatalog(http, requests),
                 messages = RabbitMqStreamMessageReader(environments, catalog),
+                publisher = RabbitMqMessagePublisher(environments, http, requests),
                 resources = listOf(environments, http),
                 log = log,
             ),

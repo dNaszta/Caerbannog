@@ -7,6 +7,7 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.connections.fakes.FakeMessagePublisher
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
@@ -56,6 +57,7 @@ class McpServerTest {
     private val streamOffsets = FakeStreamOffsets()
     private val topologyCatalog = FakeTopologyCatalog()
     private val streamReader = FakeStreamMessageReader()
+    private val publisher = FakeMessagePublisher()
 
     private val server = McpServer(
         profileRepository = repo,
@@ -64,6 +66,7 @@ class McpServerTest {
         streamOffsetsProvider = { _, _ -> streamOffsets },
         topologyCatalogProvider = { _, _ -> topologyCatalog },
         streamMessageReaderProvider = { _, _ -> streamReader },
+        messagePublisherProvider = { _, _ -> publisher },
     )
 
     @Test
@@ -318,5 +321,59 @@ class McpServerTest {
         assertTrue(text.contains("\"count\":1") || text.contains("\"count\": 1"))
         assertTrue(text.contains("TARGET"))
         assertFalse(text.contains("third order"))
+    }
+
+    @Test
+    fun `publish test message tool sends message to publisher and returns confirmation`() {
+        repo.add(
+            ConnectionProfile(
+                name = "publish-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                topologyControlLevel = TopologyControlLevel.DECLARE_AND_EDIT,
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 30, "method": "tools/call", "params": {"name": "caerbannog_publish_test_message", "arguments": {"profile": "publish-prof", "targetKind": "stream", "targetName": "orders-events", "payload": "{\"orderId\":\"TEST-1\"}", "messageId": "msg-1", "applicationProperties": {"tenant": "eu"}}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+
+        assertTrue(text.contains("\"success\":true") || text.contains("\"success\": true"))
+        assertTrue(text.contains("Message published to stream 'orders-events'"))
+
+        assertEquals(1, publisher.publishedMessages.size)
+        val sent = publisher.publishedMessages.single()
+        assertEquals("orders-events", sent.target.name)
+        assertEquals("""{"orderId":"TEST-1"}""", sent.payload.decodeToString())
+        assertEquals("msg-1", sent.properties["messageId"])
+        assertEquals("eu", sent.applicationProperties["tenant"])
+    }
+
+    @Test
+    fun `publish test message tool is refused when profile is READ_ONLY`() {
+        repo.add(
+            ConnectionProfile(
+                name = "readonly-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                topologyControlLevel = TopologyControlLevel.READ_ONLY,
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 31, "method": "tools/call", "params": {"name": "caerbannog_publish_test_message", "arguments": {"profile": "readonly-prof", "targetKind": "stream", "targetName": "orders-events", "payload": "test"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val isError = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("isError")?.jsonPrimitive?.booleanOrNull == true
+        assertTrue(isError)
+        val text = json.parseToJsonElement(resp).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("Read-only"))
     }
 }

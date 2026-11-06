@@ -79,6 +79,17 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M4-03-viewer-and-filter-ui | Message browser detail side sheet, viewer tabs, filter bar, and UI tests | M4 | done (architect: Accepted, 2026-11-07; branch `m4-03-viewer-and-filter-ui`; 11 Compose UI tests green) |
 | M4-04-gate-large-bodies-and-safety | Real broker responsiveness gate and ephemeral read-only safety verification | M4 | done (architect: Accepted, 2026-11-07; branch `m4-04-gate-large-bodies-and-safety`; 2 broker tests green) |
 
+## Milestone M5 (started 2026-11-07; M4 accepted)
+
+| ID | Title | Milestone | Status |
+| --- | --- | --- | --- |
+| M5-01-publish-test-message-core | Publish test message engine, models, and BDD scenarios | M5 | done (architect: Accepted, 2026-11-07; branch `m5-01-publish-test-message-core`; 10 unit tests green, 8 BDD scenarios green) |
+| M5-02-publish-test-message-ui | Publish test message dialog and Compose UI tests | M5 | planned |
+| M5-03-stream-management-create-delete | Create and delete streams with typed confirmation | M5 | planned |
+| M5-04-topology-migrations | Topology migrations runner and UI | M5 | planned |
+| M5-05-verify-host-name | Per-profile "Verify host name" switch (D7) | M5 | planned |
+| M5-06-gate-packaging-and-broker | Milestone M5 gate and packaging verification | M5 | planned |
+
 ## Later milestones (planned)
 
 | ID | Title | Milestone | Status |

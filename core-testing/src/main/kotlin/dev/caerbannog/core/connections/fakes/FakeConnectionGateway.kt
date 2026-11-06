@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.connections.OpenResult
+import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.Visibility
@@ -61,6 +62,7 @@ class FakeConnectionGateway(
         override val offsets: StreamOffsets,
         override val topology: TopologyCatalog,
         override val messages: StreamMessageReader = FakeStreamMessageReader(),
+        override val publisher: MessagePublisher = FakeMessagePublisher(),
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -93,6 +95,7 @@ class FakeConnectionGateway(
     private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
     private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
     private val messageReaders = ConcurrentHashMap<String, FakeStreamMessageReader>()
+    private val publishers = ConcurrentHashMap<String, FakeMessagePublisher>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -155,6 +158,9 @@ class FakeConnectionGateway(
     /** M3-01: the stream message reader every connection opened for [profileName] exposes. */
     fun messagesOf(profileName: String): FakeStreamMessageReader = messageReaders.getOrPut(profileName) { FakeStreamMessageReader() }
 
+    /** M5-01: the test message publisher every connection opened for [profileName] exposes. */
+    fun publisherOf(profileName: String): FakeMessagePublisher = publishers.getOrPut(profileName) { FakeMessagePublisher() }
+
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
@@ -202,6 +208,7 @@ class FakeConnectionGateway(
             offsets = offsetsOf(name),
             topology = topologyOf(name),
             messages = messagesOf(name),
+            publisher = publisherOf(name),
         )
         opened += held
         log += "opened:$name#${held.number}"

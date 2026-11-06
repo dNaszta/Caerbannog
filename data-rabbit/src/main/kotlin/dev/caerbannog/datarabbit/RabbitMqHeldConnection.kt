@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.topology.TopologyCatalog
@@ -17,6 +18,7 @@ class RabbitMqHeldConnection(
     override val offsets: StreamOffsets,
     override val topology: TopologyCatalog,
     override val messages: StreamMessageReader,
+    override val publisher: MessagePublisher,
     private val resources: List<AutoCloseable>,
     private val log: (String) -> Unit,
 ) : HeldConnection {

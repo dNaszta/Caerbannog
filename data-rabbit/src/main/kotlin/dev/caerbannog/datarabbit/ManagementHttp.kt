@@ -4,7 +4,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.basicAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.URLParserException
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -52,6 +56,37 @@ internal class ManagementHttp(
             ManagementReply.Response(response.status.value, response.bodyAsText())
         } catch (e: CancellationException) {
             // A client closed under a running call reports cancellation; that is a lost connection, not the caller leaving.
+            if (closed) ManagementReply.Unreachable else throw e
+        } catch (e: SSLException) {
+            classify(e)
+        } catch (e: HttpRequestTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: HttpTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: SocketTimeoutException) {
+            ManagementReply.Unreachable
+        } catch (e: IOException) {
+            ManagementReply.Unreachable
+        } catch (e: URISyntaxException) {
+            ManagementReply.Unreachable
+        } catch (e: URLParserException) {
+            ManagementReply.Unreachable
+        } catch (e: IllegalArgumentException) {
+            ManagementReply.Unreachable
+        }
+    }
+
+    suspend fun post(url: String, body: String): ManagementReply {
+        val secret = password
+        if (closed || secret == null) return ManagementReply.Unreachable
+        return try {
+            val response = client.post(url) {
+                basicAuth(username, secret)
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            ManagementReply.Response(response.status.value, response.bodyAsText())
+        } catch (e: CancellationException) {
             if (closed) ManagementReply.Unreachable else throw e
         } catch (e: SSLException) {
             classify(e)
