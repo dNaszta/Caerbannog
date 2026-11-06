@@ -63,7 +63,27 @@ None.
 
 ## Status
 
-Step 1: brief written by solution-architect (2026-11-06). Ready for step 2 (test-developer).
+Step 1: brief written by solution-architect (2026-11-06).
+Step 2: tests first done (test-developer, 2026-11-06). Added unit tests in `TopologyViewModelVhostTest` asserting `homeVhost` and Compose UI test in `TopologyVhostSwitchUiTest` asserting caption text and semantics. Confirmed red on assertions (commit `e7a6693`).
+Step 3: build done (senior-developer, 2026-11-06). Implemented `homeVhost` in `TopologyViewModel.kt`, passed to `VhostSwitch` in `TopologyControls.kt`, and rendered caption and accessibility descriptions in `TopologyVhostSwitch.kt`. All unit and Compose tests green (commit `53f5db1`).
+Step 4: verified (test-developer, 2026-11-06).
+- Automated test runs:
+  - `:core:jvmTest`: all 25 tests pass in `TopologyViewModelVhostTest`.
+  - `:ui:jvmTest`: all 10 tests pass in `TopologyVhostSwitchUiTest`.
+  - Full suite `:core:jvmTest :ui:jvmTest` passed green.
+  - `:desktopApp:test` and `:acceptance-tests:test` passed green.
+- Exploratory verification:
+  - Visual layout verified against `docs/ux/Topology.dc.html` (`vhost-item` with name and caption).
+  - Caption styled with `labelSmall` and `onSurfaceVariant` under monospace vhost name.
+  - Non-home entries never display caption.
+  - Keyboard navigation (Down/Up/Escape/Enter/Space), popup dismissal, and window resizing intact.
+  - Accessibility `contentDescription` properly set.
+Step 5: architect review (solution-architect, 2026-11-06): ACCEPTED.
+- Fit: Closes M2-08c step 5 review finding 1 / ruling 1 cleanly.
+- Architecture: Clean pure display state `TopologyState.homeVhost`, no extra network calls, no coupling.
+- Safety & Rules: Quorum safety and read-only invariants unaffected. MCP tool evaluation confirmed unnecessary for this UX detail.
+- Code quality: Idiomatic Compose and clean unit/Compose testing.
+
 Branch: `m2-08f1-vhost-home-caption`
 Round: 0
-Verdict: in progress
+Verdict: accepted, awaiting merge permission
