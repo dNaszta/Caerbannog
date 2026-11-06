@@ -242,5 +242,7 @@ Feature: Stream list
   Scenario: Statistics agree with the Management UI
     Given a real broker with a stream "orders-events" containing 1000 messages
     When I open the stream list
-    Then the publisher count and consumer count of "orders-events" equal those in the RabbitMQ Management UI
-    And the message count differs from the Management UI by no more than the offset tracking entries
+    Then the first offset of "orders-events" equals that in the stream protocol
+    And the publisher count and consumer count of "orders-events" equal those in the RabbitMQ Management UI
+    And the message count equals that in the RabbitMQ Management UI
+    And the message count differs from the published message count by no more than the offset tracking entries
