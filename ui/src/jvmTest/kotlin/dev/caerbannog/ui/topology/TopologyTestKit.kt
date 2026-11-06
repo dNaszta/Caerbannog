@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.DesktopComposeUiTest
 import dev.caerbannog.core.topology.BindingRowView
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.ExchangeRowView
 import dev.caerbannog.core.topology.QueueDetailView
 import dev.caerbannog.core.topology.QueueRowView
@@ -35,6 +36,7 @@ internal class RecordedTopologyEvents : TopologyEvents {
     override fun selectVhost(name: String) { calls += "selectVhost:$name" }
     override fun selectQueue(name: String?) { calls += "selectQueue:$name" }
     override fun setShowDefaultExchange(show: Boolean) { calls += "setShowDefaultExchange:$show" }
+    override fun setBindingsView(mode: BindingsViewMode) { calls += "setBindingsView:$mode" }
     override fun nextPage() { calls += "nextPage" }
     override fun previousPage() { calls += "previousPage" }
 }

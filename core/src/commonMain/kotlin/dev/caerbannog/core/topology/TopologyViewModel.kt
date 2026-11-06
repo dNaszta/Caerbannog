@@ -63,6 +63,7 @@ class TopologyViewModel(
     private var queueFilter = QueueTypeFilter.Quorum
     private val searches = mutableMapOf<TopologyTab, String>()
     private var showDefaultExchange = false
+    private var bindingsView = BindingsViewMode.Table
     private var selectedName: String? = null
     private var page = 1
     private var pageSize = pageSize.coerceAtLeast(1)
@@ -188,6 +189,13 @@ class TopologyViewModel(
         viewChanged()
     }
 
+    fun setBindingsView(mode: BindingsViewMode) = onScope {
+        if (closed || bindingsView == mode) return@onScope
+        bindingsView = mode
+        render()
+        if (canRun() && needsLoad()) source?.let(loop::loadNow)
+    }
+
     fun setPage(page: Int) = onScope { showPage(page) }
 
     fun nextPage() = onScope { showPage(clampedPage() + 1) }
@@ -273,7 +281,7 @@ class TopologyViewModel(
 
     // --- loading -------------------------------------------------------------------------------------
 
-    private fun needsExchanges(): Boolean = tab == TopologyTab.Exchanges
+    private fun needsExchanges(): Boolean = tab == TopologyTab.Exchanges || (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph)
 
     private fun needsBindings(): Boolean = tab == TopologyTab.Bindings || selectedName != null
 
@@ -476,6 +484,15 @@ class TopologyViewModel(
         val shownBindings = bindingRows.pageOf(current)
         val shownCount = shownQueues.size + shownExchanges.size + shownBindings.size
         val offeredVhosts = if (cannotRead) emptyList() else vhostsOffered()
+        val computedGraph = if (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph && !cannotRead) {
+            val ex = exchanges.orEmpty()
+            val q = queues.orEmpty()
+            val b = bindings.orEmpty()
+            buildBindingGraph(ex, q, b, showDefaultExchange)
+        } else null
+        val graphTooLargeMsg = if (computedGraph?.isTooLarge == true) {
+            TopologyTexts.graphTooLarge(computedGraph.totalBindings)
+        } else null
         _updatedAt.value = lastSuccessMillis
         _state.value = TopologyState(
             screen = screen,
@@ -501,6 +518,9 @@ class TopologyViewModel(
             exchanges = shownExchanges,
             bindings = shownBindings,
             showDefaultExchange = showDefaultExchange,
+            bindingsView = bindingsView,
+            graph = computedGraph,
+            graphTooLargeMessage = graphTooLargeMsg,
             selectedQueue = selectedName?.let { name -> queues.orEmpty().firstOrNull { it.name == name }?.detail(bindings.orEmpty()) },
             page = current,
             pageSize = pageSize,

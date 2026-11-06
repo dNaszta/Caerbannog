@@ -33,6 +33,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
@@ -98,6 +100,8 @@ internal enum class AppIcon(val mockupName: String) {
     Block("block"),
     Inbox("inbox"),
     Warning("warning"),
+    TableChart("table_chart"),
+    SwapHoriz("swap_horiz"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -136,6 +140,8 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Block -> Icons.Outlined.Block
     AppIcon.Inbox -> Icons.Outlined.Inbox
     AppIcon.Warning -> Icons.Outlined.Warning
+    AppIcon.TableChart -> Icons.Outlined.TableChart
+    AppIcon.SwapHoriz -> Icons.Outlined.SwapHoriz
 }
 
 /** `.ms.sm` in the mockup. */

@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyTab
 import dev.caerbannog.core.topology.TopologyViewModel
@@ -19,6 +20,7 @@ class TopologyEventsAdapter(private val viewModel: TopologyViewModel) : Topology
     override fun selectVhost(name: String) = viewModel.selectVhost(name)
     override fun selectQueue(name: String?) = viewModel.selectQueue(name)
     override fun setShowDefaultExchange(show: Boolean) = viewModel.setShowDefaultExchange(show)
+    override fun setBindingsView(mode: BindingsViewMode) = viewModel.setBindingsView(mode)
     override fun nextPage() = viewModel.nextPage()
     override fun previousPage() = viewModel.previousPage()
 }

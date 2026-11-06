@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.topology.BindingRowView
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.ExchangeRowView
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
@@ -81,7 +82,13 @@ internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, load
         when (state.tab) {
             dev.caerbannog.core.topology.TopologyTab.Queues -> QueuesTable(state, events, loading)
             dev.caerbannog.core.topology.TopologyTab.Exchanges -> ExchangesTable(state, loading)
-            dev.caerbannog.core.topology.TopologyTab.Bindings -> BindingsTable(state, loading)
+            dev.caerbannog.core.topology.TopologyTab.Bindings -> {
+                if (state.bindingsView == BindingsViewMode.Graph) {
+                    BindingsGraphView(state, loading)
+                } else {
+                    BindingsTable(state, loading)
+                }
+            }
         }
         if (detail != null && !loading) QueueDetail(detail, events::selectQueue)
     }

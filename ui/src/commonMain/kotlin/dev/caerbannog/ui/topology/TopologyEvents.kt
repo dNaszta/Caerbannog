@@ -1,5 +1,6 @@
 package dev.caerbannog.ui.topology
 
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyTab
 
@@ -23,6 +24,7 @@ interface TopologyEvents {
     /** A queue name opens its detail, null closes it. */
     fun selectQueue(name: String?)
     fun setShowDefaultExchange(show: Boolean)
+    fun setBindingsView(mode: BindingsViewMode)
     fun nextPage()
     fun previousPage()
 }

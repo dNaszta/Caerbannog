@@ -46,6 +46,7 @@ import androidx.compose.ui.text.TextRange
 import dev.caerbannog.ui.components.SearchField
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTab
@@ -108,6 +109,7 @@ internal fun TopologyControls(state: TopologyState, events: TopologyEvents, sear
                 TopologyTab.Exchanges -> TopologySearchField("exchangeSearch", "Search exchanges", state.search, events::setSearch)
                 TopologyTab.Bindings -> {
                     TopologySearchField("bindingSearch", "Search bindings", state.search, events::setSearch)
+                    BindingsViewSwitch(state.bindingsView, events::setBindingsView)
                     DefaultExchangeSwitch(state.showDefaultExchange, events::setShowDefaultExchange)
                 }
             }
@@ -144,6 +146,60 @@ private fun DefaultExchangeSwitch(checked: Boolean, onChange: (Boolean) -> Unit)
     ) {
         Text("Show default exchange", style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** The Bindings tab's view toggle: switches between Table and Graph representations. */
+@Composable
+private fun BindingsViewSwitch(view: BindingsViewMode, onSelect: (BindingsViewMode) -> Unit) {
+    Row(
+        Modifier
+            .height(48.dp)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .padding(4.dp)
+            .testTag("bindingsViewSwitch"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        BindingsViewOption(
+            icon = AppIcon.TableChart,
+            label = "Table",
+            tag = "bindingsView:Table",
+            selected = view == BindingsViewMode.Table,
+            onClick = { onSelect(BindingsViewMode.Table) },
+        )
+        BindingsViewOption(
+            icon = AppIcon.Hub,
+            label = "Graph",
+            tag = "bindingsView:Graph",
+            selected = view == BindingsViewMode.Graph,
+            onClick = { onSelect(BindingsViewMode.Graph) },
+        )
+    }
+}
+
+@Composable
+private fun BindingsViewOption(
+    icon: AppIcon,
+    label: String,
+    tag: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val fg = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier
+            .height(40.dp)
+            .testTag(tag)
+            .background(bg, RoundedCornerShape(6.dp))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ConnectionIcon(icon, SmallIconSize, tint = fg)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = fg)
     }
 }
 
