@@ -84,6 +84,6 @@ Step 5: architect review (solution-architect, 2026-11-06): ACCEPTED.
 - Safety & Rules: Quorum safety and read-only invariants unaffected. MCP tool evaluation confirmed unnecessary for this UX detail.
 - Code quality: Idiomatic Compose and clean unit/Compose testing.
 
-Branch: `m2-08f1-vhost-home-caption`
+Branch: `m2-08f1-vhost-home-caption` (merged into local `main`, not pushed)
 Round: 0
-Verdict: accepted, awaiting merge permission
+Verdict: accepted, merged
