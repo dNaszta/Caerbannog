@@ -13,8 +13,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.topology.TopologyTexts
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -155,5 +157,16 @@ class TopologyVhostSwitchUiTest {
         shown.state = bindingsState(listOf(binding("events", "orders")))
         waitForIdle()
         node("vhostSwitch").assertExists()
+    }
+
+    @Test
+    fun `the connection's virtual host entry draws the caption`() = runDesktopComposeUiTest(1280, 800) {
+        screen(queuesState(vhost = "/", vhosts = listOf("/", "billing"), homeVhost = "/"))
+        node("vhostSwitch").performClick()
+        node("vhostMenu").assertExists()
+        assertTrue(text("vhostItem:/").contains(TopologyTexts.HOME_VHOST_CAPTION), "expected caption on home vhost: ${text("vhostItem:/")}")
+        assertFalse(text("vhostItem:billing").contains(TopologyTexts.HOME_VHOST_CAPTION), "caption should not appear on non-home vhost: ${text("vhostItem:billing")}")
+        assertEquals(listOf("/, ${TopologyTexts.HOME_VHOST_CAPTION}"), node("vhostItem:/").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(listOf("billing"), node("vhostItem:billing").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
     }
 }

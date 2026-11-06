@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -71,7 +72,7 @@ private object BelowAnchorStart : PopupPositionProvider {
  * state changes the virtual host. Choosing the current one only closes the menu.
  */
 @Composable
-internal fun VhostSwitch(current: String, vhosts: List<String>, onSelect: (String) -> Unit) {
+internal fun VhostSwitch(current: String, vhosts: List<String>, homeVhost: String? = null, onSelect: (String) -> Unit) {
     var open by remember(current) { mutableStateOf(false) }
     val switchFocus = remember { FocusRequester() }
     val label = "Virtual host $current"
@@ -100,14 +101,26 @@ internal fun VhostSwitch(current: String, vhosts: List<String>, onSelect: (Strin
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true, dismissOnBackPress = false),
             ) {
-                VhostMenu(current, vhosts, choose = { name -> if (name != current) onSelect(name); close() }, dismiss = { close() })
+                VhostMenu(
+                    current = current,
+                    vhosts = vhosts,
+                    homeVhost = homeVhost,
+                    choose = { name -> if (name != current) onSelect(name); close() },
+                    dismiss = { close() },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun VhostMenu(current: String, vhosts: List<String>, choose: (String) -> Unit, dismiss: () -> Unit) {
+private fun VhostMenu(
+    current: String,
+    vhosts: List<String>,
+    homeVhost: String?,
+    choose: (String) -> Unit,
+    dismiss: () -> Unit,
+) {
     val focusManager = LocalFocusManager.current
     val entry = remember { FocusRequester() }
     // Focus moves to the selected item on open, so Enter keeps the choice and Down walks from there.
@@ -139,20 +152,38 @@ private fun VhostMenu(current: String, vhosts: List<String>, choose: (String) ->
             )
             vhosts.forEach { name ->
                 val on = name == current
+                val isHome = name == homeVhost
+                val desc = if (isHome) "$name, ${TopologyTexts.HOME_VHOST_CAPTION}" else name
+                val itemText = if (isHome) "$name ${TopologyTexts.HOME_VHOST_CAPTION}" else name
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .then(if (name == entryName) Modifier.focusRequester(entry) else Modifier)
                         .testTag("vhostItem:$name")
-                        .semantics { selected = on; text = AnnotatedString(name) }
+                        .semantics {
+                            selected = on
+                            text = AnnotatedString(itemText)
+                            contentDescription = desc
+                        }
                         .clickable(role = Role.Button) { choose(name) }
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp, vertical = if (isHome) 6.dp else 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(Modifier.widthIn(min = 18.dp)) { if (on) ConnectionIcon(AppIcon.Check, SmallIconSize) }
-                    Text(name, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
+                    if (isHome) {
+                        Column {
+                            Text(name, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
+                            Text(
+                                TopologyTexts.HOME_VHOST_CAPTION,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        Text(name, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
+                    }
                 }
             }
         }
