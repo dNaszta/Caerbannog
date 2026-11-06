@@ -118,6 +118,9 @@ data class TopologyState(
     val exchanges: List<ExchangeRowView> = emptyList(),
     val bindings: List<BindingRowView> = emptyList(),
     val showDefaultExchange: Boolean = false,
+    val bindingsView: BindingsViewMode = BindingsViewMode.Table,
+    val graph: BindingGraph? = null,
+    val graphTooLargeMessage: String? = null,
     val selectedQueue: QueueDetailView? = null,
     val page: Int = 1,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
@@ -157,6 +160,8 @@ object TopologyTexts {
     const val LOAD_FAILED: String = "Topology could not be loaded. Check that the broker is reachable and that this user may use it."
     const val APPROXIMATE: String = "Queue counts are approximate: the broker updates them every few seconds."
     const val HOME_VHOST_CAPTION: String = "This connection's virtual host"
+    const val GRAPH_TOO_LARGE: String = "There are more bindings than can be drawn. Choose an exchange or narrow the filter."
+    fun graphTooLarge(count: Int): String = "There are more bindings than can be drawn ($count bindings). Choose an exchange or narrow the filter."
     const val LOCKED_HEADLINE: String = "Topology is locked on this connection."
     const val READ_ONLY_HEADLINE: String = "This connection is set to read-only."
     const val READ_ONLY_DETAIL: String =

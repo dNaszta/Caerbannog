@@ -8,9 +8,15 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.topology.BindingDestinationType
+import dev.caerbannog.core.topology.BindingRow
+import dev.caerbannog.core.topology.BindingsViewMode
+import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyBannerKind
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTexts
+import dev.caerbannog.core.topology.buildBindingGraph
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -99,4 +105,44 @@ class TopologyScreenshotTest {
 
     @Test
     fun `screenshot - loading`() = runDesktopComposeUiTest(1280, 880) { shot(loading, "topology-11-loading.png") }
+
+    @Test
+    fun `screenshot - bindings graph`() = runDesktopComposeUiTest(1280, 880) {
+        val exchanges = listOf(
+            ExchangeRow("dev.events", "/", "topic", durable = true, autoDelete = false, internal = false),
+            ExchangeRow("dev.fanout", "/", "fanout", durable = true, autoDelete = false, internal = false),
+            ExchangeRow("orders", "/", "direct", durable = true, autoDelete = false, internal = false),
+        )
+        val queues = listOf(
+            QueueRow("dev-jobs", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
+            QueueRow("dev-mail", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
+            QueueRow("orders-0", "/", "quorum", readyMessages = 0, unackedMessages = 0, consumers = 0, leader = null, members = emptyList(), online = emptyList(), policy = null, state = "running"),
+        )
+        val bindings = listOf(
+            BindingRow("dev.events", "/", "dev-jobs", BindingDestinationType.QUEUE, "job.#"),
+            BindingRow("dev.events", "/", "dev-mail", BindingDestinationType.QUEUE, "mail.*"),
+            BindingRow("dev.events", "/", "dev.fanout", BindingDestinationType.EXCHANGE, "#"),
+            BindingRow("orders", "/", "orders-0", BindingDestinationType.QUEUE, "0"),
+        )
+        val graph = buildBindingGraph(exchanges, queues, bindings, showDefaultExchange = false)
+        val graphState = TopologyState(
+            screen = dev.caerbannog.core.topology.TopologyScreen.Ready,
+            message = null,
+            tab = dev.caerbannog.core.topology.TopologyTab.Bindings,
+            vhost = "/",
+            vhosts = listOf("/", "billing"),
+            showVhostSwitch = true,
+            bindingsView = BindingsViewMode.Graph,
+            graph = graph,
+            bindings = listOf(
+                binding("dev.events", "dev-jobs", key = "job.#"),
+                binding("dev.events", "dev-mail", key = "mail.*"),
+                binding("dev.events", "dev.fanout", type = "exchange", key = "#"),
+                binding("orders", "orders-0", key = "0"),
+            ),
+            total = 4,
+            rangeText = "1 to 4 of 4",
+        )
+        shot(graphState, "topology-12-bindings-graph.png")
+    }
 }

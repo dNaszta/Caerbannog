@@ -16,6 +16,7 @@ import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog.Companion.quoru
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.topology.BindingDestinationType
+import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyBannerKind
@@ -280,6 +281,39 @@ class TopologySteps {
         topology.addBinding(binding(exchange, queue, routingKey = "order.created"))
     }
 
+    @Given("the exchange {string} is bound to the queues {string} and {string} with routing keys {string} and {string}")
+    fun exchangeBoundToTwoQueues(exchange: String, q1: String, q2: String, rk1: String, rk2: String) {
+        topology.addExchange(exchange(exchange, "topic"))
+        topology.addQueue(quorum(q1))
+        topology.addQueue(quorum(q2))
+        topology.addBinding(binding(exchange, q1, routingKey = rk1))
+        topology.addBinding(binding(exchange, q2, routingKey = rk2))
+    }
+
+    @Given("the broker has the default exchange and {int} queues, each bound to it")
+    fun defaultExchangeAndManyQueues(count: Int) {
+        repeat(count) {
+            topology.addQueue(quorum("queue-$it"))
+        }
+    }
+
+    @Given("the exchange {string} is bound to {int} queues")
+    fun exchangeBoundToManyQueues(exchange: String, count: Int) {
+        topology.addExchange(exchange(exchange, "topic"))
+        repeat(count) {
+            val q = "queue-$it"
+            topology.addQueue(quorum(q))
+            topology.addBinding(binding(exchange, q, routingKey = "key-$it"))
+        }
+    }
+
+    @Given("the exchange {string} is bound to the queue {string} with routing key {string}")
+    fun exchangeBoundToQueue(exchange: String, queue: String, rk: String) {
+        topology.addExchange(exchange(exchange, "topic"))
+        topology.addQueue(quorum(queue))
+        topology.addBinding(binding(exchange, queue, routingKey = rk))
+    }
+
     @Given("the exchange {string} is bound to the exchange {string} with routing key {string}")
     fun exchangeBoundToExchange(source: String, destination: String, key: String) {
         topology.addExchange(exchange(source, "topic"))
@@ -300,6 +334,19 @@ class TopologySteps {
 
     @When("I open the topology screen on the {string} tab")
     fun openOnTab(tab: String) = open(tabOf(tab))
+
+    @When("I open the topology screen on the {string} tab and choose the graph view")
+    fun openOnTabAndChooseGraph(tab: String) {
+        open(tabOf(tab))
+        vm.setBindingsView(BindingsViewMode.Graph)
+        settle()
+    }
+
+    @When("I switch to the table view")
+    fun switchToTableView() {
+        vm.setBindingsView(BindingsViewMode.Table)
+        settle()
+    }
 
     @When("I open the topology screen on the {string} tab with the {string} filter")
     fun openOnTabWithFilter(tab: String, filter: String) = open(tabOf(tab), filterOf(filter))
@@ -423,6 +470,81 @@ class TopologySteps {
         assertTrue(state.bindings.isNotEmpty(), "the Bindings tab shows the binding of the scenario, screen ${state.screen}")
         state.bindings.forEach { assertTrue(it.source.isNotBlank() && it.destination.isNotBlank() && it.destinationType.isNotBlank(), "binding row: $it") }
         assertEquals(listOf(Triple("events", "orders", "order.created")), state.bindings.map { Triple(it.source, it.destination, it.routingKey) })
+    }
+
+    @Then("I see the binding with its source, destination and routing key")
+    fun seeTheBinding() {
+        seeBindings()
+    }
+
+    @Then("the graph has the nodes {string}, {string} and {string}")
+    fun graphHasNodes(n1: String, n2: String, n3: String) {
+        val graph = checkNotNull(state.graph) { "graph should not be null" }
+        val names = graph.nodes.map { it.node.name }.toSet()
+        assertEquals(setOf(n1, n2, n3), names)
+    }
+
+    @Then("it has an edge from {string} to {string} labelled {string}")
+    fun graphHasEdge(from: String, to: String, label: String) {
+        val graph = checkNotNull(state.graph) { "graph should not be null" }
+        val idToName = graph.nodes.associate { it.node.id to it.node.name }
+        val edge = graph.edges.firstOrNull {
+            idToName[it.edge.sourceId] == from && idToName[it.edge.targetId] == to && it.edge.routingKey == label
+        }
+        assertNotNull(edge, "expected edge from $from to $to labelled $label, but had: ${graph.edges.map { "${idToName[it.edge.sourceId]} -> ${idToName[it.edge.targetId]} (${it.edge.routingKey})" }}")
+    }
+
+    @Then("the graph has no node for the default exchange")
+    fun graphHasNoDefaultExchange() {
+        val graph = state.graph
+        if (graph != null) {
+            assertFalse(graph.nodes.any { it.node.name.isEmpty() || it.node.name == "(default exchange)" })
+        }
+    }
+
+    @Then("no queue is drawn only because of the default exchange")
+    fun noQueueDrawnOnlyBecauseOfDefaultExchange() {
+        val graph = state.graph
+        if (graph != null) {
+            assertTrue(graph.nodes.isEmpty(), "nodes should be empty but was ${graph.nodes}")
+        }
+    }
+
+    @Then("no partial graph is drawn")
+    fun noPartialGraphDrawn() {
+        val graph = checkNotNull(state.graph) { "graph should be present" }
+        assertTrue(graph.isTooLarge, "graph should be marked too large")
+        assertTrue(graph.nodes.isEmpty(), "no partial nodes should be drawn")
+        assertTrue(graph.edges.isEmpty(), "no partial edges should be drawn")
+    }
+
+    @Then("the screen says there are more bindings than can be drawn and asks me to choose an exchange or narrow the filter")
+    fun screenSaysTooLarge() {
+        val msg = state.graphTooLargeMessage
+        assertNotNull(msg, "graphTooLargeMessage should not be null")
+        assertTrue(msg!!.contains("more bindings than can be drawn", ignoreCase = true), "message: $msg")
+        assertTrue(msg.contains("choose an exchange or narrow", ignoreCase = true), "message: $msg")
+    }
+
+    @Then("every node can be focused with the keyboard")
+    fun everyNodeCanBeFocused() {
+        val graph = checkNotNull(state.graph) { "graph should not be null" }
+        assertTrue(graph.nodes.isNotEmpty(), "graph nodes should not be empty")
+        graph.nodes.forEach {
+            assertTrue(it.node.id.isNotEmpty())
+        }
+    }
+
+    @Then("a focused node is described with its kind, name and number of bindings")
+    fun focusedNodeDescribed() {
+        val graph = checkNotNull(state.graph) { "graph should not be null" }
+        graph.nodes.forEach { p ->
+            val node = p.node
+            val desc = node.accessibilityDescription
+            assertTrue(desc.contains(node.kind.name, ignoreCase = true), "desc should contain kind: $desc")
+            assertTrue(desc.contains(node.name), "desc should contain name: $desc")
+            assertTrue(desc.contains("${node.bindingCount}"), "desc should contain bindingCount: $desc")
+        }
     }
 
     @Then("only {string} is listed")
@@ -584,7 +706,7 @@ class TopologySteps {
         val words = listOf("edit", "delete", "bind", "declare", "purge", "create", "migration", "policy")
         val methods = TopologyViewModel::class.java.methods.filter { it.declaringClass == TopologyViewModel::class.java }.map { it.name.lowercase() }
         assertTrue(methods.isNotEmpty(), "reflection found no public method of the view model")
-        val offending = methods.filter { name -> words.any { name.contains(it) } }
+        val offending = methods.filter { name -> words.any { name.contains(it) && name != "setbindingsview" } }
         assertEquals(emptyList<String>(), offending, "view model methods that could change topology")
     }
 

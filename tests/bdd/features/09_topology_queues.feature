@@ -201,7 +201,7 @@ Feature: Topology and quorum queues
 
   # --- The bindings graph (decision T2, owner 2026-11-05; task M2-08d). The table of the Bindings tab (above) is its fallback. ---
 
-  @M2 @fake-broker @needs-08d
+  @M2 @fake-broker
   Scenario: The bindings graph shows an exchange with its queues
     Given the exchange "events" is bound to the queues "orders" and "audit" with routing keys "order.created" and "#"
     When I open the topology screen on the "Bindings" tab and choose the graph view
@@ -209,28 +209,28 @@ Feature: Topology and quorum queues
     And it has an edge from "events" to "orders" labelled "order.created"
     And it has an edge from "events" to "audit" labelled "#"
 
-  @M2 @fake-broker @needs-08d
+  @M2 @fake-broker
   Scenario: The bindings graph never draws the default exchange unless asked
     Given the broker has the default exchange and 1000 queues, each bound to it
     When I open the topology screen on the "Bindings" tab and choose the graph view
     Then the graph has no node for the default exchange
     And no queue is drawn only because of the default exchange
 
-  @M2 @fake-broker @needs-08d
+  @M2 @fake-broker
   Scenario: A big neighbourhood is not drawn partly
     Given the exchange "events" is bound to 100 queues
     When I open the topology screen on the "Bindings" tab and choose the graph view
     Then no partial graph is drawn
     And the screen says there are more bindings than can be drawn and asks me to choose an exchange or narrow the filter
 
-  @M2 @fake-broker @needs-08d
+  @M2 @fake-broker
   Scenario: The bindings can also be read as a table
     Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
     When I open the topology screen on the "Bindings" tab and choose the graph view
     And I switch to the table view
     Then I see the binding with its source, destination and routing key
 
-  @M2 @fake-broker @needs-08d
+  @M2 @fake-broker
   Scenario: Graph nodes can be reached by the keyboard
     Given the exchange "events" is bound to the queue "orders" with routing key "order.created"
     When I open the topology screen on the "Bindings" tab and choose the graph view

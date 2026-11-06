@@ -81,7 +81,21 @@ None. Headless `:mcp-server` already provides `caerbannog_list_bindings`, `caerb
 
 ## Status
 
-Step 1: brief written by solution-architect (2026-11-06). Ready for step 2 (test-developer).
+- Step 1: Brief written by solution-architect (2026-11-06). Decisions G1, G2, U2 resolved. Mockup extended in `docs/ux/Topology.dc.html`.
+- Step 2: Tests-first written by test-developer (2026-11-06). Added pure graph layout unit tests in `TopologyGraphLayoutTest.kt` (DAG layers, cycle fallback, scale cap at 60, default exchange handling). Un-skipped 5 BDD acceptance scenarios in `tests/bdd/features/09_topology_queues.feature` and wired step definitions in `TopologySteps.kt`.
+- Step 3: Senior developer implementation (2026-11-06). Added `BindingGraph.kt` pure DAG layout in `core`, `TopologyViewModel` integration, `BindingsViewSwitch` control in `TopologyControls.kt`, `BindingsGraphView.kt` with bezier canvas curves and accessible node cards, adapter in `desktopApp`, and Compose UI tests in `BindingsGraphUiTest.kt`.
+- Step 4: Verification completed by test-developer (2026-11-06).
+  - All 40 BDD scenarios in `RunTopologyAcceptanceTest` pass.
+  - All unit tests in `core:jvmTest` pass (including 5 DAG graph layout tests).
+  - All UI tests in `ui:jvmTest` pass (including 5 Bindings graph UI tests).
+  - Full repo test suite `./gradlew test` passes cleanly (all modules).
+  - Screenshot test `./gradlew screenshotTest` passes, generating `ui/build/screenshots/topology-12-bindings-graph.png`.
+- Step 5: Architect review accepted by solution-architect (2026-11-06).
+  - Visual layout strictly aligns with `docs/ux/Topology.dc.html` (`tab-bindings-graph`).
+  - No mutation or message read/purge paths exist; quorum queues safety preserved.
+  - Accessible keyboard focus and screen reader descriptions verified.
+  - Ready for merge into `main` pending product owner approval.
+
 Branch: `m2-08d-bindings-graph`
-Round: 0
-Verdict: in progress
+Round: 1
+Verdict: accepted

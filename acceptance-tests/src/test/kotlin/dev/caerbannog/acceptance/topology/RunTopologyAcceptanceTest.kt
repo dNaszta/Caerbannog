@@ -17,5 +17,5 @@ import org.junit.platform.suite.api.Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("09_topology_queues.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.topology")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@M2 and @fake-broker and not @needs-08d and not @broker")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@M2 and @fake-broker and not @broker")
 class RunTopologyAcceptanceTest
