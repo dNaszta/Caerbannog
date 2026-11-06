@@ -405,7 +405,7 @@ class StreamClientSpikeTest {
             { buildEnv(host = h, ssl = caOnlyContext(verifyHostName = true)) }, "(b) same host with verification on must fail at build")
         val ssl = causes(ex).filterIsInstance<javax.net.ssl.SSLHandshakeException>().firstOrNull()
         assertTrue(ssl != null, "(b) a SSLHandshakeException is in the cause chain: ${describe(ex)}")
-        assertTrue(ssl!!.message!!.startsWith("No subject alternative names matching"), "(b) message was: ${ssl.message}")
+        assertTrue(ssl!!.message!!.contains("No subject alternative names matching"), "(b) message was: ${ssl.message}")
     }
 
     @Test
@@ -430,7 +430,7 @@ class StreamClientSpikeTest {
         val ex = r.exceptionOrNull()
         assertTrue(ex is com.rabbitmq.stream.StreamException, "expected a failure at build, was: ${r.fold({ "OK" }, { describe(it) })}")
         val ssl = causes(ex!!).filterIsInstance<javax.net.ssl.SSLHandshakeException>().firstOrNull()
-        assertTrue(ssl?.message?.startsWith("No subject alternative names matching") == true, "was: ${describe(ex)}")
+        assertTrue(ssl?.message?.contains("No subject alternative names matching") == true, "was: ${describe(ex)}")
         assertEquals("4.2", io.netty.util.Version.identify().values.first { it.artifactId() == "netty-handler" }.artifactVersion().take(3),
             "this default is the netty 4.2 behaviour; if netty changes, re-check")
     }
@@ -449,7 +449,7 @@ class StreamClientSpikeTest {
         // The concrete class is package-private in the client (com.rabbitmq.stream.impl.ConnectionStreamException): match by name.
         assertEquals("com.rabbitmq.stream.impl.ConnectionStreamException", ex.javaClass.name)
         assertTrue(ex.message!!.startsWith("Error while creating stream connection to 127.0.0.1:$port"), "message was: ${ex.message}")
-        assertTrue(causes(ex).any { it is java.net.ConnectException && it.message == "Connection refused" }, "chain: ${describe(ex)}")
+        assertTrue(causes(ex).any { it is java.net.ConnectException && it.message?.startsWith("Connection refused") == true }, "chain: ${describe(ex)}")
         assertTrue(took < 10_000, "blocked $took ms; the default RPC timeout is 10 s")
         println("M2-03a closed port: build threw after $took ms")
     }

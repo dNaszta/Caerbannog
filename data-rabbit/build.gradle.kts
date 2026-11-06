@@ -79,7 +79,7 @@ tasks.test {
 }
 
 tasks.register<Test>("brokerTest") {
-    description = "Runs the data-rabbit tests tagged \"broker\" (needs Docker)."
+    description = "Runs the data-rabbit tests tagged \"broker\" (uses rootless Podman socket when present, or Docker)."
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
@@ -97,6 +97,32 @@ tasks.register<Test>("brokerTest") {
     // `gradlew` command line only reaches the long-lived Gradle daemon, not the test process)
     // works around it until Testcontainers ships a fix. Record of the finding: docs/spec.md Risks.
     systemProperty("api.version", "1.43")
+
+    // M2-15: Rootless Podman support on Fedora / Linux.
+    // Precedence: `-PcontainerEngine=podman|docker` > `CONTAINER_ENGINE=podman|docker` > auto-detect `$XDG_RUNTIME_DIR/podman/podman.sock`.
+    // When targeting rootless Podman:
+    //   1. Point Testcontainers at `unix://$XDG_RUNTIME_DIR/podman/podman.sock` (unless DOCKER_HOST is already set).
+    //   2. Disable the Ryuk reaper container (`TESTCONTAINERS_RYUK_DISABLED=true`, unless already set), because
+    //      rootless Podman + SELinux Enforcing blocks Ryuk from mounting the Podman socket inside the reaper container.
+    val requestedEngine = (project.findProperty("containerEngine") as String?)
+        ?.trim()
+        ?.lowercase()
+        ?: System.getenv("CONTAINER_ENGINE")?.trim()?.lowercase()
+    val xdgRuntimeDir = System.getenv("XDG_RUNTIME_DIR")?.takeIf { it.isNotBlank() } ?: "/run/user/1000"
+    val podmanSocketFile = file("$xdgRuntimeDir/podman/podman.sock")
+    val usePodman = when (requestedEngine) {
+        "podman" -> true
+        "docker" -> false
+        else -> podmanSocketFile.exists()
+    }
+    if (usePodman) {
+        if (System.getenv("DOCKER_HOST").isNullOrBlank()) {
+            environment("DOCKER_HOST", "unix://${podmanSocketFile.absolutePath}")
+        }
+        if (System.getenv("TESTCONTAINERS_RYUK_DISABLED").isNullOrBlank()) {
+            environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+        }
+    }
 }
 
 // M1-08: opt-in run of the real-keychain tests. Deliberately not wired via dependsOn/finalizedBy from
