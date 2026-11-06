@@ -58,6 +58,8 @@ import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+import dev.caerbannog.ui.components.CenteredMessage
+import dev.caerbannog.ui.components.LostConnectionBanner
 
 /** Events out of the stream list screen. Every one is asynchronous in the view model; read the result from the state. */
 interface StreamListEvents {
@@ -185,15 +187,10 @@ private fun StreamsBody(state: StreamListState, gate: CreateStreamGate, events: 
     }
 }
 
-/** A centred message, with an optional action under it. */
+/** A centred message, with an optional action under it. Delegates to [CenteredMessage]. */
 @Composable
 internal fun Message(text: String?, action: (@Composable () -> Unit)? = null) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (text != null) Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-            action?.invoke()
-        }
-    }
+    CenteredMessage(text = text, action = action)
 }
 
 @Composable
@@ -247,31 +244,7 @@ private fun GroupingNotice(message: String) {
     }
 }
 
-/** The lost-connection banner (D2): the rows below stay, dimmed; the user decides when to retry. */
-@Composable
-internal fun LostConnectionBanner(message: String, action: String, onRetry: () -> Unit, tag: String = "streamsBanner") {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .testTag(tag)
-                // The row carries the message itself (a polite live region says it when it appears); the visible text is hidden from
-                // the tree so it is not read twice.
-                .semantics { text = AnnotatedString(message); liveRegion = LiveRegionMode.Polite }
-                .padding(start = 16.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ConnectionIcon(AppIcon.Error, SmallIconSize, tint = MaterialTheme.colorScheme.error)
-            Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.weight(1f).clearAndSetSemantics {},
-            )
-            TextButton(onClick = onRetry) { Text(action) }
-        }
-    }
-}
+
 
 @Composable
 private fun StreamsFooter(state: StreamListState, events: StreamListEvents) {

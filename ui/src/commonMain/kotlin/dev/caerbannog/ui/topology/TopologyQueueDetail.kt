@@ -29,7 +29,7 @@ import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
-import dev.caerbannog.ui.streams.CopyableText
+import dev.caerbannog.ui.components.CopyableText
 
 private val LabelWidth = 140.dp
 private val FieldWidth = 280.dp

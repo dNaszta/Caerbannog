@@ -68,6 +68,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
+import dev.caerbannog.ui.components.CopyableText
+import dev.caerbannog.ui.components.SearchField
 import dev.caerbannog.core.streams.StreamRow
 import dev.caerbannog.core.streams.StreamRowKind
 import dev.caerbannog.core.streams.StreamSort
@@ -282,50 +284,6 @@ private fun CopyableCell(text: String, tag: String, column: Column, scale: Float
     }
 }
 
-/**
- * One value: its text node is focusable (Tab, visible outline) and Cmd+C or Ctrl+C copies the WHOLE displayed text, because
- * [SelectionContainer] alone gives no keyboard copy of a focused text (spike, M2-05c). The mouse selection still works.
- * With [onOpen] the same node is also a link (role Button; click or Enter opens; a drag still selects, spike M2-06b item 11).
- * Shared by the stream list and the publishers and consumers tables (UI1: one copy mechanism).
- */
-@Composable
-internal fun CopyableText(
-    text: String,
-    tag: String,
-    style: androidx.compose.ui.text.TextStyle,
-    textAlign: TextAlign = TextAlign.Start,
-    color: Color = Color.Unspecified,
-    extra: Modifier = Modifier,
-    onOpen: (() -> Unit)? = null,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
-    val outline = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
-    Text(
-        text,
-        style = style,
-        color = color,
-        textAlign = textAlign,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(tag)
-            .then(extra)
-            .onKeyEvent { event ->
-                val copy = event.type == KeyEventType.KeyDown && event.key == Key.C && (event.isMetaPressed || event.isCtrlPressed)
-                // `ui` has one target (jvm); the desktop ClipEntry wraps a Transferable. Move this when a second target is added.
-                if (copy) scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
-                copy
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .border(BorderStroke(2.dp, outline), RoundedCornerShape(4.dp))
-            // clickable is focusable and opens on Enter; a plain cell only needs the focus.
-            .then(if (onOpen != null) Modifier.clickable(role = Role.Button, onClick = onOpen) else Modifier.focusable()),
-    )
-}
-
 @Composable
 private fun LoadingRow(first: Boolean, scale: Float) {
     // Only the first row is read by a screen reader; the table already says "Loading".
@@ -347,43 +305,16 @@ private fun LoadingRow(first: Boolean, scale: Float) {
 }
 
 /**
- * The search field. It keeps its own text so typing is never lost while the view model's state arrives a moment later; the state's
- * filter wins when it differs (for example after a connection switch cleared it).
+ * The search field. Delegates to [SearchField].
  */
 @Composable
 internal fun StreamsSearchField(filter: String, onFilter: (String) -> Unit) {
-    var field by remember { mutableStateOf(TextFieldValue(filter, TextRange(filter.length))) }
-    LaunchedEffect(filter) {
-        if (filter != field.text) field = TextFieldValue(filter, TextRange(filter.length))
-    }
-    BasicTextField(
-        value = field,
-        onValueChange = {
-            val changed = it.text != field.text
-            field = it
-            if (changed) onFilter(it.text)
-        },
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        modifier = Modifier.testTag("streamsSearch").widthIn(min = 320.dp, max = 480.dp),
-        decorationBox = { inner ->
-            Row(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                ConnectionIcon(AppIcon.Search, SmallIconSize)
-                Box(Modifier.weight(1f)) {
-                    if (field.text.isEmpty()) {
-                        Text("Search streams", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    inner()
-                }
-            }
-        },
+    SearchField(
+        value = filter,
+        placeholder = "Search streams",
+        tag = "streamsSearch",
+        onSearch = onFilter,
+        minWidth = 320.dp,
+        maxWidth = 480.dp,
     )
 }

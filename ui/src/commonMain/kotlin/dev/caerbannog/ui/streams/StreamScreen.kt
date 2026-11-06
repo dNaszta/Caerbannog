@@ -48,6 +48,7 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
+import dev.caerbannog.ui.components.LostConnectionBanner
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.UpdatedAge
 import dev.caerbannog.ui.appframe.AppDestination

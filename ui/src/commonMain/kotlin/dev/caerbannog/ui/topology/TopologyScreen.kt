@@ -34,7 +34,8 @@ import dev.caerbannog.ui.appframe.AppFrame
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
-import dev.caerbannog.ui.streams.LostConnectionBanner
+import dev.caerbannog.ui.components.CenteredMessage
+import dev.caerbannog.ui.components.LostConnectionBanner
 
 /**
  * The read-only Topology screen (`docs/ux/Topology.dc.html`), drawn inside the app frame. It draws the strings of [state] and decides
@@ -133,7 +134,7 @@ private fun TabbedBody(state: TopologyState, events: TopologyEvents) {
     }
 }
 
-/** A centred message with an optional action under it. The text node carries the tag, so a test reads the message itself. */
+/** A centred message with an optional action under it. Delegates to [CenteredMessage]. */
 @Composable
 private fun TopologyMessage(
     text: String?,
@@ -141,18 +142,11 @@ private fun TopologyMessage(
     modifier: Modifier = Modifier.fillMaxSize(),
     action: (@Composable () -> Unit)? = null,
 ) {
-    Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            icon?.let { ConnectionIcon(it, IconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (text != null) {
-                Text(
-                    text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.testTag("topologyMessage"),
-                )
-            }
-            action?.invoke()
-        }
-    }
+    CenteredMessage(
+        text = text,
+        icon = icon,
+        modifier = modifier,
+        tag = "topologyMessage",
+        action = action,
+    )
 }
