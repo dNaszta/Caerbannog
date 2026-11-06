@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
+import dev.caerbannog.ui.components.SearchField
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.topology.QueueTypeFilter
@@ -147,45 +148,17 @@ private fun DefaultExchangeSwitch(checked: Boolean, onChange: (Boolean) -> Unit)
 }
 
 /**
- * The search field of one tab. It keeps its own text so typing is never lost while the view model's state arrives a moment later; the
- * state's search wins when it differs (a tab or connection switch changed it). Not shared with the stream list: that one is internal to the
- * streams package, which another branch is editing.
+ * The search field of one tab. Delegates to [SearchField].
  */
 @Composable
 private fun TopologySearchField(tag: String, placeholder: String, search: String, onSearch: (String) -> Unit) {
-    var field by remember(tag) { mutableStateOf(TextFieldValue(search, TextRange(search.length))) }
-    LaunchedEffect(search, tag) {
-        if (search != field.text) field = TextFieldValue(search, TextRange(search.length))
-    }
-    BasicTextField(
-        value = field,
-        onValueChange = {
-            val changed = it.text != field.text
-            field = it
-            if (changed) onSearch(it.text)
-        },
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        modifier = Modifier.testTag(tag).widthIn(min = 280.dp, max = 400.dp),
-        decorationBox = { inner ->
-            Row(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                ConnectionIcon(AppIcon.Search, SmallIconSize)
-                Box(Modifier.weight(1f)) {
-                    if (field.text.isEmpty()) {
-                        Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    inner()
-                }
-            }
-        },
+    SearchField(
+        value = search,
+        placeholder = placeholder,
+        tag = tag,
+        onSearch = onSearch,
+        minWidth = 280.dp,
+        maxWidth = 400.dp,
     )
 }
 

@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import dev.caerbannog.ui.components.CopyableText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.ConsumerRowState

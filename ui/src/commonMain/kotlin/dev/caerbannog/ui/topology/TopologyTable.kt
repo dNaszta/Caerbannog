@@ -31,7 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.topology.TopologyTexts
-import dev.caerbannog.ui.streams.CopyableText
+import dev.caerbannog.ui.components.CopyableText
 
 private const val STALE = "Stale"
 private const val LOADING_STATE = "Loading"
