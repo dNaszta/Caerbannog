@@ -107,7 +107,7 @@ Feature: Permission check before the first connection
     When I connect to "prod-eu"
     Then I can list streams
 
-  @fake-broker @needs-M3
+  @fake-broker
   Scenario: Browsing streams does not need the configure permission
     Given the user has no configure permission on "/"
     When I connect to "prod-eu"

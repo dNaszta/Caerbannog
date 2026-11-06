@@ -20,18 +20,28 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     /** The stream whose screen is open (Streams only), null for the list. One level, no back stack: only one detail exists. */
     val selectedStream: StateFlow<String?> = _selectedStream.asStateFlow()
 
+    private val _initialOffset = MutableStateFlow<Long?>(null)
+
+    /** Optional offset to jump to when opening the stream browser. */
+    val initialOffset: StateFlow<Long?> = _initialOffset.asStateFlow()
+
     /** Opens the screen of [name]. Only from Streams and only for a non-blank name; anything else does nothing. */
-    fun openStream(name: String) {
-        if (_screen.value == AppDestination.Streams && name.isNotBlank()) _selectedStream.value = name
+    fun openStream(name: String, offset: Long? = null) {
+        if (_screen.value == AppDestination.Streams && name.isNotBlank()) {
+            _initialOffset.value = offset
+            _selectedStream.value = name
+        }
     }
 
     /** Back to the list; does nothing when no stream is open. */
     fun closeStream() {
+        _initialOffset.value = null
         _selectedStream.value = null
     }
 
     fun open(destination: AppDestination) {
         if (destination !in WITH_SCREEN) return
+        _initialOffset.value = null
         // Streams or any other drawer item with a screen leads to a list or screen, never back into an old stream.
         _selectedStream.value = null
         _screen.value = destination

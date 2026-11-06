@@ -288,6 +288,34 @@ class PermissionCheckSteps {
         list.close()
     }
 
+    @Then("I can browse the messages of a stream")
+    fun iCanBrowseTheMessagesOfAStream() {
+        val checked = checkNotNull(result) { "no permission check result: the scenario must connect first" }
+        assertFalse(checked.topologyUnlocked, "precondition: the user has no configure permission, got $checked")
+        assertTrue(checked.canBrowseStreams, "reading streams must never depend on the permission check")
+        gateway.catalogOf(profile.name).addStream(dev.caerbannog.core.connections.fakes.FakeStreamCatalog.stream("orders", messages = 10L))
+        val msgs = (0 until 10).map { i ->
+            dev.caerbannog.core.browser.StreamMessage(
+                offset = i.toLong(),
+                timestamp = 1700000000000L + i * 1000L,
+                payload = "payload-$i".toByteArray(),
+                properties = emptyMap(),
+                applicationProperties = emptyMap(),
+            )
+        }
+        gateway.messagesOf(profile.name).seed(profile.virtualHost, "orders", msgs)
+        val vm = dev.caerbannog.core.browser.MessageBrowserViewModel(
+            reader = gateway.messagesOf(profile.name),
+            vhost = profile.virtualHost,
+            stream = "orders",
+            scope = test.backgroundScope,
+        )
+        vm.browseFirst()
+        test.runCurrent()
+        val loaded = org.junit.jupiter.api.Assertions.assertInstanceOf(dev.caerbannog.core.browser.MessageBrowserState.Loaded::class.java, vm.state.value)
+        assertEquals(10, loaded.messages.size)
+    }
+
     // M2-08c: the topology screen's reasons, core half: the REAL `TopologyViewModel` on the connection the scenario opened, with the context the
     // composition root builds (profile and the session's permission result). The drawing of the banner is a Compose test of 08c. NOTE (owner decision
     // O1): at the default Read-only level the level banner comes FIRST in the list and is the one drawn; these steps check the reason is in the list.
@@ -562,5 +590,34 @@ class PermissionCheckSteps {
         assertTrue(outcome is PermissionCheckResult.Unreadable, "expected safest mode (Unreadable), got $outcome")
         assertFalse(outcome.topologyUnlocked, "topology must be locked in safest mode")
         assertFalse(outcome.publishingEnabled, "publishing must be disabled in safest mode")
+    }
+
+    private var browserResult: dev.caerbannog.core.browser.BrowseResult? = null
+
+    @Given("a stream {string} with {int} messages")
+    fun aStreamWithMessages(stream: String, count: Int) {
+        gateway.catalogOf(profile.name).addStream(dev.caerbannog.core.connections.fakes.FakeStreamCatalog.stream(stream, messages = count.toLong()))
+        val msgs = (0 until count).map { i ->
+            dev.caerbannog.core.browser.StreamMessage(
+                offset = i.toLong(),
+                timestamp = 1700000000000L + i * 1000L,
+                payload = "payload-$i".toByteArray(),
+                properties = emptyMap(),
+                applicationProperties = emptyMap(),
+            )
+        }
+        gateway.messagesOf(profile.name).seed(profile.virtualHost, stream, msgs)
+    }
+
+    @When("I browse {string}")
+    fun iBrowseStream(stream: String) = kotlinx.coroutines.runBlocking {
+        val reader = gateway.messagesOf(profile.name)
+        browserResult = reader.readPage(profile.virtualHost, stream, dev.caerbannog.core.browser.BrowseStart.First, 100)
+    }
+
+    @Then("I see the messages")
+    fun iSeeTheMessages() {
+        val res = org.junit.jupiter.api.Assertions.assertInstanceOf(dev.caerbannog.core.browser.BrowseResult.Success::class.java, browserResult)
+        assertEquals(10, res.messages.size)
     }
 }

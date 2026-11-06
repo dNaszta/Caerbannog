@@ -704,4 +704,32 @@ class StreamListSteps {
         assertEquals(listOf(name), state.rows.map { it.name })
         assertEquals(StreamRowKind.SuperStream, state.rows.single().kind)
     }
+
+    private var openedPartitionStream: String? = null
+    private var openedPartitionOf: String? = null
+
+    @When("I choose to browse the partition {string}")
+    fun iChooseToBrowseThePartition(partition: String) {
+        if (state.screen !is StreamListScreen.Rows) {
+            iOpenTheStreamList()
+        }
+        val superStream = superPartitions.entries.firstOrNull { partition in it.value }?.key
+        if (superStream != null && !row(superStream).expanded) {
+            iExpand(superStream)
+        }
+        val r = row(partition)
+        assertEquals(StreamRowKind.Partition, r.kind)
+        openedPartitionStream = r.name
+        openedPartitionOf = r.partitionOf
+    }
+
+    @Then("the message browser opens on {string}")
+    fun theMessageBrowserOpensOn(stream: String) {
+        assertEquals(stream, openedPartitionStream)
+    }
+
+    @Then("the page title makes clear that it is a partition of {string}")
+    fun thePageTitleMakesClearThatItIsAPartitionOf(superStream: String) {
+        assertEquals(superStream, openedPartitionOf)
+    }
 }
