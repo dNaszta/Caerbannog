@@ -59,6 +59,29 @@ class TopologyViewModelVhostTest {
     }
 
     @Test
+    fun `homeVhost is set to the connection's virtual host when offered`() = runTest {
+        val s = TopologyHarness(this, vhost = "/")
+        s.topology.declareVhost("billing")
+        s.open()
+        assertEquals("/", s.state.homeVhost)
+    }
+
+    @Test
+    fun `homeVhost is null when the connection's virtual host is not offered`() = runTest {
+        val s = TopologyHarness(this, vhost = "missing")
+        s.open()
+        assertEquals(null, s.state.homeVhost)
+    }
+
+    @Test
+    fun `homeVhost is null for a user without the management tag`() = runTest {
+        val s = TopologyHarness(this, vhost = "/")
+        s.topology.hasManagementTag = false
+        s.open()
+        assertEquals(null, s.state.homeVhost)
+    }
+
+    @Test
     fun `only the vhosts the user may see are offered, a vhost it has no permission on is not`() = runTest {
         val s = TopologyHarness(this)
         s.topology.declareVhost("billing")

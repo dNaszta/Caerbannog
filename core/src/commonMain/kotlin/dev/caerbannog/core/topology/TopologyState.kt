@@ -112,6 +112,8 @@ data class TopologyState(
     /** The virtual hosts offered: the broker's list, the connection's own first, then alphabetical. Empty when it could not be read. */
     val vhosts: List<String> = emptyList(),
     val showVhostSwitch: Boolean = false,
+    /** M2-08f1: the connection's own virtual host, set only when [vhosts] contains it; null when omitted or CannotRead. */
+    val homeVhost: String? = null,
     val queues: List<QueueRowView> = emptyList(),
     val exchanges: List<ExchangeRowView> = emptyList(),
     val bindings: List<BindingRowView> = emptyList(),
@@ -154,6 +156,7 @@ object TopologyTexts {
     const val NO_BINDINGS: String = "There are no bindings in this virtual host yet."
     const val LOAD_FAILED: String = "Topology could not be loaded. Check that the broker is reachable and that this user may use it."
     const val APPROXIMATE: String = "Queue counts are approximate: the broker updates them every few seconds."
+    const val HOME_VHOST_CAPTION: String = "This connection's virtual host"
     const val LOCKED_HEADLINE: String = "Topology is locked on this connection."
     const val READ_ONLY_HEADLINE: String = "This connection is set to read-only."
     const val READ_ONLY_DETAIL: String =

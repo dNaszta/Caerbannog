@@ -80,6 +80,7 @@ internal fun queuesState(
     vhost: String = "/",
     vhosts: List<String> = listOf("/", "billing", "many"),
     showSwitch: Boolean = true,
+    homeVhost: String? = null,
     total: Int = rows.size,
     rangeText: String = if (rows.isEmpty()) "" else "1 to ${rows.size} of $total",
     hasNext: Boolean = false,
@@ -92,7 +93,7 @@ internal fun queuesState(
     updatedAtMillis: Long? = null,
 ) = TopologyState(
     screen = Screen.Ready, message = null, action = action, tab = TopologyTab.Queues, queueFilter = filter, search = search, vhost = vhost, vhosts = vhosts,
-    showVhostSwitch = showSwitch, queues = rows, selectedQueue = selected, total = total, rangeText = rangeText, hasNextPage = hasNext, hasPreviousPage = hasPrevious,
+    showVhostSwitch = showSwitch, homeVhost = homeVhost, queues = rows, selectedQueue = selected, total = total, rangeText = rangeText, hasNextPage = hasNext, hasPreviousPage = hasPrevious,
     stale = stale, connectionBanner = connectionBanner, banners = banners, updatedAtMillis = updatedAtMillis,
 )
 
