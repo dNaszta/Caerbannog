@@ -58,6 +58,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (optional, needs bump approval); no hurry |
 | M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | done (architect: Accepted, 2026-11-06; merged into local `main`) |
 | M-MCP-01-stdio-server | Headless MCP stdio server exposing connection profiles, streams, and topology tools to AI agents | Tooling / M2 | done (accepted, solution-architect 2026-11-06; merged into local `main`, not pushed; branch `m-mcp-01-stdio-server` kept; 7 BDD scenarios green, 5 unit tests green) |
+| M2-15-podman-fedora-dev | Podman on Fedora local development and broker test support (`docker-compose.yml` SELinux `:ro,z`, qualified image and `gosu rabbitmq` healthcheck, `Taskfile.yml` `podman compose` default, `brokerTest` rootless Podman wiring, `gradle.properties`, `docs/DEVELOPING_ON_FEDORA.md`) | Tooling / M2 | done (architect: Accepted, step 5 round 2, 2026-11-06; branch `m2-15-podman-fedora-dev`; 48/48 Gradle tasks and 98/98 `@broker` tests green on Fedora 45 + rootless Podman) |
 
 ## Later milestones (planned)
 

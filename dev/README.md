@@ -3,16 +3,20 @@
 Developer tooling only, not part of the product or the installer. Everything here is **throwaway: the passwords
 and the TLS files are test fixtures, never real, never reuse them anywhere**.
 
-## Commands (need Docker and go-task)
+## Commands (need Podman or Docker, and go-task)
+
+On Fedora, the `go-task` package installs the binary as `go-task` (run `go-task ...` or add `alias task=go-task`), and rootless `podman compose` and `@broker` Testcontainers require the user socket active (`systemctl --user enable --now podman.socket`) with the 5-second idle timeout disabled (`~/.config/systemd/user/podman.service.d/override.conf` setting `ExecStart=/usr/bin/podman $LOGGING system service --time=0`, followed by `systemctl --user daemon-reload && systemctl --user restart podman.socket podman.service`). See `docs/DEVELOPING_ON_FEDORA.md` for full Fedora setup.
+
+`Taskfile.yml` defaults to `podman compose` (`CONTAINER_ENGINE=podman`). To use Docker instead, either pass `CONTAINER_ENGINE=docker` or run the `:docker` task variants (`dev:up:docker`, `dev:reset:docker`).
 
 | Command | What it does |
 | --- | --- |
-| `task dev:up` | Starts RabbitMQ (`rabbitmq:4-management`) with TLS (default) and plain listeners and waits until it is healthy. |
+| `task dev:up` (or `dev:up:podman` / `dev:up:docker`) | Starts RabbitMQ (`docker.io/library/rabbitmq:4-management`) via `podman compose` (or `docker compose`) with TLS (default) and plain listeners and waits until it is healthy. |
 | `task dev:seed -- --password dev-password` | Publishes 1000 messages into each of `dev-orders`, `dev-events`, `dev-audit` on `/`, so offsets and counts are not zero. |
 | `task dev:seed:plain -- --password dev-password` | The same seed over plain (no TLS): stream 5552, management HTTP 15672, no CA. Passes `--no-tls` and no `--ca`. |
 | `task dev:seed -- --password dev-password --queues 1000 --vhost many` | Declares 1000 quorum queues in the `many` vhost (the M2-04 refresh-cost trial); declares only queues, no publishing. No `--queues` means no queues. |
 | `task dev:seed:plain -- --password dev-password --hold` (or `dev:seed`) | Seeds as usual, then keeps one named publisher (`dev-seed-publisher`) and one named consumer (`dev-seed-consumer`, stores its offset) connected per stream so the Publishers and consumers tab has rows. Press Ctrl+C to stop; the rows vanish on the next refresh. Run through `task` (Gradle), the stop ends with exit code 130 and a red "Failed to run task": that is the normal JVM exit after SIGINT, not an error; the connections were closed. |
-| `task dev:reset` | `docker compose down -v` (container and volume gone), then `up -d --wait`. Run it twice: same result. |
+| `task dev:reset` (or `dev:reset:podman` / `dev:reset:docker`) | `podman compose down -v` (or `docker compose down -v`: container and volume gone), then `up -d --wait`. Run it twice: same result. |
 
 Seed flags: `--password` (required), `--user` (default `admin`), `--host`, `--stream-port`, `--management-port`,
 `--vhost`, `--streams a,b`, `--messages N`, `--queues N`, `--max-age 7D` (RabbitMQ notation; sets a stream

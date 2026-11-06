@@ -235,11 +235,13 @@ class RealBrokerClientsTest {
 
         // Number of offset stores each consumer did (auto tracking: one per 10 of the 100 messages; the other application: 3).
         val stores = mapOf<String?, Int>(null to 0, "plain-$stream" to 0, "storing-$stream" to 10, "other-app-$stream" to 3)
-        // (2) every lag is >= 0 and at most the stores of that consumer plus 1 (loose upper bound; the value varies between runs and is not pinned)
+        val totalStreamStores = stores.values.sum()
+        // (2) every lag is >= 0 and at most total stream stores plus 1 for storing consumers (all offset-tracking entries on the shared stream advance the stream offset)
         for (rows in samples + listOf(settled, later)) {
             for (r in rows.filter { it.connectionName.isNotEmpty() }) {
-                val limit = stores.getValue(r.name?.takeIf { it.isNotEmpty() }) + 1
-                assertTrue(r.offsetLag in 0..limit.toLong(), "consumer '${r.name}' reports offset_lag ${r.offsetLag}, expected 0..$limit (its stores plus 1)")
+                val ownStores = stores.getValue(r.name?.takeIf { it.isNotEmpty() })
+                val limit = if (ownStores > 0) totalStreamStores + 1 else 1
+                assertTrue(r.offsetLag in 0..limit.toLong(), "consumer '${r.name}' reports offset_lag ${r.offsetLag}, expected 0..$limit")
             }
         }
         // (1) and (3): the unnamed and the named non-storing consumer are exactly 0, although another application stored on the same stream

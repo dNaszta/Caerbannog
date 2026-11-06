@@ -1,20 +1,35 @@
 # Local developer commands for Caerbannog.
 #
-# Requires go-task (https://taskfile.dev) installed separately, e.g. `brew install go-task` on macOS.
-# Each task below is a thin wrapper around an existing `./gradlew` command - no logic lives here, it
-# only shortens what a developer has to type. See docs/tasks/M1-TASKFILE-01-local-dev-commands.md.
+# Requires go-task (https://taskfile.dev) installed separately:
+#   - Fedora: `sudo dnf install go-task` (binary is `go-task`; optionally `alias task=go-task`)
+#   - macOS:  `brew install go-task` (binary is `task`)
+# Each task below is a thin wrapper around an existing `./gradlew` or compose command - no logic lives here,
+# it only shortens what a developer has to type. See docs/tasks/M1-TASKFILE-01-local-dev-commands.md and M2-15.
 version: '3'
+
+vars:
+  CONTAINER_ENGINE: '{{.CONTAINER_ENGINE | default "podman"}}'
 
 tasks:
   test:
-    desc: Run the fast test suite across all modules (no Docker required).
+    desc: Run the fast test suite across all modules (no container engine required).
     cmds:
       - ./gradlew test
 
   test:broker:
-    desc: Run the Docker-dependent @broker test suite (needs Docker Desktop running).
+    desc: Run the @broker test suite (uses rootless Podman socket when present, or Docker).
     cmds:
       - ./gradlew :data-rabbit:brokerTest
+
+  test:broker:podman:
+    desc: Run the @broker test suite explicitly against rootless Podman (requires `systemctl --user start podman.socket`).
+    cmds:
+      - ./gradlew :data-rabbit:brokerTest -PcontainerEngine=podman
+
+  test:broker:docker:
+    desc: Run the @broker test suite explicitly against Docker.
+    cmds:
+      - ./gradlew :data-rabbit:brokerTest -PcontainerEngine=docker
 
   test:keychain:
     desc: Run the real OS keychain tests (touches the real keychain and may prompt; run on demand).
@@ -37,13 +52,24 @@ tasks:
       - ./gradlew :desktopApp:packageDmg
 
   package:msi:
-    desc: Build the Windows .msi installer (cannot be cross-built from macOS).
+    desc: Build the Windows .msi installer (cannot be cross-built from macOS/Linux).
     cmds:
       - ./gradlew :desktopApp:packageMsi
 
-  # M2-12: local development broker (developer tooling, see dev/README.md). Throwaway secrets only.
+  # M2-12 / M2-15: local development broker (developer tooling, see dev/README.md). Throwaway secrets only.
+  # Defaults to `podman compose` (`CONTAINER_ENGINE=podman`); pass `CONTAINER_ENGINE=docker` or use `:docker` tasks for Docker.
   dev:up:
-    desc: Start the local dev RabbitMQ (TLS and plain listeners, streams, known topology) and wait until it is healthy.
+    desc: "Start the local dev RabbitMQ via {{.CONTAINER_ENGINE}} compose (default: podman) and wait until it is healthy."
+    cmds:
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml up -d --wait'
+
+  dev:up:podman:
+    desc: "Start the local dev RabbitMQ explicitly with podman compose and wait until it is healthy."
+    cmds:
+      - podman compose -f dev/broker/docker-compose.yml up -d --wait
+
+  dev:up:docker:
+    desc: "Start the local dev RabbitMQ explicitly with docker compose and wait until it is healthy."
     cmds:
       - docker compose -f dev/broker/docker-compose.yml up -d --wait
 
@@ -60,7 +86,19 @@ tasks:
       - ./gradlew -q :dev-seed:run --args="--no-tls {{.CLI_ARGS}}"
 
   dev:reset:
-    desc: Remove the dev broker and its volume, then start it again (topology is re-applied from dev/broker/definitions).
+    desc: "Remove the dev broker and its volume via {{.CONTAINER_ENGINE}} compose (default: podman), then start it again."
+    cmds:
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml down -v'
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker/docker-compose.yml up -d --wait'
+
+  dev:reset:podman:
+    desc: Remove the dev broker and its volume with `podman compose`, then start it again.
+    cmds:
+      - podman compose -f dev/broker/docker-compose.yml down -v
+      - podman compose -f dev/broker/docker-compose.yml up -d --wait
+
+  dev:reset:docker:
+    desc: Remove the dev broker and its volume with `docker compose`, then start it again.
     cmds:
       - docker compose -f dev/broker/docker-compose.yml down -v
       - docker compose -f dev/broker/docker-compose.yml up -d --wait
