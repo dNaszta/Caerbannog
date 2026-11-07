@@ -24,6 +24,9 @@ data class ConnectionProfileInput(
     val managementPort: Int = 15671,
     /** M2-14: null on add means TLS on; on update null means keep the saved value (same "keep" rule as the level). */
     val tls: Boolean? = null,
+    /** M6-01: optional MQTT port. Null on add means no MQTT; on update null means keep saved unless [clearMqtt] is true. */
+    val mqttPort: Int? = null,
+    val clearMqtt: Boolean = false,
     val topologyControlLevel: TopologyControlLevel? = null,
     val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
     /** M2-14a R2 (see [ConnectionsViewModel]): add null = none; update null = keep, blank = clear, non-blank = stored only when Valid. */

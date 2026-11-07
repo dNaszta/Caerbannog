@@ -64,6 +64,7 @@ class ConnectionsViewModel(
 
     /** Adds a brand-new profile; without an explicit level it starts at [TopologyControlLevel.READ_ONLY]. */
     fun addConnection(input: ConnectionProfileInput): SaveConnectionResult {
+        val isTls = input.tls ?: true
         val profile = ConnectionProfile(
             name = input.name,
             host = input.host,
@@ -71,8 +72,9 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
-            tls = input.tls ?: true,
-            caCertificatePath = resolveCaCertificatePath(null, input.caCertificatePath, input.tls ?: true),
+            tls = isTls,
+            mqttPort = if (input.clearMqtt) null else input.mqttPort,
+            caCertificatePath = resolveCaCertificatePath(null, input.caCertificatePath, isTls),
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
             declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
@@ -93,6 +95,7 @@ class ConnectionsViewModel(
      */
     fun updateConnection(originalName: String, input: ConnectionProfileInput): SaveConnectionResult {
         val original = profileNamed(originalName)
+        val isTls = input.tls ?: original.tls
         val updated = original.copy(
             name = input.name,
             host = input.host,
@@ -100,8 +103,13 @@ class ConnectionsViewModel(
             username = input.username,
             streamPort = input.streamPort,
             managementPort = input.managementPort,
-            tls = input.tls ?: original.tls,
-            caCertificatePath = resolveCaCertificatePath(original.caCertificatePath, input.caCertificatePath, input.tls ?: original.tls),
+            tls = isTls,
+            mqttPort = when {
+                input.clearMqtt -> null
+                input.mqttPort != null -> input.mqttPort
+                else -> original.mqttPort
+            },
+            caCertificatePath = resolveCaCertificatePath(original.caCertificatePath, input.caCertificatePath, isTls),
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
             declaredPermissions = when (val edit = input.declaredPermissions) {
                 DeclaredPermissionsEdit.Keep -> original.declaredPermissions

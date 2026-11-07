@@ -52,6 +52,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         // load as none. Json rejects unknown keys, so an older build cannot read a file that has this key:
         // downgrade is unsupported (local-only app).
         val declaredPermissions: DeclaredPermissionsDto? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val mqttPort: Int? = null,
     )
 
     @Serializable
@@ -117,6 +118,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
             TopologyControlLevelDto.FULL_CONTROL -> TopologyControlLevel.FULL_CONTROL
         },
         declaredPermissions = declaredPermissions?.let { DeclaredPermissions(configure = it.configure, write = it.write) },
+        mqttPort = mqttPort,
     )
 
     private fun ConnectionProfile.toDto() = ConnectionProfileDto(
@@ -134,6 +136,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
             TopologyControlLevel.FULL_CONTROL -> TopologyControlLevelDto.FULL_CONTROL
         },
         declaredPermissions = declaredPermissions?.let { DeclaredPermissionsDto(configure = it.configure, write = it.write) },
+        mqttPort = mqttPort,
     )
 
     companion object {

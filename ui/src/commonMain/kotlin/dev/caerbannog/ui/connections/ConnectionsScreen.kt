@@ -299,6 +299,14 @@ private fun EditPanel(
                 },
             )
 
+            Spacer(modifier = Modifier.height(20.dp))
+            MqttPluginSection(
+                enabled = form.enableMqtt,
+                tls = form.tls,
+                port = form.ports.mqtt,
+                onToggle = { form.toggleMqtt(it) },
+            )
+
             state.lastCheckResult?.let { result ->
                 Spacer(modifier = Modifier.height(8.dp))
                 CheckConnectionBanner(result, tls = selected?.tls ?: form.tls)
@@ -520,6 +528,42 @@ private fun TlsSwitchRow(tls: Boolean, onChange: (Boolean) -> Unit) {
                     Text(note, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MqttPluginSection(
+    enabled: Boolean,
+    tls: Boolean,
+    port: Int?,
+    onToggle: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("mqttPluginSwitch")
+                .toggleable(value = enabled, role = Role.Switch, onValueChange = onToggle),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ConnectionIcon(AppIcon.Hub, IconSize)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Enable MQTT plugin support", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Enable if the broker has the rabbitmq_mqtt plugin installed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = null)
+        }
+        if (enabled) {
+            ReadOnlyPortField(
+                label = if (tls) "MQTT port (TLS)" else "MQTT port",
+                port = port ?: BrokerEndpoints.defaultMqttPort(tls),
+            )
         }
     }
 }

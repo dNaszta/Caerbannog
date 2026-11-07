@@ -330,4 +330,43 @@ class ConnectionsViewModelTlsTest {
         assertEquals("Connection settings changed. Connect again.", assertIs<LinkState.Disconnected>(h.active.stateOf("uat-eu")).note)
         assertTrue(h.gateway.heldNow.isEmpty(), "the connection that trusted the old CA is closed")
     }
+
+    // --- M6-01: MQTT port in ConnectionsViewModel -------------------------------------------------------------------
+
+    @Test
+    fun `adding a connection with mqttPort stores it`() {
+        viewModel.addConnection(input().copy(mqttPort = 8883))
+        assertEquals(8883, saved().mqttPort)
+        assertTrue(saved().hasMqtt)
+    }
+
+    @Test
+    fun `updating a connection with mqttPort updates it`() {
+        viewModel.addConnection(input())
+        assertNull(saved().mqttPort)
+
+        viewModel.updateConnection("uat-eu", input().copy(mqttPort = 1883))
+        assertEquals(1883, saved().mqttPort)
+        assertTrue(saved().hasMqtt)
+    }
+
+    @Test
+    fun `updating a connection with clearMqtt clears the mqttPort`() {
+        viewModel.addConnection(input().copy(mqttPort = 8883))
+        assertEquals(8883, saved().mqttPort)
+
+        viewModel.updateConnection("uat-eu", input().copy(clearMqtt = true))
+        assertNull(saved().mqttPort)
+        assertFalse(saved().hasMqtt)
+    }
+
+    @Test
+    fun `updating a connection with clearMqtt false and mqttPort null preserves existing mqttPort`() {
+        viewModel.addConnection(input().copy(mqttPort = 8883))
+        assertEquals(8883, saved().mqttPort)
+
+        viewModel.updateConnection("uat-eu", input().copy(host = "other.example", mqttPort = null, clearMqtt = false))
+        assertEquals(8883, saved().mqttPort)
+        assertEquals("other.example", saved().host)
+    }
 }

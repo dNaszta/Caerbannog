@@ -635,4 +635,50 @@ class ConnectionsScreenTlsUiTest {
         assertFalse(exists("TLS is always on", substring = true))
         assertTrue(exists("Use TLS"))
     }
+
+    // --- M6-01: MQTT UI tests -----------------------------------------------------------------------------------------
+
+    @Test
+    fun `mqtt plugin toggle is off by default for a new profile and shows no mqtt port field`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().assertIsOff()
+        assertFalse(exists("MQTT port", substring = true))
+    }
+
+    @Test
+    fun `toggling mqtt on shows the mqtt port field with 8883 when TLS is on`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().performClick()
+        waitForIdle()
+
+        onNodeWithTag("mqttPluginSwitch").assertIsOn()
+        assertTrue(exists("MQTT port (TLS)"))
+        assertEquals("8883", field("MQTT port (TLS)").text())
+    }
+
+    @Test
+    fun `toggling tls off changes the mqtt port field to plain port 1883`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().performClick()
+        waitForIdle()
+        assertEquals("8883", field("MQTT port (TLS)").text())
+
+        tlsSwitch().performClick()
+        waitForIdle()
+
+        assertTrue(exists("MQTT port"))
+        assertFalse(exists("MQTT port (TLS)"))
+        assertEquals("1883", field("MQTT port").text())
+    }
+
+    @Test
+    fun `a saved profile with mqttPort starts with MQTT toggle on and displays the port`() = runDesktopComposeUiTest(1280, 880) {
+        val mqttProfile = uat.copy(mqttPort = 8883)
+        show(mqttProfile)
+        select(mqttProfile.name)
+
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().assertIsOn()
+        assertTrue(exists("MQTT port (TLS)"))
+        assertEquals("8883", field("MQTT port (TLS)").text())
+    }
 }

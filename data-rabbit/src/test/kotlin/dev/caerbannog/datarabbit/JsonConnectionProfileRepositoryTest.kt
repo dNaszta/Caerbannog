@@ -314,4 +314,54 @@ class JsonConnectionProfileRepositoryTest {
 
         assertFailsWith<SerializationException> { JsonFileConnectionProfileRepository(file).list() }
     }
+
+    // --- M6-01: optional mqttPort in connections.json ----------------------------------------------------------------
+
+    @Test
+    fun `a file without mqttPort loads with mqttPort null and hasMqtt false`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        file.writeText(fixtureText())
+
+        val loaded = JsonFileConnectionProfileRepository(file).list()
+
+        assertTrue(loaded.all { it.mqttPort == null })
+        assertTrue(loaded.all { !it.hasMqtt })
+    }
+
+    @Test
+    fun `mqttPort round trips through a real JSON file`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        val repository = JsonFileConnectionProfileRepository(file)
+
+        repository.add(prodEu().copy(mqttPort = 8883))
+        val loaded = repository.list().single()
+
+        assertEquals(8883, loaded.mqttPort)
+        assertTrue(loaded.hasMqtt)
+        assertTrue(file.readText().contains("\"mqttPort\": 8883"))
+    }
+
+    @Test
+    fun `a profile without mqttPort does not write the mqttPort key`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        val repository = JsonFileConnectionProfileRepository(file)
+
+        repository.add(prodEu())
+        val written = file.readText()
+
+        assertFalse(written.contains("mqttPort"))
+    }
+
+    @Test
+    fun `updating a profile to clear mqttPort removes the mqttPort key`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        val repository = JsonFileConnectionProfileRepository(file)
+
+        repository.add(prodEu().copy(mqttPort = 1883))
+        assertTrue(file.readText().contains("mqttPort"))
+
+        repository.update(prodEu().copy(mqttPort = null))
+        assertFalse(file.readText().contains("mqttPort"))
+        assertNull(repository.list().single().mqttPort)
+    }
 }
