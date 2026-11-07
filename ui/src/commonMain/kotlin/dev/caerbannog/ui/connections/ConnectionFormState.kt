@@ -25,10 +25,18 @@ class ConnectionFormState(selected: ConnectionProfile?) {
     var caCertificatePath: String by mutableStateOf(selected?.caCertificatePath.orEmpty())
     var tls: Boolean by mutableStateOf(selected?.tls ?: true)
 
+    var enableMqtt: Boolean by mutableStateOf(selected?.mqttPort != null)
+
     /** Follow the TLS switch; the ports themselves are read-only (see [BrokerEndpoints.afterTlsSwitch]). */
     var ports: BrokerPorts by mutableStateOf(
-        selected?.let { BrokerPorts(it.streamPort, it.managementPort) } ?: BrokerEndpoints.defaultsFor(tls = true),
+        selected?.let { BrokerPorts(it.streamPort, it.managementPort, it.mqttPort) }
+            ?: BrokerEndpoints.defaultsFor(tls = true, enableMqtt = false),
     )
+
+    fun toggleMqtt(enabled: Boolean) {
+        enableMqtt = enabled
+        ports = ports.copy(mqtt = if (enabled) (ports.mqtt ?: BrokerEndpoints.defaultMqttPort(tls)) else null)
+    }
 
     /** The CA path is validated on focus loss or Save, and only if it changed since the last validation. */
     var caEdited: Boolean by mutableStateOf(false)
@@ -63,6 +71,8 @@ class ConnectionFormState(selected: ConnectionProfile?) {
         password = password.ifBlank { null },
         streamPort = ports.stream,
         managementPort = ports.management,
+        mqttPort = if (enableMqtt) ports.mqtt ?: BrokerEndpoints.defaultMqttPort(tls) else null,
+        clearMqtt = !enableMqtt && (saved?.mqttPort != null),
         tls = tls,
         caCertificatePath = caPathToSend(saved),
         topologyControlLevel = level,

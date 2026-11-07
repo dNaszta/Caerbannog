@@ -20,8 +20,12 @@ data class ConnectionProfile(
     val streamPort: Int = 5551,
     val managementPort: Int = 15671,
     val tls: Boolean = true,
+    /** Optional MQTT plugin port (e.g. 8883 TLS / 1883 plain). Null when the broker profile does not use MQTT. */
+    val mqttPort: Int? = null,
     val caCertificatePath: String? = null,
     val topologyControlLevel: TopologyControlLevel = TopologyControlLevel.READ_ONLY,
     /** The user's own claim, used only when permissions cannot be read. Saved with the profile; applied on Save through [ConnectionProfileInput.declaredPermissions]. */
     val declaredPermissions: DeclaredPermissions? = null,
-)
+) {
+    val hasMqtt: Boolean get() = mqttPort != null
+}

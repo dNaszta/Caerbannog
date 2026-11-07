@@ -153,4 +153,54 @@ class ConnectionFormStateTest {
         val storedNow = saved.copy(caCertificatePath = null)
         assertNull(form.toInput(storedNow).caCertificatePath)
     }
+
+    // --- M6-01: MQTT toggle and ports in form state -----------------------------------------------------------------
+
+    @Test
+    fun `a new form starts with MQTT disabled and mqtt port null`() {
+        val form = ConnectionFormState(null)
+        assertFalse(form.enableMqtt)
+        assertNull(form.ports.mqtt)
+        assertNull(form.toInput(null).mqttPort)
+        assertFalse(form.toInput(null).clearMqtt)
+    }
+
+    @Test
+    fun `a saved profile with mqttPort starts with MQTT enabled`() {
+        val form = ConnectionFormState(saved.copy(mqttPort = 8883))
+        assertEquals(true, form.enableMqtt)
+        assertEquals(8883, form.ports.mqtt)
+        assertEquals(8883, form.toInput(saved).mqttPort)
+        assertFalse(form.toInput(saved).clearMqtt)
+    }
+
+    @Test
+    fun `toggling MQTT on sets the default port based on TLS setting and sends it in input`() {
+        val form = ConnectionFormState(null)
+        form.toggleMqtt(true)
+        assertEquals(true, form.enableMqtt)
+        assertEquals(8883, form.ports.mqtt)
+        assertEquals(8883, form.toInput(null).mqttPort)
+
+        // With plain TLS off
+        val plainForm = ConnectionFormState(null).apply {
+            tls = false
+            ports = dev.caerbannog.core.connections.BrokerEndpoints.defaultsFor(tls = false)
+        }
+        plainForm.toggleMqtt(true)
+        assertEquals(1883, plainForm.ports.mqtt)
+        assertEquals(1883, plainForm.toInput(null).mqttPort)
+    }
+
+    @Test
+    fun `disabling MQTT on a profile that had MQTT sends clearMqtt true`() {
+        val profileWithMqtt = saved.copy(mqttPort = 8883)
+        val form = ConnectionFormState(profileWithMqtt)
+        form.toggleMqtt(false)
+        assertFalse(form.enableMqtt)
+        assertNull(form.ports.mqtt)
+        val input = form.toInput(profileWithMqtt)
+        assertNull(input.mqttPort)
+        assertEquals(true, input.clearMqtt)
+    }
 }
