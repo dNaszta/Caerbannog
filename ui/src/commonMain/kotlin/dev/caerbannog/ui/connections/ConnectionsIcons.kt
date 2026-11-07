@@ -33,9 +33,12 @@ import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material.icons.outlined.Tag
@@ -112,6 +115,10 @@ internal enum class AppIcon(val mockupName: String) {
     Tag("tag"),
     Clear("clear"),
     Send("send"),
+    PlayArrow("play_arrow"),
+    Download("download"),
+    Edit("edit"),
+    Rule("rule"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -157,6 +164,10 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Tag -> Icons.Outlined.Tag
     AppIcon.Clear -> Icons.Outlined.Clear
     AppIcon.Send -> Icons.Outlined.Send
+    AppIcon.PlayArrow -> Icons.Outlined.PlayArrow
+    AppIcon.Download -> Icons.Outlined.FileDownload
+    AppIcon.Edit -> Icons.Outlined.Edit
+    AppIcon.Rule -> Icons.Outlined.Check
 }
 
 /** `.ms.sm` in the mockup. */
