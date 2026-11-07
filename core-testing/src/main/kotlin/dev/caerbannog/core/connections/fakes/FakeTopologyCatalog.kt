@@ -115,10 +115,22 @@ class FakeTopologyCatalog : TopologyCatalog {
         }
     }
 
+    fun deleteExchange(name: String, vhost: String = "/") {
+        synchronized(exchangeRows) { exchangeRows.removeAll { it.vhost == vhost && it.name == name } }
+    }
+
     /** A declared binding (not the implicit default-exchange ones, those are always there). */
     fun addBinding(row: BindingRow): FakeTopologyCatalog = apply {
         vhosts += row.vhost
         bindingRows += row
+    }
+
+    fun deleteBinding(exchange: String, queue: String, routingKey: String = "", vhost: String = "/") {
+        synchronized(bindingRows) {
+            bindingRows.removeAll {
+                it.vhost == vhost && it.source == exchange && it.destination == queue && it.routingKey == routingKey
+            }
+        }
     }
 
     private fun put(entry: QueueEntry) {

@@ -48,6 +48,11 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     }
 
     private companion object {
-        val WITH_SCREEN = setOf(AppDestination.Connections, AppDestination.Streams, AppDestination.Topology)
+        val WITH_SCREEN = setOf(
+            AppDestination.Connections,
+            AppDestination.Streams,
+            AppDestination.Topology,
+            AppDestination.Migrations,
+        )
     }
 }

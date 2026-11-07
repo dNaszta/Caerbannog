@@ -90,12 +90,12 @@ class AppNavigationStreamTest {
     }
 
     @Test
-    fun `a drawer item without a screen changes nothing, the open stream stays`() {
+    fun `opening Migrations clears the stream selection and opens Migrations`() {
         val nav = onStreams()
         nav.openStream("a")
         nav.open(AppDestination.Migrations)
-        assertEquals("a", nav.selectedStream.value)
-        assertEquals(AppDestination.Streams, nav.screen.value)
+        assertNull(nav.selectedStream.value)
+        assertEquals(AppDestination.Migrations, nav.screen.value)
     }
 
     // M2-08c: Topology has a screen now. Like the Streams item it never leads back into an old stream.

@@ -27,10 +27,18 @@ import dev.caerbannog.ui.publish.PublishEvents
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.core.connections.deleteStreamGate
+import dev.caerbannog.core.migrations.ActionResult
+import dev.caerbannog.core.migrations.InMemoryMigrationFileRepository
+import dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository
+import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.migrations.MigrationRunner
+import dev.caerbannog.core.migrations.MigrationsViewModel
+import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.streams.StreamManagementViewModel
 import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
+import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.streams.StreamListEvents
 import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
@@ -63,7 +71,7 @@ fun main() = application {
         when (screen) {
             AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
             AppDestination.Topology -> TopologyWindowContent(composition, control)
-            // Migrations has no screen yet: AppNavigation never selects it.
+            AppDestination.Migrations -> MigrationsWindowContent(composition, control)
             else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
         }
     }
@@ -250,6 +258,61 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
+    )
+}
+
+/** The Migrations screen. */
+@Composable
+private fun MigrationsWindowContent(composition: AppComposition, control: ConnectionControlState) {
+    val connections by composition.viewModel.state.collectAsState()
+    val currentConn = connections.currentConnection
+    val scope = rememberCoroutineScope()
+    val source = composition.active.source
+    val connName = currentConn?.name.orEmpty()
+    val vhost = source?.vhost ?: "/"
+    val done = currentConn?.status as? PermissionCheckStatus.Done
+    val canConfigure = done?.result?.topologyUnlocked ?: false
+    val controlLevel = dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL
+
+    val fileRepo = remember { InMemoryMigrationFileRepository() }
+    val historyRepo = remember { InMemoryMigrationHistoryRepository() }
+    val executor = remember(composition.active) {
+        object : TopologyMigrationExecutor {
+            override suspend fun execute(action: MigrationAction): ActionResult {
+                return ActionResult.Success
+            }
+        }
+    }
+    val runner = remember(historyRepo, executor) { MigrationRunner(historyRepo, executor) }
+    val migrationsVm = remember(connName, vhost, canConfigure, controlLevel) {
+        MigrationsViewModel(
+            fileRepository = fileRepo,
+            runner = runner,
+            topologyCatalog = composition.active.source?.topology,
+            profileName = connName,
+            vhost = vhost,
+            hasConfigurePermission = canConfigure,
+            controlLevel = controlLevel,
+            scope = scope,
+        )
+    }
+    val state by migrationsVm.state.collectAsState()
+
+    MigrationsScreen(
+        state = state,
+        onSelectVersion = migrationsVm::selectVersion,
+        onApplyPending = { scope.launch { migrationsVm.applyPending() } },
+        onApplySingle = { scope.launch { migrationsVm.applySingle(it) } },
+        onImportJson = { scope.launch { migrationsVm.importFile(it) } },
+        onExportTopology = { scope.launch { migrationsVm.exportCurrentTopology() } },
+        onUpdateFile = { ver, json ->
+            scope.launch {
+                fileRepo.updateFile(ver, json)
+                migrationsVm.loadMigrations()
+            }
+        },
+        onValidateAgain = migrationsVm::loadMigrations,
+        onDismissError = migrationsVm::dismissError,
     )
 }
 
