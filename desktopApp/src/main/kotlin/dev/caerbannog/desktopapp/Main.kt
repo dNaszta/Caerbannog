@@ -3,6 +3,7 @@ package dev.caerbannog.desktopapp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,7 +18,12 @@ import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.MessageBrowserViewModel
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.publish.PublishMessageViewModel
+import dev.caerbannog.core.publish.PublishTargetKind
+import dev.caerbannog.core.publish.UnavailableMessagePublisher
 import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
+import dev.caerbannog.ui.publish.PublishEvents
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.ui.appframe.AppDestination
@@ -87,6 +93,29 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
     }
     val browserState = browserVm?.state?.collectAsState()?.value ?: fallbackState
     val browserEvents = remember(browserVm) { browserVm?.let(::MessageBrowserEventsAdapter) ?: EmptyMessageBrowserEvents }
+    val connections by composition.viewModel.state.collectAsState()
+    val currentConn = connections.currentConnection
+    val done = currentConn?.status as? PermissionCheckStatus.Done
+    val canWrite = done?.result?.publishingEnabled ?: false
+    val connName = currentConn?.name.orEmpty()
+    val vhost = source?.vhost ?: "/"
+    val publisher = source?.publisher ?: UnavailableMessagePublisher
+    val publishVm = remember(connName, vhost, canWrite, publisher, stream) {
+        PublishMessageViewModel(
+            publisher = publisher,
+            connectionName = connName,
+            vhost = vhost,
+            writePermission = canWrite,
+            scope = scope,
+            initialTargetKind = PublishTargetKind.STREAM,
+            initialTargetName = stream,
+        )
+    }
+    var showPublishDialog by remember(stream) { mutableStateOf(false) }
+    val publishState = publishVm.state.collectAsState().value
+    val publishEvents = remember(publishVm) {
+        PublishEventsAdapter(publishVm, onClose = { showPublishDialog = false })
+    }
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -98,6 +127,10 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         onNavigate = composition.navigation::open,
         browserState = browserState,
         browserEvents = browserEvents,
+        publishState = publishState,
+        publishEvents = publishEvents,
+        showPublishDialog = showPublishDialog,
+        onOpenPublishDialog = { showPublishDialog = true },
     )
 }
 

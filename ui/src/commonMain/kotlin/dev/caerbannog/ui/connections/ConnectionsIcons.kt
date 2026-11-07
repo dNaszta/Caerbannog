@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ArrowDropDown
@@ -110,6 +111,7 @@ internal enum class AppIcon(val mockupName: String) {
     ContentCopy("content_copy"),
     Tag("tag"),
     Clear("clear"),
+    Send("send"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -154,6 +156,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.ContentCopy -> Icons.Outlined.ContentCopy
     AppIcon.Tag -> Icons.Outlined.Tag
     AppIcon.Clear -> Icons.Outlined.Clear
+    AppIcon.Send -> Icons.Outlined.Send
 }
 
 /** `.ms.sm` in the mockup. */
