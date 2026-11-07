@@ -25,9 +25,11 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.topology.BindingRowView
 import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.ExchangeRowView
+import dev.caerbannog.core.topology.MqttClientRowView
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyState
+import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.SmallIconSize
@@ -63,6 +65,16 @@ private val BindingColumns = listOf(
     TableColumn("Arguments", "Arguments", 260.dp),
 )
 
+private val MqttColumns = listOf(
+    TableColumn("ClientId", "Client ID", 220.dp, emphasis = true),
+    TableColumn("User", "User", 110.dp),
+    TableColumn("Protocol", "Protocol", 110.dp),
+    TableColumn("PeerAddress", "Peer address", 160.dp),
+    TableColumn("Connected", "Duration", 90.dp),
+    TableColumn("CleanSession", "Clean session", 110.dp),
+    TableColumn("Subscriptions", "Subscriptions", 260.dp),
+)
+
 /** The table of the current tab (and, on Queues, the detail of the selected queue under it) in one vertical scroller. */
 @Composable
 internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, loading: Boolean) {
@@ -89,9 +101,7 @@ internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, load
                     BindingsTable(state, loading)
                 }
             }
-            dev.caerbannog.core.topology.TopologyTab.Mqtt -> {
-                // MQTT clients table will be fully implemented in M6-03
-            }
+            dev.caerbannog.core.topology.TopologyTab.Mqtt -> MqttClientsTable(state, loading)
         }
         if (detail != null && !loading) QueueDetail(detail, events::selectQueue)
     }
@@ -166,3 +176,52 @@ private fun bindingRow(index: Int, binding: BindingRowView) = TableRowSpec(
     cellKey = index.toString(),
     cells = listOf(binding.source, binding.destination, binding.destinationType, binding.routingKey, binding.arguments),
 )
+
+@Composable
+private fun MqttClientsTable(state: TopologyState, loading: Boolean) {
+    TopologyTable("mqttClientsTable", MqttColumns, if (loading) null else state.mqttClients.map(::mqttRow), state.stale)
+}
+
+private fun mqttRow(client: MqttClientRowView): TableRowSpec {
+    val subsText = if (client.subscriptions.isEmpty()) {
+        TopologyTexts.NOT_APPLICABLE
+    } else {
+        client.subscriptions.joinToString { "${it.topic} (QoS ${it.qos})" }
+    }
+    return TableRowSpec(
+        rowTag = "mqttRow:${client.clientId}",
+        cellKey = client.clientId,
+        cells = listOf(
+            client.clientId,
+            client.username,
+            client.protocol,
+            client.peerAddress,
+            client.connectedDuration,
+            client.cleanSession,
+            subsText,
+        ),
+        decorations = mapOf(
+            "ClientId" to CellDecoration(leading = true) {
+                MqttStatusPill(client.connected, client.clientId)
+            },
+        ),
+    )
+}
+
+@Composable
+private fun MqttStatusPill(connected: Boolean, clientId: String) {
+    val bg = if (connected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (connected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val text = if (connected) "Active" else "Offline"
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = fg,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(end = 8.dp)
+            .testTag("mqttStatusPill:$clientId")
+            .background(bg, RoundedCornerShape(8.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
