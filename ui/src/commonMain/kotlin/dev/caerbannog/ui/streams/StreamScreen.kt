@@ -23,11 +23,18 @@ import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +52,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.publish.PublishGate
+import dev.caerbannog.core.publish.PublishMessageState
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
@@ -57,6 +66,8 @@ import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+import dev.caerbannog.ui.publish.PublishEvents
+import dev.caerbannog.ui.publish.PublishTestMessageDialog
 
 /** Events out of the stream screen (M2-06b). Every one is asynchronous in the view model; read the result from the state. */
 interface StreamClientsEvents {
@@ -98,6 +109,10 @@ fun StreamScreen(
     browserState: dev.caerbannog.core.browser.MessageBrowserState? = null,
     browserEvents: MessageBrowserEvents = EmptyMessageBrowserEvents,
     initialTab: Int = 0,
+    publishState: PublishMessageState? = null,
+    publishEvents: PublishEvents? = null,
+    showPublishDialog: Boolean = false,
+    onOpenPublishDialog: () -> Unit = {},
 ) {
     val tabs = remember(stream, state, events, browserState, browserEvents) {
         if (browserState != null) {
@@ -110,30 +125,76 @@ fun StreamScreen(
         }
     }
     var selected by remember(stream, initialTab, tabs.size) { mutableIntStateOf(initialTab.coerceIn(0, tabs.lastIndex)) }
-    AppFrame(
-        title = stream,
-        control = control,
-        events = controlEvents,
-        onNavigate = onNavigate,
-        // The stream screen is a level below Streams: the drawer keeps Streams selected.
-        activeItem = AppDestination.Streams.name,
-        leading = {
-            IconButton(
-                onClick = events::back,
-                modifier = Modifier.testTag("backArrow").semantics { contentDescription = StreamClientsTexts.BACK_TO_STREAMS },
-            ) { ConnectionIcon(AppIcon.ArrowBack, IconSize) }
-        },
-        actions = { ClientsActions(state, nowMillis, events) },
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            TabList(tabs, selected) { selected = it }
-            Box(Modifier.weight(1f).fillMaxWidth()) { tabs[selected].content() }
+    Box(Modifier.fillMaxSize()) {
+        AppFrame(
+            title = stream,
+            control = control,
+            events = controlEvents,
+            onNavigate = onNavigate,
+            // The stream screen is a level below Streams: the drawer keeps Streams selected.
+            activeItem = AppDestination.Streams.name,
+            leading = {
+                IconButton(
+                    onClick = events::back,
+                    modifier = Modifier.testTag("backArrow").semantics { contentDescription = StreamClientsTexts.BACK_TO_STREAMS },
+                ) { ConnectionIcon(AppIcon.ArrowBack, IconSize) }
+            },
+            actions = { ClientsActions(state, nowMillis, events, publishState, onOpenPublishDialog) },
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                TabList(tabs, selected) { selected = it }
+                Box(Modifier.weight(1f).fillMaxWidth()) { tabs[selected].content() }
+            }
+        }
+        if (showPublishDialog && publishState != null && publishEvents != null) {
+            PublishTestMessageDialog(
+                state = publishState,
+                events = publishEvents,
+            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RowScope.ClientsActions(state: StreamClientsState, nowMillis: Long, events: StreamClientsEvents) {
+private fun RowScope.ClientsActions(
+    state: StreamClientsState,
+    nowMillis: Long,
+    events: StreamClientsEvents,
+    publishState: PublishMessageState?,
+    onOpenPublishDialog: () -> Unit,
+) {
+    if (publishState != null) {
+        val gate = publishState.gate
+        val reason = (gate as? PublishGate.Disabled)?.reason
+        val button = @Composable {
+            FilledTonalButton(
+                onClick = onOpenPublishDialog,
+                enabled = reason == null,
+                modifier = Modifier
+                    .testTag("publishTestMessageButton")
+                    .semantics {
+                        if (reason != null) {
+                            contentDescription = reason
+                        }
+                    },
+            ) {
+                ConnectionIcon(AppIcon.Send, SmallIconSize)
+                Spacer(Modifier.width(8.dp))
+                Text("Publish test message")
+            }
+        }
+        if (reason == null) {
+            button()
+        } else {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text(reason) } },
+                state = rememberTooltipState(),
+            ) { button() }
+        }
+    }
+
     UpdatedAge.text(nowMillis, state.updatedAtMillis)?.let { age ->
         Text(
             age,

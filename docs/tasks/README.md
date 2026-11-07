@@ -84,7 +84,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
 | M5-01-publish-test-message-core | Publish test message engine, models, and BDD scenarios | M5 | done (architect: Accepted, 2026-11-07; branch `m5-01-publish-test-message-core`; 10 unit tests green, 8 BDD scenarios green) |
-| M5-02-publish-test-message-ui | Publish test message dialog and Compose UI tests | M5 | planned |
+| M5-02-publish-test-message-ui | Publish test message dialog and Compose UI tests | M5 | done (architect: Accepted, 2026-11-07; branch `m5-02-publish-test-message-ui`; 12 Compose UI tests green) |
 | M5-03-stream-management-create-delete | Create and delete streams with typed confirmation | M5 | planned |
 | M5-04-topology-migrations | Topology migrations runner and UI | M5 | planned |
 | M5-05-verify-host-name | Per-profile "Verify host name" switch (D7) | M5 | planned |
