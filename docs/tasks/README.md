@@ -95,7 +95,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
 | M6-01-mqtt-connection-profile | MQTT port in ConnectionProfile, validation, and profile form UI | M6 | done (architect: Accepted, 2026-11-07; branch `m6-01-mqtt-connection-profile`; all tests green) |
-| M6-02-mqtt-topology-core-and-data | Management API MQTT parser, MqttCatalog, and TopologyViewModel MQTT tab | M6 | planned |
+| M6-02-mqtt-topology-core-and-data | Management API MQTT parser, MqttCatalog, and TopologyViewModel MQTT tab | M6 | done (architect: Accepted, 2026-11-07; branch `m6-02-mqtt-topology-core-and-data`; all tests green) |
 | M6-03-mqtt-topology-ui | MQTT Tab in Topology screen (Client Sessions, Subscriptions, QoS) | M6 | planned |
 | M6-04-mqtt-sender-engine | MQTT publisher engine (QoS 0/1/2, Retain) with BDD scenarios | M6 | planned |
 | M6-05-mqtt-sender-ui | "Publish MQTT Message" dialog and Compose UI tests | M6 | planned |

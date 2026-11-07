@@ -1,5 +1,7 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
 import dev.caerbannog.core.streams.PublisherRow
@@ -284,6 +286,108 @@ internal object ManagementJson {
     /** Only `name` is read; the rest of each object is the broker's statistics. */
     fun parseVhosts(body: String): CatalogResult<List<VhostRow>> = guarded(body) { root ->
         CatalogResult.Success(root.asArray().map { VhostRow(it.asObject().requiredString("name")) })
+    }
+
+    private val MQTT_SUBSCRIPTION_REGEX = Regex("""^mqtt-subscription-(.*)qos([0-2])$""")
+
+    /**
+     * M6-02: Parses active MQTT connections from `/api/connections` and correlates them with topic
+     * subscriptions from `/api/bindings/{vhost}`.
+     */
+    fun parseMqttClients(
+        connectionsBody: String,
+        bindingsBody: String? = null,
+        vhost: String? = null,
+    ): CatalogResult<List<MqttClientRow>> = guarded(connectionsBody) { root ->
+        val subscriptionsByClient = mutableMapOf<String, MutableList<MqttSubscription>>()
+        if (!bindingsBody.isNullOrBlank()) {
+            try {
+                val bindingsRoot = Json.parseToJsonElement(bindingsBody)
+                val bindingObjects = (bindingsRoot as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+                for (b in bindingObjects) {
+                    if (vhost != null && b.string("vhost") != null && b.string("vhost") != vhost) continue
+                    val dest = b.string("destination").orEmpty()
+                    if (!dest.startsWith("mqtt-subscription-")) continue
+                    val match = MQTT_SUBSCRIPTION_REGEX.matchEntire(dest)
+                    val (clientId, qos) = if (match != null) {
+                        match.groupValues[1] to match.groupValues[2].toInt()
+                    } else {
+                        dest.removePrefix("mqtt-subscription-") to 0
+                    }
+                    val routingKey = b.string("routing_key").orEmpty()
+                    val topic = routingKey.replace('.', '/').replace('*', '+')
+                    subscriptionsByClient.getOrPut(clientId) { mutableListOf() }
+                        .add(MqttSubscription(topic = topic, qos = qos))
+                }
+            } catch (_: Exception) {
+                // Ignore bindings parsing failures: subscriptions stay empty
+            }
+        }
+
+        val connList = root.asArray().mapNotNull { it as? JsonObject }
+            .filter { conn ->
+                val protocol = conn.string("protocol").orEmpty()
+                protocol.startsWith("MQTT", ignoreCase = true) &&
+                    (vhost == null || conn.string("vhost") == null || conn.string("vhost") == vhost)
+            }
+
+        val seenClientIds = mutableSetOf<String>()
+        val activeClients = connList.map { conn ->
+            val clientProps = conn["client_properties"] as? JsonObject
+            val connectionName = conn.string("name")
+            val clientId = clientProps?.string("client_id")
+                ?: clientProps?.string("connection_name")
+                ?: connectionName.orEmpty()
+            seenClientIds += clientId
+
+            val connVhost = conn.string("vhost") ?: "/"
+            val user = conn.string("user").orEmpty()
+            val peerHost = conn.string("peer_host").orEmpty()
+            val peerPort = (conn["peer_port"] as? JsonPrimitive)?.longOrNull?.toInt() ?: 0
+            val protocol = conn.string("protocol").orEmpty()
+            val connectedAt = (conn["connected_at"] as? JsonPrimitive)?.longOrNull
+            val ssl = (conn["ssl"] as? JsonPrimitive)?.booleanOrNull ?: false
+            val cleanSession = (clientProps?.get("clean_start") as? JsonPrimitive)?.booleanOrNull
+                ?: (clientProps?.get("clean_session") as? JsonPrimitive)?.booleanOrNull
+
+            val subs = subscriptionsByClient[clientId].orEmpty().distinct()
+
+            MqttClientRow(
+                clientId = clientId,
+                connectionName = connectionName,
+                vhost = connVhost,
+                username = user,
+                peerHost = peerHost,
+                peerPort = peerPort,
+                protocol = protocol,
+                connectedAt = connectedAt,
+                ssl = ssl,
+                cleanSession = cleanSession,
+                subscriptions = subs,
+                connected = true,
+            )
+        }
+
+        val offlineClients = subscriptionsByClient
+            .filterKeys { it !in seenClientIds }
+            .map { (clientId, subs) ->
+                MqttClientRow(
+                    clientId = clientId,
+                    connectionName = null,
+                    vhost = vhost ?: "/",
+                    username = "",
+                    peerHost = "",
+                    peerPort = 0,
+                    protocol = "MQTT",
+                    connectedAt = null,
+                    ssl = false,
+                    cleanSession = false,
+                    subscriptions = subs.distinct(),
+                    connected = false,
+                )
+            }
+
+        CatalogResult.Success(activeClients + offlineClients)
     }
 
     // A count the broker has not sent (or sent as text) is null, never 0: the screen shows "n/a".

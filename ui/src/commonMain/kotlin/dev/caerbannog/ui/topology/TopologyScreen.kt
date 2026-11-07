@@ -113,7 +113,7 @@ private fun TabbedBody(state: TopologyState, events: TopologyEvents) {
         state.connectionBanner?.let { LostConnectionBanner(it, state.action ?: TopologyTexts.RETRY, events::retry, tag = "topologyConnectionBanner") }
         // Only the first reason is drawn (owner decision O1); the list may hold more, and a loop here would stack banners.
         state.banners.firstOrNull()?.let { TopologyReasonBanner(it) }
-        TopologyTabs(state.tab, events::setTab)
+        TopologyTabs(state.tab, events::setTab, state.hasMqtt)
         when (val screen = state.screen) {
             is Screen.VhostUnavailable -> {
                 TopologyControls(state, events, searchAndFilters = false)

@@ -89,6 +89,9 @@ internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, load
                     BindingsTable(state, loading)
                 }
             }
+            dev.caerbannog.core.topology.TopologyTab.Mqtt -> {
+                // MQTT clients table will be fully implemented in M6-03
+            }
         }
         if (detail != null && !loading) QueueDetail(detail, events::selectQueue)
     }

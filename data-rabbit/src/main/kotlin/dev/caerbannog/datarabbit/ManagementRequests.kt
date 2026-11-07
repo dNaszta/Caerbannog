@@ -66,6 +66,9 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M2-08a (spike S-E): the vhosts the broker lists for this user. Never `/api/vhosts/{name}`, which only an administrator may read. */
     fun vhosts(): String = "$base/api/vhosts"
 
+    /** M6-02: every connection of the broker (client connections, including MQTT). */
+    fun connections(): String = "$base/api/connections"
+
     // URLEncoder makes a space "+", which a path segment does not understand.
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 

@@ -32,10 +32,25 @@ sealed interface TopologyScreen {
     data class Failed(val reason: String) : TopologyScreen
 }
 
-enum class TopologyTab { Queues, Exchanges, Bindings }
+enum class TopologyTab { Queues, Exchanges, Bindings, Mqtt }
 
 /** The two chips of the Queues tab; exclusive, [Quorum] by default. "Other types" is every non-quorum, non-stream queue. */
 enum class QueueTypeFilter { Quorum, OtherTypes }
+
+/** One MQTT client row on the MQTT tab of the Topology screen. */
+data class MqttClientRowView(
+    val clientId: String,
+    val connectionName: String,
+    val username: String,
+    val peerAddress: String,
+    val protocol: String,
+    val connectedDuration: String,
+    val ssl: Boolean,
+    val cleanSession: String,
+    val subscriptionCount: Int,
+    val subscriptions: List<dev.caerbannog.core.mqtt.MqttSubscription>,
+    val connected: Boolean,
+)
 
 /** One queue row. [membersOnline] is "2 of 3"; a classic queue has no leader and no members: both read [TopologyTexts.NOT_APPLICABLE]. A null count reads "n/a", never 0. */
 data class QueueRowView(
@@ -114,9 +129,11 @@ data class TopologyState(
     val showVhostSwitch: Boolean = false,
     /** M2-08f1: the connection's own virtual host, set only when [vhosts] contains it; null when omitted or CannotRead. */
     val homeVhost: String? = null,
+    val hasMqtt: Boolean = false,
     val queues: List<QueueRowView> = emptyList(),
     val exchanges: List<ExchangeRowView> = emptyList(),
     val bindings: List<BindingRowView> = emptyList(),
+    val mqttClients: List<MqttClientRowView> = emptyList(),
     val showDefaultExchange: Boolean = false,
     val bindingsView: BindingsViewMode = BindingsViewMode.Table,
     val graph: BindingGraph? = null,
@@ -157,6 +174,7 @@ object TopologyTexts {
     const val NO_QUEUES: String = "There are no queues in this virtual host yet."
     const val NO_EXCHANGES: String = "There are no exchanges in this virtual host yet."
     const val NO_BINDINGS: String = "There are no bindings in this virtual host yet."
+    const val NO_MQTT_CLIENTS: String = "There are no MQTT client connections in this virtual host."
     const val LOAD_FAILED: String = "Topology could not be loaded. Check that the broker is reachable and that this user may use it."
     const val APPROXIMATE: String = "Queue counts are approximate: the broker updates them every few seconds."
     const val HOME_VHOST_CAPTION: String = "This connection's virtual host"

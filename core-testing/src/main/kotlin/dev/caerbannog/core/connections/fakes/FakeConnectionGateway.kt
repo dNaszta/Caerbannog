@@ -65,6 +65,7 @@ class FakeConnectionGateway(
         override val messages: StreamMessageReader = FakeStreamMessageReader(),
         override val publisher: MessagePublisher = FakeMessagePublisher(),
         override val manager: StreamManager = FakeStreamManager(),
+        override val mqtt: dev.caerbannog.core.mqtt.MqttCatalog = FakeMqttCatalog(),
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -99,6 +100,7 @@ class FakeConnectionGateway(
     private val messageReaders = ConcurrentHashMap<String, FakeStreamMessageReader>()
     private val publishers = ConcurrentHashMap<String, FakeMessagePublisher>()
     private val managers = ConcurrentHashMap<String, FakeStreamManager>()
+    private val mqttCatalogs = ConcurrentHashMap<String, FakeMqttCatalog>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -167,6 +169,9 @@ class FakeConnectionGateway(
     /** M5-03: the stream manager every connection opened for [profileName] exposes. */
     fun managerOf(profileName: String): FakeStreamManager = managers.getOrPut(profileName) { FakeStreamManager(catalogOf(profileName)) }
 
+    /** M6-02: the MQTT catalog every connection opened for [profileName] exposes. */
+    fun mqttOf(profileName: String): FakeMqttCatalog = mqttCatalogs.getOrPut(profileName) { FakeMqttCatalog() }
+
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
@@ -216,6 +221,7 @@ class FakeConnectionGateway(
             messages = messagesOf(name),
             publisher = publisherOf(name),
             manager = managerOf(name),
+            mqtt = mqttOf(name),
         )
         opened += held
         log += "opened:$name#${held.number}"
