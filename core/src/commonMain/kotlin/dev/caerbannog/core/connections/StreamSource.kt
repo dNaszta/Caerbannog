@@ -14,10 +14,13 @@ import dev.caerbannog.core.streams.FirstOffset
 import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.streams.StreamManagementResult
+import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.SuperStreamLayout
+import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
@@ -40,6 +43,8 @@ class StreamSource(
     val messages: StreamMessageReader,
     /** M5-01: the test message publisher of the same held connection, guarded like [catalog]. */
     val publisher: MessagePublisher = UnavailableMessagePublisher,
+    /** M5-03: the stream manager of the same held connection, guarded like [catalog]. */
+    val manager: StreamManager = UnavailableStreamManager,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -97,3 +102,15 @@ internal class GuardedPublisher(
     override suspend fun publish(request: PublishMessageRequest): PublishOutcome =
         if (isCurrent()) inner.publish(request) else PublishOutcome.Failed("Connection closed")
 }
+
+internal class GuardedStreamManager(
+    private val inner: StreamManager,
+    private val isCurrent: () -> Boolean,
+) : StreamManager {
+    override suspend fun createStream(vhost: String, name: String): StreamManagementResult =
+        if (isCurrent()) inner.createStream(vhost, name) else StreamManagementResult.Failed("Connection closed")
+
+    override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
+        if (isCurrent()) inner.deleteStream(vhost, name) else StreamManagementResult.Failed("Connection closed")
+}
+

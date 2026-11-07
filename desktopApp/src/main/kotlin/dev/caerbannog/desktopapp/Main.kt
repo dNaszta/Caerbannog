@@ -26,12 +26,17 @@ import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
 import dev.caerbannog.ui.publish.PublishEvents
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.caerbannog.core.connections.createStreamGate
+import dev.caerbannog.core.connections.deleteStreamGate
+import dev.caerbannog.core.streams.StreamManagementViewModel
+import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
+import dev.caerbannog.ui.streams.StreamListEvents
 import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
 import dev.caerbannog.ui.topology.TopologyScreen
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * M1-05: renders the real Connections screen. M2-03 part 2: all wiring lives in [createAppComposition]
@@ -116,6 +121,22 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
     val publishEvents = remember(publishVm) {
         PublishEventsAdapter(publishVm, onClose = { showPublishDialog = false })
     }
+    val manager = source?.manager ?: UnavailableStreamManager
+    val canConfigure = done?.result?.topologyUnlocked ?: false
+    val managementVm = remember(connName, vhost, canConfigure, manager, stream) {
+        StreamManagementViewModel(
+            manager = manager,
+            connectionName = connName,
+            vhost = vhost,
+            configurePermission = canConfigure,
+            existingStreams = { emptySet() },
+            consumerCounts = { clients.consumers.size },
+            onStreamDeleted = { composition.streamList.refreshNow() },
+            scope = scope,
+        )
+    }
+    val deleteState by managementVm.deleteState.collectAsState()
+    val deleteGate = deleteStreamGate(currentConn, composition.active.state.collectAsState().value)
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -131,6 +152,18 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         publishEvents = publishEvents,
         showPublishDialog = showPublishDialog,
         onOpenPublishDialog = { showPublishDialog = true },
+        deleteStreamState = deleteState,
+        deleteStreamGate = deleteGate,
+        onDeleteConfirmationChange = managementVm::setDeleteConfirmation,
+        onConfirmDelete = {
+            scope.launch {
+                if (managementVm.confirmDelete()) {
+                    composition.navigation.closeStream()
+                }
+            }
+        },
+        onCancelDelete = managementVm::closeDelete,
+        onOpenDeleteDialog = { managementVm.openDelete(stream, clients.consumers.size) },
     )
 }
 
@@ -153,16 +186,55 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
     val list by composition.streamList.state.collectAsState()
     val link by composition.active.state.collectAsState()
     val connections by composition.viewModel.state.collectAsState()
+    val source = composition.active.source
+    val scope = rememberCoroutineScope()
+    val currentConn = connections.currentConnection
+    val done = currentConn?.status as? PermissionCheckStatus.Done
+    val canConfigure = done?.result?.topologyUnlocked ?: false
+    val connName = currentConn?.name.orEmpty()
+    val vhost = source?.vhost ?: "/"
+    val manager = source?.manager ?: UnavailableStreamManager
+
+    val managementVm = remember(connName, vhost, canConfigure, manager) {
+        StreamManagementViewModel(
+            manager = manager,
+            connectionName = connName,
+            vhost = vhost,
+            configurePermission = canConfigure,
+            existingStreams = { list.rows.map { it.name }.toSet() },
+            onStreamCreated = { composition.streamList.refreshNow() },
+            onStreamDeleted = { composition.streamList.refreshNow() },
+            scope = scope,
+        )
+    }
+    val createState by managementVm.createState.collectAsState()
+    val deleteState by managementVm.deleteState.collectAsState()
+    val streamEvents = remember(composition.streamEvents, managementVm) {
+        object : StreamListEvents by composition.streamEvents {
+            override fun createStream() {
+                managementVm.openCreate()
+            }
+        }
+    }
+
     val now = rememberNowMillis()
     StreamsScreen(
         state = list,
         nowMillis = now,
         createStream = createStreamGate(connections.currentConnection, link),
-        events = composition.streamEvents,
+        events = streamEvents,
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
         onOpenStream = composition.navigation::openStream,
+        createStreamState = createState,
+        onCreateNameChange = managementVm::setCreateName,
+        onConfirmCreate = { scope.launch { managementVm.confirmCreate() } },
+        onCancelCreate = managementVm::closeCreate,
+        deleteStreamState = deleteState,
+        onDeleteConfirmationChange = managementVm::setDeleteConfirmation,
+        onConfirmDelete = { scope.launch { managementVm.confirmDelete() } },
+        onCancelDelete = managementVm::closeDelete,
     )
 }
 

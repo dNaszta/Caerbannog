@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -49,11 +50,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.connections.DeleteStreamGate
 import dev.caerbannog.core.publish.PublishGate
 import dev.caerbannog.core.publish.PublishMessageState
+import dev.caerbannog.core.streams.DeleteStreamState
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
@@ -113,6 +117,12 @@ fun StreamScreen(
     publishEvents: PublishEvents? = null,
     showPublishDialog: Boolean = false,
     onOpenPublishDialog: () -> Unit = {},
+    deleteStreamState: DeleteStreamState? = null,
+    deleteStreamGate: DeleteStreamGate = DeleteStreamGate.Enabled,
+    onDeleteConfirmationChange: (String) -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    onCancelDelete: () -> Unit = {},
+    onOpenDeleteDialog: () -> Unit = {},
 ) {
     val tabs = remember(stream, state, events, browserState, browserEvents) {
         if (browserState != null) {
@@ -139,7 +149,18 @@ fun StreamScreen(
                     modifier = Modifier.testTag("backArrow").semantics { contentDescription = StreamClientsTexts.BACK_TO_STREAMS },
                 ) { ConnectionIcon(AppIcon.ArrowBack, IconSize) }
             },
-            actions = { ClientsActions(state, nowMillis, events, publishState, onOpenPublishDialog) },
+            actions = {
+                ClientsActions(
+                    state = state,
+                    nowMillis = nowMillis,
+                    events = events,
+                    publishState = publishState,
+                    onOpenPublishDialog = onOpenPublishDialog,
+                    deleteStreamState = deleteStreamState,
+                    deleteStreamGate = deleteStreamGate,
+                    onOpenDeleteDialog = onOpenDeleteDialog,
+                )
+            },
         ) {
             Column(Modifier.fillMaxSize()) {
                 TabList(tabs, selected) { selected = it }
@@ -150,6 +171,14 @@ fun StreamScreen(
             PublishTestMessageDialog(
                 state = publishState,
                 events = publishEvents,
+            )
+        }
+        if (deleteStreamState != null && deleteStreamState.isOpen) {
+            DeleteStreamDialog(
+                state = deleteStreamState,
+                onConfirmationChange = onDeleteConfirmationChange,
+                onConfirm = onConfirmDelete,
+                onCancel = onCancelDelete,
             )
         }
     }
@@ -163,6 +192,9 @@ private fun RowScope.ClientsActions(
     events: StreamClientsEvents,
     publishState: PublishMessageState?,
     onOpenPublishDialog: () -> Unit,
+    deleteStreamState: DeleteStreamState? = null,
+    deleteStreamGate: DeleteStreamGate = DeleteStreamGate.Enabled,
+    onOpenDeleteDialog: () -> Unit = {},
 ) {
     if (publishState != null) {
         val gate = publishState.gate
@@ -192,6 +224,41 @@ private fun RowScope.ClientsActions(
                 tooltip = { PlainTooltip { Text(reason) } },
                 state = rememberTooltipState(),
             ) { button() }
+        }
+    }
+
+    if (deleteStreamState != null) {
+        val deleteReason = (deleteStreamGate as? DeleteStreamGate.Disabled)?.reason
+        val deleteBtn = @Composable {
+            FilledTonalButton(
+                onClick = onOpenDeleteDialog,
+                enabled = deleteReason == null,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+                modifier = Modifier
+                    .testTag("deleteStreamButton")
+                    .semantics {
+                        contentDescription = "Delete stream"
+                        if (deleteReason != null) {
+                            stateDescription = deleteReason
+                        }
+                    },
+            ) {
+                ConnectionIcon(AppIcon.Delete, SmallIconSize)
+                Spacer(Modifier.width(8.dp))
+                Text("Delete stream")
+            }
+        }
+        if (deleteReason == null) {
+            deleteBtn()
+        } else {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text(deleteReason) } },
+                state = rememberTooltipState(),
+            ) { deleteBtn() }
         }
     }
 

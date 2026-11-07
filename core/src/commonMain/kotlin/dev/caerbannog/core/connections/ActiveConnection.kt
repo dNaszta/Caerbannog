@@ -142,6 +142,7 @@ class ActiveConnection(
             topology = GuardedTopology(connection.topology, isCurrent),
             messages = GuardedMessageReader(connection.messages, isCurrent),
             publisher = GuardedPublisher(connection.publisher, isCurrent),
+            manager = GuardedStreamManager(connection.manager, isCurrent),
         )
     }
 
