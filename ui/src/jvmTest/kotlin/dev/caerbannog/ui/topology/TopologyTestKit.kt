@@ -8,6 +8,7 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import dev.caerbannog.core.topology.BindingRowView
 import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.ExchangeRowView
+import dev.caerbannog.core.topology.MqttClientRowView
 import dev.caerbannog.core.topology.QueueDetailView
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
@@ -107,6 +108,11 @@ internal fun exchangesState(rows: List<ExchangeRowView>, search: String = "") = 
 internal fun bindingsState(rows: List<BindingRowView>, showDefault: Boolean = false, search: String = "") = TopologyState(
     screen = Screen.Ready, message = null, tab = TopologyTab.Bindings, search = search, vhost = "/", vhosts = listOf("/", "billing"), showVhostSwitch = true,
     bindings = rows, showDefaultExchange = showDefault, total = rows.size, rangeText = "1 to ${rows.size} of ${rows.size}",
+)
+
+internal fun mqttState(rows: List<MqttClientRowView>, search: String = "", hasMqtt: Boolean = true) = TopologyState(
+    screen = Screen.Ready, message = null, tab = TopologyTab.Mqtt, search = search, vhost = "/", vhosts = listOf("/", "billing"), showVhostSwitch = true,
+    hasMqtt = hasMqtt, mqttClients = rows, total = rows.size, rangeText = "1 to ${rows.size} of ${rows.size}",
 )
 
 /** A state without rows: [screen] with the message and action the view model gives it. The tab and the switch as given. */
