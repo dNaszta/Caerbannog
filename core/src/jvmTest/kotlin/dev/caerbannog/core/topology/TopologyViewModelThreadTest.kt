@@ -140,11 +140,13 @@ class TopologyViewModelThreadTest {
                     TopologyTab.Queues -> s.queues.size
                     TopologyTab.Exchanges -> s.exchanges.size
                     TopologyTab.Bindings -> s.bindings.size
+                    TopologyTab.Mqtt -> s.mqttClients.size
                 }
                 if (shown > s.pageSize) return "$shown rows on a page of ${s.pageSize}"
                 if (s.tab != TopologyTab.Queues && s.queues.isNotEmpty()) return "queue rows on the ${s.tab} tab"
                 if (s.tab != TopologyTab.Exchanges && s.exchanges.isNotEmpty()) return "exchange rows on the ${s.tab} tab"
                 if (s.tab != TopologyTab.Bindings && s.bindings.isNotEmpty()) return "binding rows on the ${s.tab} tab"
+                if (s.tab != TopologyTab.Mqtt && s.mqttClients.isNotEmpty()) return "mqtt rows on the ${s.tab} tab"
                 if (s.tab == TopologyTab.Queues) s.queues.firstOrNull { !it.name.contains(s.search, ignoreCase = true) }?.let { return "row ${it.name} does not match '${s.search}'" }
                 if (shown > 0) {
                     val start = (s.page - 1) * s.pageSize

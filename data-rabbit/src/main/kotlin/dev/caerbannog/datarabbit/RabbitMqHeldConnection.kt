@@ -2,6 +2,8 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.HeldConnection
+import dev.caerbannog.core.mqtt.MqttCatalog
+import dev.caerbannog.core.mqtt.UnavailableMqttCatalog
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamManager
@@ -22,6 +24,7 @@ class RabbitMqHeldConnection(
     override val messages: StreamMessageReader,
     override val publisher: MessagePublisher,
     override val manager: StreamManager = UnavailableStreamManager,
+    override val mqtt: MqttCatalog = UnavailableMqttCatalog,
     private val resources: List<AutoCloseable>,
     private val log: (String) -> Unit,
 ) : HeldConnection {

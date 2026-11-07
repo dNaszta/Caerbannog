@@ -61,14 +61,15 @@ class RabbitMqHeldConnectionTest {
 
     private fun holder(vararg resources: AutoCloseable) =
         RabbitMqHeldConnection(
-            StubCatalog,
-            StubOffsets,
-            StubTopology,
-            StubMessageReader,
-            StubPublisher,
-            StubStreamManager,
-            resources.toList(),
-        ) { lines += it }
+            catalog = StubCatalog,
+            offsets = StubOffsets,
+            topology = StubTopology,
+            messages = StubMessageReader,
+            publisher = StubPublisher,
+            manager = StubStreamManager,
+            resources = resources.toList(),
+            log = { lines += it },
+        )
 
     @Test
     fun `close closes every resource once`() {

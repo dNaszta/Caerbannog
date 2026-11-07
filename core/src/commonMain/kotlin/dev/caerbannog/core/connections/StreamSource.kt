@@ -3,6 +3,9 @@ package dev.caerbannog.core.connections
 import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.StreamMessageReader
+import dev.caerbannog.core.mqtt.MqttCatalog
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.UnavailableMqttCatalog
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.publish.PublishMessageRequest
 import dev.caerbannog.core.publish.PublishOutcome
@@ -45,6 +48,8 @@ class StreamSource(
     val publisher: MessagePublisher = UnavailableMessagePublisher,
     /** M5-03: the stream manager of the same held connection, guarded like [catalog]. */
     val manager: StreamManager = UnavailableStreamManager,
+    /** M6-02: the MQTT catalog of the same held connection, guarded like [catalog]. */
+    val mqtt: MqttCatalog = UnavailableMqttCatalog,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -112,5 +117,16 @@ internal class GuardedStreamManager(
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
         if (isCurrent()) inner.deleteStream(vhost, name) else StreamManagementResult.Failed("Connection closed")
+}
+
+internal class GuardedMqttCatalog(
+    private val inner: MqttCatalog,
+    private val isCurrent: () -> Boolean,
+) : MqttCatalog {
+    private suspend fun <T> guarded(call: suspend () -> CatalogResult<T>): CatalogResult<T> =
+        if (isCurrent()) call() else CatalogResult.Unreachable
+
+    override suspend fun listClients(vhost: String?): CatalogResult<List<MqttClientRow>> =
+        guarded { inner.listClients(vhost) }
 }
 

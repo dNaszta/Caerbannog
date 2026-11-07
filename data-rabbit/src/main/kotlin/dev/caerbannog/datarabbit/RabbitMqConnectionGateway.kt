@@ -61,6 +61,7 @@ class RabbitMqConnectionGateway(
                 manager = RabbitMqStreamManager(environments),
                 resources = listOf(environments, http),
                 log = log,
+                mqtt = ManagementMqttCatalog(http, requests),
             ),
         )
     }

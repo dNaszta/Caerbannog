@@ -143,6 +143,7 @@ class ActiveConnection(
             messages = GuardedMessageReader(connection.messages, isCurrent),
             publisher = GuardedPublisher(connection.publisher, isCurrent),
             manager = GuardedStreamManager(connection.manager, isCurrent),
+            mqtt = GuardedMqttCatalog(connection.mqtt, isCurrent),
         )
     }
 

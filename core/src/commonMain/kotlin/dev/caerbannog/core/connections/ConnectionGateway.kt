@@ -48,4 +48,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M5-03: stream creator and deleter over stream and management protocols. */
     val manager: StreamManager get() = UnavailableStreamManager
+
+    /** M6-02: MQTT topology and sessions over management API. */
+    val mqtt: dev.caerbannog.core.mqtt.MqttCatalog get() = dev.caerbannog.core.mqtt.UnavailableMqttCatalog
 }

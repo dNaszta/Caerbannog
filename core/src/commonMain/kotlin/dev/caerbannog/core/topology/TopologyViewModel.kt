@@ -8,6 +8,7 @@ import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.StreamSource
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.permissionBanner
+import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.DEFAULT_PAGE_SIZE
@@ -72,6 +73,7 @@ class TopologyViewModel(
     private var queues: List<QueueRow>? = null
     private var exchanges: List<ExchangeRow>? = null
     private var bindings: List<BindingRow>? = null
+    private var mqttClients: List<MqttClientRow>? = null
 
     private var lastSuccessMillis: Long? = null
     private var stale = false
@@ -136,6 +138,7 @@ class TopologyViewModel(
         // The old tab's rows go; the bindings stay while a selected queue still needs them.
         exchanges = null
         if (selectedName == null) bindings = null
+        if (tab != TopologyTab.Mqtt) mqttClients = null
         failedFirstLoad = false
         render()
         if (canRun() && needsLoad()) source?.let(loop::loadNow)
@@ -161,6 +164,7 @@ class TopologyViewModel(
         queues = null
         exchanges = null
         bindings = null
+        mqttClients = null
         selectedName = null
         searches.clear()
         page = 1
@@ -266,6 +270,7 @@ class TopologyViewModel(
         queues = null
         exchanges = null
         bindings = null
+        mqttClients = null
         selectedName = null
         searches.clear()
         page = 1
@@ -285,7 +290,9 @@ class TopologyViewModel(
 
     private fun needsBindings(): Boolean = tab == TopologyTab.Bindings || selectedName != null
 
-    private fun needsLoad(): Boolean = (needsExchanges() && exchanges == null) || (needsBindings() && bindings == null)
+    private fun needsMqtt(): Boolean = tab == TopologyTab.Mqtt
+
+    private fun needsLoad(): Boolean = (needsExchanges() && exchanges == null) || (needsBindings() && bindings == null) || (needsMqtt() && mqttClients == null)
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod")
     private suspend fun loadOnce(src: StreamSource) {
@@ -316,10 +323,16 @@ class TopologyViewModel(
         } else {
             null
         }
+        val newMqtt = if (needsMqtt()) {
+            readOne(src) { src.mqtt.listClients(target) } ?: return
+        } else {
+            null
+        }
 
         queues = newQueues
         exchanges = newExchanges
         bindings = newBindings
+        mqttClients = newMqtt
         if (selectedName != null && newQueues.none { it.name == selectedName }) selectedName = null
         lastSuccessMillis = clock.nowMillis()
         stale = false
@@ -375,6 +388,7 @@ class TopologyViewModel(
         queues = null
         exchanges = null
         bindings = null
+        mqttClients = null
         selectedName = null
         offered = null
         cannotRead = true
@@ -387,6 +401,7 @@ class TopologyViewModel(
         queues = null
         exchanges = null
         bindings = null
+        mqttClients = null
         selectedName = null
         vhostUnavailable = true
         stale = false
@@ -401,6 +416,7 @@ class TopologyViewModel(
         TopologyTab.Queues -> queues
         TopologyTab.Exchanges -> exchanges
         TopologyTab.Bindings -> bindings
+        TopologyTab.Mqtt -> mqttClients
     }
 
     private fun search(): String = searches[tab].orEmpty()
@@ -426,10 +442,49 @@ class TopologyViewModel(
         matches(it.source) || matches(it.destination) || matches(it.routingKey)
     }
 
+    private fun mqttView(row: MqttClientRow): MqttClientRowView {
+        val peerAddress = if (row.peerHost.isNotEmpty() && row.peerPort > 0) "${row.peerHost}:${row.peerPort}" else TopologyTexts.NOT_APPLICABLE
+        val connectedDuration = if (row.connectedAt != null && row.connectedAt > 0L) {
+            val diffSec = ((clock.nowMillis() - row.connectedAt) / 1000L).coerceAtLeast(0L)
+            when {
+                diffSec < 60 -> "${diffSec}s"
+                diffSec < 3600 -> "${diffSec / 60}m"
+                diffSec < 86400 -> "${diffSec / 3600}h"
+                else -> "${diffSec / 86400}d"
+            }
+        } else TopologyTexts.NOT_APPLICABLE
+        val cleanSession = when (row.cleanSession) {
+            true -> "Yes"
+            false -> "No"
+            null -> TopologyTexts.NOT_APPLICABLE
+        }
+        return MqttClientRowView(
+            clientId = row.clientId,
+            connectionName = row.connectionName ?: row.clientId,
+            username = row.username.ifEmpty { TopologyTexts.NOT_APPLICABLE },
+            peerAddress = peerAddress,
+            protocol = row.protocol,
+            connectedDuration = connectedDuration,
+            ssl = row.ssl,
+            cleanSession = cleanSession,
+            subscriptionCount = row.subscriptions.size,
+            subscriptions = row.subscriptions,
+            connected = row.connected,
+        )
+    }
+
+    private fun mqttViews(): List<MqttClientRowView> =
+        mqttClients.orEmpty()
+            .map(::mqttView)
+            .filter { view ->
+                matches(view.clientId) || matches(view.username) || view.subscriptions.any { matches(it.topic) }
+            }
+
     private fun filteredCount(): Int = when (tab) {
         TopologyTab.Queues -> queueViews().size
         TopologyTab.Exchanges -> exchangeViews().size
         TopologyTab.Bindings -> bindingViews().size
+        TopologyTab.Mqtt -> mqttViews().size
     }
 
     private fun pageCount(total: Int): Int = ((total + pageSize - 1) / pageSize).coerceAtLeast(1)
@@ -442,6 +497,7 @@ class TopologyViewModel(
         TopologyTab.Queues -> queues.orEmpty().isEmpty()
         TopologyTab.Exchanges -> exchanges.orEmpty().isEmpty()
         TopologyTab.Bindings -> visibleBindings().isEmpty()
+        TopologyTab.Mqtt -> mqttClients.orEmpty().isEmpty()
     }
 
     private fun screen(): TopologyScreen {
@@ -462,6 +518,7 @@ class TopologyViewModel(
         TopologyTab.Queues -> TopologyTexts.NO_QUEUES
         TopologyTab.Exchanges -> TopologyTexts.NO_EXCHANGES
         TopologyTab.Bindings -> TopologyTexts.NO_BINDINGS
+        TopologyTab.Mqtt -> TopologyTexts.NO_MQTT_CLIENTS
     }
 
     private fun vhostsOffered(): List<String> {
@@ -475,14 +532,16 @@ class TopologyViewModel(
         val queueRows = if (tab == TopologyTab.Queues) queueViews() else emptyList()
         val exchangeRows = if (tab == TopologyTab.Exchanges) exchangeViews() else emptyList()
         val bindingRows = if (tab == TopologyTab.Bindings) bindingViews() else emptyList()
-        val total = queueRows.size + exchangeRows.size + bindingRows.size
+        val mqttRows = if (tab == TopologyTab.Mqtt) mqttViews() else emptyList()
+        val total = queueRows.size + exchangeRows.size + bindingRows.size + mqttRows.size
         val current = page.coerceIn(1, pageCount(total))
         val start = (current - 1) * pageSize
         val screen = screen()
         val shownQueues = queueRows.pageOf(current)
         val shownExchanges = exchangeRows.pageOf(current)
         val shownBindings = bindingRows.pageOf(current)
-        val shownCount = shownQueues.size + shownExchanges.size + shownBindings.size
+        val shownMqtt = mqttRows.pageOf(current)
+        val shownCount = shownQueues.size + shownExchanges.size + shownBindings.size + shownMqtt.size
         val offeredVhosts = if (cannotRead) emptyList() else vhostsOffered()
         val computedGraph = if (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph && !cannotRead) {
             val ex = exchanges.orEmpty()
@@ -517,9 +576,11 @@ class TopologyViewModel(
             vhosts = offeredVhosts,
             showVhostSwitch = offeredVhosts.isNotEmpty(),
             homeVhost = if (screen != TopologyScreen.CannotRead && offeredVhosts.contains(home)) home else null,
+            hasMqtt = context.value?.profile?.hasMqtt ?: false,
             queues = shownQueues,
             exchanges = shownExchanges,
             bindings = shownBindings,
+            mqttClients = shownMqtt,
             showDefaultExchange = showDefaultExchange,
             bindingsView = bindingsView,
             graph = computedGraph,

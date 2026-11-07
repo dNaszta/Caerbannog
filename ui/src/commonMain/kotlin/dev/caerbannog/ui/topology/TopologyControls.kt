@@ -55,12 +55,13 @@ import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
 
-/** The tab row (Queues, Exchanges, Bindings). Each tab is one tab stop: click, Enter or Space selects it. */
+/** The tab row (Queues, Exchanges, Bindings, and optionally Mqtt). Each tab is one tab stop: click, Enter or Space selects it. */
 @Composable
-internal fun TopologyTabs(current: TopologyTab, onSelect: (TopologyTab) -> Unit) {
+internal fun TopologyTabs(current: TopologyTab, onSelect: (TopologyTab) -> Unit, hasMqtt: Boolean = false) {
+    val tabs = if (hasMqtt) TopologyTab.entries else TopologyTab.entries.filter { it != TopologyTab.Mqtt }
     Column(Modifier.fillMaxWidth()) {
         Row {
-            TopologyTab.entries.forEach { tab ->
+            tabs.forEach { tab ->
                 val on = tab == current
                 val label = tab.name
                 Box(
@@ -111,6 +112,9 @@ internal fun TopologyControls(state: TopologyState, events: TopologyEvents, sear
                     TopologySearchField("bindingSearch", "Search bindings", state.search, events::setSearch)
                     BindingsViewSwitch(state.bindingsView, events::setBindingsView)
                     DefaultExchangeSwitch(state.showDefaultExchange, events::setShowDefaultExchange)
+                }
+                TopologyTab.Mqtt -> {
+                    TopologySearchField("mqttSearch", "Search MQTT clients", state.search, events::setSearch)
                 }
             }
         }
