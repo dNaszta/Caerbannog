@@ -4,7 +4,9 @@ import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.streams.StreamCatalog
+import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
+import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.TopologyCatalog
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -19,6 +21,7 @@ class RabbitMqHeldConnection(
     override val topology: TopologyCatalog,
     override val messages: StreamMessageReader,
     override val publisher: MessagePublisher,
+    override val manager: StreamManager = UnavailableStreamManager,
     private val resources: List<AutoCloseable>,
     private val log: (String) -> Unit,
 ) : HeldConnection {

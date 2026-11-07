@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.CreateStreamGate
+import dev.caerbannog.core.streams.CreateStreamState
+import dev.caerbannog.core.streams.DeleteStreamState
 import dev.caerbannog.core.streams.StreamClientsTexts
 import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListScreen
@@ -102,20 +104,46 @@ fun StreamsScreen(
     onNavigate: (AppDestination) -> Unit = {},
     /** The name cell of a row is a link: click or Enter calls this with the stream name (M2-06b). */
     onOpenStream: (String) -> Unit = {},
+    createStreamState: CreateStreamState? = null,
+    onCreateNameChange: (String) -> Unit = {},
+    onConfirmCreate: () -> Unit = {},
+    onCancelCreate: () -> Unit = {},
+    deleteStreamState: DeleteStreamState? = null,
+    onDeleteConfirmationChange: (String) -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    onCancelDelete: () -> Unit = {},
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
         currentEvents.setShown(true)
         onDispose { currentEvents.setShown(false) }
     }
-    AppFrame(
-        title = AppDestination.Streams.name,
-        control = control,
-        events = controlEvents,
-        onNavigate = onNavigate,
-        actions = { StreamsActions(state, nowMillis, createStream, events) },
-    ) {
-        StreamsBody(state, createStream, events, onOpenStream)
+    Box(Modifier.fillMaxSize()) {
+        AppFrame(
+            title = AppDestination.Streams.name,
+            control = control,
+            events = controlEvents,
+            onNavigate = onNavigate,
+            actions = { StreamsActions(state, nowMillis, createStream, events) },
+        ) {
+            StreamsBody(state, createStream, events, onOpenStream)
+        }
+        if (createStreamState != null && createStreamState.isOpen) {
+            CreateStreamDialog(
+                state = createStreamState,
+                onNameChange = onCreateNameChange,
+                onConfirm = onConfirmCreate,
+                onCancel = onCancelCreate,
+            )
+        }
+        if (deleteStreamState != null && deleteStreamState.isOpen) {
+            DeleteStreamDialog(
+                state = deleteStreamState,
+                onConfirmationChange = onDeleteConfirmationChange,
+                onConfirm = onConfirmDelete,
+                onCancel = onCancelDelete,
+            )
+        }
     }
 }
 

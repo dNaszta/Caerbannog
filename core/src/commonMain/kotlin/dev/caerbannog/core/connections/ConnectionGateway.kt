@@ -4,7 +4,9 @@ import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.publish.UnavailableMessagePublisher
 import dev.caerbannog.core.streams.StreamCatalog
+import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
+import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.TopologyCatalog
 
 /**
@@ -43,4 +45,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M5-01: test message publisher over stream and management protocols. */
     val publisher: MessagePublisher get() = UnavailableMessagePublisher
+
+    /** M5-03: stream creator and deleter over stream and management protocols. */
+    val manager: StreamManager get() = UnavailableStreamManager
 }

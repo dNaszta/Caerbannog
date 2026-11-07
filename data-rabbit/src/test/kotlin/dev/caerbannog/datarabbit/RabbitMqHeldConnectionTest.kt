@@ -13,6 +13,8 @@ import dev.caerbannog.core.streams.FirstOffset
 import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.streams.StreamManagementResult
+import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
@@ -58,7 +60,15 @@ class RabbitMqHeldConnectionTest {
     private val lines: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     private fun holder(vararg resources: AutoCloseable) =
-        RabbitMqHeldConnection(StubCatalog, StubOffsets, StubTopology, StubMessageReader, StubPublisher, resources.toList()) { lines += it }
+        RabbitMqHeldConnection(
+            StubCatalog,
+            StubOffsets,
+            StubTopology,
+            StubMessageReader,
+            StubPublisher,
+            StubStreamManager,
+            resources.toList(),
+        ) { lines += it }
 
     @Test
     fun `close closes every resource once`() {
@@ -127,6 +137,7 @@ class RabbitMqHeldConnectionTest {
         assertSame(StubOffsets, held.offsets)
         assertSame(StubTopology, held.topology)
         assertSame(StubPublisher, held.publisher)
+        assertSame(StubStreamManager, held.manager)
     }
 }
 
@@ -160,4 +171,12 @@ private object StubMessageReader : StreamMessageReader {
 private object StubPublisher : MessagePublisher {
     override suspend fun publish(request: PublishMessageRequest): PublishOutcome =
         PublishOutcome.Failed("Stub")
+}
+
+private object StubStreamManager : StreamManager {
+    override suspend fun createStream(vhost: String, name: String): StreamManagementResult =
+        StreamManagementResult.Failed("Stub")
+
+    override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
+        StreamManagementResult.Failed("Stub")
 }
