@@ -67,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.MetricSparkline
+import dev.caerbannog.core.streams.PartitionBalanceInfo
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.ui.components.CopyableText
@@ -214,12 +215,14 @@ private fun SizeHeader(scale: Float) {
 
 @Composable
 private fun DataRow(row: StreamRow, scale: Float, state: StreamListState, events: StreamListEvents, onOpen: (String) -> Unit) {
+    val partitionBalance = if (row.kind == StreamRowKind.Partition) state.partitionBalances[row.name] else null
     Column(Modifier.testTag("streamRow:${row.name}")) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column.entries.forEach { column ->
                 when (column) {
                     Column.Name -> NameCell(row, scale, events, onOpen)
-                    Column.Messages -> MessagesCell(row, state.messageSparklines[row.name], scale)
+                    Column.Messages -> MessagesCell(row, state.messageSparklines[row.name], partitionBalance, scale)
+                    Column.Consumers -> ConsumersCell(row, partitionBalance, scale)
                     else -> CopyableCell(column.cell(row), "cell:${row.name}:${column.name}", column, scale, MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -230,7 +233,12 @@ private fun DataRow(row: StreamRow, scale: Float, state: StreamListState, events
 }
 
 @Composable
-private fun MessagesCell(row: StreamRow, sparkline: MetricSparkline?, scale: Float) {
+private fun MessagesCell(
+    row: StreamRow,
+    sparkline: MetricSparkline?,
+    partitionBalance: PartitionBalanceInfo?,
+    scale: Float,
+) {
     Column(
         Modifier.width(Column.Messages.width * scale).padding(horizontal = CellPadding, vertical = 4.dp),
         horizontalAlignment = Alignment.End,
@@ -242,10 +250,42 @@ private fun MessagesCell(row: StreamRow, sparkline: MetricSparkline?, scale: Flo
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.End,
         )
+        if (partitionBalance != null) {
+            PartitionBalanceBadge(
+                balance = partitionBalance,
+                tag = "partitionBalance:${row.name}",
+            )
+        }
         if (sparkline != null) {
             MetricSparklineBadge(
                 sparkline = sparkline,
                 tag = "streamSparkline:${row.name}",
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConsumersCell(
+    row: StreamRow,
+    partitionBalance: PartitionBalanceInfo?,
+    scale: Float,
+) {
+    Column(
+        Modifier.width(Column.Consumers.width * scale).padding(horizontal = CellPadding, vertical = 4.dp),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        CopyableText(
+            text = Column.Consumers.cell(row),
+            tag = "cell:${row.name}:${Column.Consumers.name}",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End,
+        )
+        if (partitionBalance?.isOrphaned == true) {
+            PartitionOrphanedWarningBadge(
+                partitionName = row.name,
+                tag = "partitionOrphanedWarning:${row.name}",
             )
         }
     }
