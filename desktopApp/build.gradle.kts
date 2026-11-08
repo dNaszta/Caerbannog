@@ -51,6 +51,12 @@ compose.desktop {
             // jpackage requires MAJOR > 0 (dotted MAJOR[.MINOR][.PATCH]); this is a packaging-format
             // version, unrelated to any app-visible version string.
             packageVersion = "1.0.0"
+            // Add required Java modules that are not included by default in the bundled JRE.
+            // java.net.http is required by Ktor client for HTTP requests (HttpClient, HttpRequest, etc.)
+            // Note: javax.net.ssl.* classes are in java.base in Java 11+, so no need for java.ssl module.
+            modules("java.net.http")
+            // Rabbit icon for the application (RabbitMQ logo)
+            macOS.iconFile.set(file("src/main/resources/rabbit.icns"))
         }
     }
 }
