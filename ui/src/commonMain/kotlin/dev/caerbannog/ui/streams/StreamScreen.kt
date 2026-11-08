@@ -124,10 +124,15 @@ fun StreamScreen(
     onCancelDelete: () -> Unit = {},
     onOpenDeleteDialog: () -> Unit = {},
 ) {
+    val currentEvents by rememberUpdatedState(events)
+    DisposableEffect(stream) {
+        currentEvents.show(stream)
+        onDispose { currentEvents.hide() }
+    }
     val tabs = remember(stream, state, events, browserState, browserEvents) {
         if (browserState != null) {
             listOf(
-                StreamTab(MESSAGES_TAB) { MessageBrowserView(browserState, browserEvents) },
+                StreamTab(MESSAGES_TAB) { MessageBrowserView(browserState, browserEvents, consumers = state.consumers) },
                 StreamTab(PUBLISHERS_TAB) { ClientsTab(stream, state, events) },
             )
         } else {
@@ -307,11 +312,6 @@ private fun TabList(tabs: List<StreamTab>, selected: Int, onSelect: (Int) -> Uni
 /** The tab. It tells the view model it is shown for [stream] while it is in the composition (D3). */
 @Composable
 private fun ClientsTab(stream: String, state: StreamClientsState, events: StreamClientsEvents) {
-    val currentEvents by rememberUpdatedState(events)
-    DisposableEffect(stream) {
-        currentEvents.show(stream)
-        onDispose { currentEvents.hide() }
-    }
     when (val screen = state.screen) {
         StreamClientsScreen.Content, StreamClientsScreen.Loading -> ClientsSections(state, loading = screen == StreamClientsScreen.Loading, events)
         StreamClientsScreen.PluginMissing -> ClientsScroll {
