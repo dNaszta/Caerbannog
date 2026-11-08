@@ -20,12 +20,14 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,7 +100,12 @@ internal fun TopologyTabs(current: TopologyTab, onSelect: (TopologyTab) -> Unit,
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun TopologyControls(state: TopologyState, events: TopologyEvents, searchAndFilters: Boolean) {
+internal fun TopologyControls(
+    state: TopologyState,
+    events: TopologyEvents,
+    searchAndFilters: Boolean,
+    onOpenPublishMqtt: (() -> Unit)? = null,
+) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.showVhostSwitch) VhostSwitch(state.vhost, state.vhosts, state.homeVhost, events::selectVhost)
         if (searchAndFilters) {
@@ -115,6 +122,16 @@ internal fun TopologyControls(state: TopologyState, events: TopologyEvents, sear
                 }
                 TopologyTab.Mqtt -> {
                     TopologySearchField("mqttSearch", "Search MQTT clients", state.search, events::setSearch)
+                    if (onOpenPublishMqtt != null) {
+                        Button(
+                            onClick = onOpenPublishMqtt,
+                            modifier = Modifier.testTag("publishMqttButton"),
+                        ) {
+                            ConnectionIcon(AppIcon.Add, SmallIconSize)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Publish message")
+                        }
+                    }
                 }
             }
         }

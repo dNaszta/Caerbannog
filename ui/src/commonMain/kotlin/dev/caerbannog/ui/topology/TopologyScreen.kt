@@ -31,6 +31,9 @@ import dev.caerbannog.core.topology.TopologyScreen as Screen
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTab
 import dev.caerbannog.core.topology.TopologyTexts
+import dev.caerbannog.core.mqtt.PublishMqttState
+import dev.caerbannog.ui.mqtt.PublishMqttDialog
+import dev.caerbannog.ui.mqtt.PublishMqttEvents
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrame
 import dev.caerbannog.ui.connections.AppIcon
@@ -53,6 +56,10 @@ fun TopologyScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
+    showPublishMqttDialog: Boolean = false,
+    publishMqttState: PublishMqttState? = null,
+    publishMqttEvents: PublishMqttEvents? = null,
+    onOpenPublishMqttDialog: (() -> Unit)? = null,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
@@ -66,7 +73,13 @@ fun TopologyScreen(
         onNavigate = onNavigate,
         actions = { TopologyActions(state, nowMillis, events) },
     ) {
-        TopologyBody(state, events)
+        TopologyBody(state, events, onOpenPublishMqttDialog)
+    }
+    if (showPublishMqttDialog && publishMqttState != null && publishMqttEvents != null) {
+        PublishMqttDialog(
+            state = publishMqttState,
+            events = publishMqttEvents,
+        )
     }
 }
 
@@ -94,7 +107,11 @@ private fun RowScope.TopologyActions(state: TopologyState, nowMillis: Long, even
 }
 
 @Composable
-private fun TopologyBody(state: TopologyState, events: TopologyEvents) {
+private fun TopologyBody(
+    state: TopologyState,
+    events: TopologyEvents,
+    onOpenPublishMqtt: (() -> Unit)? = null,
+) {
     when (val screen = state.screen) {
         Screen.NotConnected, Screen.Connecting -> TopologyMessage(state.message)
         Screen.CannotRead -> TopologyMessage(state.message, AppIcon.Block)
@@ -102,13 +119,17 @@ private fun TopologyBody(state: TopologyState, events: TopologyEvents) {
             val label = state.action ?: TopologyTexts.RETRY
             Button(onClick = events::retry, modifier = Modifier.testTag("retryButton").semantics { text = AnnotatedString(label) }) { Text(label) }
         }
-        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable -> TabbedBody(state, events)
+        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable -> TabbedBody(state, events, onOpenPublishMqtt)
     }
 }
 
 /** The screens that have the tab row: banners, tabs, the controls of the current tab, then the table or a message. */
 @Composable
-private fun TabbedBody(state: TopologyState, events: TopologyEvents) {
+private fun TabbedBody(
+    state: TopologyState,
+    events: TopologyEvents,
+    onOpenPublishMqtt: (() -> Unit)? = null,
+) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         state.connectionBanner?.let { LostConnectionBanner(it, state.action ?: TopologyTexts.RETRY, events::retry, tag = "topologyConnectionBanner") }
         // Only the first reason is drawn (owner decision O1); the list may hold more, and a loop here would stack banners.
@@ -116,19 +137,19 @@ private fun TabbedBody(state: TopologyState, events: TopologyEvents) {
         TopologyTabs(state.tab, events::setTab, state.hasMqtt)
         when (val screen = state.screen) {
             is Screen.VhostUnavailable -> {
-                TopologyControls(state, events, searchAndFilters = false)
+                TopologyControls(state, events, searchAndFilters = false, onOpenPublishMqtt = onOpenPublishMqtt)
                 TopologyMessage(state.message ?: TopologyTexts.vhostUnavailable(screen.vhost), AppIcon.Block, Modifier.weight(1f))
             }
             Screen.Empty -> {
-                TopologyControls(state, events, searchAndFilters = true)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
                 TopologyMessage(state.message, AppIcon.Inbox, Modifier.weight(1f))
             }
             Screen.Loading -> {
-                TopologyControls(state, events, searchAndFilters = true)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
                 Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = true) }
             }
             else -> {
-                TopologyControls(state, events, searchAndFilters = true)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
                 Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = false) }
                 if (!(state.tab == TopologyTab.Bindings && state.bindingsView == BindingsViewMode.Graph)) {
                     TopologyFooter(state, events)
