@@ -2,6 +2,7 @@ package dev.caerbannog.ui.topology
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
@@ -110,6 +111,18 @@ class TopologyDetailAndSafetyUiTest {
         node("detailClose").performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }
         waitForIdle()
         assertEquals(listOf("selectQueue:null", "selectQueue:null"), events.sent())
+    }
+
+    @Test
+    fun `when the queue list has many rows the selected queue detail stays docked in the viewport without scrolling`() = runDesktopComposeUiTest(1280, 800) {
+        val fiftyQueues = (1..50).map { queue("orders-$it") }
+        screen(queuesState(rows = fiftyQueues, selected = mockupDetail.copy(name = "orders-1")))
+        node("queueDetail").assertExists()
+        val detailBounds = node("queueDetail").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            detailBounds.bottom <= 800f,
+            "Expected docked queueDetail to remain inside the 800dp viewport even with 50 queue rows, got $detailBounds",
+        )
     }
 
     // --- T4 and the safety rule ---

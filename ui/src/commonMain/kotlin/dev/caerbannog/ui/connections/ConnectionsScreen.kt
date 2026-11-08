@@ -175,11 +175,21 @@ private fun EditPanel(
     val scrollState = rememberScrollState()
     Row(modifier = modifier) {
         Column(
-            modifier = Modifier.weight(1f).verticalScroll(scrollState).padding(end = 12.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)).padding(16.dp),
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .padding(end = 12.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp))
+                .padding(16.dp),
         ) {
-            Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(if (selected == null) "New connection" else "Edit connection", style = MaterialTheme.typography.titleLarge)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
 
             ConnectionFieldGrid(
                 listOf(
@@ -254,7 +264,7 @@ private fun EditPanel(
                 Text(caResult.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             TopologyControlSelector(
                 level = form.level,
                 onChange = { picked ->
@@ -275,7 +285,7 @@ private fun EditPanel(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             DeclaredPermissionsSection(
                 declares = form.declares,
                 configure = form.declaredConfigure,
@@ -285,12 +295,12 @@ private fun EditPanel(
                 onWriteChange = { form.declaredWrite = it },
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             if (selected != null) {
                 PermissionCheckSection(permissionBanner(selected, state.permissionChecks[selected.name]))
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             TlsSwitchRow(
                 tls = form.tls,
                 onChange = { now ->
@@ -300,14 +310,14 @@ private fun EditPanel(
             )
 
             if (form.tls) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 VerifyHostNameRow(
                     verifyHostName = form.verifyHostName,
                     onChange = { form.verifyHostName = it },
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             MqttPluginSection(
                 enabled = form.enableMqtt,
                 tls = form.tls,
@@ -325,9 +335,13 @@ private fun EditPanel(
                 ErrorBanner("A connection named '${collision.name}' already exists.")
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             // FlowRow: with the button icons the three buttons no longer fit one line in a narrow panel (Save was squeezed).
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().testTag("editPanelActionBar"),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 if (selected != null) {
                     TextButton(onClick = { onDeleteRequest(selected.name) }) {
                         ConnectionIcon(AppIcon.Delete, SmallIconSize)

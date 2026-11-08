@@ -44,6 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
@@ -171,7 +176,7 @@ fun MessageBrowserView(
                     )
                 }
 
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.retentionShiftNotice?.let { notice ->
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
@@ -227,13 +232,13 @@ private fun FilterBar(state: MessageBrowserState.Loaded, events: MessageBrowserE
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth().testTag("browserFilterBar"),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
@@ -276,7 +281,7 @@ private fun FilterBar(state: MessageBrowserState.Loaded, events: MessageBrowserE
                         "Scan limit: 10,000",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
 
@@ -304,13 +309,13 @@ private fun FilterBar(state: MessageBrowserState.Loaded, events: MessageBrowserE
 private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowserEvents) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth().testTag("browserControls"),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 StartModeSegmentedGroup(state.startMode, events)
@@ -349,14 +354,8 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
                     TimestampSeekControls(mode.epochMs, events)
                 }
 
-                PageSizeSelector(state.pageSize, events::setPageSize)
-            }
+                Spacer(Modifier.weight(1f))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
                 OutlinedButton(
                     onClick = events::previousPage,
                     enabled = state.canGoPrevious,
@@ -388,6 +387,8 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("browserSummary"),
                 )
+
+                PageSizeSelector(state.pageSize, events::setPageSize)
             }
         }
     }
@@ -514,7 +515,39 @@ private fun MessagesTable(
     Surface(
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier.fillMaxWidth().testTag("messagesTable"),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("messagesTable")
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && state.messages.isNotEmpty()) {
+                    val currentIndex = state.selectedMessage?.let { sel ->
+                        state.messages.indexOfFirst { it.offset == sel.offset }
+                    } ?: -1
+                    when (event.key) {
+                        Key.DirectionDown -> {
+                            val nextIndex = if (currentIndex < 0) 0 else (currentIndex + 1).coerceAtMost(state.messages.lastIndex)
+                            events.selectMessage(state.messages[nextIndex].offset)
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            val prevIndex = if (currentIndex <= 0) 0 else currentIndex - 1
+                            events.selectMessage(state.messages[prevIndex].offset)
+                            true
+                        }
+                        Key.Escape -> {
+                            if (state.selectedMessage != null) {
+                                events.selectMessage(null)
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            },
     ) {
         Column(Modifier.fillMaxSize()) {
             // Table Header
@@ -585,8 +618,12 @@ private fun MessagesTable(
                             modifier = Modifier.width(170.dp).testTag("messageCell:${msg.offset}:timestamp"),
                         )
                         Spacer(Modifier.width(16.dp))
-                        Box(Modifier.width(160.dp).testTag("messageCell:${msg.offset}:properties")) {
-                            val contentType = msg.properties["content-type"]?.toString().orEmpty()
+                        Row(
+                            modifier = Modifier.width(160.dp).testTag("messageCell:${msg.offset}:properties"),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val contentType = (msg.properties["content-type"] ?: msg.properties["contentType"])?.toString().orEmpty()
                             if (contentType.isNotEmpty()) {
                                 Surface(
                                     color = MaterialTheme.colorScheme.secondaryContainer,
@@ -595,7 +632,25 @@ private fun MessagesTable(
                                     Text(
                                         contentType,
                                         style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            val appPropsCount = msg.applicationProperties.size
+                            if (appPropsCount > 0) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                    shape = RoundedCornerShape(12.dp),
+                                ) {
+                                    Text(
+                                        "+$appPropsCount",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        maxLines = 1,
+                                        modifier = Modifier
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            .testTag("messageAppPropsBadge:${msg.offset}"),
                                     )
                                 }
                             }
