@@ -47,7 +47,10 @@ fun main() {
         streamCatalogProvider = { profile, _ -> getHeldConnection(profile).catalog },
         streamOffsetsProvider = { profile, _ -> getHeldConnection(profile).offsets },
         topologyCatalogProvider = { profile, _ -> getHeldConnection(profile).topology },
-        streamMessageReaderProvider = { profile, _ -> getHeldConnection(profile).messages }
+        streamMessageReaderProvider = { profile, _ -> getHeldConnection(profile).messages },
+        messagePublisherProvider = { profile, _ -> getHeldConnection(profile).publisher },
+        mqttCatalogProvider = { profile, _ -> getHeldConnection(profile).mqtt },
+        mqttMessagePublisherProvider = { profile, _ -> getHeldConnection(profile).mqttPublisher },
     )
 
     Runtime.getRuntime().addShutdownHook(Thread {

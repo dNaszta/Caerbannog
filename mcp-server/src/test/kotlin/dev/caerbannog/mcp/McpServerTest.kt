@@ -8,10 +8,15 @@ import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeMessagePublisher
+import dev.caerbannog.core.connections.fakes.FakeMqttCatalog
+import dev.caerbannog.core.connections.fakes.FakeMqttMessagePublisher
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttQos
+import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.Retention
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.topology.BindingDestinationType
@@ -58,6 +63,8 @@ class McpServerTest {
     private val topologyCatalog = FakeTopologyCatalog()
     private val streamReader = FakeStreamMessageReader()
     private val publisher = FakeMessagePublisher()
+    private val mqttCatalog = FakeMqttCatalog()
+    private val mqttPublisher = FakeMqttMessagePublisher()
 
     private val server = McpServer(
         profileRepository = repo,
@@ -67,6 +74,8 @@ class McpServerTest {
         topologyCatalogProvider = { _, _ -> topologyCatalog },
         streamMessageReaderProvider = { _, _ -> streamReader },
         messagePublisherProvider = { _, _ -> publisher },
+        mqttCatalogProvider = { _, _ -> mqttCatalog },
+        mqttMessagePublisherProvider = { _, _ -> mqttPublisher },
     )
 
     @Test
@@ -100,6 +109,9 @@ class McpServerTest {
         assertTrue(toolNames.contains("caerbannog_list_exchanges"))
         assertTrue(toolNames.contains("caerbannog_list_bindings"))
         assertTrue(toolNames.contains("caerbannog_browse_stream"))
+        assertTrue(toolNames.contains("caerbannog_publish_test_message"))
+        assertTrue(toolNames.contains("caerbannog_list_mqtt_clients"))
+        assertTrue(toolNames.contains("caerbannog_publish_mqtt"))
 
         for (name in toolNames) {
             val lower = name.orEmpty().lowercase()
@@ -375,5 +387,128 @@ class McpServerTest {
         val text = json.parseToJsonElement(resp).jsonObject["result"]?.jsonObject
             ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
         assertTrue(text.contains("Read-only"))
+    }
+
+    @Test
+    fun `list mqtt clients returns client details and subscriptions`() {
+        repo.add(
+            ConnectionProfile(
+                name = "mqtt-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                mqttPort = 1883,
+            )
+        )
+        mqttCatalog.clients.addAll(
+            listOf(
+                MqttClientRow(
+                    clientId = "sensor-device-1",
+                    connectionName = "127.0.0.1:50000 -> 127.0.0.1:1883",
+                    vhost = "/",
+                    username = "sensor-user",
+                    peerHost = "127.0.0.1",
+                    peerPort = 50000,
+                    protocol = "MQTT 3.1.1",
+                    connectedAt = 1000L,
+                    ssl = false,
+                    cleanSession = true,
+                    subscriptions = listOf(MqttSubscription("sensors/temperature", qos = 1)),
+                    connected = true,
+                )
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 40, "method": "tools/call", "params": {"name": "caerbannog_list_mqtt_clients", "arguments": {"profile": "mqtt-prof"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+
+        assertTrue(text.contains("\"clientCount\":1") || text.contains("\"clientCount\": 1"))
+        assertTrue(text.contains("sensor-device-1"))
+        assertTrue(text.contains("sensors/temperature"))
+        assertTrue(text.contains("\"qos\":1") || text.contains("\"qos\": 1"))
+    }
+
+    @Test
+    fun `list mqtt clients returns error when profile has no mqttPort`() {
+        repo.add(
+            ConnectionProfile(
+                name = "no-mqtt-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                mqttPort = null,
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 41, "method": "tools/call", "params": {"name": "caerbannog_list_mqtt_clients", "arguments": {"profile": "no-mqtt-prof"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val isError = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("isError")?.jsonPrimitive?.booleanOrNull == true
+        assertTrue(isError)
+        val text = json.parseToJsonElement(resp).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("mqttPort is null"))
+    }
+
+    @Test
+    fun `publish mqtt tool publishes message with QoS and retain`() {
+        repo.add(
+            ConnectionProfile(
+                name = "mqtt-pub-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                mqttPort = 1883,
+                topologyControlLevel = TopologyControlLevel.DECLARE_AND_EDIT,
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 42, "method": "tools/call", "params": {"name": "caerbannog_publish_mqtt", "arguments": {"profile": "mqtt-pub-prof", "topic": "factory/sensors/temperature", "payload": "24.5", "qos": 1, "retain": true}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val text = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+
+        assertTrue(text.contains("\"success\":true") || text.contains("\"success\": true"))
+        assertTrue(text.contains("factory/sensors/temperature"))
+
+        assertEquals(1, mqttPublisher.publishedMessages.size)
+        val sent = mqttPublisher.publishedMessages.single()
+        assertEquals("factory/sensors/temperature", sent.topic)
+        assertEquals("24.5", sent.payload.decodeToString())
+        assertEquals(MqttQos.AT_LEAST_ONCE, sent.qos)
+        assertTrue(sent.retain)
+    }
+
+    @Test
+    fun `publish mqtt tool refuses wildcards in topic`() {
+        repo.add(
+            ConnectionProfile(
+                name = "mqtt-wildcard-prof",
+                host = "localhost",
+                virtualHost = "/",
+                username = "guest",
+                tls = true,
+                mqttPort = 1883,
+                topologyControlLevel = TopologyControlLevel.DECLARE_AND_EDIT,
+            )
+        )
+
+        val req = """{"jsonrpc": "2.0", "id": 43, "method": "tools/call", "params": {"name": "caerbannog_publish_mqtt", "arguments": {"profile": "mqtt-wildcard-prof", "topic": "factory/+/temp", "payload": "24.5"}}}"""
+        val resp = server.handleRequest(req)
+        assertNotNull(resp)
+        val isError = json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+            ?.get("isError")?.jsonPrimitive?.booleanOrNull == true
+        assertTrue(isError)
+        val text = json.parseToJsonElement(resp).jsonObject["result"]?.jsonObject
+            ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        assertTrue(text.contains("Topic cannot contain wildcards"))
     }
 }

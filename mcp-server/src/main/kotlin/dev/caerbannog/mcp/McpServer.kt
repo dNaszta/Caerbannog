@@ -11,6 +11,12 @@ import dev.caerbannog.core.publish.PublishMessageRequest
 import dev.caerbannog.core.publish.PublishOutcome
 import dev.caerbannog.core.publish.PublishTarget
 import dev.caerbannog.core.publish.PublishTargetKind
+import dev.caerbannog.core.mqtt.MqttCatalog
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttMessagePublisher
+import dev.caerbannog.core.mqtt.MqttQos
+import dev.caerbannog.core.mqtt.MqttSubscription
+import dev.caerbannog.core.mqtt.PublishMqttRequest
 import kotlinx.coroutines.flow.toList
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionCheckResult
@@ -33,6 +39,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -60,6 +68,8 @@ class McpServer(
     val topologyCatalogProvider: (profile: ConnectionProfile, vhost: String) -> TopologyCatalog,
     val streamMessageReaderProvider: ((profile: ConnectionProfile, vhost: String) -> StreamMessageReader)? = null,
     val messagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MessagePublisher)? = null,
+    val mqttCatalogProvider: ((profile: ConnectionProfile, vhost: String) -> MqttCatalog)? = null,
+    val mqttMessagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MqttMessagePublisher)? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -283,6 +293,60 @@ class McpServer(
                     add(JsonPrimitive("payload"))
                 }
             }
+        ),
+        McpTool(
+            name = "caerbannog_list_mqtt_clients",
+            description = "List active MQTT client sessions, connected protocols, peer addresses, and topic subscriptions with QoS levels on a configured connection profile.",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("profile") {
+                        put("type", "string")
+                        put("description", "Connection profile name")
+                    }
+                    putJsonObject("vhost") {
+                        put("type", "string")
+                        put("description", "Virtual host (defaults to profile's configured virtual host)")
+                    }
+                }
+                putJsonArray("required") {
+                    add(JsonPrimitive("profile"))
+                }
+            }
+        ),
+        McpTool(
+            name = "caerbannog_publish_mqtt",
+            description = "Publish a test message over MQTT with QoS and retain flags to a configured connection profile.",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("profile") {
+                        put("type", "string")
+                        put("description", "Connection profile name")
+                    }
+                    putJsonObject("topic") {
+                        put("type", "string")
+                        put("description", "MQTT topic path (cannot contain wildcards '+' or '#')")
+                    }
+                    putJsonObject("payload") {
+                        put("type", "string")
+                        put("description", "Message payload text or JSON")
+                    }
+                    putJsonObject("qos") {
+                        put("type", "integer")
+                        put("description", "Quality of Service level: 0 (At most once), 1 (At least once), or 2 (Exactly once). Defaults to 0.")
+                    }
+                    putJsonObject("retain") {
+                        put("type", "boolean")
+                        put("description", "Whether the broker should retain this message. Defaults to false.")
+                    }
+                }
+                putJsonArray("required") {
+                    add(JsonPrimitive("profile"))
+                    add(JsonPrimitive("topic"))
+                    add(JsonPrimitive("payload"))
+                }
+            }
         )
     )
 
@@ -376,6 +440,8 @@ class McpServer(
             "caerbannog_list_bindings" -> listBindings(args)
             "caerbannog_browse_stream" -> browseStream(args)
             "caerbannog_publish_test_message" -> publishTestMessage(args)
+            "caerbannog_list_mqtt_clients" -> listMqttClients(args)
+            "caerbannog_publish_mqtt" -> publishMqtt(args)
             else -> McpCallToolResult(
                 content = listOf(McpContent(text = "Unknown tool: $name")),
                 isError = true
@@ -896,6 +962,169 @@ class McpServer(
             )
             is PublishOutcome.Failed -> McpCallToolResult(
                 content = listOf(McpContent(text = "Publish failed: ${outcome.error}")),
+                isError = true,
+            )
+        }
+    }
+
+    private suspend fun listMqttClients(args: JsonObject): McpCallToolResult {
+        val profileName = args["profile"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'profile' argument")), isError = true)
+        val profile = profileRepository.list().firstOrNull { it.name == profileName }
+            ?: return McpCallToolResult(listOf(McpContent(text = "Profile '$profileName' not found")), isError = true)
+
+        if (!profile.hasMqtt) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Profile '${profile.name}' does not have MQTT configured (mqttPort is null).")),
+                isError = true,
+            )
+        }
+
+        val check = connectionChecker.check(profile)
+        if (check !is ConnectionCheckResult.BothReachable) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Profile '${profile.name}' is unreachable.")),
+                isError = true,
+            )
+        }
+
+        val catalogProvider = mqttCatalogProvider
+            ?: return McpCallToolResult(listOf(McpContent(text = "MQTT catalog not configured on this MCP server")), isError = true)
+
+        val vhost = args["vhost"]?.jsonPrimitive?.content ?: profile.virtualHost
+        val catalog = catalogProvider(profile, vhost)
+
+        return when (val result = catalog.listClients(vhost)) {
+            is CatalogResult.Success -> {
+                val clients = result.value
+                val jsonResult = buildJsonObject {
+                    put("profile", profile.name)
+                    put("vhost", vhost)
+                    put("clientCount", clients.size)
+                    putJsonArray("clients") {
+                        clients.forEach { client ->
+                            add(buildJsonObject {
+                                put("clientId", client.clientId)
+                                put("username", client.username)
+                                put("peerHost", client.peerHost)
+                                put("peerPort", client.peerPort)
+                                put("protocol", client.protocol)
+                                put("connected", client.connected)
+                                client.cleanSession?.let { put("cleanSession", it) }
+                                putJsonArray("subscriptions") {
+                                    client.subscriptions.forEach { sub ->
+                                        add(buildJsonObject {
+                                            put("topic", sub.topic)
+                                            put("qos", sub.qos)
+                                        })
+                                    }
+                                }
+                            })
+                        }
+                    }
+                }
+                McpCallToolResult(content = listOf(McpContent(text = json.encodeToString(jsonResult))))
+            }
+            CatalogResult.NotAuthorised -> McpCallToolResult(
+                listOf(McpContent(text = "Not authorised to list MQTT clients on vhost '$vhost'")),
+                isError = true,
+            )
+            CatalogResult.PluginMissing -> McpCallToolResult(
+                listOf(McpContent(text = "MQTT plugin is not available on broker")),
+                isError = true,
+            )
+            CatalogResult.Unreachable -> McpCallToolResult(
+                listOf(McpContent(text = "Broker unreachable while listing MQTT clients")),
+                isError = true,
+            )
+            else -> McpCallToolResult(
+                listOf(McpContent(text = "Failed to list MQTT clients: $result")),
+                isError = true,
+            )
+        }
+    }
+
+    private suspend fun publishMqtt(args: JsonObject): McpCallToolResult {
+        val profileName = args["profile"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'profile' argument")), isError = true)
+        val profile = profileRepository.list().firstOrNull { it.name == profileName }
+            ?: return McpCallToolResult(listOf(McpContent(text = "Profile '$profileName' not found")), isError = true)
+
+        if (!profile.hasMqtt) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Publishing refused: profile '${profile.name}' does not have MQTT configured (mqttPort is null).")),
+                isError = true,
+            )
+        }
+
+        val topic = args["topic"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'topic' argument")), isError = true)
+        if (topic.isBlank()) {
+            return McpCallToolResult(listOf(McpContent(text = "Topic cannot be blank")), isError = true)
+        }
+        if (topic.contains('+') || topic.contains('#')) {
+            return McpCallToolResult(listOf(McpContent(text = "Topic cannot contain wildcards '+' or '#")), isError = true)
+        }
+
+        val payloadStr = args["payload"]?.jsonPrimitive?.content
+            ?: return McpCallToolResult(listOf(McpContent(text = "Missing 'payload' argument")), isError = true)
+
+        val qosInt = args["qos"]?.jsonPrimitive?.intOrNull ?: 0
+        if (qosInt !in 0..2) {
+            return McpCallToolResult(listOf(McpContent(text = "Invalid qos '$qosInt'. Must be 0, 1, or 2")), isError = true)
+        }
+        val qos = MqttQos.fromInt(qosInt)
+        val retain = args["retain"]?.jsonPrimitive?.booleanOrNull ?: false
+
+        if (profile.topologyControlLevel == TopologyControlLevel.READ_ONLY) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Publishing refused: profile '${profile.name}' is set to Read-only topology control level.")),
+                isError = true,
+            )
+        }
+        if (profile.declaredPermissions != null && !profile.declaredPermissions!!.write) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Publishing refused: profile '${profile.name}' has no write permission declared.")),
+                isError = true,
+            )
+        }
+
+        val check = connectionChecker.check(profile)
+        if (check !is ConnectionCheckResult.BothReachable) {
+            return McpCallToolResult(
+                listOf(McpContent(text = "Publishing refused: broker connection is unreachable.")),
+                isError = true,
+            )
+        }
+
+        val publisherProvider = mqttMessagePublisherProvider
+            ?: return McpCallToolResult(listOf(McpContent(text = "MQTT publisher not configured on this MCP server")), isError = true)
+        val vhost = profile.virtualHost
+        val publisher = publisherProvider(profile, vhost)
+
+        val request = PublishMqttRequest(
+            topic = topic.trim(),
+            payload = payloadStr.encodeToByteArray(),
+            qos = qos,
+            retain = retain,
+        )
+
+        return when (val outcome = publisher.publish(request)) {
+            is PublishOutcome.Success -> McpCallToolResult(
+                content = listOf(McpContent(text = json.encodeToString(buildJsonObject {
+                    put("success", true)
+                    put("message", outcome.message)
+                    put("topic", topic.trim())
+                    put("qos", qos.value)
+                    put("retain", retain)
+                })))
+            )
+            is PublishOutcome.Refused -> McpCallToolResult(
+                content = listOf(McpContent(text = "Broker refused MQTT publish: ${outcome.reason}")),
+                isError = true,
+            )
+            is PublishOutcome.Failed -> McpCallToolResult(
+                content = listOf(McpContent(text = "MQTT publish failed: ${outcome.error}")),
                 isError = true,
             )
         }
