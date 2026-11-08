@@ -61,6 +61,7 @@ class StreamListViewModel(
     private var loaded: List<StreamSummary>? = null
     private var publisherCounts: Map<String, Int>? = null
     private val firstOffsets = mutableMapOf<String, FirstOffset>()
+    private val messageHistory = RollingMetricHistory()
 
     // M2-07: the last grouping read for this connection (null: never read, the list is flat and says so), the entries built from it
     // and the loaded streams, and the expanded super streams by name (only a super stream can be in it).
@@ -220,6 +221,7 @@ class StreamListViewModel(
         loaded = null
         publisherCounts = null
         firstOffsets.clear()
+        messageHistory.clear()
         layouts = null
         entries = emptyList()
         expanded.clear()
@@ -262,11 +264,16 @@ class StreamListViewModel(
             counts = (result as? CatalogResult.Success)?.value
         }
 
+        val now = clock.nowMillis()
+        streams.forEach { summary ->
+            messageHistory.record(summary.name, summary.messages, now)
+        }
+        messageHistory.retainKeys(streams.map { it.name }.toSet())
         loaded = streams
         layouts = newLayouts
         entries = groupStreams(streams, newLayouts.orEmpty())
         publisherCounts = counts
-        lastSuccessMillis = clock.nowMillis()
+        lastSuccessMillis = now
         stale = false
         banner = null
         cannotRead = false
@@ -301,6 +308,7 @@ class StreamListViewModel(
     private fun notAllowed() {
         loaded = null
         entries = emptyList()
+        messageHistory.clear()
         cannotRead = true
         stale = false
         render()
@@ -405,6 +413,8 @@ class StreamListViewModel(
         val visible = all.drop(start).take(pageSize)
         val screen = screen()
         val counts = publisherCounts
+        val visibleRows = visible.flatMap { rowsOf(it, counts) }
+        val sparklines = messageHistory.snapshot(visibleRows.map { it.name }, SparklineSemantic.Velocity)
         _updatedAt.value = lastSuccessMillis
         _state.value = StreamListState(
             screen = screen,
@@ -422,7 +432,7 @@ class StreamListViewModel(
                 screen == StreamListScreen.Empty -> StreamListTexts.CREATE_STREAM
                 else -> null
             },
-            rows = visible.flatMap { rowsOf(it, counts) },
+            rows = visibleRows,
             filter = filter,
             sort = sort,
             page = current,
@@ -437,6 +447,7 @@ class StreamListViewModel(
             updatedAtMillis = lastSuccessMillis,
             kindFilter = kindFilter,
             groupingNotice = if (loaded != null && layouts == null) StreamListTexts.GROUPING_UNAVAILABLE else null,
+            messageSparklines = sparklines,
         )
     }
 }

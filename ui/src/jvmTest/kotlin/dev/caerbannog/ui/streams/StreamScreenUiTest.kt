@@ -477,4 +477,39 @@ class StreamScreenUiTest {
         listOf("Reference", "Connection", "Published", "Confirmed", "Errors").forEach { onNodeWithTag("publishersHeader:$it", useUnmergedTree = true).assertExists() }
         listOf("Consumer", "Connection", "Offset", "Behind", "Status").forEach { onNodeWithTag("consumersHeader:$it", useUnmergedTree = true).assertExists() }
     }
+
+    @Test
+    fun `publisher and consumer rows render rolling velocity and lag trend sparklines when present in state`() = runDesktopComposeUiTest(1280, 800) {
+        val base = content()
+        val pubKey = base.publishers.first().key
+        val consKey = "analytics"
+        val pubSpark = dev.caerbannog.core.streams.MetricSparkline(
+            samples = listOf(48_000L, 48_100L),
+            normalizedPoints = listOf(0f, 1f),
+            deltaPerTick = 100L,
+            deltaPerSecond = 20L,
+            direction = dev.caerbannog.core.streams.TrendDirection.Growing,
+            label = "+20/s",
+            semantic = dev.caerbannog.core.streams.SparklineSemantic.Velocity,
+        )
+        val lagSpark = dev.caerbannog.core.streams.MetricSparkline(
+            samples = listOf(469L, 349L),
+            normalizedPoints = listOf(1f, 0f),
+            deltaPerTick = -120L,
+            deltaPerSecond = -24L,
+            direction = dev.caerbannog.core.streams.TrendDirection.Draining,
+            label = "↘ Draining (-120)",
+            semantic = dev.caerbannog.core.streams.SparklineSemantic.ConsumerLag,
+        )
+        val stateWithSparklines = base.copy(
+            publisherSparklines = mapOf(pubKey to pubSpark),
+            consumerLagSparklines = mapOf(consKey to lagSpark),
+        )
+        clientsScreen(stateWithSparklines)
+
+        onNodeWithTag("publisherSparkline:$pubKey", useUnmergedTree = true).assertExists()
+        onNodeWithTag("publisherSparkline:$pubKey:label", useUnmergedTree = true).assertTextEquals("+20/s")
+        onNodeWithTag("consumerLagTrend:$consKey", useUnmergedTree = true).assertExists()
+        onNodeWithTag("consumerLagTrend:$consKey:label", useUnmergedTree = true).assertTextEquals("↘ Draining (-120)")
+    }
 }

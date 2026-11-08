@@ -66,9 +66,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.caerbannog.core.streams.MetricSparkline
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.ui.components.CopyableText
+import dev.caerbannog.ui.components.MetricSparklineBadge
 import dev.caerbannog.ui.components.SearchField
 import dev.caerbannog.core.streams.StreamRow
 import dev.caerbannog.core.streams.StreamRowKind
@@ -150,7 +152,7 @@ private fun StreamsTableBody(rows: List<StreamRow>?, state: StreamListState, eve
             } else {
                 // One SelectionContainer for the whole body: mouse selection works as in any text; the focusable cells add the keyboard.
                 SelectionContainer {
-                    Column { rows.forEach { DataRow(it, scale, events, onOpen) } }
+                    Column { rows.forEach { DataRow(it, scale, state, events, onOpen) } }
                 }
             }
         }
@@ -211,19 +213,41 @@ private fun SizeHeader(scale: Float) {
 }
 
 @Composable
-private fun DataRow(row: StreamRow, scale: Float, events: StreamListEvents, onOpen: (String) -> Unit) {
+private fun DataRow(row: StreamRow, scale: Float, state: StreamListState, events: StreamListEvents, onOpen: (String) -> Unit) {
     Column(Modifier.testTag("streamRow:${row.name}")) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column.entries.forEach { column ->
-                if (column == Column.Name) {
-                    NameCell(row, scale, events, onOpen)
-                } else {
-                    CopyableCell(column.cell(row), "cell:${row.name}:${column.name}", column, scale, MaterialTheme.typography.bodyMedium)
+                when (column) {
+                    Column.Name -> NameCell(row, scale, events, onOpen)
+                    Column.Messages -> MessagesCell(row, state.messageSparklines[row.name], scale)
+                    else -> CopyableCell(column.cell(row), "cell:${row.name}:${column.name}", column, scale, MaterialTheme.typography.bodyMedium)
                 }
             }
         }
         if (row.kind == StreamRowKind.SuperStream && row.expanded) PartitionNote(row.name)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+private fun MessagesCell(row: StreamRow, sparkline: MetricSparkline?, scale: Float) {
+    Column(
+        Modifier.width(Column.Messages.width * scale).padding(horizontal = CellPadding, vertical = 4.dp),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        CopyableText(
+            text = Column.Messages.cell(row),
+            tag = "cell:${row.name}:${Column.Messages.name}",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End,
+        )
+        if (sparkline != null) {
+            MetricSparklineBadge(
+                sparkline = sparkline,
+                tag = "streamSparkline:${row.name}",
+            )
+        }
     }
 }
 
