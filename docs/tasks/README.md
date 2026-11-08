@@ -88,7 +88,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M5-03-stream-management-create-delete | Create and delete streams with typed confirmation | M5 | done (architect: Accepted, 2026-11-07; branch `m5-03-stream-management-create-delete`; 11 BDD scenarios green, 11 Compose UI tests green, 10 ViewModel tests green) |
 | M5-04-topology-migrations | Topology migrations runner and UI | M5 | done (architect: Accepted, 2026-11-07; branch `m5-04-topology-migrations`; 14 BDD scenarios green, 10 Compose UI tests green, 8 ViewModel tests green) |
 | M5-05-verify-host-name | Per-profile "Verify host name" switch (D7) | M5 | done (architect: Accepted, 2026-11-08; branch `m5-05-verify-host-name`; all tests green) |
-| M5-06-gate-packaging-and-broker | Milestone M5 gate and packaging verification | M5 | planned |
+| M5-06-gate-packaging-and-broker | Milestone M5 gate and packaging verification | M5 | done (architect: Accepted, 2026-11-08; branch `m5-06-gate-packaging-and-broker`; 5 broker tests green, DMG packaged) |
 
 ## Milestone M6 (started 2026-11-07; MQTT Plugin Support)
 
