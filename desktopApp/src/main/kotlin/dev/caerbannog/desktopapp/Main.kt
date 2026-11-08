@@ -38,14 +38,19 @@ import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
+import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.streams.StreamManagementViewModel
 import dev.caerbannog.core.streams.UnavailableStreamManager
+import dev.caerbannog.core.topology.QueueMessageInspectionViewModel
+import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.streams.StreamListEvents
 import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
+import dev.caerbannog.ui.topology.EmptyQueueInspectionEvents
+import dev.caerbannog.ui.topology.QueueInspectionEvents
 import dev.caerbannog.ui.topology.TopologyScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -336,6 +341,33 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
     }
 
     val now = rememberNowMillis()
+    val selectedQueueName = topology.selectedQueue?.name
+    val selectedVhost = topology.vhost.ifEmpty { "/" }
+    val queueInspector = source?.queueInspector ?: UnavailableQueueMessageInspector
+    val queueInspectionVm = remember(connName, selectedVhost, selectedQueueName, queueInspector) {
+        selectedQueueName?.let { queueName ->
+            QueueMessageInspectionViewModel(
+                inspector = queueInspector,
+                vhost = selectedVhost,
+                queue = queueName,
+                scope = scope,
+            )
+        }
+    }
+    val queueInspectionState = queueInspectionVm?.state?.collectAsState()?.value
+    val queueInspectionEvents = remember(queueInspectionVm) {
+        if (queueInspectionVm != null) {
+            object : QueueInspectionEvents {
+                override fun inspectMessages() = queueInspectionVm.inspectMessages()
+                override fun setCount(count: Int) = queueInspectionVm.setCount(count)
+                override fun selectMessage(index: Int) = queueInspectionVm.selectMessage(index)
+                override fun setPayloadViewKind(kind: PayloadViewKind?) = queueInspectionVm.setPayloadViewKind(kind)
+                override fun clear() = queueInspectionVm.clear()
+            }
+        } else {
+            EmptyQueueInspectionEvents
+        }
+    }
     TopologyScreen(
         state = topology,
         nowMillis = now,
@@ -351,6 +383,8 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
             composition.navigation.open(AppDestination.Streams)
             composition.navigation.openStream(streamName)
         },
+        queueInspectionState = queueInspectionState,
+        queueInspectionEvents = queueInspectionEvents,
     )
 }
 

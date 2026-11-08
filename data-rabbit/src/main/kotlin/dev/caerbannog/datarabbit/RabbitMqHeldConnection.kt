@@ -9,7 +9,9 @@ import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.UnavailableStreamManager
+import dev.caerbannog.core.topology.QueueMessageInspector
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -28,6 +30,7 @@ class RabbitMqHeldConnection(
     private val log: (String) -> Unit,
     override val mqtt: MqttCatalog = UnavailableMqttCatalog,
     override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher,
+    override val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 

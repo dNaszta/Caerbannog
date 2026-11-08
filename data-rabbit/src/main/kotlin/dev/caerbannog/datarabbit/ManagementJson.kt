@@ -12,9 +12,12 @@ import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.topology.InspectedQueueMessage
+import dev.caerbannog.core.topology.QueueInspectionConstants
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.VhostRow
+import java.util.Base64
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -286,6 +289,64 @@ internal object ManagementJson {
     /** Only `name` is read; the rest of each object is the broker's statistics. */
     fun parseVhosts(body: String): CatalogResult<List<VhostRow>> = guarded(body) { root ->
         CatalogResult.Success(root.asArray().map { VhostRow(it.asObject().requiredString("name")) })
+    }
+
+    /**
+     * M7-08: Parses the array returned by `POST /api/queues/{vhost}/{name}/get` into [InspectedQueueMessage] items.
+     * Supports both `"string"` and `"base64"` payload encodings, extracts standard AMQP `properties` and `properties.headers`,
+     * and marks every message as `acknowledged = false` (`ack_requeue_true`).
+     */
+    fun parseInspectedQueueMessages(body: String): CatalogResult<List<InspectedQueueMessage>> = guarded(body) { root ->
+        val items = root.asArray().mapIndexed { idx, elem ->
+            val obj = elem.asObject()
+            val payloadStr = obj.string("payload").orEmpty()
+            val encoding = obj.string("payload_encoding") ?: "string"
+            val payloadBytesArray = if (encoding.equals("base64", ignoreCase = true)) {
+                try {
+                    Base64.getDecoder().decode(payloadStr)
+                } catch (_: IllegalArgumentException) {
+                    payloadStr.encodeToByteArray()
+                }
+            } else {
+                payloadStr.encodeToByteArray()
+            }
+            val reportedBytes = obj.long("payload_bytes") ?: payloadBytesArray.size.toLong()
+            val redelivered = obj.boolean("redelivered")
+            val exchange = obj.string("exchange").orEmpty()
+            val routingKey = obj.string("routing_key").orEmpty()
+            val messageCount = obj.long("message_count")
+            val propsObj = obj["properties"] as? JsonObject
+            val headersObj = propsObj?.get("headers") as? JsonObject
+            val propsMap = buildMap {
+                propsObj?.forEach { (k, v) ->
+                    if (k != "headers") {
+                        val strVal = if (v is JsonPrimitive && v.isString) v.content else v.toString()
+                        if (strVal != "null") put(k, strVal)
+                    }
+                }
+            }
+            val headersMap = buildMap {
+                headersObj?.forEach { (k, v) ->
+                    val strVal = if (v is JsonPrimitive && v.isString) v.content else v.toString()
+                    if (strVal != "null") put(k, strVal)
+                }
+            }
+            InspectedQueueMessage(
+                index = idx + 1,
+                payload = payloadBytesArray,
+                payloadBytes = reportedBytes,
+                payloadEncoding = encoding,
+                redelivered = redelivered,
+                exchange = exchange,
+                routingKey = routingKey,
+                messageCount = messageCount,
+                properties = propsMap,
+                headers = headersMap,
+                acknowledged = false,
+                ackMode = QueueInspectionConstants.ACK_REQUEUE_TRUE,
+            )
+        }
+        CatalogResult.Success(items)
     }
 
     private val MQTT_SUBSCRIPTION_REGEX = Regex("""^mqtt-subscription-(.*)qos([0-2])$""")

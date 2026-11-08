@@ -69,6 +69,9 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M6-02: every connection of the broker (client connections, including MQTT). */
     fun connections(): String = "$base/api/connections"
 
+    /** M7-08: non-destructive queue message inspection endpoint (`POST /api/queues/{vhost}/{name}/get`). */
+    fun getQueueMessages(vhost: String, name: String): String = "$base/api/queues/${encode(vhost)}/${encode(name)}/get"
+
     // URLEncoder makes a space "+", which a path segment does not understand.
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 

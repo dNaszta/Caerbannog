@@ -23,7 +23,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.topology.BindingRowView
+import dev.caerbannog.core.topology.InspectedQueueMessage
+import dev.caerbannog.core.topology.QueueInspectionConstants
+import dev.caerbannog.core.topology.QueueInspectionState
 import org.junit.jupiter.api.Test
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -218,4 +222,87 @@ class TopologyDetailAndSafetyUiTest {
     @Test
     fun `a focused exchange name cell copies the name`() =
         assertEquals("dev.events", copied(exchangesState(listOf(exchange("dev.events", "topic"))), "cell:dev.events:Name"))
+
+    @Test
+    fun `non-destructive queue message inspection shows requeue mode notice and marks messages as not acknowledged`() = runDesktopComposeUiTest(1280, 900) {
+        val recordedCalls = mutableListOf<String>()
+        val inspectionEvents = object : QueueInspectionEvents {
+            override fun inspectMessages() { recordedCalls += "inspectMessages" }
+            override fun setCount(count: Int) { recordedCalls += "setCount:$count" }
+            override fun selectMessage(index: Int) { recordedCalls += "selectMessage:$index" }
+            override fun setPayloadViewKind(kind: PayloadViewKind?) { recordedCalls += "setKind:$kind" }
+            override fun clear() { recordedCalls += "clear" }
+        }
+        val msg1 = InspectedQueueMessage(
+            index = 1,
+            payload = """{"orderId":"ORD-500"}""".encodeToByteArray(),
+            payloadBytes = 21L,
+            payloadEncoding = "string",
+            redelivered = true,
+            exchange = "events",
+            routingKey = "order.created",
+            properties = mapOf("content_type" to "application/json", "message_id" to "m-500"),
+            headers = mapOf("region" to "eu"),
+        )
+        val msg2 = InspectedQueueMessage(
+            index = 2,
+            payload = "second-message-body".encodeToByteArray(),
+            payloadBytes = 19L,
+            payloadEncoding = "string",
+            redelivered = false,
+            exchange = "",
+            routingKey = "orders",
+        )
+        val loadedInspection = QueueInspectionState.Loaded(
+            vhost = "/",
+            queue = "orders",
+            count = 10,
+            messages = listOf(msg1, msg2),
+            selectedIndex = 1,
+        )
+
+        setContent {
+            TopologyScreen(
+                state = queuesState(selected = mockupDetail),
+                nowMillis = 0,
+                events = RecordedTopologyEvents(),
+                control = dev.caerbannog.ui.streams.connected,
+                controlEvents = dev.caerbannog.ui.streams.noControlEvents,
+                queueInspectionState = loadedInspection,
+                queueInspectionEvents = inspectionEvents,
+            )
+        }
+
+        // Section header and requeue notice exist
+        node("queueMessageInspector").assertExists()
+        node("queueInspectorTitle").assertTextEquals("Non-destructive message inspection")
+        node("queueInspectorAckModeBadge:label").assertTextEquals("Not acknowledged (requeued)")
+        node("queueInspectorRequeueNotice").assertTextEquals(QueueInspectionConstants.REQUEUE_MODE_NOTICE)
+
+        // Both message rows are listed and each is marked "Not acknowledged (requeued)"
+        node("inspectedMessageRow:1").assertExists()
+        node("inspectedMessageAckBadge:1:label").assertTextEquals("Not acknowledged (requeued)")
+        node("inspectedMessageRow:2").assertExists()
+        node("inspectedMessageAckBadge:2:label").assertTextEquals("Not acknowledged (requeued)")
+
+        // Detail pane shows message #1, its Not acknowledged badge, and formatted JSON payload
+        node("inspectedDetailTitle").assertTextEquals("Message #1 (21 B)")
+        node("inspectedDetailAckBadge:label").assertTextEquals("Not acknowledged (requeued)")
+        val payloadText = node("inspectedDetailPayload").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString("\n") { it.text }.orEmpty()
+        assertTrue(payloadText.contains("ORD-500"), "Expected payload to contain ORD-500, got: $payloadText")
+
+        // Clicking count option, message row, inspect button, and clear button dispatches events
+        node("inspectCountOption:5").performClick()
+        node("inspectedMessageRow:2").performClick()
+        node("inspectQueueMessagesButton").performClick()
+        node("clearInspectedMessagesButton").performClick()
+        waitForIdle()
+        assertEquals(
+            listOf("setCount:5", "selectMessage:2", "inspectMessages", "clear"),
+            recordedCalls,
+        )
+
+        // Ensure no forbidden write/destructive control words exist even with the inspector open
+        assertNoWriteControl("queue detail with non-destructive message inspector")
+    }
 }

@@ -26,6 +26,7 @@ import dev.caerbannog.core.topology.BindingRowView
 import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.ExchangeRowView
 import dev.caerbannog.core.topology.MqttClientRowView
+import dev.caerbannog.core.topology.QueueInspectionState
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyState
@@ -85,6 +86,8 @@ internal fun TopologyTableFor(
     events: TopologyEvents,
     loading: Boolean,
     onOpenStream: ((String) -> Unit)? = null,
+    queueInspectionState: QueueInspectionState? = null,
+    queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
 ) {
     val detail = state.selectedQueue
     Column(
@@ -122,7 +125,14 @@ internal fun TopologyTableFor(
                 dev.caerbannog.core.topology.TopologyTab.Mqtt -> MqttClientsTable(state, loading)
             }
         }
-        if (detail != null && !loading) QueueDetail(detail, events::selectQueue)
+        if (detail != null && !loading) {
+            QueueDetail(
+                detail = detail,
+                onClose = events::selectQueue,
+                inspectionState = queueInspectionState,
+                inspectionEvents = queueInspectionEvents,
+            )
+        }
     }
 }
 

@@ -145,6 +145,7 @@ class ActiveConnection(
             manager = GuardedStreamManager(connection.manager, isCurrent),
             mqtt = GuardedMqttCatalog(connection.mqtt, isCurrent),
             mqttPublisher = GuardedMqttPublisher(connection.mqttPublisher, isCurrent),
+            queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
         )
     }
 
