@@ -55,6 +55,14 @@ compose.desktop {
             // java.net.http is required by Ktor client for HTTP requests (HttpClient, HttpRequest, etc.)
             // Note: javax.net.ssl.* classes are in java.base in Java 11+, so no need for java.ssl module.
             modules("java.net.http")
+            // Add JVM arguments to open packages for reflection access required by Paho MQTT client.
+            // Paho uses reflection to access java.net.URI.userInfo, which is not opened by default.
+            jvmArgs(
+                "--add-opens", "java.base/java.net=ALL-UNNAMED",
+                "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+                "--add-opens", "java.base/sun.security.ssl=ALL-UNNAMED",
+                "--add-opens", "java.base/sun.net.www.protocol.http=ALL-UNNAMED"
+            )
             // Rabbit icon for the application (RabbitMQ logo)
             macOS.iconFile.set(file("src/main/resources/rabbit.icns"))
         }
