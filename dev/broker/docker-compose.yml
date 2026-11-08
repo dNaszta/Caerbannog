@@ -15,6 +15,8 @@ services:
       - "5671:5671"
       - "5552:5552"
       - "15672:15672"
+      - "1883:1883"
+      - "8883:8883"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ../../data-rabbit/src/test/resources/tls/rabbitmq.conf:/etc/rabbitmq/conf.d/90-tls.conf:ro,z

@@ -44,8 +44,8 @@ boot**, in file name order; anything deleted by hand comes back, data is only cl
 
 ## Ports and certificates
 
-TLS (the default): stream **5551**, management API (HTTPS) **15671**, AMQP **5671**. Plain, not encrypted:
-stream **5552**, management API (HTTP) **15672**; AMQP 5672 is not published. The CA is `data-rabbit/src/test/resources/tls/ca.pem` (the server cert and key next to it are mounted
+TLS (the default): stream **5551**, management API (HTTPS) **15671**, AMQP **5671**, MQTT **8883**. Plain, not encrypted:
+stream **5552**, management API (HTTP) **15672**, MQTT **1883**; AMQP 5672 is not published. The CA is `data-rabbit/src/test/resources/tls/ca.pem` (the server cert and key next to it are mounted
 read-only from there; one home, no copy). The host name is not verified, so `localhost` works.
 
 ## Users (all passwords: `dev-password`)
@@ -67,7 +67,7 @@ exchange `many.events`.
 
 ## The A1 profile for the app
 
-Host `localhost`, stream port `5551`, management port `15671`, vhost `/`, user `admin`, password `dev-password`,
+Host `localhost`, stream port `5551`, management port `15671`, MQTT port `8883` (optional), vhost `/`, user `admin`, password `dev-password`,
 CA file: the absolute path of `data-rabbit/src/test/resources/tls/ca.pem`. Check the list without the app:
 
 ```
@@ -76,7 +76,7 @@ curl --cacert data-rabbit/src/test/resources/tls/ca.pem -u admin:dev-password ht
 
 ## The A2 profile for the app (plain, not encrypted)
 
-Host `localhost`, stream port `5552`, management port `15672`, vhost `/`, user `admin`, password `dev-password`,
+Host `localhost`, stream port `5552`, management port `15672`, MQTT port `1883` (optional), vhost `/`, user `admin`, password `dev-password`,
 **TLS switch off**; no CA file is needed. The app shows "Not encrypted" for this profile (the password travels in
 clear text; fine for this throwaway broker, never for a real one). Seed it with `task dev:seed:plain -- --password
 dev-password`; the TLS profile (A1, above) is seeded with `task dev:seed -- --password dev-password`. Check the list
