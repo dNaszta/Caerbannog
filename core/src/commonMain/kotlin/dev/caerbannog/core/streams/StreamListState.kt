@@ -82,6 +82,8 @@ data class StreamListState(
     val groupingNotice: String? = null,
     /** Rolling throughput sparklines keyed by stream name, populated after 2+ refresh ticks with zero extra broker calls. */
     val messageSparklines: Map<String, MetricSparkline> = emptyMap(),
+    /** M7-07: partition balance and consumer health info keyed by partition stream name for expanded super streams. */
+    val partitionBalances: Map<String, PartitionBalanceInfo> = emptyMap(),
 )
 
 /** Texts of the stream list, shared by core and the screen. */

@@ -415,6 +415,7 @@ class StreamListViewModel(
         val counts = publisherCounts
         val visibleRows = visible.flatMap { rowsOf(it, counts) }
         val sparklines = messageHistory.snapshot(visibleRows.map { it.name }, SparklineSemantic.Velocity)
+        val partitionBalances = computePartitionBalances(visible, expanded)
         _updatedAt.value = lastSuccessMillis
         _state.value = StreamListState(
             screen = screen,
@@ -448,6 +449,7 @@ class StreamListViewModel(
             kindFilter = kindFilter,
             groupingNotice = if (loaded != null && layouts == null) StreamListTexts.GROUPING_UNAVAILABLE else null,
             messageSparklines = sparklines,
+            partitionBalances = partitionBalances,
         )
     }
 }

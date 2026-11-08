@@ -27,6 +27,8 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.connections.CreateStreamGate
+import dev.caerbannog.core.streams.PartitionBalanceInfo
+import dev.caerbannog.core.streams.PartitionHealth
 import dev.caerbannog.core.streams.StreamKindFilter
 import dev.caerbannog.core.streams.StreamListTexts
 import org.junit.jupiter.api.Test
@@ -354,6 +356,88 @@ class StreamsSuperStreamUiTest {
 
         node("rangeText").assertTextEquals("1 to 2 of 2")
         assertFalse(node("rangeText").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text).orEmpty().toString().contains("5"))
+    }
+
+    @Test
+    fun `expanded super stream partitions render partition balance bars and orphaned consumer warnings without affecting cell copy`() = runDesktopComposeUiTest(1280, 800) {
+        val clipboard = FakeClipboard()
+        val balances = mapOf(
+            "orders-0" to PartitionBalanceInfo(
+                partitionName = "orders-0",
+                superStreamName = "orders",
+                partitionIndex = 0,
+                partitionCount = 3,
+                messages = 80_000L,
+                totalSuperStreamMessages = 100_000L,
+                shareFraction = 0.80f,
+                sharePercent = 80,
+                shareLabel = "Hot \u00b7 80%",
+                consumers = 2,
+                isSkewedHot = true,
+                isOrphaned = false,
+                health = PartitionHealth.SkewedHot,
+            ),
+            "orders-1" to PartitionBalanceInfo(
+                partitionName = "orders-1",
+                superStreamName = "orders",
+                partitionIndex = 1,
+                partitionCount = 3,
+                messages = 10_000L,
+                totalSuperStreamMessages = 100_000L,
+                shareFraction = 0.10f,
+                sharePercent = 10,
+                shareLabel = "10%",
+                consumers = 2,
+                isSkewedHot = false,
+                isOrphaned = false,
+                health = PartitionHealth.Balanced,
+            ),
+            "orders-2" to PartitionBalanceInfo(
+                partitionName = "orders-2",
+                superStreamName = "orders",
+                partitionIndex = 2,
+                partitionCount = 3,
+                messages = 10_000L,
+                totalSuperStreamMessages = 100_000L,
+                shareFraction = 0.10f,
+                sharePercent = 10,
+                shareLabel = "10%",
+                consumers = 0,
+                isSkewedHot = false,
+                isOrphaned = true,
+                health = PartitionHealth.OrphanedNoConsumers,
+            ),
+        )
+        val stateWithBalances = expanded.copy(partitionBalances = balances)
+        setContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                StreamsScreen(stateWithBalances, 0, CreateStreamGate.Enabled, RecordedEvents(), connected, noControlEvents)
+            }
+        }
+
+        // Balance bars exist on partition rows, not on plain stream or super stream rows
+        node("partitionBalance:audit-log").assertDoesNotExistCompat()
+        node("partitionBalance:orders").assertDoesNotExistCompat()
+        node("partitionBalance:orders-0").assertExistsCompat()
+        node("partitionBalance:orders-0:bar").assertExistsCompat()
+        node("partitionBalance:orders-0:label").assertTextEquals("Hot \u00b7 80%")
+        node("partitionBalance:orders-1:label").assertTextEquals("10%")
+        node("partitionBalance:orders-2:label").assertTextEquals("10%")
+
+        // Orphaned consumer warning only on orders-2
+        node("partitionOrphanedWarning:orders-0").assertDoesNotExistCompat()
+        node("partitionOrphanedWarning:orders-1").assertDoesNotExistCompat()
+        node("partitionOrphanedWarning:orders-2").assertExistsCompat()
+        node("partitionOrphanedWarning:orders-2:label").assertTextEquals("Orphaned")
+
+        // Copying the Messages cell of orders-0 still copies only the displayed count text
+        node("cell:orders-0:Messages").requestFocus()
+        onRoot().performKeyInput {
+            val modifier = if (mac) Key.MetaLeft else Key.CtrlLeft
+            keyDown(modifier); keyDown(Key.C); keyUp(Key.C); keyUp(modifier)
+        }
+        waitForIdle()
+        assertEquals("31,200", clipboard.text)
     }
 }
 
