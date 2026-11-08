@@ -15,7 +15,10 @@ internal sealed interface BrokerTransport {
     /** `https` or `http`. */
     val scheme: String
 
-    class Tls(val trust: TrustManagerFactory) : BrokerTransport {
+    class Tls(
+        val trust: TrustManagerFactory,
+        val verifyHostName: Boolean = false,
+    ) : BrokerTransport {
         override val scheme: String = "https"
     }
 
@@ -25,6 +28,6 @@ internal sealed interface BrokerTransport {
 
     companion object {
         fun from(profile: ConnectionProfile): BrokerTransport =
-            if (profile.tls) Tls(TlsSupport.trustManagerFactory(profile.caCertificatePath)) else Plain
+            if (profile.tls) Tls(TlsSupport.trustManagerFactory(profile.caCertificatePath), profile.verifyHostName) else Plain
     }
 }

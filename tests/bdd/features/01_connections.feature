@@ -272,6 +272,13 @@ Feature: Connection profiles
     When I delete the connection "uat-eu" and confirm
     Then the connection "uat-eu" is no longer in the saved profiles
 
+  # M5-05: Per-profile "Verify host name" switch (D7)
+  @fake-broker
+  Scenario: Toggle verify host name on a TLS connection profile
+    Given a saved connection "uat-eu" with TLS on
+    When I set verify host name of "uat-eu" to on
+    Then the saved profile "uat-eu" has verify host name enabled
+
   Scenario: Deleting a profile can be cancelled
     Given a saved connection "uat-eu"
     When I start deleting the connection "uat-eu" and then cancel

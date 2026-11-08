@@ -60,7 +60,7 @@ class StreamAndManagementReachabilityChecker(
                     val ssl = TlsSupport.sslContextOf(transport.trust).socketFactory
                         .createSocket(raw, profile.host, profile.streamPort, true) as SSLSocket
                     ssl.use {
-                        it.sslParameters = TlsSupport.permissiveSslParameters()
+                        it.sslParameters = TlsSupport.sslParametersOf(transport.verifyHostName)
                         it.soTimeout = connectTimeoutMillis.toInt()
                         it.startHandshake()
                     }

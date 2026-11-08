@@ -492,10 +492,11 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     private fun DesktopComposeUiTest.declarationSwitch(): SemanticsNodeInteraction =
-        // M2-14: the form has a second switch, "Use TLS" (tag tlsSwitch); M6-01: MQTT switch (tag mqttPluginSwitch)
+        // M2-14: the form has a second switch, "Use TLS" (tag tlsSwitch); M6-01: MQTT switch (tag mqttPluginSwitch); M5-05: verifyHostName
         onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
                 .and(!hasTestTag("tlsSwitch"))
+                .and(!hasTestTag("verifyHostNameSwitch"))
                 .and(!hasTestTag("mqttPluginSwitch")),
         ).performScrollTo()
 

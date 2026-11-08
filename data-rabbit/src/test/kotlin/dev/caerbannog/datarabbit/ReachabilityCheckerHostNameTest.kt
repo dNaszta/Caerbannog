@@ -27,4 +27,17 @@ class ReachabilityCheckerHostNameTest {
             assertEquals(ConnectionCheckResult.BothReachable, result, "host name must not be verified (D7), got $result")
         }
     }
+
+    @Test
+    fun `the check refuses a certificate for another host name when verifyHostName is on`(@TempDir dir: Path) {
+        TlsHttpsServer(dir).use { server ->
+            val profile = ConnectionProfile(
+                name = "hn-check-strict", host = "127.0.0.1", virtualHost = "/", username = "svc",
+                streamPort = server.port, managementPort = server.port, tls = true, caCertificatePath = server.certificatePath,
+                verifyHostName = true,
+            )
+            val result = runBlocking { StreamAndManagementReachabilityChecker(connectTimeoutMillis = 5_000).check(profile) }
+            assertEquals(ConnectionCheckResult.CertificateRejected, result, "host name must be verified when verifyHostName is on, got $result")
+        }
+    }
 }

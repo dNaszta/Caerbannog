@@ -681,4 +681,36 @@ class ConnectionsScreenTlsUiTest {
         assertTrue(exists("MQTT port (TLS)"))
         assertEquals("8883", field("MQTT port (TLS)").text())
     }
+
+    // --- M5-05: verifyHostName switch UI tests ------------------------------------------------------------------------
+
+    private fun DesktopComposeUiTest.verifyHostNameSwitch(): SemanticsNodeInteraction = onNodeWithTag("verifyHostNameSwitch").performScrollTo()
+
+    @Test
+    fun `with TLS on, toggling verify host name on hides the note and persists on save`() = runDesktopComposeUiTest(1280, 880) {
+        show(uat.copy(verifyHostName = false))
+        select(uat.name)
+
+        assertTrue(exists("Host name is not verified."))
+        verifyHostNameSwitch().assertIsOff()
+
+        verifyHostNameSwitch().performClick()
+        waitForIdle()
+
+        verifyHostNameSwitch().assertIsOn()
+        assertFalse(exists("Host name is not verified."))
+
+        save()
+
+        val saved = repository.list().first { it.name == uat.name }
+        assertTrue(saved.verifyHostName)
+    }
+
+    @Test
+    fun `with TLS off, verify host name switch is not shown`() = runDesktopComposeUiTest(1280, 880) {
+        show(uat.copy(tls = false))
+        select(uat.name)
+
+        onNodeWithTag("verifyHostNameSwitch").assertDoesNotExist()
+    }
 }

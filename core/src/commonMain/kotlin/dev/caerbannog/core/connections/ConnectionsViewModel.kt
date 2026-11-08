@@ -75,6 +75,7 @@ class ConnectionsViewModel(
             tls = isTls,
             mqttPort = if (input.clearMqtt) null else input.mqttPort,
             caCertificatePath = resolveCaCertificatePath(null, input.caCertificatePath, isTls),
+            verifyHostName = input.verifyHostName ?: false,
             topologyControlLevel = input.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
             declaredPermissions = (input.declaredPermissions as? DeclaredPermissionsEdit.Set)?.permissions,
         )
@@ -110,6 +111,7 @@ class ConnectionsViewModel(
                 else -> original.mqttPort
             },
             caCertificatePath = resolveCaCertificatePath(original.caCertificatePath, input.caCertificatePath, isTls),
+            verifyHostName = input.verifyHostName ?: original.verifyHostName,
             topologyControlLevel = input.topologyControlLevel ?: original.topologyControlLevel,
             declaredPermissions = when (val edit = input.declaredPermissions) {
                 DeclaredPermissionsEdit.Keep -> original.declaredPermissions

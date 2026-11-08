@@ -46,14 +46,14 @@ object ConnectionNotes {
 }
 
 /**
- * M2-14: the notes of the edit panel for the TLS switch position [tls] (the form's value, saved or not).
- * [hostNameNotVerified] is [ConnectionNotes.HOST_NAME_NOT_VERIFIED] only with TLS on, otherwise null;
+ * M2-14 / M5-05: the notes of the edit panel for the TLS switch position [tls] and hostname verification [verifyHostName].
+ * [hostNameNotVerified] is [ConnectionNotes.HOST_NAME_NOT_VERIFIED] only with TLS on AND verifyHostName off;
  * [notEncrypted] is [ConnectionNotes.NOT_ENCRYPTED] only with TLS off, otherwise null. One pure rule, so the BDD
  * steps and the screen cannot drift.
  */
 data class EditPanelNotes(val hostNameNotVerified: String?, val notEncrypted: String?)
 
-fun editPanelNotes(tls: Boolean): EditPanelNotes = EditPanelNotes(
-    hostNameNotVerified = if (tls) ConnectionNotes.HOST_NAME_NOT_VERIFIED else null,
+fun editPanelNotes(tls: Boolean, verifyHostName: Boolean = false): EditPanelNotes = EditPanelNotes(
+    hostNameNotVerified = if (tls && !verifyHostName) ConnectionNotes.HOST_NAME_NOT_VERIFIED else null,
     notEncrypted = if (tls) null else ConnectionNotes.NOT_ENCRYPTED,
 )

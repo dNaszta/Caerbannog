@@ -364,4 +364,39 @@ class JsonConnectionProfileRepositoryTest {
         assertFalse(file.readText().contains("mqttPort"))
         assertNull(repository.list().single().mqttPort)
     }
+
+    // --- M5-05: optional verifyHostName in connections.json -----------------------------------------------------------
+
+    @Test
+    fun `a file without verifyHostName loads with verifyHostName false`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        file.writeText(fixtureText())
+
+        val loaded = JsonFileConnectionProfileRepository(file).list()
+
+        assertTrue(loaded.all { !it.verifyHostName })
+    }
+
+    @Test
+    fun `verifyHostName round trips through a real JSON file`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        val repository = JsonFileConnectionProfileRepository(file)
+
+        repository.add(prodEu().copy(verifyHostName = true))
+        val loaded = repository.list().single()
+
+        assertTrue(loaded.verifyHostName)
+        assertTrue(file.readText().contains("\"verifyHostName\": true"))
+    }
+
+    @Test
+    fun `a profile with verifyHostName false does not write the verifyHostName key`(@TempDir tempDir: File) {
+        val file = File(tempDir, "connections.json")
+        val repository = JsonFileConnectionProfileRepository(file)
+
+        repository.add(prodEu().copy(verifyHostName = false))
+        val written = file.readText()
+
+        assertFalse(written.contains("verifyHostName"))
+    }
 }

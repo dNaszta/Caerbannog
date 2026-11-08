@@ -203,4 +203,27 @@ class ConnectionFormStateTest {
         assertNull(input.mqttPort)
         assertEquals(true, input.clearMqtt)
     }
+
+    // --- M5-05: verifyHostName in form state --------------------------------------------------------------------------
+
+    @Test
+    fun `a new form starts with verifyHostName false`() {
+        val form = ConnectionFormState(null)
+        assertFalse(form.verifyHostName)
+        assertEquals(false, form.toInput(null).verifyHostName)
+    }
+
+    @Test
+    fun `a saved profile with verifyHostName true initializes verifyHostName to true`() {
+        val form = ConnectionFormState(saved.copy(verifyHostName = true))
+        assertEquals(true, form.verifyHostName)
+        assertEquals(true, form.toInput(saved).verifyHostName)
+    }
+
+    @Test
+    fun `toggling verifyHostName updates the input`() {
+        val form = ConnectionFormState(saved)
+        form.verifyHostName = true
+        assertEquals(true, form.toInput(saved).verifyHostName)
+    }
 }
