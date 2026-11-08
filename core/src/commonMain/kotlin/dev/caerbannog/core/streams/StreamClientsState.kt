@@ -83,6 +83,10 @@ data class StreamClientsState(
     val banner: String? = null,
     val updatedAtMillis: Long? = null,
     val refreshInterval: RefreshInterval = DEFAULT_REFRESH,
+    /** Rolling publish velocity sparklines keyed by [PublisherRowState.key], populated after 2+ refresh ticks. */
+    val publisherSparklines: Map<String, MetricSparkline> = emptyMap(),
+    /** Rolling lag trend sparklines keyed by [ConsumerRowState.key] (`↗ Growing` / `↘ Draining` / `→ Steady`), populated after 2+ refresh ticks. */
+    val consumerLagSparklines: Map<String, MetricSparkline> = emptyMap(),
 )
 
 object StreamClientsTexts {

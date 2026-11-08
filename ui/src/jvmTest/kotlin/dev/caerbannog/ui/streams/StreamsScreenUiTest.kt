@@ -426,4 +426,26 @@ class StreamsScreenUiTest {
         assertTrue(chip.right <= 800f + 0.5f, "the chip is inside the window: $chip")
         onNodeWithTag("columnHeader:Consumers", useUnmergedTree = true).assertExists("the table scrolls sideways, it does not drop columns")
     }
+
+    @Test
+    fun `stream row renders rolling velocity sparkline badge when messageSparklines contains stream entry`() = runDesktopComposeUiTest(1280, 800) {
+        val sparkline = dev.caerbannog.core.streams.MetricSparkline(
+            samples = listOf(1000L, 1225L, 1450L),
+            normalizedPoints = listOf(0f, 0.5f, 1f),
+            deltaPerTick = 225L,
+            deltaPerSecond = 45L,
+            direction = dev.caerbannog.core.streams.TrendDirection.Growing,
+            label = "+45/s",
+            semantic = dev.caerbannog.core.streams.SparklineSemantic.Velocity,
+        )
+        val state = rowsState(listOf(row("orders-events", messages = "1,450"))).copy(
+            messageSparklines = mapOf("orders-events" to sparkline),
+        )
+        screen(state)
+
+        onNode(hasTestTag("cell:orders-events:Messages").and(hasText("1,450")), useUnmergedTree = true).assertExists()
+        onNodeWithTag("streamSparkline:orders-events", useUnmergedTree = true).assertExists()
+        onNodeWithTag("streamSparkline:orders-events:canvas", useUnmergedTree = true).assertExists()
+        onNode(hasTestTag("streamSparkline:orders-events:label").and(hasText("+45/s")), useUnmergedTree = true).assertExists()
+    }
 }

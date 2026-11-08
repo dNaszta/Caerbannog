@@ -49,10 +49,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import dev.caerbannog.ui.components.CopyableText
+import dev.caerbannog.ui.components.MetricSparklineBadge
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.streams.ConsumerRowState
 import dev.caerbannog.core.streams.ConsumerStatus
+import dev.caerbannog.core.streams.MetricSparkline
 import dev.caerbannog.core.streams.PublisherRowState
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
@@ -94,13 +96,21 @@ internal fun rememberClientsScrollStates(): ClientsScrollStates {
     return remember(publishers, consumers) { ClientsScrollStates(publishers, consumers) }
 }
 
-internal fun LazyListScope.publishersSection(rows: List<PublisherRowState>?, stale: Boolean, contentWidth: Dp, scroll: ScrollState) {
+internal fun LazyListScope.publishersSection(
+    rows: List<PublisherRowState>?,
+    stale: Boolean,
+    state: StreamClientsState,
+    contentWidth: Dp,
+    scroll: ScrollState,
+) {
     clientsSection(
         "publishers", StreamClientsTexts.PUBLISHERS_TITLE, rows?.size, PublisherColumns, rows?.isEmpty() == true, StreamClientsTexts.NO_PUBLISHERS,
         stale, contentWidth, scroll,
     ) { scale ->
         rows?.let { list ->
-            itemsIndexed(list, key = { _, row -> "publisher:${row.key}" }) { index, row -> PublisherRow(index, row, scale, scroll, stale) }
+            itemsIndexed(list, key = { _, row -> "publisher:${row.key}" }) { index, row ->
+                PublisherRow(index, row, state.publisherSparklines[row.key], scale, scroll, stale)
+            }
         }
     }
 }
@@ -113,7 +123,11 @@ internal fun LazyListScope.consumersSection(rows: List<ConsumerRowState>?, stale
     ) { scale ->
         // The key is the row identity (a consumer that disappears or reorders keeps the others' state); the prefix keeps it apart from
         // a publisher on the same connection, because both tables live in one list.
-        rows?.let { list -> items(list, key = { "consumer:${it.key}" }) { row -> ConsumerRow(row, scale, scroll, stale) } }
+        rows?.let { list ->
+            items(list, key = { "consumer:${it.key}" }) { row ->
+                ConsumerRow(row, state.consumerLagSparklines[row.key], scale, scroll, stale)
+            }
+        }
     }
 }
 
@@ -282,13 +296,27 @@ private fun LoadingRow(columns: List<ClientColumn>, scale: Float, first: Boolean
 // Cells are top aligned on purpose: the selection container orders its texts by position, and a centred one-line cell next to a
 // two-line connection cell would be ordered after the connection, so a drag over it selected the wrong text.
 @Composable
-private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
+private fun PublisherRow(
+    index: Int,
+    row: PublisherRowState,
+    sparkline: MetricSparkline?,
+    scale: Float,
+    scroll: ScrollState,
+    stale: Boolean,
+) {
     val tag = "publisherCell:$index"
     StaleDim(stale) { Column(Modifier.rowScroll(scroll, PublisherColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.reference, "$tag:Reference", PublisherColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, PublisherColumns[1], scale)
-            ValueCell(row.published, "$tag:Published", PublisherColumns[2], scale)
+            ValueWithSparklineCell(
+                text = row.published,
+                tag = "$tag:Published",
+                sparkline = sparkline,
+                sparklineTag = "publisherSparkline:${row.key}",
+                column = PublisherColumns[2],
+                scale = scale,
+            )
             ValueCell(row.confirmed, "$tag:Confirmed", PublisherColumns[3], scale)
             ValueCell(row.errors, "$tag:Errors", PublisherColumns[4], scale)
         }
@@ -297,18 +325,57 @@ private fun PublisherRow(index: Int, row: PublisherRowState, scale: Float, scrol
 }
 
 @Composable
-private fun ConsumerRow(row: ConsumerRowState, scale: Float, scroll: ScrollState, stale: Boolean) {
+private fun ConsumerRow(
+    row: ConsumerRowState,
+    lagSparkline: MetricSparkline?,
+    scale: Float,
+    scroll: ScrollState,
+    stale: Boolean,
+) {
     val tag = "consumerCell:${row.key}"
     StaleDim(stale) { Column(Modifier.rowScroll(scroll, ConsumerColumns.totalWidth())) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.Top) {
             ValueCell(row.name, "$tag:Name", ConsumerColumns[0], scale, MaterialTheme.typography.titleSmall)
             ConnectionCell(row.connection, row.user, tag, ConsumerColumns[1], scale)
             ValueCell(row.offset, "$tag:Offset", ConsumerColumns[2], scale)
-            ValueCell(row.behind, "$tag:Behind", ConsumerColumns[3], scale)
+            ValueWithSparklineCell(
+                text = row.behind,
+                tag = "$tag:Behind",
+                sparkline = lagSparkline,
+                sparklineTag = "consumerLagTrend:${row.key}",
+                column = ConsumerColumns[3],
+                scale = scale,
+            )
             StatusCell(row.status, "$tag:Status", row.key, ConsumerColumns[4], scale)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     } }
+}
+
+@Composable
+private fun ValueWithSparklineCell(
+    text: String,
+    tag: String,
+    sparkline: MetricSparkline?,
+    sparklineTag: String,
+    column: ClientColumn,
+    scale: Float,
+) {
+    if (sparkline == null) {
+        ValueCell(text, tag, column, scale)
+        return
+    }
+    Column(
+        Modifier.width(column.width * scale).padding(horizontal = CellPadding, vertical = CellVerticalPadding),
+        horizontalAlignment = if (column.numeric) Alignment.End else Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        CopyableText(text, tag, MaterialTheme.typography.bodyMedium, if (column.numeric) TextAlign.End else TextAlign.Start)
+        MetricSparklineBadge(
+            sparkline = sparkline,
+            tag = sparklineTag,
+        )
+    }
 }
 
 @Composable

@@ -56,6 +56,8 @@ class StreamClientsViewModel(
     private var stale = false
     private var banner: String? = null
     private var failedFirstLoad = false
+    private val publisherHistory = RollingMetricHistory()
+    private val consumerLagHistory = RollingMetricHistory()
 
     private val loop = RefreshLoop(
         scope = scope,
@@ -164,6 +166,8 @@ class StreamClientsViewModel(
         stale = false
         banner = null
         failedFirstLoad = false
+        publisherHistory.clear()
+        consumerLagHistory.clear()
     }
 
     // --- loading -------------------------------------------------------------------------------------
@@ -216,7 +220,26 @@ class StreamClientsViewModel(
 
     private fun finish(result: Outcome, success: Boolean) {
         outcome = result
-        if (success) lastSuccessMillis = clock.nowMillis()
+        if (success) {
+            val now = clock.nowMillis()
+            lastSuccessMillis = now
+            if (result is Outcome.Sections) {
+                val pubKeys = uniqueKeys(result.publishers.map { "${it.connectionName}#${it.publisherId}" })
+                pubKeys.zip(result.publishers).forEach { (key, row) ->
+                    if (!row.isSettling()) {
+                        publisherHistory.record(key, row.published, now)
+                    }
+                }
+                publisherHistory.retainKeys(pubKeys.toSet())
+                val consKeys = uniqueKeys(result.consumers.map { "${it.connectionName}#${it.subscriptionId}" })
+                consKeys.zip(result.consumers).forEach { (key, row) ->
+                    if (!row.isSettling()) {
+                        consumerLagHistory.record(key, row.offsetLag, now)
+                    }
+                }
+                consumerLagHistory.retainKeys(consKeys.toSet())
+            }
+        }
         stale = false
         banner = null
         failedFirstLoad = false
@@ -245,6 +268,12 @@ class StreamClientsViewModel(
         val screen = screen()
         val result = outcome
         val sections = result as? Outcome.Sections
+        val pubStates = sections?.publishers.orEmpty().let { rows ->
+            uniqueKeys(rows.map { "${it.connectionName}#${it.publisherId}" }).zip(rows) { key, row -> publisherState(key, row) }
+        }
+        val consStates = sections?.consumers.orEmpty().let { rows ->
+            uniqueKeys(rows.map { "${it.connectionName}#${it.subscriptionId}" }).zip(rows) { key, row -> consumerState(key, row) }
+        }
         _updatedAt.value = lastSuccessMillis
         _state.value = StreamClientsState(
             screen = screen,
@@ -264,17 +293,15 @@ class StreamClientsViewModel(
                 is Outcome.PluginMissing -> result.lastOffset
                 else -> ""
             },
-            publishers = sections?.publishers.orEmpty().let { rows ->
-                uniqueKeys(rows.map { "${it.connectionName}#${it.publisherId}" }).zip(rows) { key, row -> publisherState(key, row) }
-            },
-            consumers = sections?.consumers.orEmpty().let { rows ->
-                uniqueKeys(rows.map { "${it.connectionName}#${it.subscriptionId}" }).zip(rows) { key, row -> consumerState(key, row) }
-            },
+            publishers = pubStates,
+            consumers = consStates,
             ownConnectionsNotice = if (sections?.ownOnly == true) StreamClientsTexts.OWN_CONNECTIONS_NOTICE else null,
             stale = stale,
             banner = banner,
             updatedAtMillis = lastSuccessMillis,
             refreshInterval = interval,
+            publisherSparklines = publisherHistory.snapshot(pubStates.map { it.key }, SparklineSemantic.Velocity),
+            consumerLagSparklines = consumerLagHistory.snapshot(consStates.map { it.key }, SparklineSemantic.ConsumerLag),
         )
     }
 }

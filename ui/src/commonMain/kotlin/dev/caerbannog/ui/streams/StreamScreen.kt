@@ -515,7 +515,7 @@ private fun ClientsSections(state: StreamClientsState, loading: Boolean, events:
                     }
                 }
                 val stale = state.stale && !loading
-                publishersSection(if (loading) null else state.publishers, stale, contentWidth, scrolls.publishers)
+                publishersSection(if (loading) null else state.publishers, stale, state, contentWidth, scrolls.publishers)
                 consumersSection(if (loading) null else state.consumers, stale, state, contentWidth, scrolls.consumers)
                 if (!loading) {
                     item(key = "footnote") {

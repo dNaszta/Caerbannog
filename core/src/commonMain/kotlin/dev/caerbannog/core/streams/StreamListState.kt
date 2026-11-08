@@ -80,6 +80,8 @@ data class StreamListState(
     val kindFilter: StreamKindFilter = StreamKindFilter.All,
     /** M2-07: set while the super stream grouping was never read (the list is flat); null otherwise. */
     val groupingNotice: String? = null,
+    /** Rolling throughput sparklines keyed by stream name, populated after 2+ refresh ticks with zero extra broker calls. */
+    val messageSparklines: Map<String, MetricSparkline> = emptyMap(),
 )
 
 /** Texts of the stream list, shared by core and the screen. */
