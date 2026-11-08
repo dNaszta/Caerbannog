@@ -293,7 +293,8 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 - M2 Stream list and stats: accepted by the product owner on 2026-11-06; gate passed (`@gate-M2` stats match real broker in `RealBrokerStatsMatchTest`).
 - M3 Message browser: accepted by the product owner on 2026-11-06; gate passed (`@gate-M3` paging across real broker chunk boundaries, edge handling, and consumer offset safety in `RealBrokerMessageBrowserTest`).
 - M4 Payload viewer and filter: accepted on 2026-11-07; gate passed (`@gate-M4` large bodies keep screen responsive with 100 x 1 MB messages on real RabbitMQ 4 broker in `RealBrokerPayloadViewerTest`; filtering safety verified).
-- M5 Publish and test message: next milestone (publishing single and batch test messages, migration history).
+- M5 Publish, manage, package: accepted on 2026-11-08; gate passed (`@gate-M5` stream creation/deletion, message publishing, MQTT plugin session tracking & TLS QoS 2 publishing, and MQTT-to-stream routing in `RealBrokerM5GateTest`; macOS DMG installer built cleanly via `:desktopApp:packageDmg`, 125 MB).
+- M6 MQTT Plugin Support: accepted on 2026-11-08; client sessions and subscriptions discovery, MQTT publisher engine (QoS 0/1/2, Retain) with UI dialog, dev broker MQTT listeners (1883/8883), and MCP server tools (`caerbannog_list_mqtt_clients`, `caerbannog_publish_mqtt`).
 
 **Risks**
 
