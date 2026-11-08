@@ -58,3 +58,54 @@ data class MqttClientRow(
     val subscriptions: List<MqttSubscription> = emptyList(),
     val connected: Boolean = true,
 )
+
+/**
+ * Inbound binding into a RabbitMQ stream, with MQTT topic translation when bound to `amq.topic`.
+ */
+data class StreamInboundRoute(
+    val exchange: String,
+    val routingKey: String,
+    val arguments: Map<String, String> = emptyMap(),
+) {
+    /** True when this binding comes from RabbitMQ's MQTT exchange (`amq.topic`). */
+    val isMqttTopicExchange: Boolean
+        get() = exchange == "amq.topic"
+
+    /**
+     * Converts an AMQP topic routing key (`sensors.#`, `devices.*.telemetry`) to its MQTT topic filter
+     * equivalent (`sensors/#`, `devices/+/telemetry`), or null when not bound to `amq.topic`.
+     */
+    val mqttTopicFilter: String?
+        get() = if (isMqttTopicExchange) routingKeyToMqttFilter(routingKey) else null
+
+    /**
+     * Suggests a valid, concrete MQTT publish topic that will match this binding's [routingKey]
+     * (replacing `*`/`+` with `item` and `#` with `test`, or `test` if empty), or null when not bound to `amq.topic`.
+     */
+    val suggestedPublishTopic: String?
+        get() = if (isMqttTopicExchange) routingKeyToSuggestedMqttTopic(routingKey) else null
+
+    companion object {
+        fun routingKeyToMqttFilter(routingKey: String): String {
+            val trimmed = routingKey.trim()
+            if (trimmed.isEmpty()) return "#"
+            return trimmed.split('.', '/')
+                .filter { it.isNotEmpty() }
+                .joinToString("/") { seg -> if (seg == "*") "+" else seg }
+        }
+
+        fun routingKeyToSuggestedMqttTopic(routingKey: String): String {
+            val trimmed = routingKey.trim()
+            if (trimmed.isEmpty()) return "test"
+            val segments = trimmed.split('.', '/').mapNotNull { seg ->
+                when (seg) {
+                    "#" -> "test"
+                    "*", "+" -> "item"
+                    "" -> null
+                    else -> seg
+                }
+            }
+            return if (segments.isEmpty()) "test" else segments.joinToString("/")
+        }
+    }
+}

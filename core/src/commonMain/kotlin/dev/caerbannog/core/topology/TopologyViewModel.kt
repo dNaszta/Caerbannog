@@ -16,6 +16,8 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.RefreshLoop
 import dev.caerbannog.core.streams.RefreshTarget
+import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.groupDigits
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -74,6 +76,7 @@ class TopologyViewModel(
     private var exchanges: List<ExchangeRow>? = null
     private var bindings: List<BindingRow>? = null
     private var mqttClients: List<MqttClientRow>? = null
+    private var streams: List<StreamSummary>? = null
 
     private var lastSuccessMillis: Long? = null
     private var stale = false
@@ -165,6 +168,7 @@ class TopologyViewModel(
         exchanges = null
         bindings = null
         mqttClients = null
+        streams = null
         selectedName = null
         searches.clear()
         page = 1
@@ -271,6 +275,7 @@ class TopologyViewModel(
         exchanges = null
         bindings = null
         mqttClients = null
+        streams = null
         selectedName = null
         searches.clear()
         page = 1
@@ -328,11 +333,21 @@ class TopologyViewModel(
         } else {
             null
         }
+        val newStreams = if (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph) {
+            when (val res = loop.ask(src) { src.catalog.listStreams(StreamListRequest(vhost = target, page = 1, pageSize = 500)) }) {
+                is CatalogResult.Success -> res.value.rows
+                null -> return
+                else -> emptyList()
+            }
+        } else {
+            streams
+        }
 
         queues = newQueues
         exchanges = newExchanges
         bindings = newBindings
         mqttClients = newMqtt
+        streams = newStreams
         if (selectedName != null && newQueues.none { it.name == selectedName }) selectedName = null
         lastSuccessMillis = clock.nowMillis()
         stale = false
@@ -389,6 +404,7 @@ class TopologyViewModel(
         exchanges = null
         bindings = null
         mqttClients = null
+        streams = null
         selectedName = null
         offered = null
         cannotRead = true
@@ -402,6 +418,7 @@ class TopologyViewModel(
         exchanges = null
         bindings = null
         mqttClients = null
+        streams = null
         selectedName = null
         vhostUnavailable = true
         stale = false
@@ -550,7 +567,7 @@ class TopologyViewModel(
                 val src = if (row.source.isEmpty()) TopologyTexts.DEFAULT_EXCHANGE else row.source
                 matches(src) || matches(row.destination) || matches(row.routingKey)
             }
-            buildBindingGraph(ex, q, b, showDefaultExchange)
+            buildBindingGraph(ex, q, b, showDefaultExchange, streams = streams.orEmpty())
         } else null
         val graphTooLargeMsg = if (computedGraph?.isTooLarge == true) {
             TopologyTexts.graphTooLarge(computedGraph.totalBindings)

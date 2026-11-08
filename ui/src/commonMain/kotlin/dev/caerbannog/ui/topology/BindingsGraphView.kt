@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,12 @@ import dev.caerbannog.ui.connections.SmallIconSize
  * notice is displayed asking to narrow the search or focus on an exchange.
  */
 @Composable
-internal fun BindingsGraphView(state: TopologyState, loading: Boolean) {
+internal fun BindingsGraphView(
+    state: TopologyState,
+    loading: Boolean,
+    onSelectQueue: ((String) -> Unit)? = null,
+    onOpenStream: ((String) -> Unit)? = null,
+) {
     val overflowMsg = state.graphTooLargeMessage
     if (overflowMsg != null) {
         GraphTooLargeNotice(overflowMsg)
@@ -150,22 +156,51 @@ internal fun BindingsGraphView(state: TopologyState, loading: Boolean) {
 
             // Nodes
             nodes.forEach { pNode ->
-                GraphNodeCard(pNode)
+                GraphNodeCard(
+                    pNode = pNode,
+                    onSelectQueue = onSelectQueue,
+                    onOpenStream = onOpenStream,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun GraphNodeCard(pNode: PositionedNode) {
+private fun GraphNodeCard(
+    pNode: PositionedNode,
+    onSelectQueue: ((String) -> Unit)? = null,
+    onOpenStream: ((String) -> Unit)? = null,
+) {
     val node = pNode.node
-    val icon = if (node.kind == GraphNodeKind.Exchange) AppIcon.SwapHoriz else AppIcon.Inbox
+    val icon = when (node.kind) {
+        GraphNodeKind.Exchange -> AppIcon.SwapHoriz
+        GraphNodeKind.Stream -> AppIcon.Stream
+        GraphNodeKind.Queue -> AppIcon.Inbox
+    }
+    val clickHandler: (() -> Unit)? = when (node.kind) {
+        GraphNodeKind.Stream -> onOpenStream?.let { cb -> { cb(node.name) } }
+        GraphNodeKind.Queue -> onSelectQueue?.let { cb -> { cb(node.name) } }
+        GraphNodeKind.Exchange -> null
+    }
+    val borderColor = if (node.kind == GraphNodeKind.Stream) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
     Card(
         modifier = Modifier
             .offset(x = pNode.x.dp, y = pNode.y.dp)
             .width(NODE_WIDTH.dp)
             .height(NODE_HEIGHT.dp)
             .testTag("graphNode:${node.name}")
+            .then(
+                if (clickHandler != null) {
+                    Modifier.clickable(role = Role.Button, onClick = clickHandler)
+                } else {
+                    Modifier
+                }
+            )
             .focusable()
             .semantics {
                 contentDescription = node.accessibilityDescription
@@ -173,7 +208,7 @@ private fun GraphNodeCard(pNode: PositionedNode) {
             },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(if (node.kind == GraphNodeKind.Stream) 1.5.dp else 1.dp, borderColor),
     ) {
         Row(
             Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),

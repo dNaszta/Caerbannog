@@ -1,8 +1,11 @@
 package dev.caerbannog.core.topology
 
+import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.mqtt.StreamInboundRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TopologyGraphLayoutTest {
@@ -157,5 +160,49 @@ class TopologyGraphLayoutTest {
 
         assertEquals("", partitionNode.detail, "Stream partition absent from queues must not show fake (0 ready)")
         assertEquals("(1,240 ready)", quorumNode.detail, "Known queue must format readyMessages with groupDigits")
+    }
+
+    @Test
+    fun `stream destinations matching known streams receive GraphNodeKind Stream and formatted message counts`() {
+        val exchanges = listOf(exchange("amq.topic", "topic"))
+        val queues = listOf(queue("orders", ready = 25))
+        val streams = listOf(
+            stream(name = "telemetry-stream", messages = 4500L),
+        )
+        val bindings = listOf(
+            binding("amq.topic", "telemetry-stream", BindingDestinationType.QUEUE, "sensors.#"),
+            binding("amq.topic", "orders", BindingDestinationType.QUEUE, "orders.#"),
+        )
+
+        val graph = buildBindingGraph(exchanges, queues, bindings, showDefaultExchange = false, streams = streams)
+        val streamNode = graph.nodes.first { it.node.name == "telemetry-stream" }.node
+        val queueNode = graph.nodes.first { it.node.name == "orders" }.node
+
+        assertEquals(GraphNodeKind.Stream, streamNode.kind)
+        assertEquals("(stream · 4,500 msgs)", streamNode.detail)
+        assertEquals(GraphNodeKind.Queue, queueNode.kind)
+        assertEquals("(25 ready)", queueNode.detail)
+    }
+
+    @Test
+    fun `StreamInboundRoute translates amq topic routing keys into MQTT topic filters and concrete suggested publish topics`() {
+        val multiLevel = StreamInboundRoute(exchange = "amq.topic", routingKey = "sensors.#")
+        assertTrue(multiLevel.isMqttTopicExchange)
+        assertEquals("sensors/#", multiLevel.mqttTopicFilter)
+        assertEquals("sensors/test", multiLevel.suggestedPublishTopic)
+
+        val singleLevel = StreamInboundRoute(exchange = "amq.topic", routingKey = "devices.*.telemetry")
+        assertTrue(singleLevel.isMqttTopicExchange)
+        assertEquals("devices/+/telemetry", singleLevel.mqttTopicFilter)
+        assertEquals("devices/item/telemetry", singleLevel.suggestedPublishTopic)
+
+        val rootWildcard = StreamInboundRoute(exchange = "amq.topic", routingKey = "#")
+        assertEquals("#", rootWildcard.mqttTopicFilter)
+        assertEquals("test", rootWildcard.suggestedPublishTopic)
+
+        val nonMqtt = StreamInboundRoute(exchange = "orders.exchange", routingKey = "orders.created")
+        assertFalse(nonMqtt.isMqttTopicExchange)
+        assertNull(nonMqtt.mqttTopicFilter)
+        assertNull(nonMqtt.suggestedPublishTopic)
     }
 }

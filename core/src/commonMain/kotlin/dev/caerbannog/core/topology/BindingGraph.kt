@@ -1,10 +1,11 @@
 package dev.caerbannog.core.topology
 
+import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.groupDigits
 
 enum class BindingsViewMode { Table, Graph }
 
-enum class GraphNodeKind { Exchange, Queue }
+enum class GraphNodeKind { Exchange, Queue, Stream }
 
 data class GraphNode(
     val id: String,
@@ -61,6 +62,7 @@ fun buildBindingGraph(
     queues: List<QueueRow>,
     bindings: List<BindingRow>,
     showDefaultExchange: Boolean = false,
+    streams: List<StreamSummary> = emptyList(),
 ): BindingGraph {
     val filteredBindings = bindings.filter { showDefaultExchange || it.source.isNotEmpty() }
     val totalBindings = filteredBindings.size
@@ -98,6 +100,7 @@ fun buildBindingGraph(
 
     val exchangeMap = exchanges.associateBy { it.name }
     val queueMap = queues.associateBy { it.name }
+    val streamMap = streams.associateBy { it.name }
 
     // Count bindings per node
     val bindingCounts = mutableMapOf<String, Int>()
@@ -128,17 +131,19 @@ fun buildBindingGraph(
 
     activeQueueNames.forEach { name ->
         val q = queueMap[name]
-        val detail = if (q == null) {
-            ""
-        } else {
-            q.readyMessages?.let { "(${groupDigits(it)} ready)" } ?: "(${TopologyTexts.NOT_AVAILABLE})"
+        val s = streamMap[name]
+        val kind = if (s != null) GraphNodeKind.Stream else GraphNodeKind.Queue
+        val detail = when {
+            s != null -> s.messages?.let { "(stream · ${groupDigits(it)} msgs)" } ?: "(stream)"
+            q != null -> q.readyMessages?.let { "(${groupDigits(it)} ready)" } ?: "(${TopologyTexts.NOT_AVAILABLE})"
+            else -> ""
         }
         val id = "q:$name"
         rawNodes.add(
             GraphNode(
                 id = id,
                 name = name,
-                kind = GraphNodeKind.Queue,
+                kind = kind,
                 detail = detail,
                 bindingCount = bindingCounts[id] ?: 0,
             )
