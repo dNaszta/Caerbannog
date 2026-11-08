@@ -121,6 +121,17 @@ class RabbitMqStreamMessageReader internal constructor(
                             p.replyTo?.let { put("replyTo", it) }
                             p.to?.let { put("to", it) }
                             p.subject?.let { put("subject", it) }
+                            p.userId?.takeIf { it.isNotEmpty() }?.let {
+                                runCatching { it.decodeToString() }.getOrNull()?.takeIf { s -> s.isNotEmpty() }?.let { s -> put("userId", s) }
+                            }
+                            p.groupId?.let { put("groupId", it) }
+                            if (p.groupSequence > 0L) put("groupSequence", p.groupSequence)
+                            p.replyToGroupId?.let { put("replyToGroupId", it) }
+                            if (p.creationTime > 0L) put("creationTime", p.creationTime)
+                            if (p.absoluteExpiryTime > 0L) put("absoluteExpiryTime", p.absoluteExpiryTime)
+                        }
+                        message.messageAnnotations?.forEach { (k, v) ->
+                            if (v != null) put(k, v)
                         }
                     }
                     val appProps = message.applicationProperties ?: emptyMap()

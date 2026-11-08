@@ -58,6 +58,51 @@ data class InspectedQueueMessage(
     val acknowledgementStatusText: String
         get() = if (!acknowledged) QueueInspectionConstants.NOT_ACKNOWLEDGED_BADGE else "Acknowledged"
 
+    /** Human-readable exchange name (`(default exchange)` when `exchange` is blank). */
+    val displayExchange: String
+        get() = exchange.ifBlank { "(default exchange)" }
+
+    /** Human-readable routing key (`(empty)` when `routingKey` is blank). */
+    val displayRoutingKey: String
+        get() = routingKey.ifBlank { "(empty)" }
+
+    /** Human-readable delivery mode (`2 (Persistent)`, `1 (Transient)`, or raw value). */
+    val formattedDeliveryMode: String?
+        get() = when (val mode = properties["delivery_mode"]) {
+            "2" -> "2 (Persistent)"
+            "1" -> "1 (Transient)"
+            else -> mode
+        }
+
+    /** Formats a single AMQP property value with human-readable enrichment (e.g. `delivery_mode`). */
+    fun formatPropertyValue(key: String, rawValue: String): String = when (key) {
+        "delivery_mode" -> formattedDeliveryMode ?: rawValue
+        else -> rawValue
+    }
+
+    /** Formats routing metadata, AMQP properties, and message headers for one-click copying. */
+    fun formatMetadataForCopy(): String = buildString {
+        appendLine("Exchange: $displayExchange")
+        appendLine("Routing key: $displayRoutingKey")
+        appendLine("Redelivered: ${if (redelivered) "yes" else "no"}")
+        appendLine("Payload size: $payloadBytes B ($payloadEncoding)")
+        messageCount?.let { appendLine("Remaining in queue: $it") }
+        if (properties.isNotEmpty()) {
+            appendLine()
+            appendLine("Properties:")
+            for ((k, v) in properties) {
+                appendLine("  $k: ${formatPropertyValue(k, v)}")
+            }
+        }
+        if (headers.isNotEmpty()) {
+            appendLine()
+            appendLine("Headers:")
+            for ((k, v) in headers) {
+                appendLine("  $k: $v")
+            }
+        }
+    }.trimEnd()
+
     /** Converts this queue message to a [StreamMessage] so [PayloadFormatter] can inspect Text/JSON/Hex views. */
     fun toStreamMessage(): StreamMessage = StreamMessage(
         offset = index.toLong(),

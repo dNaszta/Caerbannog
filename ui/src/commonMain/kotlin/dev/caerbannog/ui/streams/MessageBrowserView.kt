@@ -844,6 +844,26 @@ private fun MessageDetailsSheet(
                     Spacer(Modifier.width(6.dp))
                     Text("Copy offset")
                 }
+
+                if (message.properties.isNotEmpty() || message.applicationProperties.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = {
+                            val metadataText = formatter.copyHeadersAndProperties(message)
+                            coroutineScope.launch {
+                                try {
+                                    clipboard.setClipEntry(ClipEntry(StringSelection(metadataText)))
+                                } catch (_: Exception) {
+                                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(metadataText), null)
+                                }
+                            }
+                        },
+                        modifier = Modifier.testTag("copyHeadersAndPropertiesButton"),
+                    ) {
+                        ConnectionIcon(AppIcon.Info, SmallIconSize)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Copy metadata")
+                    }
+                }
             }
         }
     }
