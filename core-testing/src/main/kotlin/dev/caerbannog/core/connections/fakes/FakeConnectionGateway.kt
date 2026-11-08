@@ -66,6 +66,7 @@ class FakeConnectionGateway(
         override val publisher: MessagePublisher = FakeMessagePublisher(),
         override val manager: StreamManager = FakeStreamManager(),
         override val mqtt: dev.caerbannog.core.mqtt.MqttCatalog = FakeMqttCatalog(),
+        override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = FakeMqttMessagePublisher(),
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()

@@ -62,6 +62,7 @@ class RabbitMqConnectionGateway(
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),
+                mqttPublisher = RabbitMqMqttPublisher(profile, password, transport),
             ),
         )
     }

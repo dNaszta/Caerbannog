@@ -49,6 +49,10 @@ dependencies {
     // decision S1 had it in test scope only). Production scope, and it brings Netty along.
     implementation("com.rabbitmq:stream-client:1.12.0")
 
+    // M6-04: MQTT message publisher (Eclipse Paho 1.2.5, published 2020, passes two-week age rule;
+    // zero transitive dependencies; EPL-2.0 / EDL-1.0).
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
+
     testImplementation(kotlin("test"))
     // M2-14c: ManagementHttp classification tests throw constructed SSL exceptions from a mock engine (no server can produce a cause loop).
     testImplementation("io.ktor:ktor-client-mock:3.0.3")
