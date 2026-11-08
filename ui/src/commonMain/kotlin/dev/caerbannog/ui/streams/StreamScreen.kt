@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,14 +20,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -256,7 +257,9 @@ private fun StreamInboundRoutesBar(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = 240.dp)
             .padding(horizontal = ClientsHorizontalPadding, vertical = 6.dp)
+            .verticalScroll(rememberScrollState())
             .testTag("streamInboundRoutesBar"),
     ) {
         Column(
@@ -292,6 +295,8 @@ private fun StreamInboundRoutesBar(
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         route.mqttTopicFilter?.let { topicFilter ->
                             Text(
@@ -300,6 +305,8 @@ private fun StreamInboundRoutesBar(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -323,6 +330,8 @@ private fun StreamInboundRoutesBar(
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -467,7 +476,12 @@ private fun RowScope.ClientsActions(
 @Composable
 private fun TabList(tabs: List<StreamTab>, selected: Int, onSelect: (Int) -> Unit) {
     Column {
-        Row(Modifier.testTag("tabList").padding(horizontal = 24.dp)) {
+        Row(
+            Modifier
+                .testTag("tabList")
+                .padding(horizontal = 24.dp)
+                .horizontalScroll(rememberScrollState())
+        ) {
             tabs.forEachIndexed { index, tab ->
                 val on = index == selected
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -480,6 +494,8 @@ private fun TabList(tabs: List<StreamTab>, selected: Int, onSelect: (Int) -> Uni
                             .selectable(selected = on, role = Role.Tab, onClick = { onSelect(index) })
                             .heightIn(min = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 14.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Box(Modifier.height(3.dp).width(32.dp).background(if (on) MaterialTheme.colorScheme.primary else Color.Transparent))
                 }

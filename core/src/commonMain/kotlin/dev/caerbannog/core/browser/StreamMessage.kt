@@ -8,6 +8,8 @@ package dev.caerbannog.core.browser
  * @property payload Raw message payload bytes.
  * @property properties Standard AMQP / Stream properties (e.g. messageId, correlationId, contentType).
  * @property applicationProperties User-defined message headers and properties.
+ * @property exchange The exchange through which this message was published, if available.
+ * @property routingKey The routing key used when publishing, if available.
  */
 data class StreamMessage(
     val offset: Long,
@@ -15,6 +17,8 @@ data class StreamMessage(
     val payload: ByteArray,
     val properties: Map<String, Any?> = emptyMap(),
     val applicationProperties: Map<String, Any?> = emptyMap(),
+    val exchange: String? = null,
+    val routingKey: String? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

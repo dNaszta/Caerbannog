@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,11 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -56,6 +62,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
@@ -209,14 +216,14 @@ fun MessageBrowserView(
                         MessagesTable(
                             state = state,
                             events = events,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
 
                         state.selectedMessage?.let { selected ->
                             MessageDetailsSheet(
                                 message = selected,
                                 events = events,
-                                modifier = Modifier.width(420.dp),
+                                modifier = Modifier.width(420.dp).fillMaxHeight(),
                             )
                         }
                     }
@@ -506,6 +513,7 @@ private fun PageSizeSelector(currentSize: Int, onSelectSize: (Int) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MessagesTable(
     state: MessageBrowserState.Loaded,
@@ -587,7 +595,7 @@ private fun MessagesTable(
             HorizontalDivider()
 
             // Table Rows
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.weight(1f)) {
                 items(state.messages, key = { it.offset }) { msg ->
                     val isSelected = msg.offset == state.selectedMessage?.offset
                     val rowBg = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent
@@ -656,12 +664,40 @@ private fun MessagesTable(
                             }
                         }
                         Spacer(Modifier.width(16.dp))
-                        Text(
-                            text = previewBody(msg.payload),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f).testTag("messageCell:${msg.offset}:body"),
-                        )
+                        val clipboard = LocalClipboard.current
+                        val bodyText = remember(msg.payload) { fullBodyForTooltip(msg.payload) }
+                        val scope = rememberCoroutineScope()
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(
+                                        text = bodyText,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                        modifier = Modifier.testTag("bodyTooltip:${msg.offset}"),
+                                    )
+                                }
+                            },
+                            state = rememberTooltipState(),
+                        ) {
+                            Text(
+                                text = previewBody(msg.payload),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("messageCell:${msg.offset}:body")
+                                    .clickable {
+                                        scope.launch {
+                                            try {
+                                                clipboard.setClipEntry(ClipEntry(StringSelection(bodyText)))
+                                            } catch (_: Exception) {
+                                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(bodyText), null)
+                                            }
+                                        }
+                                    },
+                            )
+                        }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
@@ -693,10 +729,17 @@ private fun MessageDetailsSheet(
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier.fillMaxHeight().testTag("messageDetailsSheet"),
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        val verticalScrollState = rememberScrollState()
+        val horizontalScrollState = rememberScrollState()
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp)
+                    .verticalScroll(verticalScrollState)
+                    .horizontalScroll(horizontalScrollState),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
             // Header: title and close button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -766,11 +809,10 @@ private fun MessageDetailsSheet(
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.fillMaxSize().padding(12.dp)) {
-                    val scrollState = rememberScrollState()
-                    Box(Modifier.weight(1f).verticalScroll(scrollState)) {
+                Column(Modifier.padding(12.dp)) {
+                    Box(Modifier.fillMaxWidth()) {
                         Text(
                             text = inspection.displayText,
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -796,6 +838,12 @@ private fun MessageDetailsSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 KeyValueRow("Timestamp", formatTimestamp(message.timestamp))
+                inspection.exchange?.takeIf { it.isNotEmpty() }?.let { exchange ->
+                    KeyValueRow("Exchange", exchange)
+                }
+                inspection.routingKey?.takeIf { it.isNotEmpty() }?.let { routingKey ->
+                    KeyValueRow("Routing Key", routingKey)
+                }
                 for ((k, v) in inspection.properties) {
                     KeyValueRow(k, v)
                 }
@@ -867,24 +915,30 @@ private fun MessageDetailsSheet(
             }
         }
     }
+    }
 }
 
 @Composable
 private fun KeyValueRow(key: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             key,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         Text(
             value,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -906,4 +960,23 @@ private fun previewBody(payload: ByteArray): String = try {
     }
 } catch (_: Exception) {
     payload.take(32).joinToString(" ") { "%02x".format(it) }
+}
+
+/**
+ * Formats the full body for display in a tooltip.
+ * For text content, returns the full text (truncated to a reasonable limit for display).
+ * For binary content, returns the hex representation.
+ */
+private fun fullBodyForTooltip(payload: ByteArray): String = try {
+    val text = payload.decodeToString()
+    if (text.any { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
+        // Binary data: show hex dump
+        payload.joinToString(" ") { "%02x".format(it) }
+    } else {
+        // Text data: show full text but limit to reasonable size for tooltip
+        text.take(1000) + if (payload.size > 1000) "\n\n... (truncated, full length: ${payload.size} bytes)" else ""
+    }
+} catch (_: Exception) {
+    // Cannot decode as text, show hex
+    payload.joinToString(" ") { "%02x".format(it) }
 }

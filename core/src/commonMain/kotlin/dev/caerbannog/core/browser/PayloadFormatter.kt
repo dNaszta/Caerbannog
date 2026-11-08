@@ -38,6 +38,8 @@ data class PayloadInspection(
     val canShowAll: Boolean = false,
     val properties: Map<String, String> = emptyMap(),
     val applicationProperties: Map<String, String> = emptyMap(),
+    val exchange: String? = null,
+    val routingKey: String? = null,
 )
 
 /**
@@ -218,6 +220,8 @@ class PayloadFormatter(
             canShowAll = canShowAll,
             properties = standardProps,
             applicationProperties = appProps,
+            exchange = message.exchange,
+            routingKey = message.routingKey,
         )
     }
 
@@ -245,6 +249,8 @@ class PayloadFormatter(
     fun copyHeadersAndProperties(message: StreamMessage): String = buildString {
         appendLine("Offset: ${message.offset}")
         appendLine("Timestamp: ${message.timestamp}")
+        message.exchange?.takeIf { it.isNotEmpty() }?.let { appendLine("Exchange: $it") }
+        message.routingKey?.takeIf { it.isNotEmpty() }?.let { appendLine("Routing Key: $it") }
         if (message.properties.isNotEmpty()) {
             appendLine()
             appendLine("Properties:")

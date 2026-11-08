@@ -112,6 +112,9 @@ class RabbitMqStreamMessageReader internal constructor(
                     val rawPayload = message.bodyAsBinary ?: ByteArray(0)
                     val timestamp = context.timestamp().takeIf { it > 0L }
                         ?: message.properties?.creationTime ?: 0L
+                    // Extract exchange and routing key from message annotations or properties
+                    val exchange = message.messageAnnotations?.get("x-exchange")?.toString()
+                    val routingKey = message.messageAnnotations?.get("x-routing-key")?.toString()
                     val props = buildMap<String, Any?> {
                         message.properties?.let { p ->
                             p.messageIdAsString?.let { put("messageId", it) }
@@ -135,7 +138,7 @@ class RabbitMqStreamMessageReader internal constructor(
                         }
                     }
                     val appProps = message.applicationProperties ?: emptyMap()
-                    collected.add(StreamMessage(offset, timestamp, rawPayload, props, appProps))
+                    collected.add(StreamMessage(offset, timestamp, rawPayload, props, appProps, exchange, routingKey))
                     doneLatch.countDown()
                 }
             }

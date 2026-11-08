@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -185,9 +186,12 @@ fun PublishMqttDialog(
                         placeholder = { Text("""{"temperature": 21.5, "unit": "C"}""") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp)
+                            .heightIn(min = 140.dp, max = 300.dp)
+                            .verticalScroll(rememberScrollState())
                             .testTag("publishMqttPayloadInput"),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        maxLines = 15,
+                        minLines = 5,
                     )
                 }
 
