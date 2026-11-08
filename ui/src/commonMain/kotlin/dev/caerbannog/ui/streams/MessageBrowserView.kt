@@ -56,7 +56,9 @@ import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.PayloadFormatter
 import dev.caerbannog.core.browser.PayloadViewKind
+import dev.caerbannog.core.browser.StreamLogTape
 import dev.caerbannog.core.browser.StreamMessage
+import dev.caerbannog.core.streams.ConsumerRowState
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -75,6 +77,7 @@ fun MessageBrowserView(
     state: MessageBrowserState,
     events: MessageBrowserEvents,
     modifier: Modifier = Modifier,
+    consumers: List<ConsumerRowState> = emptyList(),
 ) {
     Box(modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
         when (state) {
@@ -126,7 +129,24 @@ fun MessageBrowserView(
                 }
             }
             is MessageBrowserState.Loaded -> {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                val logTape = remember(
+                    state.streamFirstOffset,
+                    state.streamLastOffset,
+                    state.messages,
+                    state.selectedMessage,
+                    consumers,
+                ) {
+                    StreamLogTape.from(
+                        firstOffset = state.streamFirstOffset,
+                        lastOffset = state.streamLastOffset,
+                        pageFirstOffset = state.messages.firstOrNull()?.offset,
+                        pageLastOffset = state.messages.lastOrNull()?.offset,
+                        selectedOffset = state.selectedMessage?.offset,
+                        consumers = consumers,
+                    )
+                }
+
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     state.retentionShiftNotice?.let { notice ->
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
@@ -140,6 +160,13 @@ fun MessageBrowserView(
                                 modifier = Modifier.padding(12.dp),
                             )
                         }
+                    }
+
+                    if (logTape != null) {
+                        StreamLogTapeCard(
+                            tape = logTape,
+                            onSeekOffset = events::browseOffset,
+                        )
                     }
 
                     ControlCard(state, events)

@@ -17,6 +17,8 @@ import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.streams.ConsumerRowState
+import dev.caerbannog.core.streams.ConsumerStatus
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import org.junit.jupiter.api.Test
@@ -299,5 +301,82 @@ class MessageBrowserUiTest {
 
         onNodeWithTag("showAllButton").assertExists()
         onNodeWithTag("showAllButton").performClick()
+    }
+
+    @Test
+    fun `stream log tape renders offset window, truncated cliff badges, and consumer pins that seek on click`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val state = MessageBrowserState.Loaded(
+            vhost = "/",
+            stream = "telemetry",
+            messages = listOf(sampleMessage(500), sampleMessage(550)),
+            streamFirstOffset = 100L,
+            streamLastOffset = 1100L,
+            approximateTotal = 1001L,
+            pageSize = 50,
+            startMode = BrowseStart.Offset(500L),
+            canGoNext = true,
+            canGoPrevious = true,
+            selectedMessage = null,
+        )
+        val consumers = listOf(
+            ConsumerRowState(
+                key = "c-risk",
+                name = "slow-worker",
+                connection = "127.0.0.1:50001",
+                user = "admin",
+                offset = "150",
+                behind = "950",
+                status = ConsumerStatus.Behind(950L),
+                browseFromOffset = 150L,
+            ),
+            ConsumerRowState(
+                key = "c-head",
+                name = "realtime-sink",
+                connection = "127.0.0.1:50002",
+                user = "admin",
+                offset = "1100",
+                behind = "0",
+                status = ConsumerStatus.CaughtUp,
+                browseFromOffset = 1100L,
+            ),
+        )
+
+        setContent {
+            MessageBrowserView(
+                state = state,
+                events = events,
+                consumers = consumers,
+            )
+        }
+
+        onNodeWithTag("streamLogTapeCard").assertExists()
+        onNodeWithTag("streamLogTapeCanvas").assertExists()
+        onNodeWithTag("logTapeTruncatedBadge").assertExists()
+        onNodeWithTag("logTapeRetentionCliffBadge").assertExists()
+        onNodeWithTag("logTapeConsumerChip:c-risk").assertExists()
+        onNodeWithTag("logTapeConsumerChip:c-head").assertExists()
+
+        // Clicking a consumer pin chip jumps the Message Browser to that consumer's offset
+        onNodeWithTag("logTapeConsumerChip:c-risk").performClick()
+        assertEquals(150L, events.lastOffset)
+    }
+
+    @Test
+    fun `clicking stream log tape canvas seeks to proportional stream offset`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val state = sampleLoadedState() // streamFirstOffset = 0L, streamLastOffset = 200L
+
+        setContent {
+            MessageBrowserView(
+                state = state,
+                events = events,
+            )
+        }
+
+        onNodeWithTag("streamLogTapeCanvas").performClick()
+        // Center click (0.5f) on 0..200 seeks near offset 100
+        val sought = events.lastOffset
+        assertTrue(sought != null && sought in 95L..105L, "Expected center click on 0..200 tape to seek near 100, got $sought")
     }
 }
