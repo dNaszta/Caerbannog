@@ -27,6 +27,7 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.streams.StreamClientsTexts
 import dev.caerbannog.core.streams.UpdatedAge
 import dev.caerbannog.core.topology.BindingsViewMode
+import dev.caerbannog.core.topology.QueueInspectionState
 import dev.caerbannog.core.topology.TopologyScreen as Screen
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTab
@@ -61,6 +62,8 @@ fun TopologyScreen(
     publishMqttEvents: PublishMqttEvents? = null,
     onOpenPublishMqttDialog: (() -> Unit)? = null,
     onOpenStream: ((String) -> Unit)? = null,
+    queueInspectionState: QueueInspectionState? = null,
+    queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
@@ -74,7 +77,7 @@ fun TopologyScreen(
         onNavigate = onNavigate,
         actions = { TopologyActions(state, nowMillis, events) },
     ) {
-        TopologyBody(state, events, onOpenPublishMqttDialog, onOpenStream)
+        TopologyBody(state, events, onOpenPublishMqttDialog, onOpenStream, queueInspectionState, queueInspectionEvents)
     }
     if (showPublishMqttDialog && publishMqttState != null && publishMqttEvents != null) {
         PublishMqttDialog(
@@ -113,6 +116,8 @@ private fun TopologyBody(
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
     onOpenStream: ((String) -> Unit)? = null,
+    queueInspectionState: QueueInspectionState? = null,
+    queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
 ) {
     when (val screen = state.screen) {
         Screen.NotConnected, Screen.Connecting -> TopologyMessage(state.message)
@@ -121,7 +126,8 @@ private fun TopologyBody(
             val label = state.action ?: TopologyTexts.RETRY
             Button(onClick = events::retry, modifier = Modifier.testTag("retryButton").semantics { text = AnnotatedString(label) }) { Text(label) }
         }
-        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable -> TabbedBody(state, events, onOpenPublishMqtt, onOpenStream)
+        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable ->
+            TabbedBody(state, events, onOpenPublishMqtt, onOpenStream, queueInspectionState, queueInspectionEvents)
     }
 }
 
@@ -132,6 +138,8 @@ private fun TabbedBody(
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
     onOpenStream: ((String) -> Unit)? = null,
+    queueInspectionState: QueueInspectionState? = null,
+    queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         state.connectionBanner?.let { LostConnectionBanner(it, state.action ?: TopologyTexts.RETRY, events::retry, tag = "topologyConnectionBanner") }
@@ -149,11 +157,29 @@ private fun TabbedBody(
             }
             Screen.Loading -> {
                 TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
-                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = true, onOpenStream = onOpenStream) }
+                Box(Modifier.weight(1f)) {
+                    TopologyTableFor(
+                        state = state,
+                        events = events,
+                        loading = true,
+                        onOpenStream = onOpenStream,
+                        queueInspectionState = queueInspectionState,
+                        queueInspectionEvents = queueInspectionEvents,
+                    )
+                }
             }
             else -> {
                 TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
-                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = false, onOpenStream = onOpenStream) }
+                Box(Modifier.weight(1f)) {
+                    TopologyTableFor(
+                        state = state,
+                        events = events,
+                        loading = false,
+                        onOpenStream = onOpenStream,
+                        queueInspectionState = queueInspectionState,
+                        queueInspectionEvents = queueInspectionEvents,
+                    )
+                }
                 if (!(state.tab == TopologyTab.Bindings && state.bindingsView == BindingsViewMode.Graph)) {
                     TopologyFooter(state, events)
                 }

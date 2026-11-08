@@ -20,7 +20,7 @@ internal class PlainManagementServer(
     private val answerGarbageWith400: Boolean = false,
 ) : AutoCloseable {
 
-    data class Seen(val method: String, val rawPath: String, val authorization: String?)
+    data class Seen(val method: String, val rawPath: String, val authorization: String?, val body: String = "")
 
     private val requests = CopyOnWriteArrayList<Seen>()
     private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
@@ -58,13 +58,25 @@ internal class PlainManagementServer(
             val parts = requestLine.split(' ')
             if (parts.size != 3 || !parts[2].startsWith("HTTP/1.") || !parts[1].startsWith("/") || !parts[0].all { c -> c in 'A'..'Z' }) return@use
             var authorization: String? = null
+            var contentLength = 0
             while (true) {
                 val line = input.readLine() ?: return@use
                 if (line.isEmpty()) break
                 if (line.startsWith("Authorization:", ignoreCase = true)) authorization = line.substringAfter(':').trim()
+                if (line.startsWith("Content-Length:", ignoreCase = true)) contentLength = line.substringAfter(':').trim().toIntOrNull() ?: 0
             }
+            val reqBody = if (contentLength > 0) {
+                val chars = CharArray(contentLength)
+                var readTotal = 0
+                while (readTotal < contentLength) {
+                    val r = input.read(chars, readTotal, contentLength - readTotal)
+                    if (r < 0) break
+                    readTotal += r
+                }
+                String(chars, 0, readTotal)
+            } else ""
             val rawPath = parts[1].substringBefore('?')
-            requests += Seen(parts[0], rawPath, authorization)
+            requests += Seen(parts[0], rawPath, authorization, reqBody)
             // The longest registered prefix wins; anything unregistered is a 404 like a missing route.
             val (status, body) = routes.entries.filter { e -> rawPath.startsWith(e.key) }.maxByOrNull { e -> e.key.length }?.value
                 ?: (404 to """{"error":"Object Not Found","reason":"Not Found"}""")

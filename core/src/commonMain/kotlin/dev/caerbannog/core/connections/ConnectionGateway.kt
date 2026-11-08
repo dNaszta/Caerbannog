@@ -7,7 +7,9 @@ import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.UnavailableStreamManager
+import dev.caerbannog.core.topology.QueueMessageInspector
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 
 /**
  * Opens the clients of one connection profile (management API over HTTPS, stream client lazily). Gateway
@@ -54,4 +56,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M6-04: MQTT publisher over MQTT protocol. */
     val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher get() = dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
+
+    /** M7-08: non-destructive queue message inspector over Management API in requeue mode. */
+    val queueInspector: QueueMessageInspector get() = UnavailableQueueMessageInspector
 }

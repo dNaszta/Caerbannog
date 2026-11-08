@@ -25,6 +25,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.topology.BindingRowView
 import dev.caerbannog.core.topology.QueueDetailView
+import dev.caerbannog.core.topology.QueueInspectionState
 import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -40,7 +41,12 @@ private val FieldWidth = 280.dp
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun QueueDetail(detail: QueueDetailView, onClose: (String?) -> Unit) {
+internal fun QueueDetail(
+    detail: QueueDetailView,
+    onClose: (String?) -> Unit,
+    inspectionState: QueueInspectionState? = null,
+    inspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
+) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().testTag("queueDetail")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -80,6 +86,12 @@ internal fun QueueDetail(detail: QueueDetailView, onClose: (String?) -> Unit) {
                 DetailRow("Binding", TopologyTexts.NOT_APPLICABLE, "detailNoBinding")
             } else {
                 detail.bindings.forEachIndexed { index, binding -> DetailRow("Binding", bindingText(binding), "detailBinding:$index") }
+            }
+            if (inspectionState != null) {
+                QueueMessageInspectionSection(
+                    state = inspectionState,
+                    events = inspectionEvents,
+                )
             }
         }
     }

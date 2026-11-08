@@ -63,6 +63,7 @@ class RabbitMqConnectionGateway(
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),
                 mqttPublisher = RabbitMqMqttPublisher(profile, password, transport),
+                queueInspector = ManagementQueueMessageInspector(http, requests),
             ),
         )
     }

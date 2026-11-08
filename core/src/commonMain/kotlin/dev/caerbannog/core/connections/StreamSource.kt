@@ -30,8 +30,11 @@ import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
+import dev.caerbannog.core.topology.QueueInspectionResult
+import dev.caerbannog.core.topology.QueueMessageInspector
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
+import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 import dev.caerbannog.core.topology.VhostRow
 
 /**
@@ -55,6 +58,8 @@ class StreamSource(
     val mqtt: MqttCatalog = UnavailableMqttCatalog,
     /** M6-04: the MQTT publisher of the same held connection, guarded like [publisher]. */
     val mqttPublisher: MqttMessagePublisher = UnavailableMqttMessagePublisher,
+    /** M7-08: the non-destructive queue message inspector of the same held connection, guarded like [publisher]. */
+    val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -141,6 +146,14 @@ internal class GuardedMqttPublisher(
 ) : MqttMessagePublisher {
     override suspend fun publish(request: PublishMqttRequest): PublishOutcome =
         if (isCurrent()) inner.publish(request) else PublishOutcome.Failed("Connection closed")
+}
+
+internal class GuardedQueueMessageInspector(
+    private val inner: QueueMessageInspector,
+    private val isCurrent: () -> Boolean,
+) : QueueMessageInspector {
+    override suspend fun inspectQueueMessages(vhost: String, queue: String, count: Int): QueueInspectionResult =
+        if (isCurrent()) inner.inspectQueueMessages(vhost, queue, count) else QueueInspectionResult.Failed("Connection closed")
 }
 
 
