@@ -14,11 +14,18 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.PublishMqttState
+import dev.caerbannog.core.mqtt.StreamInboundRoute
+import dev.caerbannog.core.streams.StreamClientsScreen
+import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTab
 import dev.caerbannog.core.topology.TopologyScreen as Screen
 import dev.caerbannog.ui.mqtt.PublishMqttDialog
 import dev.caerbannog.ui.mqtt.PublishMqttEvents
+import dev.caerbannog.ui.streams.RecordedClientsEvents
+import dev.caerbannog.ui.streams.StreamScreen
+import dev.caerbannog.ui.streams.connected
+import dev.caerbannog.ui.streams.noControlEvents
 import dev.caerbannog.ui.topology.RecordedTopologyEvents
 import dev.caerbannog.ui.topology.screen
 import org.junit.jupiter.api.Test
@@ -227,6 +234,39 @@ class PublishMqttDialogUiTest {
         onNodeWithTag("publishMqttButton").assertExists()
         onNodeWithTag("publishMqttButton").performClick()
         assertTrue(dialogOpened)
+    }
+
+    @Test
+    fun `StreamScreen displays inbound MQTT route banner and pre-fills suggested publish topic on click`() = runDesktopComposeUiTest(1280, 800) {
+        val routes = listOf(
+            StreamInboundRoute(exchange = "amq.topic", routingKey = "sensors.#"),
+        )
+        var openedWithTopic: String? = null
+        val mqttEvents = RecordingMqttEvents()
+
+        setContent {
+            androidx.compose.material3.MaterialTheme {
+                StreamScreen(
+                    stream = "telemetry-stream",
+                    state = StreamClientsState(screen = StreamClientsScreen.Content),
+                    nowMillis = 10_000L,
+                    events = RecordedClientsEvents(),
+                    control = connected,
+                    controlEvents = noControlEvents,
+                    inboundRoutes = routes,
+                    showPublishMqttDialog = false,
+                    publishMqttState = defaultState,
+                    publishMqttEvents = mqttEvents,
+                    onOpenPublishMqttDialog = { topic -> openedWithTopic = topic },
+                )
+            }
+        }
+
+        onNodeWithTag("streamInboundRoutesBar").assertExists()
+        onNodeWithTag("inboundRoute:amq.topic:sensors.#").assertExists()
+        onNodeWithTag("mqttTopicFilterPill:sensors.#", useUnmergedTree = true).assertTextEquals("MQTT: sensors/#")
+        onNodeWithTag("publishMqttRouteButton:sensors.#").performClick()
+        assertEquals("sensors/test", openedWithTopic)
     }
 }
 

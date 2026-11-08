@@ -60,6 +60,7 @@ fun TopologyScreen(
     publishMqttState: PublishMqttState? = null,
     publishMqttEvents: PublishMqttEvents? = null,
     onOpenPublishMqttDialog: (() -> Unit)? = null,
+    onOpenStream: ((String) -> Unit)? = null,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
@@ -73,7 +74,7 @@ fun TopologyScreen(
         onNavigate = onNavigate,
         actions = { TopologyActions(state, nowMillis, events) },
     ) {
-        TopologyBody(state, events, onOpenPublishMqttDialog)
+        TopologyBody(state, events, onOpenPublishMqttDialog, onOpenStream)
     }
     if (showPublishMqttDialog && publishMqttState != null && publishMqttEvents != null) {
         PublishMqttDialog(
@@ -111,6 +112,7 @@ private fun TopologyBody(
     state: TopologyState,
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
+    onOpenStream: ((String) -> Unit)? = null,
 ) {
     when (val screen = state.screen) {
         Screen.NotConnected, Screen.Connecting -> TopologyMessage(state.message)
@@ -119,7 +121,7 @@ private fun TopologyBody(
             val label = state.action ?: TopologyTexts.RETRY
             Button(onClick = events::retry, modifier = Modifier.testTag("retryButton").semantics { text = AnnotatedString(label) }) { Text(label) }
         }
-        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable -> TabbedBody(state, events, onOpenPublishMqtt)
+        Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable -> TabbedBody(state, events, onOpenPublishMqtt, onOpenStream)
     }
 }
 
@@ -129,6 +131,7 @@ private fun TabbedBody(
     state: TopologyState,
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
+    onOpenStream: ((String) -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         state.connectionBanner?.let { LostConnectionBanner(it, state.action ?: TopologyTexts.RETRY, events::retry, tag = "topologyConnectionBanner") }
@@ -146,11 +149,11 @@ private fun TabbedBody(
             }
             Screen.Loading -> {
                 TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
-                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = true) }
+                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = true, onOpenStream = onOpenStream) }
             }
             else -> {
                 TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
-                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = false) }
+                Box(Modifier.weight(1f)) { TopologyTableFor(state, events, loading = false, onOpenStream = onOpenStream) }
                 if (!(state.tab == TopologyTab.Bindings && state.bindingsView == BindingsViewMode.Graph)) {
                     TopologyFooter(state, events)
                 }

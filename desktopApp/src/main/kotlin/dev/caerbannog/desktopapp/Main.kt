@@ -20,10 +20,12 @@ import dev.caerbannog.core.browser.MessageBrowserViewModel
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
+import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
 import dev.caerbannog.core.publish.PublishMessageViewModel
 import dev.caerbannog.core.publish.PublishTargetKind
 import dev.caerbannog.core.publish.UnavailableMessagePublisher
+import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
 import dev.caerbannog.ui.publish.PublishEvents
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -155,6 +157,40 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
     }
     val deleteState by managementVm.deleteState.collectAsState()
     val deleteGate = deleteStreamGate(currentConn, composition.active.state.collectAsState().value)
+    var inboundRoutes by remember(stream, connName, vhost) { mutableStateOf<List<StreamInboundRoute>>(emptyList()) }
+    LaunchedEffect(stream, source, vhost) {
+        val topo = source?.topology ?: return@LaunchedEffect
+        when (val res = topo.bindings(vhost)) {
+            is CatalogResult.Success -> {
+                inboundRoutes = res.value
+                    .filter { it.destination == stream && it.source.isNotEmpty() }
+                    .map { StreamInboundRoute(exchange = it.source, routingKey = it.routingKey, arguments = it.arguments) }
+            }
+            else -> Unit
+        }
+    }
+    val mqttPublisher = source?.mqttPublisher ?: UnavailableMqttMessagePublisher
+    val publishMqttVm = remember(connName, mqttPublisher, stream) {
+        PublishMqttViewModel(
+            publisher = mqttPublisher,
+            connectionName = connName,
+            scope = scope,
+        )
+    }
+    var showPublishMqttDialog by remember(stream, connName) { mutableStateOf(false) }
+    val publishMqttState by publishMqttVm.state.collectAsState()
+    val publishMqttEvents = remember(publishMqttVm, browserVm) {
+        PublishMqttEventsAdapter(
+            vm = publishMqttVm,
+            onClose = { showPublishMqttDialog = false },
+            onPublished = {
+                browserVm?.browseLastPage()
+                composition.streamClients.refreshNow()
+                composition.streamList.refreshNow()
+            },
+        )
+    }
+    val hasMqttOnStream = source?.mqttPublisher != null || inboundRoutes.any { it.isMqttTopicExchange }
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -182,6 +218,18 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         },
         onCancelDelete = managementVm::closeDelete,
         onOpenDeleteDialog = { managementVm.openDelete(stream, clients.consumers.size) },
+        inboundRoutes = inboundRoutes,
+        showPublishMqttDialog = showPublishMqttDialog,
+        publishMqttState = publishMqttState,
+        publishMqttEvents = publishMqttEvents,
+        onOpenPublishMqttDialog = if (hasMqttOnStream) {
+            { suggestedTopic ->
+                suggestedTopic?.let(publishMqttVm::setTopic)
+                showPublishMqttDialog = true
+            }
+        } else {
+            null
+        },
     )
 }
 
@@ -299,6 +347,10 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
         onOpenPublishMqttDialog = { showPublishMqttDialog = true },
+        onOpenStream = { streamName ->
+            composition.navigation.open(AppDestination.Streams)
+            composition.navigation.openStream(streamName)
+        },
     )
 }
 

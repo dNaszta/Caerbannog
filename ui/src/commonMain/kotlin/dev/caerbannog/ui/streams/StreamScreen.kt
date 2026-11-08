@@ -1,6 +1,10 @@
 package dev.caerbannog.ui.streams
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -55,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.DeleteStreamGate
+import dev.caerbannog.core.mqtt.PublishMqttState
+import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.publish.PublishGate
 import dev.caerbannog.core.publish.PublishMessageState
 import dev.caerbannog.core.streams.DeleteStreamState
@@ -70,8 +76,12 @@ import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+import dev.caerbannog.ui.mqtt.PublishMqttDialog
+import dev.caerbannog.ui.mqtt.PublishMqttEvents
 import dev.caerbannog.ui.publish.PublishEvents
 import dev.caerbannog.ui.publish.PublishTestMessageDialog
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 
 /** Events out of the stream screen (M2-06b). Every one is asynchronous in the view model; read the result from the state. */
 interface StreamClientsEvents {
@@ -123,6 +133,11 @@ fun StreamScreen(
     onConfirmDelete: () -> Unit = {},
     onCancelDelete: () -> Unit = {},
     onOpenDeleteDialog: () -> Unit = {},
+    inboundRoutes: List<StreamInboundRoute> = emptyList(),
+    showPublishMqttDialog: Boolean = false,
+    publishMqttState: PublishMqttState? = null,
+    publishMqttEvents: PublishMqttEvents? = null,
+    onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)? = null,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(stream) {
@@ -140,6 +155,9 @@ fun StreamScreen(
         }
     }
     var selected by remember(stream, initialTab, tabs.size) { mutableIntStateOf(initialTab.coerceIn(0, tabs.lastIndex)) }
+    val defaultMqttSuggestion = remember(inboundRoutes) {
+        inboundRoutes.firstOrNull { it.isMqttTopicExchange }?.suggestedPublishTopic
+    }
     Box(Modifier.fillMaxSize()) {
         AppFrame(
             title = stream,
@@ -161,6 +179,7 @@ fun StreamScreen(
                     events = events,
                     publishState = publishState,
                     onOpenPublishDialog = onOpenPublishDialog,
+                    onOpenPublishMqttDialog = onOpenPublishMqttDialog?.let { cb -> { cb(defaultMqttSuggestion) } },
                     deleteStreamState = deleteStreamState,
                     deleteStreamGate = deleteStreamGate,
                     onOpenDeleteDialog = onOpenDeleteDialog,
@@ -168,6 +187,13 @@ fun StreamScreen(
             },
         ) {
             Column(Modifier.fillMaxSize()) {
+                if (inboundRoutes.isNotEmpty()) {
+                    StreamInboundRoutesBar(
+                        stream = stream,
+                        routes = inboundRoutes,
+                        onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                    )
+                }
                 TabList(tabs, selected) { selected = it }
                 Box(Modifier.weight(1f).fillMaxWidth()) { tabs[selected].content() }
             }
@@ -176,6 +202,12 @@ fun StreamScreen(
             PublishTestMessageDialog(
                 state = publishState,
                 events = publishEvents,
+            )
+        }
+        if (showPublishMqttDialog && publishMqttState != null && publishMqttEvents != null) {
+            PublishMqttDialog(
+                state = publishMqttState,
+                events = publishMqttEvents,
             )
         }
         if (deleteStreamState != null && deleteStreamState.isOpen) {
@@ -189,6 +221,92 @@ fun StreamScreen(
     }
 }
 
+@Composable
+private fun StreamInboundRoutesBar(
+    stream: String,
+    routes: List<StreamInboundRoute>,
+    onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)?,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ClientsHorizontalPadding, vertical = 6.dp)
+            .testTag("streamInboundRoutesBar"),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ConnectionIcon(AppIcon.Hub, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
+            Text(
+                text = "Inbound routes:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            routes.forEach { route ->
+                val keyDisplay = route.routingKey.ifEmpty { "*" }
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .testTag("inboundRoute:${route.exchange}:${route.routingKey}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "${route.exchange} ──[$keyDisplay]──> $stream",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    route.mqttTopicFilter?.let { topicFilter ->
+                        Text(
+                            text = "MQTT: $topicFilter",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .testTag("mqttTopicFilterPill:${route.routingKey}"),
+                        )
+                        if (onOpenPublishMqttDialog != null) {
+                            Row(
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
+                                    .clickable(role = Role.Button) {
+                                        onOpenPublishMqttDialog(route.suggestedPublishTopic)
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .testTag("publishMqttRouteButton:${route.routingKey}"),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                ConnectionIcon(AppIcon.Send, SmallIconSize, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Text(
+                                    text = "Publish MQTT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RowScope.ClientsActions(
@@ -197,10 +315,21 @@ private fun RowScope.ClientsActions(
     events: StreamClientsEvents,
     publishState: PublishMessageState?,
     onOpenPublishDialog: () -> Unit,
+    onOpenPublishMqttDialog: (() -> Unit)? = null,
     deleteStreamState: DeleteStreamState? = null,
     deleteStreamGate: DeleteStreamGate = DeleteStreamGate.Enabled,
     onOpenDeleteDialog: () -> Unit = {},
 ) {
+    if (onOpenPublishMqttDialog != null) {
+        FilledTonalButton(
+            onClick = onOpenPublishMqttDialog,
+            modifier = Modifier.testTag("publishMqttStreamButton"),
+        ) {
+            ConnectionIcon(AppIcon.Hub, SmallIconSize)
+            Spacer(Modifier.width(8.dp))
+            Text("Publish MQTT")
+        }
+    }
     if (publishState != null) {
         val gate = publishState.gate
         val reason = (gate as? PublishGate.Disabled)?.reason

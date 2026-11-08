@@ -80,7 +80,12 @@ private val MqttColumns = listOf(
  * so that clicking a queue row in a long page displays [QueueDetail] immediately in the viewport without scrolling to the bottom.
  */
 @Composable
-internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, loading: Boolean) {
+internal fun TopologyTableFor(
+    state: TopologyState,
+    events: TopologyEvents,
+    loading: Boolean,
+    onOpenStream: ((String) -> Unit)? = null,
+) {
     val detail = state.selectedQueue
     Column(
         Modifier
@@ -104,7 +109,12 @@ internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, load
                 dev.caerbannog.core.topology.TopologyTab.Exchanges -> ExchangesTable(state, loading)
                 dev.caerbannog.core.topology.TopologyTab.Bindings -> {
                     if (state.bindingsView == BindingsViewMode.Graph) {
-                        BindingsGraphView(state, loading)
+                        BindingsGraphView(
+                            state = state,
+                            loading = loading,
+                            onSelectQueue = events::selectQueue,
+                            onOpenStream = onOpenStream,
+                        )
                     } else {
                         BindingsTable(state, loading)
                     }

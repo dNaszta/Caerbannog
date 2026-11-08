@@ -228,4 +228,51 @@ class BindingsGraphUiTest {
         node("pagePrevious").assertExists()
         node("pageNext").assertExists()
     }
+
+    @Test
+    fun `stream nodes in BindingsGraphView display stream detail and invoke onOpenStream when clicked`() = runDesktopComposeUiTest(1280, 800) {
+        val exchanges = listOf(exRow("amq.topic", "topic"))
+        val streams = listOf(
+            dev.caerbannog.core.streams.StreamSummary(
+                name = "mqtt-telemetry-stream",
+                vhost = "/",
+                messages = 1280L,
+                consumers = 1,
+                segments = 1,
+                firstTimestamp = 1_700_000_000_000L,
+                leader = "rabbit@node1",
+                node = "rabbit@node1",
+                members = listOf("rabbit@node1"),
+                online = listOf("rabbit@node1"),
+                retention = dev.caerbannog.core.streams.Retention(),
+            )
+        )
+        val bindings = listOf(
+            bRow("amq.topic", "mqtt-telemetry-stream", BindingDestinationType.QUEUE, "sensors.#"),
+        )
+        val graph = buildBindingGraph(exchanges, emptyList(), bindings, showDefaultExchange = false, streams = streams)
+        val state = sampleGraphState(viewMode = BindingsViewMode.Graph).copy(graph = graph)
+
+        var openedStream: String? = null
+        setContent {
+            androidx.compose.material3.MaterialTheme {
+                BindingsGraphView(
+                    state = state,
+                    loading = false,
+                    onOpenStream = { openedStream = it },
+                )
+            }
+        }
+        waitForIdle()
+
+        val streamNode = node("graphNode:mqtt-telemetry-stream")
+        streamNode.assertExists()
+        onNode(hasText("(stream · 1,280 msgs)"), useUnmergedTree = true).assertExists()
+
+        val desc = streamNode.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() ?: ""
+        assertTrue(desc.contains("stream mqtt-telemetry-stream", ignoreCase = true), "Expected stream description, got: $desc")
+
+        streamNode.performClick()
+        assertEquals("mqtt-telemetry-stream", openedStream)
+    }
 }
