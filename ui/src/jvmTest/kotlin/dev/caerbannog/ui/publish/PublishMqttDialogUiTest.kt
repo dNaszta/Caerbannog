@@ -265,8 +265,14 @@ class PublishMqttDialogUiTest {
         onNodeWithTag("streamInboundRoutesBar").assertExists()
         onNodeWithTag("inboundRoute:amq.topic:sensors.#").assertExists()
         onNodeWithTag("mqttTopicFilterPill:sensors.#", useUnmergedTree = true).assertTextEquals("MQTT: sensors/#")
+        onNodeWithTag("streamPipelineGraph").assertExists()
+        onNodeWithTag("pipelineNode:route:amq.topic:sensors.#").assertExists()
+        onNodeWithTag("pipelineNode:stream:telemetry-stream").assertExists()
         onNodeWithTag("publishMqttRouteButton:sensors.#").performClick()
         assertEquals("sensors/test", openedWithTopic)
+
+        onNodeWithTag("togglePipelineGraphButton").performClick()
+        onAllNodesWithTag("streamPipelineGraph").assertCountEquals(0)
     }
 }
 

@@ -176,17 +176,25 @@ private fun GraphNodeCard(
     val icon = when (node.kind) {
         GraphNodeKind.Exchange -> AppIcon.SwapHoriz
         GraphNodeKind.Stream -> AppIcon.Stream
+        GraphNodeKind.MqttClient -> AppIcon.Hub
         GraphNodeKind.Queue -> AppIcon.Inbox
     }
     val clickHandler: (() -> Unit)? = when (node.kind) {
         GraphNodeKind.Stream -> onOpenStream?.let { cb -> { cb(node.name) } }
         GraphNodeKind.Queue -> onSelectQueue?.let { cb -> { cb(node.name) } }
-        GraphNodeKind.Exchange -> null
+        GraphNodeKind.Exchange, GraphNodeKind.MqttClient -> null
     }
-    val borderColor = if (node.kind == GraphNodeKind.Stream) {
-        MaterialTheme.colorScheme.primary
+    val borderColor = when {
+        node.memberOffline -> MaterialTheme.colorScheme.error
+        node.kind == GraphNodeKind.Stream -> MaterialTheme.colorScheme.primary
+        node.kind == GraphNodeKind.MqttClient -> MaterialTheme.colorScheme.secondary
+        node.unackedCount > 0L -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val borderWidth = if (node.memberOffline || node.kind == GraphNodeKind.Stream || node.kind == GraphNodeKind.MqttClient || node.unackedCount > 0L) {
+        1.5.dp
     } else {
-        MaterialTheme.colorScheme.outline
+        1.dp
     }
     Card(
         modifier = Modifier
@@ -208,14 +216,18 @@ private fun GraphNodeCard(
             },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(if (node.kind == GraphNodeKind.Stream) 1.5.dp else 1.dp, borderColor),
+        border = BorderStroke(borderWidth, borderColor),
     ) {
         Row(
             Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ConnectionIcon(icon, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
+            ConnectionIcon(
+                icon = icon,
+                size = SmallIconSize,
+                tint = if (node.memberOffline) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            )
             Column(
                 Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center,
@@ -235,6 +247,11 @@ private fun GraphNodeCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                     )
+                }
+            }
+            if (node.memberOffline && node.kind == GraphNodeKind.Queue) {
+                Box(Modifier.testTag("graphNodeOffline:${node.name}")) {
+                    ConnectionIcon(AppIcon.Warning, SmallIconSize, tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

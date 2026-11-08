@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -67,6 +68,7 @@ import dev.caerbannog.core.streams.DeleteStreamState
 import dev.caerbannog.core.streams.StreamClientsScreen
 import dev.caerbannog.core.streams.StreamClientsState
 import dev.caerbannog.core.streams.StreamClientsTexts
+import dev.caerbannog.core.streams.buildStreamPipelineGraph
 import dev.caerbannog.ui.components.LostConnectionBanner
 import dev.caerbannog.core.streams.StreamListTexts
 import dev.caerbannog.core.streams.UpdatedAge
@@ -190,8 +192,17 @@ fun StreamScreen(
                 if (inboundRoutes.isNotEmpty()) {
                     StreamInboundRoutesBar(
                         stream = stream,
+                        state = state,
                         routes = inboundRoutes,
                         onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                        onSeekToOffset = if (browserState != null) {
+                            { offset ->
+                                selected = 0
+                                browserEvents.browseOffset(offset)
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
                 TabList(tabs, selected) { selected = it }
@@ -224,9 +235,21 @@ fun StreamScreen(
 @Composable
 private fun StreamInboundRoutesBar(
     stream: String,
+    state: StreamClientsState,
     routes: List<StreamInboundRoute>,
     onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)?,
+    onSeekToOffset: ((Long) -> Unit)? = null,
 ) {
+    var showPipeline by remember(stream) { mutableStateOf(true) }
+    val pipelineGraph = remember(stream, state.lastOffset, routes, state.publishers, state.consumers) {
+        buildStreamPipelineGraph(
+            stream = stream,
+            lastOffset = state.lastOffset,
+            inboundRoutes = routes,
+            publishers = state.publishers,
+            consumers = state.consumers,
+        )
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(8.dp),
@@ -236,72 +259,100 @@ private fun StreamInboundRoutesBar(
             .padding(horizontal = ClientsHorizontalPadding, vertical = 6.dp)
             .testTag("streamInboundRoutesBar"),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ConnectionIcon(AppIcon.Hub, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
-            Text(
-                text = "Inbound routes:",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            routes.forEach { route ->
-                val keyDisplay = route.routingKey.ifEmpty { "*" }
-                Row(
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp))
-                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .testTag("inboundRoute:${route.exchange}:${route.routingKey}"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = "${route.exchange} ──[$keyDisplay]──> $stream",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    route.mqttTopicFilter?.let { topicFilter ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ConnectionIcon(AppIcon.Hub, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "Inbound routes:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                routes.forEach { route ->
+                    val keyDisplay = route.routingKey.ifEmpty { "*" }
+                    Row(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp))
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("inboundRoute:${route.exchange}:${route.routingKey}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         Text(
-                            text = "MQTT: $topicFilter",
+                            text = "${route.exchange} ──[$keyDisplay]──> $stream",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                .testTag("mqttTopicFilterPill:${route.routingKey}"),
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
-                        if (onOpenPublishMqttDialog != null) {
-                            Row(
+                        route.mqttTopicFilter?.let { topicFilter ->
+                            Text(
+                                text = "MQTT: $topicFilter",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
-                                    .clickable(role = Role.Button) {
-                                        onOpenPublishMqttDialog(route.suggestedPublishTopic)
-                                    }
+                                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    .testTag("publishMqttRouteButton:${route.routingKey}"),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                ConnectionIcon(AppIcon.Send, SmallIconSize, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                                Text(
-                                    text = "Publish MQTT",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                )
+                                    .testTag("mqttTopicFilterPill:${route.routingKey}"),
+                            )
+                            if (onOpenPublishMqttDialog != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
+                                        .clickable(role = Role.Button) {
+                                            onOpenPublishMqttDialog(route.suggestedPublishTopic)
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .testTag("publishMqttRouteButton:${route.routingKey}"),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    ConnectionIcon(AppIcon.Send, SmallIconSize, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                    Text(
+                                        text = "Publish MQTT",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                }
                             }
                         }
                     }
                 }
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp))
+                        .clickable(role = Role.Button) { showPipeline = !showPipeline }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .testTag("togglePipelineGraphButton"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ConnectionIcon(AppIcon.AccountTree, SmallIconSize, tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = if (showPipeline) "Hide pipeline" else "Show pipeline",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            if (showPipeline) {
+                StreamPipelineGraphCard(
+                    graph = pipelineGraph,
+                    onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                    onSeekToOffset = onSeekToOffset,
+                )
             }
         }
     }
