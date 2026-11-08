@@ -27,6 +27,8 @@ Feature: Model Context Protocol (MCP) server
     And the tools list contains "caerbannog_list_queues"
     And the tools list contains "caerbannog_list_exchanges"
     And the tools list contains "caerbannog_list_bindings"
+    And the tools list contains "caerbannog_list_mqtt_clients"
+    And the tools list contains "caerbannog_publish_mqtt"
     And the tools list does not contain any tool that reads or purges queue messages
 
   Scenario: MCP server lists configured connection profiles without revealing secrets
@@ -55,3 +57,13 @@ Feature: Model Context Protocol (MCP) server
     Then the response is an MCP error with code -32601 and message "Method not found"
     When the client calls MCP tool "caerbannog_check_connection" with profile "nonexistent"
     Then the tool result indicates an error "Profile 'nonexistent' not found"
+
+  Scenario: MCP server lists MQTT clients for a profile
+    Given the profile "dev-local" has MQTT port 1883 and an active client "sensor-01" subscribed to "sensors/temp" with QoS 1
+    When the client calls MCP tool "caerbannog_list_mqtt_clients" with profile "dev-local" and vhost "/"
+    Then the tool result includes MQTT client "sensor-01" with subscription "sensors/temp"
+
+  Scenario: MCP server publishes an MQTT test message
+    Given the profile "dev-local" has MQTT port 1883 and topology control level "Full control"
+    When the client calls MCP tool "caerbannog_publish_mqtt" with profile "dev-local", topic "sensors/temperature", payload "21.5", qos 1
+    Then the tool result indicates a successful MQTT publish to "sensors/temperature"

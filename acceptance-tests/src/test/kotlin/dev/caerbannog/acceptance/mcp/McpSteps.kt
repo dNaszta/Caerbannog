@@ -8,6 +8,10 @@ import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
+import dev.caerbannog.core.connections.fakes.FakeMqttCatalog
+import dev.caerbannog.core.connections.fakes.FakeMqttMessagePublisher
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.Retention
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.topology.BindingDestinationType
@@ -38,6 +42,8 @@ class McpSteps {
     private val fakeStreamCatalog = FakeStreamCatalog()
     private val fakeStreamOffsets = FakeStreamOffsets()
     private val fakeTopologyCatalog = FakeTopologyCatalog()
+    private val fakeMqttCatalog = FakeMqttCatalog()
+    private val fakeMqttPublisher = FakeMqttMessagePublisher()
 
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var server: McpServer
@@ -52,7 +58,9 @@ class McpSteps {
             connectionChecker = reachabilityChecker,
             streamCatalogProvider = { _, _ -> fakeStreamCatalog },
             streamOffsetsProvider = { _, _ -> fakeStreamOffsets },
-            topologyCatalogProvider = { _, _ -> fakeTopologyCatalog }
+            topologyCatalogProvider = { _, _ -> fakeTopologyCatalog },
+            mqttCatalogProvider = { _, _ -> fakeMqttCatalog },
+            mqttMessagePublisherProvider = { _, _ -> fakeMqttPublisher },
         )
     }
 
@@ -310,5 +318,57 @@ class McpSteps {
         assertTrue(lastToolIsError)
         assertTrue(lastToolResultText.contains(expectedError, ignoreCase = true),
             "Expected $expectedError in $lastToolResultText")
+    }
+
+    @Given("the profile {string} has MQTT port {int} and an active client {string} subscribed to {string} with QoS {int}")
+    fun profileHasMqttAndActiveClient(profileName: String, port: Int, clientId: String, topic: String, qos: Int) {
+        val existing = profileRepository.list().first { it.name == profileName }
+        profileRepository.update(existing.copy(mqttPort = port))
+        fakeMqttCatalog.clients.add(
+            MqttClientRow(
+                clientId = clientId,
+                connectionName = null,
+                vhost = existing.virtualHost,
+                username = existing.username,
+                peerHost = "127.0.0.1",
+                peerPort = 50000,
+                protocol = "MQTT 3.1.1",
+                connectedAt = 1000L,
+                ssl = false,
+                cleanSession = true,
+                subscriptions = listOf(MqttSubscription(topic, qos = qos)),
+                connected = true,
+            )
+        )
+    }
+
+    @Given("the profile {string} has MQTT port {int} and topology control level {string}")
+    fun profileHasMqttAndTopologyControlLevel(profileName: String, port: Int, levelDisplayName: String) {
+        val existing = profileRepository.list().first { it.name == profileName }
+        val level = when (levelDisplayName) {
+            "Full control" -> TopologyControlLevel.FULL_CONTROL
+            "Declare and edit" -> TopologyControlLevel.DECLARE_AND_EDIT
+            else -> TopologyControlLevel.READ_ONLY
+        }
+        profileRepository.update(existing.copy(mqttPort = port, topologyControlLevel = level))
+    }
+
+    @When("the client calls MCP tool {string} with profile {string}, topic {string}, payload {string}, qos {int}")
+    fun callPublishMqtt(toolName: String, profile: String, topic: String, payload: String, qos: Int) {
+        callTool(toolName, """{"profile": "$profile", "topic": "$topic", "payload": "$payload", "qos": $qos}""")
+    }
+
+    @Then("the tool result includes MQTT client {string} with subscription {string}")
+    fun assertMqttClientIncluded(clientId: String, topic: String) {
+        assertFalse(lastToolIsError, "Expected success but was error: $lastToolResultText")
+        assertTrue(lastToolResultText.contains(clientId), "Missing clientId $clientId in $lastToolResultText")
+        assertTrue(lastToolResultText.contains(topic), "Missing topic $topic in $lastToolResultText")
+    }
+
+    @Then("the tool result indicates a successful MQTT publish to {string}")
+    fun assertMqttPublishSuccess(topic: String) {
+        assertFalse(lastToolIsError, "Expected success but was error: $lastToolResultText")
+        assertTrue(lastToolResultText.contains("\"success\":true") || lastToolResultText.contains("\"success\": true"))
+        assertTrue(lastToolResultText.contains(topic))
     }
 }
