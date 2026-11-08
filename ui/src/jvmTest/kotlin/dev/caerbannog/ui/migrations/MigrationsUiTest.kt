@@ -325,4 +325,29 @@ class MigrationsUiTest {
 
         onNodeWithTag("migrations:errorBanner").assertIsDisplayed()
     }
+
+    @Test
+    fun `MigrationsScreen renders inside AppFrame with navigation drawer items`(): Unit = runDesktopComposeUiTest(1280, 800) {
+        var navigatedTo: dev.caerbannog.ui.appframe.AppDestination? = null
+        val state = MigrationsScreenState(profileName = "uat-eu")
+
+        setContent {
+            MigrationsScreen(
+                state = state,
+                onSelectVersion = {},
+                onApplyPending = {},
+                onApplySingle = {},
+                onImportJson = {},
+                onExportTopology = {},
+                onUpdateFile = { _, _ -> },
+                onValidateAgain = {},
+                onDismissError = {},
+                onNavigate = { navigatedTo = it },
+            )
+        }
+
+        onNodeWithTag("appDrawer").assertIsDisplayed()
+        onNodeWithTag("navItem:Streams").performClick()
+        assertEquals(dev.caerbannog.ui.appframe.AppDestination.Streams, navigatedTo)
+    }
 }

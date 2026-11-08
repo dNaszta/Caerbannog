@@ -43,11 +43,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import dev.caerbannog.core.connections.ConnectionControlEvents
+import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.migrations.ActionDryRun
 import dev.caerbannog.core.migrations.MigrationEntry
 import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
+import dev.caerbannog.ui.appframe.AppDestination
+import dev.caerbannog.ui.appframe.AppFrameLayout
+import dev.caerbannog.ui.appframe.ConnectionControl
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -65,30 +70,18 @@ fun MigrationsScreen(
     onValidateAgain: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
+    control: ConnectionControlState? = null,
+    controlEvents: ConnectionControlEvents? = null,
+    onNavigate: (AppDestination) -> Unit = {},
 ) {
     var showImportDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        // App Bar Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Migrations",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.testTag("migrations:title"),
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
+    AppFrameLayout(
+        title = AppDestination.Migrations.name,
+        modifier = modifier,
+        onNavigate = onNavigate,
+        actions = {
             OutlinedButton(
                 onClick = { showImportDialog = true },
                 modifier = Modifier.testTag("migrations:importBtn"),
@@ -116,128 +109,137 @@ fun MigrationsScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Apply pending")
             }
-        }
-
-        // Subheader Info
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        },
+        chip = if (control != null && controlEvents != null) ({ ConnectionControl(control, controlEvents) }) else null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = Color.Gray)
-            Text(
-                text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        // Error Banner
-        val errorMessage = state.errorMessage
-        if (errorMessage != null) {
+            // Subheader Info
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFFFEBEE))
-                    .padding(12.dp)
-                    .testTag("migrations:errorBanner"),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.testTag("migrations:title"),
             ) {
-                ConnectionIcon(AppIcon.Error, tint = Color(0xFFC62828), size = IconSize)
-                Spacer(modifier = Modifier.width(12.dp))
+                ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    text = errorMessage,
-                    color = Color(0xFFC62828),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onDismissError) {
-                    Text("Dismiss", color = Color(0xFFC62828))
-                }
-            }
-        }
-
-        // Warning Banner (e.g. modified migration on disk)
-        val warningMessage = state.warningMessage
-        if (warningMessage != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFFFF3E0))
-                    .padding(12.dp)
-                    .testTag("migrations:warningBanner"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ConnectionIcon(AppIcon.Warning, tint = Color(0xFFE65100), size = IconSize)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = warningMessage,
-                    color = Color(0xFFE65100),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        // Main Content Area: Left file list + Right detail
-        val selectedFile = state.selectedFile
-        Row(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            // Left Column: Migration files list
-            Column(
-                modifier = Modifier
-                    .width(340.dp)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Migration files",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
+            }
 
-                if (state.entries.isEmpty()) {
+            // Error Banner
+            val errorMessage = state.errorMessage
+            if (errorMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(12.dp)
+                        .testTag("migrations:errorBanner"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ConnectionIcon(AppIcon.Error, tint = MaterialTheme.colorScheme.onErrorContainer, size = IconSize)
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "No migration files found.",
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.weight(1f),
                     )
+                    TextButton(onClick = onDismissError) {
+                        Text("Dismiss", color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
                 }
+            }
 
-                for (entry in state.entries) {
-                    MigrationFileCard(
-                        entry = entry,
-                        isSelected = entry.file.version == state.selectedVersion,
-                        onClick = { onSelectVersion(entry.file.version) },
+            // Warning Banner (e.g. modified migration on disk)
+            val warningMessage = state.warningMessage
+            if (warningMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(12.dp)
+                        .testTag("migrations:warningBanner"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ConnectionIcon(AppIcon.Warning, tint = MaterialTheme.colorScheme.onSecondaryContainer, size = IconSize)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = warningMessage,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
 
-            // Right Column: Selected file detail & dry run
-            if (selectedFile != null) {
-                MigrationDetailPanel(
-                    file = selectedFile,
-                    state = state,
-                    onEdit = { showEditDialog = true },
-                    onValidateAgain = onValidateAgain,
-                    onApply = { onApplySingle(selectedFile.version) },
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    contentAlignment = Alignment.Center,
+            // Main Content Area: Left file list + Right detail
+            val selectedFile = state.selectedFile
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                // Left Column: Migration files list
+                Column(
+                    modifier = Modifier
+                        .width(340.dp)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "Select a migration file to inspect details.",
-                        color = Color.Gray,
+                        text = "Migration files",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
                     )
+
+                    if (state.entries.isEmpty()) {
+                        Text(
+                            text = "No migration files found.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+
+                    for (entry in state.entries) {
+                        MigrationFileCard(
+                            entry = entry,
+                            isSelected = entry.file.version == state.selectedVersion,
+                            onClick = { onSelectVersion(entry.file.version) },
+                        )
+                    }
+                }
+
+                // Right Column: Selected file detail & dry run
+                if (selectedFile != null) {
+                    MigrationDetailPanel(
+                        file = selectedFile,
+                        state = state,
+                        onEdit = { showEditDialog = true },
+                        onValidateAgain = onValidateAgain,
+                        onApply = { onApplySingle(selectedFile.version) },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Select a migration file to inspect details.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

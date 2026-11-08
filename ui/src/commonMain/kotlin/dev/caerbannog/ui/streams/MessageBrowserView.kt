@@ -95,8 +95,33 @@ fun MessageBrowserView(
                 }
             }
             is MessageBrowserState.NoMessagesAtOrAfterTime -> {
-                Box(Modifier.fillMaxSize().testTag("browserNoMessagesAtTime"), contentAlignment = Alignment.Center) {
-                    Text("No messages found at or after timestamp ${state.epochMs}", style = MaterialTheme.typography.bodyLarge)
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("browserControls"),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            StartModeSegmentedGroup(BrowseStart.Timestamp(state.epochMs), events)
+                            TimestampSeekControls(state.epochMs, events)
+                        }
+                    }
+
+                    Box(Modifier.weight(1f).fillMaxWidth().testTag("browserNoMessagesAtTime"), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text("No messages found at or after timestamp ${state.epochMs}", style = MaterialTheme.typography.bodyLarge)
+                            Button(
+                                onClick = events::browseFirst,
+                                modifier = Modifier.testTag("browseFirstFromEmptyTimeButton"),
+                            ) {
+                                Text("Browse from first offset")
+                            }
+                        }
+                    }
                 }
             }
             is MessageBrowserState.OutsideRange -> {
@@ -320,6 +345,10 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
                     }
                 }
 
+                if (mode is BrowseStart.Timestamp) {
+                    TimestampSeekControls(mode.epochMs, events)
+                }
+
                 PageSizeSelector(state.pageSize, events::setPageSize)
             }
 
@@ -377,7 +406,49 @@ private fun StartModeSegmentedGroup(startMode: BrowseStart, events: MessageBrows
             events.browseOffset(0L)
         }
         SegmentButton("Time", "startMode:Time", startMode is BrowseStart.Timestamp) {
-            events.browseTimestamp(System.currentTimeMillis())
+            events.browseTimestamp(System.currentTimeMillis() - 3_600_000L)
+        }
+    }
+}
+
+@Composable
+private fun TimestampSeekControls(initialEpochMs: Long, events: MessageBrowserEvents) {
+    var epochText by remember(initialEpochMs) { mutableStateOf(initialEpochMs.toString()) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = epochText,
+            onValueChange = { epochText = it.filter { ch -> ch.isDigit() } },
+            label = { Text("Epoch ms") },
+            modifier = Modifier.width(160.dp).testTag("timestampInput"),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+        Button(
+            onClick = { epochText.toLongOrNull()?.let(events::browseTimestamp) },
+            modifier = Modifier.testTag("applyTimestampButton"),
+        ) {
+            Text("Jump")
+        }
+        OutlinedButton(
+            onClick = { events.browseTimestamp(System.currentTimeMillis() - 5 * 60_000L) },
+            modifier = Modifier.testTag("timePreset:5m"),
+        ) {
+            Text("-5m")
+        }
+        OutlinedButton(
+            onClick = { events.browseTimestamp(System.currentTimeMillis() - 3_600_000L) },
+            modifier = Modifier.testTag("timePreset:1h"),
+        ) {
+            Text("-1h")
+        }
+        OutlinedButton(
+            onClick = { events.browseTimestamp(System.currentTimeMillis() - 24 * 3_600_000L) },
+            modifier = Modifier.testTag("timePreset:24h"),
+        ) {
+            Text("-24h")
         }
     }
 }

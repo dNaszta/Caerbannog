@@ -11,6 +11,7 @@ import dev.caerbannog.ui.publish.PublishEvents
 class PublishEventsAdapter(
     private val vm: PublishMessageViewModel,
     private val onClose: () -> Unit = {},
+    private val onPublished: () -> Unit = {},
 ) : PublishEvents {
     override fun setTargetKind(kind: PublishTargetKind) = vm.setTargetKind(kind)
     override fun setTargetName(name: String) = vm.setTargetName(name)
@@ -20,7 +21,7 @@ class PublishEventsAdapter(
     override fun setBody(body: String) = vm.setBody(body)
     override fun addApplicationProperty(key: String, value: String) = vm.addApplicationProperty(key, value)
     override fun removeApplicationProperty(key: String) = vm.removeApplicationProperty(key)
-    override fun publish() = vm.publish()
+    override fun publish() = vm.publish { onPublished() }
     override fun cancel() {
         vm.clearFeedback()
         onClose()

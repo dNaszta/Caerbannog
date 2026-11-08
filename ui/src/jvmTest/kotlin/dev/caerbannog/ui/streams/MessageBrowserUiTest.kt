@@ -379,4 +379,28 @@ class MessageBrowserUiTest {
         val sought = events.lastOffset
         assertTrue(sought != null && sought in 95L..105L, "Expected center click on 0..200 tape to seek near 100, got $sought")
     }
+
+    @Test
+    fun `no messages at or after time state keeps navigation controls and recovery button visible`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        setContent {
+            MessageBrowserView(
+                state = MessageBrowserState.NoMessagesAtOrAfterTime(
+                    vhost = "/",
+                    stream = "events",
+                    epochMs = 1700000000000L,
+                    streamFirstOffset = 0L,
+                    streamLastOffset = 100L,
+                ),
+                events = events,
+            )
+        }
+
+        onNodeWithTag("browserControls").assertExists()
+        onNodeWithTag("timestampInput").assertExists()
+        onNodeWithTag("applyTimestampButton").assertExists()
+        onNodeWithTag("timePreset:1h").assertExists()
+        onNodeWithTag("browseFirstFromEmptyTimeButton").performClick()
+        assertEquals(listOf("browseFirst"), events.calls)
+    }
 }
