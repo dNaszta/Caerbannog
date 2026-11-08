@@ -19,6 +19,8 @@ import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.MessageBrowserViewModel
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.mqtt.PublishMqttViewModel
+import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
 import dev.caerbannog.core.publish.PublishMessageViewModel
 import dev.caerbannog.core.publish.PublishTargetKind
 import dev.caerbannog.core.publish.UnavailableMessagePublisher
@@ -126,8 +128,16 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
     }
     var showPublishDialog by remember(stream) { mutableStateOf(false) }
     val publishState = publishVm.state.collectAsState().value
-    val publishEvents = remember(publishVm) {
-        PublishEventsAdapter(publishVm, onClose = { showPublishDialog = false })
+    val publishEvents = remember(publishVm, browserVm) {
+        PublishEventsAdapter(
+            vm = publishVm,
+            onClose = { showPublishDialog = false },
+            onPublished = {
+                browserVm?.browseLastPage()
+                composition.streamClients.refreshNow()
+                composition.streamList.refreshNow()
+            },
+        )
     }
     val manager = source?.manager ?: UnavailableStreamManager
     val canConfigure = done?.result?.topologyUnlocked ?: false
@@ -250,6 +260,33 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
 @Composable
 private fun TopologyWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val topology by composition.topology.state.collectAsState()
+    val connections by composition.viewModel.state.collectAsState()
+    val currentConn = connections.currentConnection
+    val connName = currentConn?.name.orEmpty()
+    val source = composition.active.source
+    val scope = rememberCoroutineScope()
+    val mqttPublisher = source?.mqttPublisher ?: UnavailableMqttMessagePublisher
+
+    val publishMqttVm = remember(connName, mqttPublisher) {
+        PublishMqttViewModel(
+            publisher = mqttPublisher,
+            connectionName = connName,
+            scope = scope,
+        )
+    }
+    var showPublishMqttDialog by remember(connName) { mutableStateOf(false) }
+    val publishMqttState by publishMqttVm.state.collectAsState()
+    val publishMqttEvents = remember(publishMqttVm) {
+        PublishMqttEventsAdapter(
+            vm = publishMqttVm,
+            onClose = { showPublishMqttDialog = false },
+            onPublished = {
+                composition.topology.refreshNow()
+                composition.streamList.refreshNow()
+            },
+        )
+    }
+
     val now = rememberNowMillis()
     TopologyScreen(
         state = topology,
@@ -258,6 +295,10 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
+        showPublishMqttDialog = showPublishMqttDialog,
+        publishMqttState = publishMqttState,
+        publishMqttEvents = publishMqttEvents,
+        onOpenPublishMqttDialog = { showPublishMqttDialog = true },
     )
 }
 
@@ -313,6 +354,9 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         },
         onValidateAgain = migrationsVm::loadMigrations,
         onDismissError = migrationsVm::dismissError,
+        control = control,
+        controlEvents = composition.control,
+        onNavigate = composition.navigation::open,
     )
 }
 
