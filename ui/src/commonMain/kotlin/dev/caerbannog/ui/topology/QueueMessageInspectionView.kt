@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -18,19 +19,30 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -39,6 +51,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.awt.datatransfer.StringSelection
 import dev.caerbannog.core.browser.PayloadFormatter
 import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.topology.InspectedQueueMessage
@@ -48,6 +61,13 @@ import dev.caerbannog.core.topology.TopologyTexts
 import dev.caerbannog.ui.components.CopyableText
 
 private val NotAcknowledgedAmber = Color(0xFFB36B00)
+
+/**
+ * Extension function to capitalize each word in a string.
+ */
+private fun String.capitalizeEachWord(): String = this.split(' ').joinToString(" ") { word ->
+    word.replaceFirstChar { it.uppercase() }
+}
 
 /**
  * Events for non-destructive queue message inspection in requeue mode.
@@ -379,21 +399,105 @@ private fun InspectedMessagesContent(
                         }
                     }
 
-                    // Metadata & headers summary
+                    // Basic metadata line
                     val metaParts = buildList {
                         add("Redelivered: ${if (selectedMsg.redelivered) "yes" else "no"}")
                         selectedMsg.properties["content_type"]?.let { add("Content-Type: $it") }
                         selectedMsg.properties["message_id"]?.let { add("ID: $it") }
-                        if (selectedMsg.headers.isNotEmpty()) {
-                            add("Headers: " + selectedMsg.headers.entries.joinToString { "${it.key}=${it.value}" })
+                    }
+                    if (metaParts.isNotEmpty()) {
+                        Text(
+                            text = metaParts.joinToString(" \u00b7 "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("inspectedDetailMeta"),
+                        )
+                    }
+
+                    // Properties and Headers section
+                    if (selectedMsg.properties.isNotEmpty() || selectedMsg.headers.isNotEmpty()) {
+                        val metadataText = selectedMsg.formatMetadataForCopy()
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(8.dp)) {
+                                val propertiesEntries = selectedMsg.properties.entries.filter { it.key != "headers" }
+                                if (propertiesEntries.isNotEmpty()) {
+                                    Text(
+                                        text = "Properties:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 4.dp).testTag("inspectedDetailPropertiesLabel"),
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        propertiesEntries.forEach { (key, value) ->
+                                            val displayKey = key.replace('_', ' ').capitalizeEachWord()
+                                            val displayValue = selectedMsg.formatPropertyValue(key, value)
+                                            Text(
+                                                text = "$displayKey: $displayValue",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.testTag("inspectedDetailProperty:$key"),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (selectedMsg.headers.isNotEmpty()) {
+                                    if (propertiesEntries.isNotEmpty()) {
+                                        Spacer(Modifier.height(8.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        Spacer(Modifier.height(8.dp))
+                                    }
+                                    Text(
+                                        text = "Headers:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 4.dp).testTag("inspectedDetailHeadersLabel"),
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        selectedMsg.headers.entries.forEach { (key, value) ->
+                                            Text(
+                                                text = "$key: $value",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.testTag("inspectedDetailHeader:$key"),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Copy button for all metadata
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    val clipboard = LocalClipboard.current
+                                    val scope = rememberCoroutineScope()
+                                    var copied by remember { mutableStateOf(false) }
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                clipboard.setClipEntry(ClipEntry(StringSelection(metadataText)))
+                                                copied = true
+                                            }
+                                        },
+                                        modifier = Modifier.testTag("inspectedDetailCopyMetadataButton"),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentCopy,
+                                            contentDescription = if (copied) "Metadata copied" else "Copy metadata",
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
-                    Text(
-                        text = metaParts.joinToString(" \u00b7 "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("inspectedDetailMeta"),
-                    )
                 }
             }
         }

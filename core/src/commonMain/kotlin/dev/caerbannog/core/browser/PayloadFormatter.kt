@@ -238,4 +238,26 @@ class PayloadFormatter(
     fun copyOffset(message: StreamMessage): String {
         return message.offset.toString()
     }
+
+    /**
+     * Formats standard message properties and application properties (headers) for copying.
+     */
+    fun copyHeadersAndProperties(message: StreamMessage): String = buildString {
+        appendLine("Offset: ${message.offset}")
+        appendLine("Timestamp: ${message.timestamp}")
+        if (message.properties.isNotEmpty()) {
+            appendLine()
+            appendLine("Properties:")
+            for ((k, v) in message.properties) {
+                appendLine("  $k: ${v ?: ""}")
+            }
+        }
+        if (message.applicationProperties.isNotEmpty()) {
+            appendLine()
+            appendLine("Headers / Application Properties:")
+            for ((k, v) in message.applicationProperties) {
+                appendLine("  $k: ${v ?: ""}")
+            }
+        }
+    }.trimEnd()
 }
