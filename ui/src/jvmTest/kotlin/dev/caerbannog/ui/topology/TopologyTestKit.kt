@@ -18,6 +18,8 @@ import dev.caerbannog.core.topology.TopologyScreen as Screen
 import dev.caerbannog.core.topology.TopologyState
 import dev.caerbannog.core.topology.TopologyTab
 import dev.caerbannog.core.topology.TopologyTexts
+import dev.caerbannog.core.mqtt.PublishMqttState
+import dev.caerbannog.ui.mqtt.PublishMqttEvents
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.streams.connected
 import dev.caerbannog.ui.streams.noControlEvents
@@ -150,12 +152,27 @@ internal fun DesktopComposeUiTest.screen(
     events: RecordedTopologyEvents = RecordedTopologyEvents(),
     nowMillis: Long = 0,
     onNavigate: (AppDestination) -> Unit = {},
+    showPublishMqttDialog: Boolean = false,
+    publishMqttState: PublishMqttState? = null,
+    publishMqttEvents: PublishMqttEvents? = null,
+    onOpenPublishMqttDialog: (() -> Unit)? = null,
     wrap: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ): Shown {
     val shown = Shown(state, nowMillis, events)
     setContent {
         wrap {
-            TopologyScreen(shown.state, shown.now, events, connected, noControlEvents, onNavigate)
+            TopologyScreen(
+                state = shown.state,
+                nowMillis = shown.now,
+                events = events,
+                control = connected,
+                controlEvents = noControlEvents,
+                onNavigate = onNavigate,
+                showPublishMqttDialog = showPublishMqttDialog,
+                publishMqttState = publishMqttState,
+                publishMqttEvents = publishMqttEvents,
+                onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+            )
         }
     }
     return shown

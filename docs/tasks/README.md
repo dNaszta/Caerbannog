@@ -98,7 +98,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M6-02-mqtt-topology-core-and-data | Management API MQTT parser, MqttCatalog, and TopologyViewModel MQTT tab | M6 | done (architect: Accepted, 2026-11-07; branch `m6-02-mqtt-topology-core-and-data`; all tests green) |
 | M6-03-mqtt-topology-ui | MQTT Tab in Topology screen (Client Sessions, Subscriptions, QoS) | M6 | done (architect: Accepted, 2026-11-07; branch `m6-03-mqtt-topology-ui`; all tests green) |
 | M6-04-mqtt-sender-engine | MQTT publisher engine (QoS 0/1/2, Retain) with BDD scenarios | M6 | done (architect: Accepted, 2026-11-08; branch `m6-04-mqtt-sender-engine`; all tests green) |
-| M6-05-mqtt-sender-ui | "Publish MQTT Message" dialog and Compose UI tests | M6 | planned |
+| M6-05-mqtt-sender-ui | "Publish MQTT Message" dialog and Compose UI tests | M6 | done (architect: Accepted, 2026-11-08; branch `m6-05-mqtt-sender-ui`; all tests green) |
 | M6-06-mqtt-mcp-tools | MCP tools: caerbannog_list_mqtt_clients & caerbannog_publish_mqtt | M6 | planned |
 
 ## Later milestones (planned)
