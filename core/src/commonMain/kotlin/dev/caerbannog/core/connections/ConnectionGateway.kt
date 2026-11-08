@@ -51,4 +51,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M6-02: MQTT topology and sessions over management API. */
     val mqtt: dev.caerbannog.core.mqtt.MqttCatalog get() = dev.caerbannog.core.mqtt.UnavailableMqttCatalog
+
+    /** M6-04: MQTT publisher over MQTT protocol. */
+    val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher get() = dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
 }

@@ -24,9 +24,10 @@ class RabbitMqHeldConnection(
     override val messages: StreamMessageReader,
     override val publisher: MessagePublisher,
     override val manager: StreamManager = UnavailableStreamManager,
-    override val mqtt: MqttCatalog = UnavailableMqttCatalog,
     private val resources: List<AutoCloseable>,
     private val log: (String) -> Unit,
+    override val mqtt: MqttCatalog = UnavailableMqttCatalog,
+    override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 
