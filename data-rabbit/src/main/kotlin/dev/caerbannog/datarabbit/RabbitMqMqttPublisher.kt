@@ -56,7 +56,7 @@ class RabbitMqMqttPublisher internal constructor(
             userName = profile.username
             password = this@RabbitMqMqttPublisher.password.toCharArray()
             if (transport is BrokerTransport.Tls) {
-                socketFactory = TlsSupport.sslContextOf(transport.trust).socketFactory
+                socketFactory = TlsSupport.managementSslContextOf(transport.trust, transport.verifyHostName).socketFactory
             }
         }
 

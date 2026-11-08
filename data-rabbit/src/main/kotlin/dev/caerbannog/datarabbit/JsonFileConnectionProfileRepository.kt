@@ -53,6 +53,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         // downgrade is unsupported (local-only app).
         val declaredPermissions: DeclaredPermissionsDto? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val mqttPort: Int? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val verifyHostName: Boolean = false,
     )
 
     @Serializable
@@ -119,6 +120,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         },
         declaredPermissions = declaredPermissions?.let { DeclaredPermissions(configure = it.configure, write = it.write) },
         mqttPort = mqttPort,
+        verifyHostName = verifyHostName,
     )
 
     private fun ConnectionProfile.toDto() = ConnectionProfileDto(
@@ -137,6 +139,7 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         },
         declaredPermissions = declaredPermissions?.let { DeclaredPermissionsDto(configure = it.configure, write = it.write) },
         mqttPort = mqttPort,
+        verifyHostName = verifyHostName,
     )
 
     companion object {

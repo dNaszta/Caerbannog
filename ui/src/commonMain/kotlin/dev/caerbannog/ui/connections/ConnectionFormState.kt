@@ -24,6 +24,7 @@ class ConnectionFormState(selected: ConnectionProfile?) {
     var password: String by mutableStateOf("")
     var caCertificatePath: String by mutableStateOf(selected?.caCertificatePath.orEmpty())
     var tls: Boolean by mutableStateOf(selected?.tls ?: true)
+    var verifyHostName: Boolean by mutableStateOf(selected?.verifyHostName ?: false)
 
     var enableMqtt: Boolean by mutableStateOf(selected?.mqttPort != null)
 
@@ -74,6 +75,7 @@ class ConnectionFormState(selected: ConnectionProfile?) {
         mqttPort = if (enableMqtt) ports.mqtt ?: BrokerEndpoints.defaultMqttPort(tls) else null,
         clearMqtt = !enableMqtt && (saved?.mqttPort != null),
         tls = tls,
+        verifyHostName = verifyHostName,
         caCertificatePath = caPathToSend(saved),
         topologyControlLevel = level,
         declaredPermissions = if (declares) {

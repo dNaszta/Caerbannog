@@ -78,9 +78,10 @@ internal class StreamEnvironments(
             .environmentBuilder()
         // Plain: no TLS context at all (spike S-E: host and port are enough). Only the transport decides.
         if (transport is BrokerTransport.Tls) {
+            val endpointAlgo = if (transport.verifyHostName) "HTTPS" else null
             val sslContext = SslContextBuilder.forClient()
                 .trustManager(transport.trust)
-                .endpointIdentificationAlgorithm(null)
+                .endpointIdentificationAlgorithm(endpointAlgo)
                 .build()
             builder.tls().sslContext(sslContext)
         }

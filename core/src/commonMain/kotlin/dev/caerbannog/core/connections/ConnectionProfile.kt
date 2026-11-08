@@ -23,6 +23,8 @@ data class ConnectionProfile(
     /** Optional MQTT plugin port (e.g. 8883 TLS / 1883 plain). Null when the broker profile does not use MQTT. */
     val mqttPort: Int? = null,
     val caCertificatePath: String? = null,
+    /** M5-05 (D7): strict TLS hostname verification against the server certificate. Default false. */
+    val verifyHostName: Boolean = false,
     val topologyControlLevel: TopologyControlLevel = TopologyControlLevel.READ_ONLY,
     /** The user's own claim, used only when permissions cannot be read. Saved with the profile; applied on Save through [ConnectionProfileInput.declaredPermissions]. */
     val declaredPermissions: DeclaredPermissions? = null,

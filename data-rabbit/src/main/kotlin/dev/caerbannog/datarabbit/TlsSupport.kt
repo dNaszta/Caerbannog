@@ -33,7 +33,7 @@ internal object TlsSupport {
         engine {
             config {
                 if (transport is BrokerTransport.Tls) {
-                    sslContext(managementSslContextOf(transport.trust))
+                    sslContext(managementSslContextOf(transport.trust, transport.verifyHostName))
                 }
                 connectTimeout(Duration.ofMillis(timeoutMillis))
             }
@@ -44,9 +44,11 @@ internal object TlsSupport {
         }
     }
 
-    fun permissiveSslParameters(): SSLParameters = SSLParameters().apply {
-        endpointIdentificationAlgorithm = ""
+    fun sslParametersOf(verifyHostName: Boolean): SSLParameters = SSLParameters().apply {
+        endpointIdentificationAlgorithm = if (verifyHostName) "HTTPS" else ""
     }
+
+    fun permissiveSslParameters(): SSLParameters = sslParametersOf(false)
 
     /**
      * The one place that decides what is trusted, for the management client and the stream client alike: the
@@ -76,10 +78,15 @@ internal object TlsSupport {
     /**
      * The context of the management HTTP client. The JDK HttpClient ignores an empty endpoint identification
      * algorithm and checks the host name itself, so D7 (host name not verified) is kept by [NameTolerantTrustManager].
+     * When [verifyHostName] is true, standard hostname verification is retained.
      */
-    fun managementSslContextOf(trust: TrustManagerFactory): SSLContext {
-        val managers = trust.trustManagers.map { if (it is X509TrustManager) NameTolerantTrustManager(it) else it }
-        return SSLContext.getInstance("TLS").apply { init(null, managers.toTypedArray(), null) }
+    fun managementSslContextOf(trust: TrustManagerFactory, verifyHostName: Boolean = false): SSLContext {
+        val managers = if (verifyHostName) {
+            trust.trustManagers
+        } else {
+            trust.trustManagers.map { if (it is X509TrustManager) NameTolerantTrustManager(it) else it }.toTypedArray()
+        }
+        return SSLContext.getInstance("TLS").apply { init(null, managers, null) }
     }
 }
 

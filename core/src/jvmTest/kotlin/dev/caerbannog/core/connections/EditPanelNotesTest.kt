@@ -15,8 +15,22 @@ class EditPanelNotesTest {
     }
 
     @Test
+    fun `TLS on with verifyHostName on shows no host name note and no warning`() {
+        val notes = editPanelNotes(tls = true, verifyHostName = true)
+        assertNull(notes.hostNameNotVerified)
+        assertNull(notes.notEncrypted)
+    }
+
+    @Test
     fun `TLS off shows Not encrypted and no host name note`() {
         val notes = editPanelNotes(tls = false)
+        assertNull(notes.hostNameNotVerified)
+        assertEquals("Not encrypted", notes.notEncrypted)
+    }
+
+    @Test
+    fun `TLS off with verifyHostName on shows Not encrypted and no host name note`() {
+        val notes = editPanelNotes(tls = false, verifyHostName = true)
         assertNull(notes.hostNameNotVerified)
         assertEquals("Not encrypted", notes.notEncrypted)
     }

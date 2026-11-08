@@ -245,7 +245,7 @@ private fun EditPanel(
                 ),
             )
             // Product decision D7: TLS is checked against the CA, the host name is not. Said where the user sets the CA.
-            editPanelNotes(form.tls).hostNameNotVerified?.let {
+            editPanelNotes(form.tls, form.verifyHostName).hostNameNotVerified?.let {
                 Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             val caResult = state.lastCaCertificateValidationResult
@@ -298,6 +298,14 @@ private fun EditPanel(
                     form.ports = BrokerEndpoints.afterTlsSwitch(form.ports, now)
                 },
             )
+
+            if (form.tls) {
+                Spacer(modifier = Modifier.height(12.dp))
+                VerifyHostNameRow(
+                    verifyHostName = form.verifyHostName,
+                    onChange = { form.verifyHostName = it },
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
             MqttPluginSection(
@@ -529,6 +537,29 @@ private fun TlsSwitchRow(tls: Boolean, onChange: (Boolean) -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VerifyHostNameRow(verifyHostName: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("verifyHostNameSwitch")
+            .toggleable(value = verifyHostName, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ConnectionIcon(AppIcon.VerifiedUser, IconSize)
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Verify host name", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Enforce strict TLS host name verification against the server certificate",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = verifyHostName, onCheckedChange = null)
     }
 }
 

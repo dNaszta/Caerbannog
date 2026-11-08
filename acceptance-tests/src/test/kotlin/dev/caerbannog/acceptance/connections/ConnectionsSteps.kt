@@ -208,6 +208,33 @@ class ConnectionsSteps {
         assertEquals(emptyList<String>(), caValidator.validated, "the CA validator was asked about: ${caValidator.validated}")
     }
 
+    @When("I set verify host name of {string} to {word}")
+    fun iSetVerifyHostNameTo(name: String, word: String) {
+        val verify = word == "on"
+        val saved = repository.list().first { it.name == name }
+        lastProfileName = name
+        lastSaveResult = viewModel.updateConnection(
+            originalName = name,
+            input = ConnectionProfileInput(
+                name = saved.name,
+                host = saved.host,
+                virtualHost = saved.virtualHost,
+                username = saved.username,
+                password = null,
+                streamPort = saved.streamPort,
+                managementPort = saved.managementPort,
+                tls = saved.tls,
+                verifyHostName = verify,
+            ),
+        )
+    }
+
+    @Then("the saved profile {string} has verify host name enabled")
+    fun assertVerifyHostNameEnabled(name: String) {
+        val profile = repository.list().first { it.name == name }
+        assertTrue(profile.verifyHostName, "Expected verifyHostName=true on profile '$name'")
+    }
+
     @When("I try to save another connection named {string}")
     fun iTryToSaveAnotherConnectionNamed(name: String) {
         // A genuinely different profile (different host) that happens to reuse an existing name -

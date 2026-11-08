@@ -31,6 +31,8 @@ data class ConnectionProfileInput(
     val declaredPermissions: DeclaredPermissionsEdit = DeclaredPermissionsEdit.Keep,
     /** M2-14a R2 (see [ConnectionsViewModel]): add null = none; update null = keep, blank = clear, non-blank = stored only when Valid. */
     val caCertificatePath: String? = null,
+    /** M5-05: null on add means false; on update null means keep saved value. */
+    val verifyHostName: Boolean? = null,
 )
 
 /**
