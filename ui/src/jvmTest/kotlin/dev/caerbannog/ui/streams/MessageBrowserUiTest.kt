@@ -1,5 +1,6 @@
 package dev.caerbannog.ui.streams
 
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -11,7 +12,10 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
@@ -402,5 +406,40 @@ class MessageBrowserUiTest {
         onNodeWithTag("timePreset:1h").assertExists()
         onNodeWithTag("browseFirstFromEmptyTimeButton").performClick()
         assertEquals(listOf("browseFirst"), events.calls)
+    }
+
+    @Test
+    fun `table renders camelCase contentType and application properties count badge and steps rows with arrow keys`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingBrowserEvents()
+        val msg1 = StreamMessage(
+            offset = 500L,
+            timestamp = 1700000000000L,
+            payload = """{"sensor":"temp-1","val":21.5}""".toByteArray(),
+            properties = mapOf("contentType" to "application/json"),
+            applicationProperties = mapOf("qos" to "1", "topic" to "sensors/temp", "device" to "esp32"),
+        )
+        val msg2 = StreamMessage(
+            offset = 501L,
+            timestamp = 1700000001000L,
+            payload = """{"sensor":"temp-2","val":22.0}""".toByteArray(),
+            properties = mapOf("contentType" to "application/json"),
+            applicationProperties = emptyMap(),
+        )
+        setContent {
+            MessageBrowserView(
+                state = sampleLoadedState(messages = listOf(msg1, msg2), selectedMessage = msg1),
+                events = events,
+            )
+        }
+
+        // Verify camelCase contentType badge and +3 application properties badge render
+        onNodeWithTag("messageAppPropsBadge:500", useUnmergedTree = true).assertTextEquals("+3")
+        onNodeWithTag("messageAppPropsBadge:501", useUnmergedTree = true).assertDoesNotExist()
+
+        // Step down and up with arrow keys
+        onNodeWithTag("messageRow:500").requestFocus()
+        onNodeWithTag("messageRow:500").performKeyInput { pressKey(Key.DirectionDown) }
+        waitForIdle()
+        assertEquals(501L, events.lastSelected)
     }
 }

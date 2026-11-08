@@ -75,33 +75,42 @@ private val MqttColumns = listOf(
     TableColumn("Subscriptions", "Subscriptions", 260.dp),
 )
 
-/** The table of the current tab (and, on Queues, the detail of the selected queue under it) in one vertical scroller. */
+/**
+ * The table of the current tab in its own vertical scroller, with the selected queue's detail pinned below the scroller
+ * so that clicking a queue row in a long page displays [QueueDetail] immediately in the viewport without scrolling to the bottom.
+ */
 @Composable
 internal fun TopologyTableFor(state: TopologyState, events: TopologyEvents, loading: Boolean) {
     val detail = state.selectedQueue
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             // Escape closes the detail from anywhere in the table or the detail (the search and the switch keep their own Escape).
             .onPreviewKeyEvent { event ->
                 val close = detail != null && event.type == KeyEventType.KeyDown && event.key == Key.Escape
                 if (close) events.selectQueue(null)
                 close
             },
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        when (state.tab) {
-            dev.caerbannog.core.topology.TopologyTab.Queues -> QueuesTable(state, events, loading)
-            dev.caerbannog.core.topology.TopologyTab.Exchanges -> ExchangesTable(state, loading)
-            dev.caerbannog.core.topology.TopologyTab.Bindings -> {
-                if (state.bindingsView == BindingsViewMode.Graph) {
-                    BindingsGraphView(state, loading)
-                } else {
-                    BindingsTable(state, loading)
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            when (state.tab) {
+                dev.caerbannog.core.topology.TopologyTab.Queues -> QueuesTable(state, events, loading)
+                dev.caerbannog.core.topology.TopologyTab.Exchanges -> ExchangesTable(state, loading)
+                dev.caerbannog.core.topology.TopologyTab.Bindings -> {
+                    if (state.bindingsView == BindingsViewMode.Graph) {
+                        BindingsGraphView(state, loading)
+                    } else {
+                        BindingsTable(state, loading)
+                    }
                 }
+                dev.caerbannog.core.topology.TopologyTab.Mqtt -> MqttClientsTable(state, loading)
             }
-            dev.caerbannog.core.topology.TopologyTab.Mqtt -> MqttClientsTable(state, loading)
         }
         if (detail != null && !loading) QueueDetail(detail, events::selectQueue)
     }
