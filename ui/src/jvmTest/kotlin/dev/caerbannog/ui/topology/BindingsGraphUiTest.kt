@@ -275,4 +275,56 @@ class BindingsGraphUiTest {
         streamNode.performClick()
         assertEquals("mqtt-telemetry-stream", openedStream)
     }
+
+    @Test
+    fun `BindingsGraphView renders MQTT client subscriber nodes and offline queue health indicators`() = runDesktopComposeUiTest(1280, 800) {
+        val exchanges = listOf(exRow("amq.topic", "topic"))
+        val offlineQueue = QueueRow(
+            name = "degraded-quorum",
+            vhost = "/",
+            type = "quorum",
+            readyMessages = 40L,
+            unackedMessages = 5L,
+            consumers = 1,
+            leader = "rabbit@node1",
+            members = listOf("rabbit@node1", "rabbit@node2"),
+            online = listOf("rabbit@node1"),
+            policy = null,
+            state = "running",
+        )
+        val bindings = listOf(
+            bRow("amq.topic", "degraded-quorum", BindingDestinationType.QUEUE, "alerts.#"),
+        )
+        val mqttClients = listOf(
+            dev.caerbannog.core.mqtt.MqttClientRow(
+                clientId = "mqtt-sub-client",
+                connectionName = "10.0.0.5:1883",
+                vhost = "/",
+                username = "mqtt",
+                peerHost = "10.0.0.5",
+                peerPort = 1883,
+                protocol = "MQTT 5.0",
+                connectedAt = 1_700_000_000_000L,
+                ssl = false,
+                cleanSession = true,
+                subscriptions = listOf(dev.caerbannog.core.mqtt.MqttSubscription("sensors/#", qos = 1)),
+                connected = true,
+            ),
+        )
+        val graph = buildBindingGraph(
+            exchanges = exchanges,
+            queues = listOf(offlineQueue),
+            bindings = bindings,
+            showDefaultExchange = false,
+            mqttClients = mqttClients,
+        )
+        val state = sampleGraphState(viewMode = BindingsViewMode.Graph).copy(graph = graph)
+
+        screen(state)
+
+        node("graphNode:degraded-quorum").assertExists()
+        node("graphNodeOffline:degraded-quorum").assertExists()
+        node("graphNode:mqtt-sub-client").assertExists()
+        node("edgePill:sensors/# (QoS 1)").assertExists()
+    }
 }

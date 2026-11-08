@@ -1,11 +1,12 @@
 package dev.caerbannog.core.topology
 
+import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.groupDigits
 
 enum class BindingsViewMode { Table, Graph }
 
-enum class GraphNodeKind { Exchange, Queue, Stream }
+enum class GraphNodeKind { Exchange, Queue, Stream, MqttClient }
 
 data class GraphNode(
     val id: String,
@@ -13,6 +14,8 @@ data class GraphNode(
     val kind: GraphNodeKind,
     val detail: String,
     val bindingCount: Int,
+    val memberOffline: Boolean = false,
+    val unackedCount: Long = 0L,
 ) {
     val accessibilityDescription: String
         get() = "${kind.name.lowercase()} $name, $bindingCount binding${if (bindingCount == 1) "" else "s"}"
@@ -63,9 +66,12 @@ fun buildBindingGraph(
     bindings: List<BindingRow>,
     showDefaultExchange: Boolean = false,
     streams: List<StreamSummary> = emptyList(),
+    mqttClients: List<MqttClientRow> = emptyList(),
 ): BindingGraph {
     val filteredBindings = bindings.filter { showDefaultExchange || it.source.isNotEmpty() }
-    val totalBindings = filteredBindings.size
+    val activeMqttClients = mqttClients.filter { it.subscriptions.isNotEmpty() }
+    val mqttSubscriptionCount = activeMqttClients.sumOf { it.subscriptions.size }
+    val totalBindings = filteredBindings.size + mqttSubscriptionCount
 
     // Collect all referenced sources and destinations
     val activeExchangeNames = mutableSetOf<String>()
@@ -78,8 +84,11 @@ fun buildBindingGraph(
             BindingDestinationType.QUEUE -> activeQueueNames.add(b.destination)
         }
     }
+    if (activeMqttClients.isNotEmpty()) {
+        activeExchangeNames.add("amq.topic")
+    }
 
-    val totalNodesCount = activeExchangeNames.size + activeQueueNames.size
+    val totalNodesCount = activeExchangeNames.size + activeQueueNames.size + activeMqttClients.size
     if (totalNodesCount > MAX_GRAPH_NODES) {
         return BindingGraph(
             nodes = emptyList(),
@@ -110,13 +119,19 @@ fun buildBindingGraph(
         bindingCounts[srcId] = (bindingCounts[srcId] ?: 0) + 1
         bindingCounts[dstId] = (bindingCounts[dstId] ?: 0) + 1
     }
+    if (activeMqttClients.isNotEmpty()) {
+        bindingCounts["e:amq.topic"] = (bindingCounts["e:amq.topic"] ?: 0) + mqttSubscriptionCount
+        activeMqttClients.forEach { client ->
+            bindingCounts["m:${client.clientId}"] = client.subscriptions.size
+        }
+    }
 
     // Build raw nodes
     val rawNodes = mutableListOf<GraphNode>()
     activeExchangeNames.forEach { name ->
         val ex = exchangeMap[name]
         val displayName = if (name.isEmpty()) TopologyTexts.DEFAULT_EXCHANGE else name
-        val type = ex?.type ?: "direct"
+        val type = ex?.type ?: if (name == "amq.topic") "topic" else "direct"
         val id = "e:$name"
         rawNodes.add(
             GraphNode(
@@ -146,6 +161,27 @@ fun buildBindingGraph(
                 kind = kind,
                 detail = detail,
                 bindingCount = bindingCounts[id] ?: 0,
+                memberOffline = q?.hasOfflineMember ?: false,
+                unackedCount = q?.unackedMessages ?: 0L,
+            )
+        )
+    }
+
+    activeMqttClients.forEach { client ->
+        val id = "m:${client.clientId}"
+        val detail = if (client.connected) {
+            "(mqtt · ${client.subscriptions.size} sub)"
+        } else {
+            "(mqtt · offline)"
+        }
+        rawNodes.add(
+            GraphNode(
+                id = id,
+                name = client.clientId,
+                kind = GraphNodeKind.MqttClient,
+                detail = detail,
+                bindingCount = client.subscriptions.size,
+                memberOffline = !client.connected,
             )
         )
     }
@@ -212,12 +248,15 @@ fun buildBindingGraph(
     }
 
     // Assign layer to each node
+    val amqTopicLayer = exchangeLayers["amq.topic"] ?: 0
     val nodeWithLayer = rawNodes.map { node ->
-        val layer = if (node.kind == GraphNodeKind.Exchange) {
-            val exName = if (node.name == TopologyTexts.DEFAULT_EXCHANGE) "" else node.name
-            exchangeLayers[exName] ?: 0
-        } else {
-            queueLayers[node.name] ?: 1
+        val layer = when (node.kind) {
+            GraphNodeKind.Exchange -> {
+                val exName = if (node.name == TopologyTexts.DEFAULT_EXCHANGE) "" else node.name
+                exchangeLayers[exName] ?: 0
+            }
+            GraphNodeKind.MqttClient -> amqTopicLayer + 1
+            GraphNodeKind.Queue, GraphNodeKind.Stream -> queueLayers[node.name] ?: 1
         }
         node to layer
     }
@@ -276,7 +315,41 @@ fun buildBindingGraph(
         }
     }
 
-    val positionedEdges = resolveEdgeLabelPositions(initialEdges)
+    val positionedEdges = resolveEdgeLabelPositions(
+        buildList {
+            addAll(initialEdges)
+            val fromNode = nodeMapById["e:amq.topic"]
+            if (fromNode != null) {
+                var mqttEdgeIdx = initialEdges.size
+                activeMqttClients.forEach { client ->
+                    val toNode = nodeMapById["m:${client.clientId}"]
+                    if (toNode != null) {
+                        val fromX = fromNode.x + NODE_WIDTH
+                        val fromY = fromNode.y + NODE_HEIGHT / 2f
+                        val toX = toNode.x
+                        val toY = toNode.y + NODE_HEIGHT / 2f
+                        client.subscriptions.forEach { sub ->
+                            add(
+                                PositionedEdge(
+                                    edge = GraphEdge(
+                                        id = "edge-mqtt-${mqttEdgeIdx++}",
+                                        sourceId = "e:amq.topic",
+                                        targetId = "m:${client.clientId}",
+                                        routingKey = "${sub.topic} (QoS ${sub.qos})",
+                                        arguments = "{}",
+                                    ),
+                                    fromX = fromX,
+                                    fromY = fromY,
+                                    toX = toX,
+                                    toY = toY,
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    )
 
     return BindingGraph(
         nodes = positionedNodes,

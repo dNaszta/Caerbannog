@@ -1,7 +1,15 @@
 package dev.caerbannog.core.topology
 
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.mqtt.StreamInboundRoute
+import dev.caerbannog.core.streams.ConsumerRowState
+import dev.caerbannog.core.streams.ConsumerStatus
+import dev.caerbannog.core.streams.PipelineNodeHealth
+import dev.caerbannog.core.streams.PipelineNodeKind
+import dev.caerbannog.core.streams.PublisherRowState
+import dev.caerbannog.core.streams.buildStreamPipelineGraph
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -204,5 +212,130 @@ class TopologyGraphLayoutTest {
         assertFalse(nonMqtt.isMqttTopicExchange)
         assertNull(nonMqtt.mqttTopicFilter)
         assertNull(nonMqtt.suggestedPublishTopic)
+    }
+
+    @Test
+    fun `buildBindingGraph includes MQTT client subscriber nodes and queue health flags`() {
+        val exchanges = listOf(exchange("amq.topic", "topic"))
+        val degradedQueue = QueueRow(
+            name = "alerts-quorum",
+            vhost = "/",
+            type = "quorum",
+            readyMessages = 12L,
+            unackedMessages = 4L,
+            consumers = 1,
+            leader = "rabbit@node1",
+            members = listOf("rabbit@node1", "rabbit@node2"),
+            online = listOf("rabbit@node1"),
+            policy = null,
+            state = "running",
+        )
+        val bindings = listOf(
+            binding("amq.topic", "alerts-quorum", BindingDestinationType.QUEUE, "alerts.#"),
+        )
+        val mqttClients = listOf(
+            MqttClientRow(
+                clientId = "dashboard-sub-1",
+                connectionName = "10.0.0.9:51112",
+                vhost = "/",
+                username = "mqtt",
+                peerHost = "10.0.0.9",
+                peerPort = 51112,
+                protocol = "MQTT 5.0",
+                connectedAt = 1_700_000_000_000L,
+                ssl = true,
+                cleanSession = true,
+                subscriptions = listOf(MqttSubscription("sensors/#", qos = 1)),
+                connected = true,
+            ),
+        )
+
+        val graph = buildBindingGraph(
+            exchanges = exchanges,
+            queues = listOf(degradedQueue),
+            bindings = bindings,
+            showDefaultExchange = false,
+            mqttClients = mqttClients,
+        )
+
+        val qNode = graph.nodes.first { it.node.name == "alerts-quorum" }.node
+        assertTrue(qNode.memberOffline)
+        assertEquals(4L, qNode.unackedCount)
+
+        val mqttNode = graph.nodes.first { it.node.name == "dashboard-sub-1" }
+        assertEquals(GraphNodeKind.MqttClient, mqttNode.node.kind)
+        assertEquals("(mqtt · 1 sub)", mqttNode.node.detail)
+        assertEquals(1, mqttNode.layer)
+        assertTrue(graph.edges.any { it.edge.targetId == "m:dashboard-sub-1" && it.edge.routingKey == "sensors/# (QoS 1)" })
+    }
+
+    @Test
+    fun `buildStreamPipelineGraph organizes ingress routes, publishers, stream hub, and consumers across three layers`() {
+        val routes = listOf(
+            StreamInboundRoute(exchange = "amq.topic", routingKey = "sensors.#"),
+        )
+        val publishers = listOf(
+            PublisherRowState(
+                key = "c1#0",
+                connection = "10.0.0.1:5000",
+                user = "svc",
+                reference = "ingest-1",
+                published = "12,400",
+                confirmed = "12,400",
+                errors = "0",
+                settling = false,
+            ),
+        )
+        val consumers = listOf(
+            ConsumerRowState(
+                key = "c2#0",
+                name = "archiver",
+                connection = "10.0.0.2:5001",
+                user = "svc",
+                offset = "12399",
+                behind = "0",
+                status = ConsumerStatus.CaughtUp,
+                browseFromOffset = 12399L,
+            ),
+            ConsumerRowState(
+                key = "c3#0",
+                name = "ml-worker",
+                connection = "10.0.0.3:5002",
+                user = "svc",
+                offset = "11000",
+                behind = "1,399",
+                status = ConsumerStatus.Behind(1399L),
+                browseFromOffset = 11000L,
+            ),
+        )
+
+        val pipeline = buildStreamPipelineGraph(
+            stream = "telemetry-stream",
+            lastOffset = "12399",
+            inboundRoutes = routes,
+            publishers = publishers,
+            consumers = consumers,
+        )
+
+        assertTrue(pipeline.hasSourcesOrSinks)
+        assertEquals(5, pipeline.nodes.size)
+        assertEquals(4, pipeline.edges.size)
+
+        val mqttNode = pipeline.nodes.first { it.kind == PipelineNodeKind.MqttRoute }
+        val pubNode = pipeline.nodes.first { it.kind == PipelineNodeKind.StreamPublisher }
+        val hubNode = pipeline.nodes.first { it.kind == PipelineNodeKind.StreamHub }
+        val archiverNode = pipeline.nodes.first { it.title == "archiver" }
+        val mlNode = pipeline.nodes.first { it.title == "ml-worker" }
+
+        assertEquals(0, mqttNode.layer)
+        assertEquals("sensors/test", mqttNode.suggestedMqttTopic)
+        assertEquals(0, pubNode.layer)
+        assertEquals(1, hubNode.layer)
+        assertEquals("head @12399", hubNode.subtitle)
+        assertEquals(2, archiverNode.layer)
+        assertEquals(PipelineNodeHealth.Healthy, archiverNode.health)
+        assertEquals(2, mlNode.layer)
+        assertEquals(PipelineNodeHealth.Lagging, mlNode.health)
+        assertEquals(11000L, mlNode.seekOffset)
     }
 }

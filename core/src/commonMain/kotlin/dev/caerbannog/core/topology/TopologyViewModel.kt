@@ -330,6 +330,12 @@ class TopologyViewModel(
         }
         val newMqtt = if (needsMqtt()) {
             readOne(src) { src.mqtt.listClients(target) } ?: return
+        } else if (tab == TopologyTab.Bindings && bindingsView == BindingsViewMode.Graph && context.value?.profile?.hasMqtt == true) {
+            when (val res = loop.ask(src) { src.mqtt.listClients(target) }) {
+                is CatalogResult.Success -> res.value
+                null -> return
+                else -> emptyList()
+            }
         } else {
             null
         }
@@ -567,7 +573,10 @@ class TopologyViewModel(
                 val src = if (row.source.isEmpty()) TopologyTexts.DEFAULT_EXCHANGE else row.source
                 matches(src) || matches(row.destination) || matches(row.routingKey)
             }
-            buildBindingGraph(ex, q, b, showDefaultExchange, streams = streams.orEmpty())
+            val m = mqttClients.orEmpty().filter { client ->
+                matches(client.clientId) || matches("amq.topic") || client.subscriptions.any { matches(it.topic) }
+            }
+            buildBindingGraph(ex, q, b, showDefaultExchange, streams = streams.orEmpty(), mqttClients = m)
         } else null
         val graphTooLargeMsg = if (computedGraph?.isTooLarge == true) {
             TopologyTexts.graphTooLarge(computedGraph.totalBindings)
