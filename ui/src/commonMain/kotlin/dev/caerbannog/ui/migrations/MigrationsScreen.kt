@@ -515,6 +515,14 @@ private fun DryRunActionRow(
                 text = actionDryRun.action.description,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            actionDryRun.action.detail?.let { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("actionDetail:$index"),
+                )
+            }
             val reason = actionDryRun.reason
             if (reason != null) {
                 Text(
