@@ -129,9 +129,22 @@ class MigrationWriterTest {
 
     @Test
     fun `a 400 precondition failure is the conflict reason with the name`() {
-        val body = """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x-delivery-limit' for queue 'orders' in vhost '/': received '5' but current is '3'"}"""
+        val body = """{"error":"bad_request","reason":"inequivalent arg 'x-delivery-limit' for queue 'orders' in vhost '/': received '5' but current is '3'"}"""
         assertEquals(M508a.conflict("orders"), M508a.failedReason(write(declare, M508a.answering(400, body))))
         assertEquals(M508a.conflict("limits"), M508a.failedReason(write(MigrationAction.DeclareExchange("limits"), M508a.answering(400, body))))
+    }
+
+    @Test
+    fun `the 400 bodies measured on a real 4x broker, an inequivalent argument is a conflict, an unknown type or a bad policy key is a refusal`() {
+        val inequivalent = """{"error":"bad_request","reason":"inequivalent arg 'durable' for queue 'q1' in vhost '/': received 'false' but current is 'true'"}"""
+        assertEquals(M508a.conflict("q1"), M508a.failedReason(write(MigrationAction.DeclareQueue("q1"), M508a.answering(400, inequivalent))))
+        for (body in listOf(
+            """{"error":"bad_request","reason":"unknown exchange type 'nosuch'"}""",
+            """{"error":"bad_request","reason":"Validation failed\n\n[{<<\"bad-key\">>,1}] are not recognised policy settings\n"}""",
+        )) {
+            val reason = M508a.failedReason(write(MigrationAction.DeclareExchange("e2"), M508a.answering(400, body)))
+            assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("different settings"), reason)
+        }
     }
 
     @Test
@@ -187,7 +200,7 @@ class MigrationWriterTest {
 
     @Test
     fun `a name with dot, underscore and dash is echoed in the conflict reason, the vhost slash too`() {
-        val precondition = """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x'"}"""
+        val precondition = """{"error":"bad_request","reason":"inequivalent arg 'x'"}"""
         for (name in listOf("order-events", "orders.v2", "my_queue")) {
             assertEquals(M508a.conflict(name), M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition))))
         }
@@ -195,7 +208,7 @@ class MigrationWriterTest {
 
     @Test
     fun `a name that is not short and plain is not echoed in the conflict reason`() {
-        val precondition = """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x'"}"""
+        val precondition = """{"error":"bad_request","reason":"inequivalent arg 'x'"}"""
         for (name in listOf("a\"quote", "line\nbreak", "<script>x</script>", "x".repeat(65), "back\\slash", "a b")) {
             val reason = M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition)))
             assertTrue(reason.contains("exists with different settings"), reason)

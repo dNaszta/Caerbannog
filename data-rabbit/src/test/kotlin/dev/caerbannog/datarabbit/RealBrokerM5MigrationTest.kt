@@ -189,10 +189,10 @@ class RealBrokerM5MigrationTest {
     fun `a queue that exists with other arguments answers 400, the executor reports a conflict and the queue is unchanged`() {
         val queue = unique("conflict"); track("/api/queues/%2F/$queue")
         assertTrue(api.declareQueue(queue, """{"x-queue-type":"quorum","x-delivery-limit":3}""").ok)
-        // the raw broker answer the writer relies on: 400 with PRECONDITION_FAILED
+        // the raw broker answer the writer relies on, MEASURED on 4.x: 400 and a reason that starts with "inequivalent arg" (no PRECONDITION_FAILED text)
         val raw = api.declareQueue(queue, """{"x-queue-type":"quorum","x-delivery-limit":5}""")
         assertEquals(400, raw.status, raw.toString())
-        assertTrue(raw.body.contains("PRECONDITION_FAILED"), raw.body)
+        assertTrue(raw.body.contains("inequivalent arg"), raw.body)
 
         val result = exec(MigrationAction.DeclareQueue(queue, "quorum", arguments = mapOf("x-delivery-limit" to ArgumentValue.Whole(5))))
         assertTrue((result as ActionResult.Failed).reason.contains("exists with different settings"), result.toString())
@@ -255,6 +255,28 @@ class RealBrokerM5MigrationTest {
         assertEquals(ActionResult.Success, exec(MigrationAction.DeleteBinding(exchange, queue)))
         assertTrue(api.get("/api/bindings/%2F/e/$exchange/q/$queue").arr.isEmpty())
         assertEquals(ActionResult.Success, exec(MigrationAction.DeleteBinding(exchange, queue)), "a second delete is a no-op")
+    }
+
+    @Test
+    fun `a binding delete removes exactly the named binding for routing keys with a tilde, a plus or other characters`() {
+        // Step 4 finding (measured on 4.x): properties_key is the QUOTED key ("~" is %7E, "+" is %2B, a space is "+"), so a path built from the plain
+        // key deleted the EMPTY-key binding for the key "~" and failed (read-back: still exists) for "+" and "x~y". Each key must remove only itself.
+        val queue = unique("bkq"); val exchange = unique("bkx")
+        track("/api/queues/%2F/$queue"); track("/api/exchanges/%2F/$exchange")
+        assertEquals(ActionResult.Success, exec(MigrationAction.DeclareQueue(queue, "quorum")))
+        assertEquals(ActionResult.Success, exec(MigrationAction.DeclareExchange(exchange, "direct")))
+        val keys = listOf("", "~", "a+b", "x~y", "a b", "a/b", "a%b", "\u00e9", "a.b", "a#b", "a?b")
+        for (key in keys) {
+            keys.forEach { assertEquals(ActionResult.Success, exec(MigrationAction.DeclareBinding(exchange, queue, it)), "declare [$it]") }
+            fun present() = api.get("/api/bindings/%2F/e/$exchange/q/$queue").arr.map { it.jsonObject["routing_key"]!!.jsonPrimitive.content }.toSet()
+            assertEquals(keys.toSet(), present(), "premise for [$key]")
+            assertEquals(ActionResult.Success, exec(MigrationAction.DeleteBinding(exchange, queue, key)), "delete [$key]")
+            assertEquals(keys.toSet() - key, present(), "deleting [$key] must remove exactly that binding")
+            (keys.toSet() - key).forEach { exec(MigrationAction.DeleteBinding(exchange, queue, it)) }
+            api.delete("/api/queues/%2F/$queue"); api.delete("/api/exchanges/%2F/$exchange")
+            assertEquals(ActionResult.Success, exec(MigrationAction.DeclareQueue(queue, "quorum")))
+            assertEquals(ActionResult.Success, exec(MigrationAction.DeclareExchange(exchange, "direct")))
+        }
     }
 
     @Test

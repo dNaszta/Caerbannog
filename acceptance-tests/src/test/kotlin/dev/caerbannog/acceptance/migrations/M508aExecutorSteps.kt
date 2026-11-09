@@ -425,6 +425,8 @@ class M508aExecutorSteps {
         }
         // the real broker pages at 500; a smaller page here makes 150 queues several pages (the reader must not assume a page size)
         pagedCatalog = PagedTopologyCatalog(s.fakeTopologyCatalog, pageSize = 40).also { s.topologyCatalogOverride = it }
+        // The Background may already have built the view model with the plain catalog; the next getVm() builds it with the paged one.
+        s.viewModel = null
     }
 
     @Then("the new migration declares all {int} queues")

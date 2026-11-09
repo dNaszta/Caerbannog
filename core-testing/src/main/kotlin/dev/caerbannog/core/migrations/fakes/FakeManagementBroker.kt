@@ -23,7 +23,7 @@ import java.util.Collections
  * policies, operator policies of 4.x), WITHOUT any HTTP library: the data-rabbit tests and the acceptance glue wrap [handle] in a
  * Ktor mock engine. Rules, each one a fact of the real broker (the live test `RealBrokerM5MigrationTest` measures them again):
  *  - PUT of a queue or exchange: new gives 201; the same settings give 204; other durable, auto_delete, type or arguments give 400 with a
- *    `PRECONDITION_FAILED - inequivalent arg ...` reason that names the resource and the values (a test uses it as a sentinel: the app must
+ *    `inequivalent arg ...` reason that names the resource and the values (a test uses it as a sentinel: the app must
  *    never copy it); a name that decodes to `.` or `..` gives 405 and creates nothing (measured on 4.x, M8-04); an unknown vhost gives 404.
  *  - argument values are compared as typed JSON: `5` and `"5"` differ, `5` and `5.0` differ (the broker compares typed AMQP values).
  *  - PUT of a policy REPLACES an existing one (201 new, 204 replaced): so a test that counts [policyWrites] sees an overwrite the app should not make.
@@ -179,7 +179,7 @@ class FakeManagementBroker {
     private fun parse(body: String?): JsonObject = if (body.isNullOrBlank()) JsonObject(emptyMap()) else Json.parseToJsonElement(body).jsonObject
 
     private fun precondition(what: String, name: String, vhost: String, arg: String, received: String, current: String) =
-        Reply(400, """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg '$arg' for $what '$name' in vhost '$vhost': received '$received' but current is '$current'"}""")
+        Reply(400, """{"error":"bad_request","reason":"inequivalent arg '$arg' for $what '$name' in vhost '$vhost': received '$received' but current is '$current'"}""")
 
     private fun queue(method: String, vhost: String, name: String, body: String?): Reply {
         val key = Key(vhost, name)
