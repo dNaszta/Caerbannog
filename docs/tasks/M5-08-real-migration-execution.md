@@ -39,6 +39,7 @@ Ports in `core` (`TopologyMigrationExecutor`, `MigrationFileRepository`, `Migrat
 None in this task. The M5-04 brief listed `caerbannog_list_migrations`, `caerbannog_dry_run_migration`, `caerbannog_apply_migrations`; none is built, and scenario "The MCP apply tools refuse access actions" in `18` assumes an apply tool. That discrepancy is for the owner (see Product decisions, item 3) and for `M8-10`. If an apply tool is ever built it must call the same runner (so the level, permission and vhost guards apply) and never create or remove a Shovel.
 
 ## Open points
+0. (M8-04 review) `MigrationRequests` encodes a path segment made only of dots as `%2E`; the live test must check that the broker and the HTTP client route such a name literally (the parser already refuses `.` and `..` from files). `MigrationParser.parse` never throws for a wrong-typed value (fixed message), which this task relies on when it re-parses every file on disk.
 1. History is keyed by profile name: a renamed profile loses its history (it shows every migration as pending, and the actions are idempotent). Proposal: the profile rename in `ConnectionsViewModel` also renames the history key; small follow-up if not done here.
 2. A 4.x `DELETE` of a binding needs the properties key; the live test measures the exact form (unverified).
 3. The 3.x read-only source has no executor by design.

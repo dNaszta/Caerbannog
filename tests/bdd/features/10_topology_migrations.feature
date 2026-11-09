@@ -89,6 +89,8 @@ Feature: Topology migrations
       | declares a queue type inside the arguments | the queue type belongs in "type"   |
       | has a policy with an unknown apply-to      | the policy apply-to is not supported |
       | has a binding with an unknown destination type | the binding destination type must be queue or exchange |
+      | has a queue whose name is an object       | the value of "name" has the wrong type |
+      | declares a queue named ".."               | a name must not be "." or ".."          |
 
   # ---- M8-04: the format carries what a converted 3.x topology needs (additive; old files unchanged) ----
 
