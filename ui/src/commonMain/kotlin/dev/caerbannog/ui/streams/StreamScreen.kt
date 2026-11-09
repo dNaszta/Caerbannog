@@ -4,7 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -266,10 +268,12 @@ private fun StreamInboundRoutesBar(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            val routesScroll = rememberScrollState()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(routesScroll)
+                    .testTag("inboundRoutesRow"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -295,8 +299,6 @@ private fun StreamInboundRoutesBar(
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                         route.mqttTopicFilter?.let { topicFilter ->
                             Text(
@@ -305,8 +307,6 @@ private fun StreamInboundRoutesBar(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -330,8 +330,6 @@ private fun StreamInboundRoutesBar(
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -355,6 +353,12 @@ private fun StreamInboundRoutesBar(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+            }
+            if (routesScroll.maxValue > 0) {
+                HorizontalScrollbar(
+                    adapter = rememberScrollbarAdapter(routesScroll),
+                    modifier = Modifier.fillMaxWidth().testTag("inboundRoutesScrollbar"),
+                )
             }
             if (showPipeline) {
                 StreamPipelineGraphCard(

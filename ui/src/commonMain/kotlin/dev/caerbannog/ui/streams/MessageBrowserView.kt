@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -834,51 +835,32 @@ private fun MessageDetailsSheet(
                 }
             }
 
-            // Copy buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Button(
-                    onClick = {
-                        val bodyText = formatter.copyBody(message)
-                        copyToClipboard(bodyText)
-                    },
-                    modifier = Modifier.testTag("copyBodyButton"),
-                ) {
-                    ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Copy body")
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        val offsetText = formatter.copyOffset(message)
-                        copyToClipboard(offsetText)
-                    },
-                    modifier = Modifier.testTag("copyOffsetButton"),
-                ) {
-                    ConnectionIcon(AppIcon.Tag, SmallIconSize)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Copy offset")
-                }
-
+            // Copy actions: compact icon toolbar (never wraps); the label is the tooltip and the accessibility description.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                CopyIconButton("Copy body", AppIcon.ContentCopy, "copyBodyButton") { copyToClipboard(formatter.copyBody(message)) }
+                CopyIconButton("Copy offset", AppIcon.Tag, "copyOffsetButton") { copyToClipboard(formatter.copyOffset(message)) }
                 if (message.properties.isNotEmpty() || message.applicationProperties.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = {
-                            val metadataText = formatter.copyHeadersAndProperties(message)
-                            copyToClipboard(metadataText)
-                        },
-                        modifier = Modifier.testTag("copyHeadersAndPropertiesButton"),
-                    ) {
-                        ConnectionIcon(AppIcon.Info, SmallIconSize)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Copy metadata")
+                    CopyIconButton("Copy metadata", AppIcon.Info, "copyHeadersAndPropertiesButton") {
+                        copyToClipboard(formatter.copyHeadersAndProperties(message))
                     }
                 }
             }
         }
     }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CopyIconButton(label: String, icon: AppIcon, tag: String, onClick: () -> Unit) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        OutlinedIconButton(onClick = onClick, modifier = Modifier.testTag(tag)) {
+            ConnectionIcon(icon, IconSize, contentDescription = label)
+        }
     }
 }
 

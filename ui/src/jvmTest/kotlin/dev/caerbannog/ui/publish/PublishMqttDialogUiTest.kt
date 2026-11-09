@@ -237,6 +237,32 @@ class PublishMqttDialogUiTest {
     }
 
     @Test
+    fun `StreamScreen inbound routes row scrolls and shows a scrollbar when several long routes overflow`() = runDesktopComposeUiTest(600, 800) {
+        val routes = (1..6).map { StreamInboundRoute(exchange = "very.long.exchange.name.number.$it", routingKey = "sensors.building.floor.$it.#") }
+
+        setContent {
+            androidx.compose.material3.MaterialTheme {
+                StreamScreen(
+                    stream = "telemetry-stream",
+                    state = StreamClientsState(screen = StreamClientsScreen.Content),
+                    nowMillis = 10_000L,
+                    events = RecordedClientsEvents(),
+                    control = connected,
+                    controlEvents = noControlEvents,
+                    inboundRoutes = routes,
+                    showPublishMqttDialog = false,
+                    publishMqttState = defaultState,
+                    publishMqttEvents = RecordingMqttEvents(),
+                    onOpenPublishMqttDialog = {},
+                )
+            }
+        }
+
+        onNodeWithTag("inboundRoutesScrollbar").assertExists()
+        onNodeWithTag("inboundRoute:very.long.exchange.name.number.6:sensors.building.floor.6.#").assertExists()
+    }
+
+    @Test
     fun `StreamScreen displays inbound MQTT route banner and pre-fills suggested publish topic on click`() = runDesktopComposeUiTest(1280, 800) {
         val routes = listOf(
             StreamInboundRoute(exchange = "amq.topic", routingKey = "sensors.#"),
