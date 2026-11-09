@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrations
 
-import dev.caerbannog.core.json.ArgumentValue // M8-04 STUB: the type lives in M804TestStubs.kt until the senior developer moves the real one
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.json.ArgumentValueJson
 import dev.caerbannog.core.topology.BindingDestinationType
 
 /**
@@ -12,7 +13,7 @@ sealed interface MigrationAction {
     val description: String
     val isDestructive: Boolean get() = false
 
-    /** M8-04 STUB: one-line summary of arguments or definition (null = nothing to show). The real behaviour is the developer's. */
+    /** One-line summary of arguments or definition for the migrations screen; null when there is nothing to show. */
     val detail: String? get() = null
 
     data class DeclareQueue(
@@ -21,10 +22,11 @@ sealed interface MigrationAction {
         override val vhost: String = "/",
         val durable: Boolean = true,
         val arguments: Map<String, ArgumentValue> = emptyMap(),
-        val autoDelete: Boolean = false, // M8-04 STUB field
+        val autoDelete: Boolean = false,
     ) : MigrationAction {
         override val actionName: String get() = "declareQueue"
         override val description: String get() = "Declare $type queue $name"
+        override val detail: String? get() = argumentsDetail(arguments)
     }
 
     data class DeleteQueue(
@@ -41,12 +43,13 @@ sealed interface MigrationAction {
         val type: String = "direct",
         override val vhost: String = "/",
         val durable: Boolean = true,
-        val autoDelete: Boolean = false, // M8-04 STUB fields
+        val autoDelete: Boolean = false,
         val internal: Boolean = false,
         val arguments: Map<String, ArgumentValue> = emptyMap(),
     ) : MigrationAction {
         override val actionName: String get() = "declareExchange"
         override val description: String get() = "Declare $type exchange $name"
+        override val detail: String? get() = argumentsDetail(arguments)
     }
 
     data class DeleteExchange(
@@ -63,16 +66,16 @@ sealed interface MigrationAction {
         val queue: String,
         val routingKey: String = "",
         override val vhost: String = "/",
-        val destinationType: BindingDestinationType = BindingDestinationType.QUEUE, // M8-04 STUB fields
+        val destinationType: BindingDestinationType = BindingDestinationType.QUEUE,
         val arguments: Map<String, ArgumentValue> = emptyMap(),
     ) : MigrationAction {
         override val actionName: String get() = "declareBinding"
         override val description: String
-            get() = if (routingKey.isNotBlank()) {
-                "Bind $exchange to $queue with $routingKey"
-            } else {
-                "Bind $exchange to $queue"
+            get() {
+                val target = if (destinationType == BindingDestinationType.EXCHANGE) "exchange $queue" else queue
+                return if (routingKey.isNotBlank()) "Bind $exchange to $target with $routingKey" else "Bind $exchange to $target"
             }
+        override val detail: String? get() = argumentsDetail(arguments)
     }
 
     data class DeleteBinding(
@@ -113,14 +116,15 @@ sealed interface MigrationAction {
         val pattern: String,
         val definition: Map<String, ArgumentValue> = emptyMap(),
         override val vhost: String = "/",
-        val applyTo: String = "all", // M8-04 STUB fields
+        val applyTo: String = "all",
         val priority: Int = 0,
     ) : MigrationAction {
         override val actionName: String get() = "declarePolicy"
         override val description: String get() = "Declare policy $name"
+        override val detail: String get() = policyDetail(applyTo, priority, definition)
     }
 
-    /** M8-04 STUB of the new action (the real one is the developer's). */
+    /** A 4.x operator policy: same shape as [DeclarePolicy]; the broker accepts only limit keys in it. */
     data class DeclareOperatorPolicy(
         val name: String,
         val pattern: String,
@@ -131,6 +135,7 @@ sealed interface MigrationAction {
     ) : MigrationAction {
         override val actionName: String get() = "declareOperatorPolicy"
         override val description: String get() = "Declare operator policy $name"
+        override val detail: String get() = policyDetail(applyTo, priority, definition)
     }
 
     data class DeletePolicy(
@@ -141,6 +146,34 @@ sealed interface MigrationAction {
         override val description: String get() = "Delete policy $name"
         override val isDestructive: Boolean get() = true
     }
+}
+
+private const val MAX_DETAIL_LENGTH = 120
+
+private fun argumentsDetail(arguments: Map<String, ArgumentValue>): String? =
+    if (arguments.isEmpty()) null else oneLine(pairs(arguments))
+
+private fun policyDetail(applyTo: String, priority: Int, definition: Map<String, ArgumentValue>): String {
+    val head = "apply-to=$applyTo, priority=$priority"
+    return oneLine(if (definition.isEmpty()) head else "$head; ${pairs(definition)}")
+}
+
+private fun pairs(entries: Map<String, ArgumentValue>): String =
+    entries.toSortedMap().entries.joinToString(", ") { (key, value) -> "$key=${shown(value)}" }
+
+private fun shown(value: ArgumentValue): String = when (value) {
+    is ArgumentValue.Text -> value.value
+    is ArgumentValue.Whole -> value.value.toString()
+    is ArgumentValue.Decimal -> value.value.toString()
+    is ArgumentValue.Flag -> value.value.toString()
+    ArgumentValue.Nothing -> "null"
+    is ArgumentValue.Items, is ArgumentValue.Table -> ArgumentValueJson.encode(value).toString()
+}
+
+/** Control characters become spaces so the text stays on one line; cut to [MAX_DETAIL_LENGTH] with an ellipsis. */
+private fun oneLine(text: String): String {
+    val flat = text.map { if (it.isISOControl()) ' ' else it }.joinToString("")
+    return if (flat.length > MAX_DETAIL_LENGTH) flat.take(MAX_DETAIL_LENGTH - 1) + "…" else flat
 }
 
 /**

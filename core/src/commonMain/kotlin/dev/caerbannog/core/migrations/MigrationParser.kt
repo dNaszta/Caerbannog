@@ -6,11 +6,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -25,6 +23,8 @@ object MigrationParser {
 
     /** A migration file has a known shallow schema (a few levels); far below the reader's failure point near 10,000. */
     private const val MAX_FILE_DEPTH = 64
+
+    private const val MAX_ECHOED_NAME_LENGTH = 64
 
     private val prettyJson = Json {
         prettyPrint = true
@@ -84,107 +84,11 @@ object MigrationParser {
                 return MigrationValidationResult.Invalid("which action is not supported")
             }
 
-            val vhost = itemObj["vhost"]?.jsonPrimitive?.content ?: "/"
-
-            when (actionName) {
-                "declareQueue" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("queue name is required")
-                    val type = itemObj["type"]?.jsonPrimitive?.content ?: "quorum"
-                    val durable = itemObj["durable"]?.jsonPrimitive?.booleanOrNull ?: true
-                    actions += MigrationAction.DeclareQueue(
-                        name = name,
-                        type = type,
-                        vhost = vhost,
-                        durable = durable,
-                    )
-                }
-
-                "deleteQueue" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("queue name is required")
-                    actions += MigrationAction.DeleteQueue(name = name, vhost = vhost)
-                }
-
-                "declareExchange" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("exchange name is required")
-                    val type = itemObj["type"]?.jsonPrimitive?.content ?: "direct"
-                    val durable = itemObj["durable"]?.jsonPrimitive?.booleanOrNull ?: true
-                    actions += MigrationAction.DeclareExchange(
-                        name = name,
-                        type = type,
-                        vhost = vhost,
-                        durable = durable,
-                    )
-                }
-
-                "deleteExchange" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("exchange name is required")
-                    actions += MigrationAction.DeleteExchange(name = name, vhost = vhost)
-                }
-
-                "declareBinding" -> {
-                    val exchange = itemObj["exchange"]?.jsonPrimitive?.content
-                    val queue = itemObj["queue"]?.jsonPrimitive?.content
-                        ?: itemObj["destination"]?.jsonPrimitive?.content
-                    if (exchange.isNullOrBlank() || queue.isNullOrBlank()) {
-                        return MigrationValidationResult.Invalid("binding requires exchange and queue")
-                    }
-                    val routingKey = itemObj["routingKey"]?.jsonPrimitive?.content ?: ""
-                    actions += MigrationAction.DeclareBinding(
-                        exchange = exchange,
-                        queue = queue,
-                        routingKey = routingKey,
-                        vhost = vhost,
-                    )
-                }
-
-                "deleteBinding" -> {
-                    val exchange = itemObj["exchange"]?.jsonPrimitive?.content
-                    val queue = itemObj["queue"]?.jsonPrimitive?.content
-                        ?: itemObj["destination"]?.jsonPrimitive?.content
-                    if (exchange.isNullOrBlank() || queue.isNullOrBlank()) {
-                        return MigrationValidationResult.Invalid("binding requires exchange and queue")
-                    }
-                    val routingKey = itemObj["routingKey"]?.jsonPrimitive?.content ?: ""
-                    actions += MigrationAction.DeleteBinding(
-                        exchange = exchange,
-                        queue = queue,
-                        routingKey = routingKey,
-                        vhost = vhost,
-                    )
-                }
-
-                "declareStream" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("stream name is required")
-                    actions += MigrationAction.DeclareStream(name = name, vhost = vhost)
-                }
-
-                "deleteStream" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("stream name is required")
-                    actions += MigrationAction.DeleteStream(name = name, vhost = vhost)
-                }
-
-                "declarePolicy" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    val pattern = itemObj["pattern"]?.jsonPrimitive?.content ?: ".*"
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("policy name is required")
-                    actions += MigrationAction.DeclarePolicy(name = name, pattern = pattern, vhost = vhost)
-                }
-
-                "deletePolicy" -> {
-                    val name = itemObj["name"]?.jsonPrimitive?.content
-                    if (name.isNullOrBlank()) return MigrationValidationResult.Invalid("policy name is required")
-                    actions += MigrationAction.DeletePolicy(name = name, vhost = vhost)
-                }
-
-                else -> {
-                    return MigrationValidationResult.Invalid("action '$actionName' is not supported; which action is not supported")
-                }
+            val codec = ActionCodecs.find(actionName)
+                ?: return MigrationValidationResult.Invalid(unsupportedActionMessage(actionName))
+            when (val result = codec.read(itemObj)) {
+                is ActionReadResult.Read -> actions += result.action
+                is ActionReadResult.Refused -> return MigrationValidationResult.Invalid(result.reason)
             }
         }
 
@@ -198,6 +102,12 @@ object MigrationParser {
         )
 
         return MigrationValidationResult.Valid(migrationFile)
+    }
+
+    /** An untrusted action name is named only when it is short and plain; the phrase stays the same either way. */
+    private fun unsupportedActionMessage(actionName: String): String {
+        val plain = actionName.length <= MAX_ECHOED_NAME_LENGTH && actionName.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }
+        return if (plain) "action '$actionName' is not supported; which action is not supported" else "which action is not supported"
     }
 
     fun exportToJson(
@@ -214,51 +124,7 @@ object MigrationParser {
                         buildJsonObject {
                             put("action", action.actionName)
                             if (action.vhost != "/") put("vhost", action.vhost)
-                            when (action) {
-                                is MigrationAction.DeclareQueue -> {
-                                    put("name", action.name)
-                                    put("type", action.type)
-                                    if (!action.durable) put("durable", false)
-                                }
-                                is MigrationAction.DeleteQueue -> {
-                                    put("name", action.name)
-                                }
-                                is MigrationAction.DeclareExchange -> {
-                                    put("name", action.name)
-                                    put("type", action.type)
-                                    if (!action.durable) put("durable", false)
-                                }
-                                is MigrationAction.DeleteExchange -> {
-                                    put("name", action.name)
-                                }
-                                is MigrationAction.DeclareBinding -> {
-                                    put("exchange", action.exchange)
-                                    put("queue", action.queue)
-                                    if (action.routingKey.isNotEmpty()) put("routingKey", action.routingKey)
-                                }
-                                is MigrationAction.DeleteBinding -> {
-                                    put("exchange", action.exchange)
-                                    put("queue", action.queue)
-                                    if (action.routingKey.isNotEmpty()) put("routingKey", action.routingKey)
-                                }
-                                is MigrationAction.DeclareStream -> {
-                                    put("name", action.name)
-                                }
-                                is MigrationAction.DeleteStream -> {
-                                    put("name", action.name)
-                                }
-                                is MigrationAction.DeclarePolicy -> {
-                                    put("name", action.name)
-                                    put("pattern", action.pattern)
-                                }
-                                is MigrationAction.DeletePolicy -> {
-                                    put("name", action.name)
-                                }
-                                is MigrationAction.DeclareOperatorPolicy -> { // M8-04 STUB: no new keys written yet
-                                    put("name", action.name)
-                                    put("pattern", action.pattern)
-                                }
-                            }
+                            ActionCodecs.forAction(action.actionName).write(action, this)
                         }
                     )
                 }

@@ -199,7 +199,14 @@ class MigrationsViewModel(
             val exchanges = (exchangesResult as? dev.caerbannog.core.streams.CatalogResult.Success)?.value ?: emptyList()
             for (ex in exchanges) {
                 if (ex.name.isNotEmpty() && !ex.name.startsWith("amq.")) {
-                    actions += MigrationAction.DeclareExchange(name = ex.name, type = ex.type, vhost = vhost)
+                    actions += MigrationAction.DeclareExchange(
+                        name = ex.name,
+                        type = ex.type,
+                        vhost = vhost,
+                        durable = ex.durable,
+                        autoDelete = ex.autoDelete,
+                        internal = ex.internal,
+                    )
                 }
             }
 
@@ -212,6 +219,7 @@ class MigrationsViewModel(
                         queue = b.destination,
                         routingKey = b.routingKey,
                         vhost = vhost,
+                        destinationType = b.destinationType,
                     )
                 }
             }
