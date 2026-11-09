@@ -33,7 +33,8 @@ Prefer the `task` wrappers (`task --list`); Fedora installs it as `go-task`.
 
 ## Safety rules (never break)
 
-- Never read messages from queues; only streams, and only with an unnamed or `noTrackingStrategy()` consumer, so browsing changes nothing on the broker.
+- Streams: read only with an unnamed or `noTrackingStrategy()` consumer, so browsing changes nothing on the broker.
+- Queues: the only way to see messages is `ManagementQueueMessageInspector` (management API `get` with `ack_requeue_true`). Never ack, delete, purge or consume queue messages, and never add another read path. Verified live that requeue peeking does not count toward quorum-queue delivery limits (`RealBrokerM7GateTest`); keep that test green when touching the inspector.
 - Passwords live only in the OS keychain and in the per-connection holder's memory. Never put them in `SessionState`, logs, error strings or MCP output.
 - No silent fallback between TLS and plain; the profile switch decides.
 - Topology changes and publishing respect the profile's declared permissions and topology control level.

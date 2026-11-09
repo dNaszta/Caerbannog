@@ -100,6 +100,17 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M6-04-mqtt-sender-engine | MQTT publisher engine (QoS 0/1/2, Retain) with BDD scenarios | M6 | done (architect: Accepted, 2026-11-08; branch `m6-04-mqtt-sender-engine`; all tests green) |
 | M6-05-mqtt-sender-ui | "Publish MQTT Message" dialog and Compose UI tests | M6 | done (architect: Accepted, 2026-11-08; branch `m6-05-mqtt-sender-ui`; all tests green) |
 | M6-06-mqtt-mcp-tools | MCP tools: caerbannog_list_mqtt_clients & caerbannog_publish_mqtt | M6 | done (architect: Accepted, 2026-11-08; branch `m6-06-mqtt-mcp-tools`; all tests green) |
+| M7-01-stream-log-tape | Stream log tape in the message browser (offset window, retention cliff, consumer pins, click to seek) | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; built outside the team loop; commit 923cd3d, on `main`) |
+| M7-02-p0-wiring-fixes | P0 wiring fixes: Migrations in the app frame, live MQTT publish wiring, Time start mode controls | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit ad6bd15) |
+| M7-03-p1-layout-ergonomics | P1 layout and ergonomics: Topology docked detail, compact message browser with arrow keys, Connections panel | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit 544025a; number assigned in commit order) |
+| M7-04-mqtt-to-stream-workflow | End-to-end MQTT-to-stream workflow (inbound routes, suggested topic) and stream nodes in the Bindings graph | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit 6fb91e3; number assigned in commit order) |
+| M7-05-rolling-sparklines-lag-trends | Rolling sparklines and consumer lag trends | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit c9b51de; number assigned in commit order) |
+| M7-06-pipeline-graph-mqtt-subscribers | End-to-end pipeline graph, MQTT subscriber nodes, Inbound routes bar | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit 0fe7b1b; number assigned in commit order) |
+| M7-07-partition-balance-bar | Super stream partition balance bar and orphaned consumer indicator | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit 9982df1) |
+| M7-08-queue-message-inspection | Non-destructive queue message inspection (requeue peek, `ack_requeue_true` only) | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit d501d11; OPEN RISK: delivery-limit effect of requeue, live test recommended) |
+| M7-09-headers-properties-inspection | Headers and properties inspection, copy metadata | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commit 21193c7; no tests added) |
+| M7-10-mqtt-headers-default-payload | MQTT headers (MQTT 5 user properties), editable default payload, MCP `headers` argument, Paho MQTT 5 client | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commits 85987cc, 09f1d91) |
+| M7-11-review-follow-ups | Review follow-ups: BodyPreview, clipboard helper, copy toolbar, routes scrollbar, live annotation test | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commits 9134e60, dc5f82b; number assigned in commit order) |
 
 ## Later milestones (planned)
 

@@ -1,6 +1,6 @@
 # Caerbannog
 
-*Behind the rabbit.* A free desktop app for exploring **RabbitMQ Streams**: connect to a broker, list streams, and page through their messages by offset or time. It also shows quorum-queue topology and statistics, but never reads messages from queues.
+*Behind the rabbit.* A free desktop app for exploring **RabbitMQ Streams**: connect to a broker, list streams, and page through their messages by offset or time. It also shows quorum-queue topology and statistics, and can peek at queue messages without consuming them (see Safety).
 
 Built with Kotlin and Compose Multiplatform (JVM desktop). Supports RabbitMQ 4.x.
 
@@ -10,11 +10,12 @@ Built with Kotlin and Compose Multiplatform (JVM desktop). Supports RabbitMQ 4.x
 - **Message browser:** start from the first message, the last page, an offset or a timestamp; next, previous and jump; filter inside a bounded scan.
 - **Message details:** offset, timestamp, exchange and routing key (when the broker records them), properties and application properties; the body as text, pretty JSON or hex; copy body, offset or metadata.
 - **Publish:** send a test message to a stream, exchange or queue, or over MQTT with QoS, retain flag and headers (MQTT 5 user properties).
+- **Queue message inspection:** peek at the first messages of a queue through the management API in requeue mode; they are returned to the queue and shown as "Not acknowledged (requeued)".
 - **Topology:** quorum queues, exchanges and bindings with statistics; declare and edit them where your permissions allow; export and apply topology as versioned JSON migrations.
 - **Global search** across streams, queues and exchanges by name.
 - **MCP server** (`mcp-server`): exposes profiles, stream catalogs and inspection to AI agents over stdio, with the same safety rules.
 
-Safety first: browsing uses unnamed stream consumers, so it never changes offsets or tracking on the broker. Passwords stay in your OS keychain. Connections use TLS by default; turning it off shows "Not encrypted" everywhere and never falls back silently.
+Safety first: browsing uses unnamed stream consumers, so it never changes offsets or tracking on the broker. Queue messages are only peeked at with `ack_requeue_true` and are never acknowledged, deleted or purged. Passwords stay in your OS keychain. Connections use TLS by default; turning it off shows "Not encrypted" everywhere and never falls back silently.
 
 ## Install
 

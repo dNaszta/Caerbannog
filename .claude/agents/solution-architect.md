@@ -23,7 +23,7 @@ If these disagree, say so, name the files, and propose which one to change. Neve
 
 - TLS is the default (D9a in `docs/spec.md`). Stream protocol on 5551, management API over HTTPS on 15671. A per-profile "Use TLS" switch may turn it off for any host (plain 5552 and 15672, CA ignored); a plain profile must show "Not encrypted" on the panel, the chip and the popup row, and no credential may be sent before the user has chosen the profile. Block any plain path that is not behind that switch.
 - Each connection profile is its own environment. Topology changes are allowed only when the user has the configure permission, checked before the first connection. No configure means read-only. No write permission disables test publishing.
-- Quorum queue messages are never read, got or purged. Publishing a test message is allowed to any stream, exchange or queue.
+- Queue messages are never consumed, acknowledged, deleted or purged. The only accepted way to see them is the requeue peek (`ack_requeue_true`, `ManagementQueueMessageInspector`, accepted with M7 on 2026-11-09); do not add another read path. Publishing a test message is allowed to any stream, exchange or queue.
 - Browsing a stream never changes anything on the broker: short-lived reads with an unnamed consumer. Paging: next = last shown + 1; previous = first shown minus page size, clamped to the first offset. Message count is approximate.
 - Super streams: one partition at a time, no merge.
 - Topology migrations: versioned JSON, applied in order, history per machine per connection profile, idempotent actions, dry run, export and import in the same format.
