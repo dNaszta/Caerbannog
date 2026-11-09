@@ -109,36 +109,7 @@ class RabbitMqStreamMessageReader internal constructor(
                 val offset = context.offset()
                 // Drop messages delivered from chunk start that precede requested offset
                 if (offset >= minOffset && collected.size < pageSize) {
-                    val rawPayload = message.bodyAsBinary ?: ByteArray(0)
-                    val timestamp = context.timestamp().takeIf { it > 0L }
-                        ?: message.properties?.creationTime ?: 0L
-                    // Extract exchange and routing key from message annotations or properties
-                    val exchange = message.messageAnnotations?.get("x-exchange")?.toString()
-                    val routingKey = message.messageAnnotations?.get("x-routing-key")?.toString()
-                    val props = buildMap<String, Any?> {
-                        message.properties?.let { p ->
-                            p.messageIdAsString?.let { put("messageId", it) }
-                            p.correlationIdAsString?.let { put("correlationId", it) }
-                            p.contentType?.let { put("contentType", it) }
-                            p.contentEncoding?.let { put("contentEncoding", it) }
-                            p.replyTo?.let { put("replyTo", it) }
-                            p.to?.let { put("to", it) }
-                            p.subject?.let { put("subject", it) }
-                            p.userId?.takeIf { it.isNotEmpty() }?.let {
-                                runCatching { it.decodeToString() }.getOrNull()?.takeIf { s -> s.isNotEmpty() }?.let { s -> put("userId", s) }
-                            }
-                            p.groupId?.let { put("groupId", it) }
-                            if (p.groupSequence > 0L) put("groupSequence", p.groupSequence)
-                            p.replyToGroupId?.let { put("replyToGroupId", it) }
-                            if (p.creationTime > 0L) put("creationTime", p.creationTime)
-                            if (p.absoluteExpiryTime > 0L) put("absoluteExpiryTime", p.absoluteExpiryTime)
-                        }
-                        message.messageAnnotations?.forEach { (k, v) ->
-                            if (v != null) put(k, v)
-                        }
-                    }
-                    val appProps = message.applicationProperties ?: emptyMap()
-                    collected.add(StreamMessage(offset, timestamp, rawPayload, props, appProps, exchange, routingKey))
+                    collected.add(toStreamMessage(offset, context.timestamp(), message))
                     doneLatch.countDown()
                 }
             }

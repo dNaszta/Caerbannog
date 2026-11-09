@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.BodyPreview
+import dev.caerbannog.core.browser.TimeSeekPresets
 import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.core.browser.PayloadFormatter
 import dev.caerbannog.core.browser.PayloadViewKind
@@ -88,6 +89,8 @@ fun MessageBrowserView(
     events: MessageBrowserEvents,
     modifier: Modifier = Modifier,
     consumers: List<ConsumerRowState> = emptyList(),
+    /** The clock the Time start mode and its presets read; injectable so tests need no real time. */
+    nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     Box(modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
         when (state) {
@@ -116,8 +119,8 @@ fun MessageBrowserView(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            StartModeSegmentedGroup(BrowseStart.Timestamp(state.epochMs), events)
-                            TimestampSeekControls(state.epochMs, events)
+                            StartModeSegmentedGroup(BrowseStart.Timestamp(state.epochMs), events, nowMillis)
+                            TimestampSeekControls(state.epochMs, events, nowMillis)
                         }
                     }
 
@@ -204,7 +207,7 @@ fun MessageBrowserView(
                         )
                     }
 
-                    ControlCard(state, events)
+                    ControlCard(state, events, nowMillis)
                     FilterBar(state, events)
 
                     Row(
@@ -311,7 +314,7 @@ private fun FilterBar(state: MessageBrowserState.Loaded, events: MessageBrowserE
 }
 
 @Composable
-private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowserEvents) {
+private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowserEvents, nowMillis: () -> Long) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         shape = RoundedCornerShape(10.dp),
@@ -323,7 +326,7 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StartModeSegmentedGroup(state.startMode, events)
+                StartModeSegmentedGroup(state.startMode, events, nowMillis)
 
                 val mode = state.startMode
                 var offsetText by remember(state.startMode) {
@@ -356,7 +359,7 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
                 }
 
                 if (mode is BrowseStart.Timestamp) {
-                    TimestampSeekControls(mode.epochMs, events)
+                    TimestampSeekControls(mode.epochMs, events, nowMillis)
                 }
 
                 Spacer(Modifier.weight(1f))
@@ -400,7 +403,7 @@ private fun ControlCard(state: MessageBrowserState.Loaded, events: MessageBrowse
 }
 
 @Composable
-private fun StartModeSegmentedGroup(startMode: BrowseStart, events: MessageBrowserEvents) {
+private fun StartModeSegmentedGroup(startMode: BrowseStart, events: MessageBrowserEvents, nowMillis: () -> Long) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
@@ -412,13 +415,13 @@ private fun StartModeSegmentedGroup(startMode: BrowseStart, events: MessageBrows
             events.browseOffset(0L)
         }
         SegmentButton("Time", "startMode:Time", startMode is BrowseStart.Timestamp) {
-            events.browseTimestamp(System.currentTimeMillis() - 3_600_000L)
+            events.browseTimestamp(TimeSeekPresets.defaultStart(nowMillis()))
         }
     }
 }
 
 @Composable
-private fun TimestampSeekControls(initialEpochMs: Long, events: MessageBrowserEvents) {
+private fun TimestampSeekControls(initialEpochMs: Long, events: MessageBrowserEvents, nowMillis: () -> Long) {
     var epochText by remember(initialEpochMs) { mutableStateOf(initialEpochMs.toString()) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -439,19 +442,19 @@ private fun TimestampSeekControls(initialEpochMs: Long, events: MessageBrowserEv
             Text("Jump")
         }
         OutlinedButton(
-            onClick = { events.browseTimestamp(System.currentTimeMillis() - 5 * 60_000L) },
+            onClick = { events.browseTimestamp(TimeSeekPresets.since(nowMillis(), TimeSeekPresets.FIVE_MINUTES_MS)) },
             modifier = Modifier.testTag("timePreset:5m"),
         ) {
             Text("-5m")
         }
         OutlinedButton(
-            onClick = { events.browseTimestamp(System.currentTimeMillis() - 3_600_000L) },
+            onClick = { events.browseTimestamp(TimeSeekPresets.since(nowMillis(), TimeSeekPresets.ONE_HOUR_MS)) },
             modifier = Modifier.testTag("timePreset:1h"),
         ) {
             Text("-1h")
         }
         OutlinedButton(
-            onClick = { events.browseTimestamp(System.currentTimeMillis() - 24 * 3_600_000L) },
+            onClick = { events.browseTimestamp(TimeSeekPresets.since(nowMillis(), TimeSeekPresets.ONE_DAY_MS)) },
             modifier = Modifier.testTag("timePreset:24h"),
         ) {
             Text("-24h")
