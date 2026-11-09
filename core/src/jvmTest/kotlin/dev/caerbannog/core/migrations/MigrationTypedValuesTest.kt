@@ -261,4 +261,17 @@ class MigrationTypedValuesTest {
         val o = only(fileWith("""{ "action": "declareOperatorPolicy", "name": "p", "pattern": ".*", "definition": { "x-queue-type": "quorum" } }""")) as MigrationAction.DeclareOperatorPolicy
         assertEquals(ArgumentValue.Text("quorum"), o.definition["x-queue-type"])
     }
+
+    @Test
+    fun `U+2028, U+2029, NEL, vertical tab and form feed in a key or value become spaces in detail`() {
+        val odd = listOf('\u2028', '\u2029', '\u0085', '\u000B', '\u000C')
+        for (c in odd) {
+            val queue = MigrationAction.DeclareQueue("q", arguments = mapOf("k${c}k" to ArgumentValue.Text("a${c}b")))
+            assertEquals("k k=a b", queue.detail, "U+%04X".format(c.code))
+            val policy = MigrationAction.DeclarePolicy("p", ".*", mapOf("x" to ArgumentValue.Text("v${c}w")))
+            assertEquals("apply-to=all, priority=0; x=v w", policy.detail, "U+%04X".format(c.code))
+        }
+        val nested = MigrationAction.DeclareQueue("q", arguments = mapOf("k" to ArgumentValue.Items(listOf(ArgumentValue.Text("a\u2028b")))))
+        assertTrue(nested.detail!!.none { it == '\u2028' || it == '\u2029' }, nested.detail)
+    }
 }

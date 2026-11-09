@@ -45,4 +45,12 @@ class MigrationArchitectureGuardTest {
         val stubs = sources("json").filter { it.name == "M804TestStubs.kt" }
         assertTrue(stubs.isEmpty(), "delete the test-first stub file: ${stubs.map { it.path }}")
     }
+
+    @Test
+    fun `only ActionFields reads JSON values untyped, so a codec cannot reintroduce the wrong-type crash`() {
+        val tokens = listOf(".jsonPrimitive", ".jsonObject", ".jsonArray")
+        val offenders = sources("migrations").filter { it.name != "ActionFields.kt" }
+            .filter { f -> f.readLines().any { line -> tokens.any { line.substringBefore("//").contains(it) } } }
+        assertTrue(offenders.isEmpty(), "use the helpers of ActionFields.kt (string, flag, typedEntries): these files read untyped JSON: ${offenders.map { it.name }}")
+    }
 }

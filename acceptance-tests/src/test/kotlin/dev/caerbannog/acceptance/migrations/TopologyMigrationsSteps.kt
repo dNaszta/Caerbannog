@@ -437,6 +437,12 @@ class TopologyMigrationsSteps {
                 """.trimIndent()
                 lastImportResult = getVm().importFile(json)
             }
+            "has a queue whose name is an object" -> lastImportResult = getVm().importFile(
+                """{ "version": "0097", "up": [ { "action": "declareQueue", "name": { "inner": "x" } } ] }""",
+            )
+            "declares a queue named \"..\"" -> lastImportResult = getVm().importFile(
+                """{ "version": "0096", "up": [ { "action": "declareQueue", "name": ".." } ] }""",
+            )
             "declares a queue type inside the arguments" -> lastImportResult = getVm().importFile(
                 """{ "version": "0098", "up": [ { "action": "declareQueue", "name": "q", "arguments": { "x-queue-type": "quorum" } } ] }""",
             )

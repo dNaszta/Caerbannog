@@ -237,4 +237,24 @@ class MigrationRequestsTest {
         assertEquals(setOf("pattern", "definition", "priority", "apply-to"), body(MigrationAction.DeclarePolicy("p", ".*", vhost = "v")).keys)
         assertEquals(setOf("pattern", "definition", "priority", "apply-to"), body(MigrationAction.DeclareOperatorPolicy("p", ".*", vhost = "v")).keys)
     }
+
+    @Test
+    fun `a name made only of dots is encoded so no dot segment reaches the broker, and the default vhost stays %2F`() {
+        assertEquals("/api/queues/%2F/%2E%2E", write(MigrationAction.DeclareQueue("..", vhost = "/")).path)
+        assertEquals("/api/queues/%2F/%2E", write(MigrationAction.DeclareQueue(".", vhost = "/")).path)
+        assertEquals("/api/queues/%2E%2E/q", write(MigrationAction.DeclareQueue("q", vhost = "..")).path)
+        assertEquals("/api/exchanges/%2F/%2E%2E", write(MigrationAction.DeclareExchange("..", "direct")).path)
+        assertEquals("/api/policies/%2F/%2E%2E", write(MigrationAction.DeclarePolicy("..", ".*")).path)
+        assertEquals("/api/operator-policies/%2F/%2E", write(MigrationAction.DeclareOperatorPolicy(".", ".*")).path)
+        assertEquals("/api/bindings/%2F/e/%2E%2E/q/%2E", write(MigrationAction.DeclareBinding("..", ".")).path)
+        assertEquals("/api/bindings/%2F/e/%2E/e/%2E%2E", write(MigrationAction.DeclareBinding(".", "..", destinationType = BindingDestinationType.EXCHANGE)).path)
+        for (path in listOf(write(MigrationAction.DeclareQueue("..")).path, write(MigrationAction.DeclareBinding("..", "..")).path)) {
+            assertFalse(path.split("/").any { it == "." || it == ".." }, path)
+        }
+    }
+
+    @Test
+    fun `names that merely contain dots keep them`() {
+        assertEquals("/api/queues/%2F/a.b", write(MigrationAction.DeclareQueue("a.b")).path)
+    }
 }
