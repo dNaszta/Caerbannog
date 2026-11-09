@@ -151,9 +151,20 @@ class PolicyRulesTest {
             val f = r.only("policy-pattern-unreadable")
             f.assertShape(Severity.Info, FindingClass.BehaviourChange, verified = false)
             assertEquals(Proposal.None, f.proposal)
-            assertContainsText(f.text(), "could not read the pattern", "policy-pattern-unreadable")
+            assertEquals(listOf("invalid"), f.about, "round 1: about carries the reason code")
+            assertContainsText(f.text(), "The app could not evaluate this pattern (", "policy-pattern-unreadable")
+            assertContainsText(f.text(), "), so it did not use it to decide which queues are mirrored. If it matches queues, check them by hand.", "policy-pattern-unreadable")
         }
         assertEquals(ItemKind.OperatorPolicy, withOperatorPolicy("max-length" to 1, pattern = "[a-").only("policy-pattern-unreadable").kind)
+    }
+
+    @Test
+    fun `policy-pattern-unreadable carries the reason code invalid, unsupported or too-large in about`() {
+        assertEquals(listOf("invalid"), withPolicy("max-length" to 1, pattern = "(").only("policy-pattern-unreadable").about)
+        assertEquals(listOf("unsupported"), withPolicy("max-length" to 1, pattern = "(?=a)").only("policy-pattern-unreadable").about)
+        assertEquals(listOf("unsupported"), withOperatorPolicy("max-length" to 1, pattern = "\\1").only("policy-pattern-unreadable").about)
+        assertEquals(listOf("too-large"), withPolicy("max-length" to 1, pattern = "a{1000}").only("policy-pattern-unreadable").about)
+        assertEquals(listOf("too-large"), withPolicy("max-length" to 1, pattern = "a".repeat(1025)).only("policy-pattern-unreadable").about)
     }
 
     @Test

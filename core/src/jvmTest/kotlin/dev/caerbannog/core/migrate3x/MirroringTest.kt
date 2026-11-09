@@ -99,4 +99,41 @@ class MirroringTest {
             assertTrue(!it.text().contains("ha-all") && !it.text().contains("ha-exactly"), "${it.name} must not be named as mirrored but: ${it.text()}")
         }
     }
+
+    // ---- round 1 (F1): policies the app cannot evaluate ----
+
+    @Test
+    fun `a higher priority policy with an unevaluable pattern is ignored and the evaluable one still decides`() {
+        for (bad in listOf("(?=a)", "(", "a{1000}")) {
+            val r = report(D.classicQueue("q"), ha("pol-bad-hi", bad, priority = 9), ha("pol-good-lo", ".*", priority = 1))
+            mirroredBy(r, "q", "pol-good-lo")
+            notMirrored(r, "q", "pol-bad-hi")
+        }
+    }
+
+    @Test
+    fun `an unevaluable ha-mode policy alone does not mirror but is still a blocker and gets exactly one unreadable info with the reason`() {
+        for ((pattern, code) in listOf("(?=a)" to "unsupported", "(" to "invalid", "a{1000}" to "too-large")) {
+            val r = report(D.classicQueue("q"), ha("pol-bad", pattern))
+            notMirrored(r, "q", "pol-bad")
+            r.only("ha-policy-key", "pol-bad")
+            val unreadable = r.only("policy-pattern-unreadable", "pol-bad")
+            assertEquals(listOf(code), unreadable.about, "reason code of <$pattern>")
+        }
+    }
+
+    @Test
+    fun `a queue name over 1024 characters is matched by no policy`() {
+        val r = report(D.classicQueue("a".repeat(1025)), ha("pol-all", ".*"))
+        val f = r.withRule("classic-not-replicated").single()
+        assertTrue(!f.text().contains("pol-all"), "a name over 1,024 characters cannot exist on a broker and is matched by no policy")
+        mirroredBy(report(D.classicQueue("a".repeat(1024)), ha("pol-all", ".*")), "a".repeat(1024), "pol-all")
+    }
+
+    @Test
+    fun `an operator policy with an unevaluable pattern gets its own unreadable info too`() {
+        val op = D.operatorPolicy("op-bad", "(?i)a", D.args("max-length" to 1))
+        val r = report(D.classicQueue("q"), operatorPolicies = listOf(op))
+        assertEquals(listOf("unsupported"), r.only("policy-pattern-unreadable", "op-bad").about)
+    }
 }

@@ -154,4 +154,42 @@ class ReportOrderAndSummaryTest {
         r.assertAnalyzed()
         r.findings.forEach { assertEquals(it.about.sorted(), it.about, "about of ${it.id}") }
     }
+
+    // ---- round 1 (F3): unique ids for duplicate items ----
+
+    @Test
+    fun `duplicate queues get unique ids, the second and later with the suffix #2 and #3 in report order`() {
+        val r = analyze(D.document(queues = listOf(D.classicQueue("q"), D.classicQueue("q"), D.classicQueue("q"))))
+        assertEquals(r.findings.size, r.findings.map { it.id }.toSet().size, "ids must be unique")
+        val ids = r.withRule("classic-not-replicated").map { it.id }
+        val base = "classic-not-replicated|/|Queue|q|"
+        assertEquals(listOf(base, "$base#2", "$base#3"), ids)
+    }
+
+    @Test
+    fun `duplicate users get unique ids`() {
+        val r = analyze(D.document(users = listOf(D.user("x"), D.user("x"))))
+        assertEquals(r.findings.size, r.findings.map { it.id }.toSet().size)
+        assertEquals(listOf("access-declare-user|-|User|x|", "access-declare-user|-|User|x|#2"), r.withRule("access-declare-user").map { it.id })
+    }
+
+    @Test
+    fun `equal duplicates are shuffle-stable and a suffix never appears without a duplicate`() {
+        val doc = D.document(queues = listOf(D.classicQueue("q"), D.classicQueue("q"), D.classicQueue("other")), users = listOf(D.user("x"), D.user("x")))
+        val expected = analyze(doc)
+        for (seed in 1..6) assertEquals(expected, analyze(doc.copy(queues = doc.queues.shuffled(Random(seed)), users = doc.users.shuffled(Random(seed)))))
+        assertTrue(expected.findings.filter { it.name == "other" }.none { it.id.contains('#') })
+    }
+
+    @Test
+    fun `duplicates with different content are ordered by message then proposal text, not by their place in the file`() {
+        val a = D.user("x", tags = listOf("aaa"))
+        val b = D.user("x", tags = listOf("bbb"))
+        val one = analyze(D.document(users = listOf(a, b)))
+        val two = analyze(D.document(users = listOf(b, a)))
+        assertEquals(one, two)
+        val first = one.withRule("access-declare-user").first()
+        assertEquals(listOf("aaa"), (first.proposal as Proposal.DeclareUser).tags, "proposal.toString() decides: the smaller one gets the plain id")
+        assertTrue(!first.id.contains('#'))
+    }
 }
