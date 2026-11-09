@@ -4,7 +4,7 @@
 
 ## Goals and scope
 
-Caerbannog ("behind the rabbit") is a free, desktop-only "Kafka UI for RabbitMQ Streams": connect to a broker, list streams, and page through messages by offset or timestamp. It also covers quorum queues (topology and statistics, plus a read-only peek at their messages that always requeues them, never consuming), MQTT sessions and publishing, and live monitoring views. It is a Kotlin Multiplatform project using Compose Multiplatform, but v1 ships only the JVM desktop target and supports RabbitMQ 4.x and later.
+Caerbannog ("behind the rabbit") is a free, desktop-only "Kafka UI for RabbitMQ Streams": connect to a broker, list streams, and page through messages by offset or timestamp. It also covers quorum queues (topology and statistics, plus a read-only peek at their messages that always requeues them, never consuming), MQTT sessions and publishing, and live monitoring views. It is a Kotlin Multiplatform project using Compose Multiplatform, but v1 ships only the JVM desktop target and supports RabbitMQ 4.x and later. RabbitMQ 3.x is supported only as a read-only source for migrating to 4.x (M8, see "Migrating from RabbitMQ 3.x (M8)"); no other feature is built or tested against 3.x.
 
 **v1 features**
 
@@ -14,6 +14,7 @@ Caerbannog ("behind the rabbit") is a free, desktop-only "Kafka UI for RabbitMQ 
 - Search and filter plus payload viewer: text, JSON (pretty-printed) and hex views; filter by properties and application properties.
 - Publish and manage: publish a test message to any stream, exchange or queue; create and delete streams, view consumer offsets.
 - Quorum queue topology and statistics: list queues, exchanges and bindings; see message counts, consumers, leader and members; declare, edit (policies, bindings) and delete them where the connection's permissions allow; apply or export topology as versioned JSON migrations.
+- Migrate from RabbitMQ 3.x (M8): analyse a 3.x topology (live connection or exported `definitions.json`), review a compatibility report with proposed 4.x equivalents, write the accepted fixes as a normal migration, and forward the messages of a 3.x queue with a broker-side dynamic Shovel. See "Migrating from RabbitMQ 3.x (M8)".
 - Global search: one box that finds streams, queues and exchanges by name (substring or regex), with the type of each result; names only, never message contents.
 - MQTT (M6): the broker's MQTT clients and subscriptions on a Topology tab, and a Publish MQTT dialog with topic, QoS 0/1/2, retain, payload and headers (MQTT 5 user properties). See "MQTT support".
 - Queue message inspection (M7-08): peek at the first messages of a queue without consuming them. See "Queue message inspection".
@@ -22,7 +23,8 @@ Caerbannog ("behind the rabbit") is a free, desktop-only "Kafka UI for RabbitMQ 
 **Non-goals for v1**
 
 - Android, iOS and Web targets (the stream client is JVM-only; these need a backend, see Architecture).
-- Consuming messages from quorum or classic queues, or acknowledging, deleting or purging them. The only way the app shows queue messages is the requeue peek (see "Queue message inspection"); anything that would remove or settle a message stays out of scope.
+- Consuming messages from quorum or classic queues, or acknowledging, deleting or purging them, in the app's own process. The only way the app shows queue messages is the requeue peek (see "Queue message inspection"); anything in the app that would remove or settle a message stays out of scope. One accepted exception (product decision 2026-11-09, M8): the app may configure a broker-side dynamic Shovel that moves the messages of a queue to another broker; the broker moves them, the app never touches a message. See "Forwarding messages with a dynamic Shovel".
+- Writing to a RabbitMQ 3.x broker, or using 3.x for anything except reading its topology and statistics as a migration source.
 - Live tailing at high throughput; v1 browses, it does not replace a consumer.
 
 **Quality requirement**
@@ -51,6 +53,8 @@ flowchart LR
 The stream protocol (default port 5551 with TLS, 5552 without) carries message reads, publishes and stream create/delete. The management HTTP API (default port 15671 over HTTPS, 15672 over plain HTTP) supplies the stream list, message counts, publishers and consumers, plus all quorum queue topology and statistics. First offsets come only from the stream protocol (`queryStreamStats`); there is no byte size per stream anywhere (see "Management API facts").
 
 **Why JVM-only:** the official RabbitMQ stream client is a Java library, so it runs on desktop JVM (and Android) but not on iOS or in a browser. Adding those later means a small Ktor gateway that holds the stream connection and exposes a paged REST API; the UI and view models stay shared.
+
+**Broker versions (product decision 2026-11-09, M8):** the app is built and tested for RabbitMQ 4.x and later. RabbitMQ 3.x is accepted only as a read-only migration source: the app reads its definitions (and queue statistics) through the management API, writes nothing to it and offers no other feature on it (see "Migrating from RabbitMQ 3.x (M8)"). The stream plugin is not needed on a 3.x source.
 
 **Broker requirements:** the `rabbitmq_stream` and `rabbitmq_stream_management` plugins must be enabled, TLS is on by default and a profile can turn it off (decision D9a); with it off the user's password and all messages travel in clear text, and the app says "Not encrypted" wherever the connection is shown. The app never falls back from TLS to plain or the other way: the profile switch is the only source of the mode. For browsing, use a dedicated user with read-only permissions where possible.
 
@@ -100,7 +104,7 @@ The `data-rabbit` module sits behind repository interfaces in `core`, so a futur
 
 The `:mcp-server` module exposes Caerbannog's connection profiles, stream catalogs, and topology inspection to external AI developer agents (such as Antigravity and Claude Code) via the Model Context Protocol over `stdio`.
 
-**Architectural rule:** For every new capability introduced to the product (such as browsing messages in M3, payload inspection in M4, or publishing and migrations in M5), the **solution architect is responsible for evaluating** whether the capability should be exposed to AI agents as an MCP tool. If yes, the architect must specify the tool schema, permissions, and safety scenarios in the task brief; if no, the brief must explicitly record why. The MCP server must always uphold Caerbannog's safety rules: no consuming, acknowledging, deleting or purging of queue messages (the MCP server does not expose queue inspection at all today), ephemeral stream reads, and no secret leakage.
+**Architectural rule:** For every new capability introduced to the product (such as browsing messages in M3, payload inspection in M4, or publishing and migrations in M5), the **solution architect is responsible for evaluating** whether the capability should be exposed to AI agents as an MCP tool. If yes, the architect must specify the tool schema, permissions, and safety scenarios in the task brief; if no, the brief must explicitly record why. The MCP server must always uphold Caerbannog's safety rules: no consuming, acknowledging, deleting or purging of queue messages (the MCP server does not expose queue inspection at all today, and no tool creates or removes a Shovel, M8), ephemeral stream reads, and no secret leakage.
 
 ## Paging model
 
@@ -196,7 +200,7 @@ Optional: a profile has an `mqttPort` (null means no MQTT; the form validates it
 
 ## Queue message inspection (M7-08)
 
-A queue detail can show the first messages of the queue (default 10, at most a bounded maximum; bodies truncated at 64 KB) through the management API `POST /api/queues/{vhost}/{name}/get`. The request is always sent with `ackmode = ack_requeue_true`, so the messages go back to the queue and are never acknowledged, deleted or purged; every row and the section header say "Not acknowledged (requeued)". A user without read access to the queue gets a refusal message, an unknown queue "not found". Rows show properties and headers; "Copy metadata" copies them. There is no MCP tool for it.
+A queue detail can show the first messages of the queue (default 10, at most a bounded maximum; bodies truncated at 64 KB) through the management API `POST /api/queues/{vhost}/{name}/get`. The request is always sent with `ackmode = ack_requeue_true`, so the messages go back to the queue and are never acknowledged, deleted or purged; every row and the section header say "Not acknowledged (requeued)". A user without read access to the queue gets a refusal message, an unknown queue "not found". Rows show properties and headers; "Copy metadata" copies them. There is no MCP tool for it. M8 adds a second, different thing that moves messages, a broker-side Shovel, which is not an inspection path and has its own rules (see "Forwarding messages with a dynamic Shovel").
 
 Verified on a live RabbitMQ 4 broker (`RealBrokerM7GateTest`, `@gate-M7`): inspection does not count toward a quorum queue's delivery limit. A queue with `x-delivery-limit` 2 was inspected 8 times and a queue with the default limit 30 times; no message was dropped, the order and bodies were identical each time, the queue kept its message count, and a consumer afterwards still received every message.
 
@@ -214,7 +218,7 @@ All computed in `core` as pure functions and drawn in `ui`; none of them adds a 
 
 Topology changes are versioned JSON files applied in order, like a database migration tool, and each connection is its own environment (one broker, one user and one default virtual host: the stream list, the stream screen, test publishing and, from M5, topology changes work on the connection's virtual host; the read-only Topology screen may show any other virtual host the user can see): before the first connection the app checks what the connection's user may do, and limits itself to that. On top of that broker-read check, the user also sets their own ceiling for the connection — a self-constraint level — and the app enforces whichever of the two is stricter.
 
-A migration lists the changes to make: streams, super streams, quorum queues, exchanges, bindings and policies. The app applies pending files in version order, tracking applied versions per machine and per connection profile, and can export a broker's current topology as a new file, so one format covers both apply and export/import. The format below is a proposal to refine.
+A migration lists the changes to make: streams, super streams, quorum queues, exchanges, bindings and policies. The app applies pending files in version order, tracking applied versions per machine and per connection profile, and can export a broker's current topology as a new file, so one format covers both apply and export/import. The format below is a proposal to refine. M8 reuses it to carry a reviewed 3.x to 4.x conversion (see "Migrating from RabbitMQ 3.x (M8)").
 
 ```json
 {
@@ -274,6 +278,111 @@ An action is allowed only when both halves allow it — the stricter of the self
 - **Apply a migration:** each action inside it is checked individually against the same two rules; a migration that only reads (dry run, export) never needs either.
 - **Test publishing:** governed solely by the broker's write permission. The self-constraint level is topology-only and has no effect on it.
 
+## Migrating from RabbitMQ 3.x (M8)
+
+Planned 2026-11-09 at the product owner's request: the owner runs several RabbitMQ 3.x brokers with classic queues and other 3.x topology, and has to move to 4.x, where most of that topology is not acceptable as it is and where the messages of the old queues must be carried over. Briefs: `docs/tasks/M8-00` to `M8-12`. Scenarios: `tests/bdd/features/16_migrate_from_3x.feature` (sources, report, review, MCP, gate) `17_forward_messages_with_shovel.feature` and `18_migrate_access_from_3x.feature`.
+
+### Goals and non-goals
+
+Goals: (1) read a 3.x topology; (2) list every incompatibility with 4.x, with a severity and a proposed 4.x equivalent; (3) let the user review each item and write the result as a normal migration (M5-04 format) that can be applied or exported; (4) forward the messages of a 3.x queue into a 4.x queue with a broker-side Shovel.
+
+Non-goals: writing anything to a 3.x broker; upgrading a broker in place; computing, generating or storing passwords (hashes are only passed through from the export, see "Users, virtual hosts and permissions in the migration"); migrating federation, exchange-to-exchange shovels or other plugins' parameters (listed as "not covered"); the app consuming messages itself; any 3.x feature other than this one (stream browsing, publishing, topology edits on 3.x are not supported).
+
+### Product decisions (owner, 2026-11-09)
+
+1. **Source, both ways.** A live 3.x connection profile (management API only, `GET /api/definitions`; the stream plugin is not needed) or an imported `definitions.json` exported from 3.x. One parser, one analysis, same report.
+2. **Conversion.** Analyse, propose fixes, the user reviews each item (accept, change, skip), then the app writes a versioned 4.x migration in the existing migrations format that can be applied or exported. A compatibility report lists every incompatibility with severity and proposed 4.x equivalent.
+3. **Forwarding messages.** Broker-side dynamic Shovel only. The app configures it through the management API (`PUT /api/parameters/shovel/{vhost}/{name}`, value `{src-protocol, src-uri, src-queue, dest-protocol, dest-uri, dest-queue, src-delete-after, ack-mode, reconnect-delay}`; status `GET /api/shovels`; removal `DELETE /api/parameters/shovel/{vhost}/{name}`; needs the `policymaker` tag and the plugins `rabbitmq_shovel` and `rabbitmq_shovel_management`; verified by the owner on rabbitmq.com/docs/shovel-dynamic). The broker moves the messages; the app never consumes queue messages itself.
+
+4. **Shovel credentials (P1, owner 2026-11-09).** The Shovel reuses the connection profile's user. The confirmation dialog must say explicitly that the broker stores these credentials until the Shovel is removed. A credential-free local destination URI is preferred if spike S-F proves it works.
+5. **`src-delete-after` default (P5, owner 2026-11-09).** `queue-length` (the Shovel and its stored credentials disappear after the messages that were present have moved); `never` is offered only with a warning.
+6. **Users, vhosts and permissions are part of the generated migration (P2, owner 2026-11-09, against the architect's first recommendation).** The 4.x migration declares the 3.x virtual hosts, users (with the exported password hash and tags) and permissions, including topic permissions. Design and risks in "Users, virtual hosts and permissions in the migration".
+
+**Proposed by the architect, awaiting owner confirmation (not decided; the design below is written on these assumptions and changes if they are not confirmed):** P3 one migration per source virtual host; P4 removing a Shovel needs Full control; P6 3.x detected automatically on Connect (no profile flag); P7 the Shovel runs on the 4.x destination broker (keeps 3.x write-free); P8 the AMQP host and port as the Shovel's broker reaches them are asked in the dialog, prefilled, never saved with a password; P9 `ack-mode` `on-confirm` only in v1. New open questions from P2: P10 broker-level access actions are exempt from the V1 single-vhost rule and travel in their own file; P11 `guest` is skipped by default; P12 a user whose hash algorithm 4.x does not accept is a manual step; P13 a migration file that holds hashes is written owner-only where the OS allows and warned about on export.
+
+### Facts the owner verified, and what is still unverified
+
+Verified (owner, 2026-11-09): classic queue mirroring was removed in RabbitMQ 4.0 (deprecated since 2021); classic queues stay as non-replicated queues, quorum queues and streams are the replicated types. After an upgrade to 4.0 the mirroring parts of policies (`ha-mode`, `ha-params`, `ha-sync-mode`, per the 4.0.1 release notes) have no effect. Quorum queues are replicated by default (no policy needed), always write to disk, and 4.0 supports quorum queue priorities, but not identically to classic queues. The dynamic Shovel facts in decision 3.
+
+UNVERIFIED, each is a spike item in `docs/tasks/M8-00-spike-live-3x-vs-4x.md` and stays unverified in this spec and in the report until measured: the exact shape of 3.x `/api/definitions` (vhosts, users, permissions, queues, exchanges, bindings, policies, operator policies, parameters) and whether a non-administrator may call it; which queue arguments quorum queues reject (exclusive, non-durable or transient, `x-max-priority`, `x-queue-mode` lazy, `x-queue-master-locator`, `x-single-active-consumer`, per-queue `x-message-ttl`, `x-max-length-bytes`, `x-overflow` modes, `x-dead-letter-*`); which policy keys have no effect or are rejected on 4.x; whether classic queues with those arguments are still declarable on 4.x; global QoS removal and other client-visible changes; what the 4.x definitions import rejects when given a 3.x export as is; whether classic to quorum changes behaviour the user must be warned about (ordering, redelivery, the default delivery limit of 20, priority parity). Also unverified: that leftover mirroring policies or queues can stop a node from starting (a Tanzu RabbitMQ 10.x knowledge-base article says so; distribution-specific, not verified for upstream). The report must not state any of these as fact before the spike.
+
+### 3.x as a read-only source
+
+- The app detects the broker version on Connect from the management API (`rabbitmq_version` in `GET /api/overview`; shape on 3.x UNVERIFIED, spike S-H; automatic detection or a profile flag is proposed decision P6, recommended automatic, awaiting owner confirmation). A connection whose major version is below 4 is a **migration source**: the connection pill says "RabbitMQ 3.x: migration source only", the effective topology level is forced to Read-only, test publishing and every stream feature are disabled, and the only offered action is "Migrate from 3.x". The TLS rules (D9a) are unchanged.
+- The user's own check still runs first. A user who cannot call `GET /api/definitions` (needs the administrator tag, UNVERIFIED) is told so and offered the file import instead.
+- Nothing is ever written to a 3.x broker: every request the app sends to it is a GET (a test asserts this). A Shovel is therefore created on the 4.x destination broker (proposed decision P7, awaiting owner confirmation) and pulls from 3.x.
+- Secrets in the definitions model (changed 2026-11-09 with P2): the URIs of existing shovel and federation parameters are dropped by the parser at the earliest point. A user's `password_hash` is needed for the migration, so it is kept, but only as a pass-through `SecretValue` whose `toString`, serialization to the report and logging redact it; it is never computed, never stored in `SecretStore`, and never appears in the report, the review UI, logs, error strings or MCP output. See "Users, virtual hosts and permissions in the migration".
+- Analysis can be run from a held 3.x connection or from a file; the result is an in-memory model that survives switching the held connection, so the user can analyse on 3.x and then connect to the 4.x broker. The one-held-connection rule (D1) is not changed.
+
+### Compatibility report
+
+Pure `core` code (`CompatibilityAnalyzer`, input: the definitions model; output: the report). Rules are data with evidence: each rule names the spike fixture that proves it; a rule without evidence is reported as `unverified`.
+
+| Field | Meaning |
+| --- | --- |
+| `severity` | `blocker`: will not work on 4.x as it is (rejected, or semantically gone). `warning`: works, or has no effect, but behaviour changes and the user should decide. `info`: nothing to do, or a manual step |
+| `vhost`, `kind`, `name` | The item: queue, exchange, binding, policy, operator policy, vhost, user, permission, parameter, global |
+| `rule` | Stable id, for example `ha-policy-key` |
+| `message`, `why` | What is wrong, and the reason in plain words |
+| `proposal` | The proposed 4.x equivalent: `dropKey`, `convertQueueType`, `setArgument`, `removeArgument`, `manual`, or `none`, with the resulting action(s) in the migration format |
+| `verified` | true when backed by a spike fixture |
+
+The report also counts the items that need no change ("37 of 52 items are compatible as they are"). It is exportable as JSON (`"schema": "caerbannog.compat-report/1"`) and copyable as plain text. A finding without a proposal is allowed and makes the review ask for a manual decision.
+
+### Review and the generated migration
+
+Each finding with a proposal is reviewed: accept (use the proposal), change (edit the resulting action, for example another queue type or argument), or skip (leave it out; it stays in the report as skipped). The migration cannot be generated while a finding is undecided. The output is one ordinary topology migration file per source virtual host (proposed decision P3, awaiting owner confirmation), plus one access migration (below), version = next free number, description "Migrated from RabbitMQ 3.x <source> vhost <name>", in the M5-04 format, parsed back by the same parser as a check. It is applied, dry-run, exported and guarded exactly as any migration: configure permission, self-constraint level, per-virtual-host V1 rule (the connection's own virtual host only, so a source with three vhosts needs one 4.x profile per vhost), idempotent actions. Vhosts, users, passwords hashes and permissions follow the extra rules of the next subsection. A Shovel is **not** a migration action: it moves data, is not idempotent in effect and must never run from "Apply pending". The migration model has to grow (queue arguments with typed values, exchange flags and arguments, policy keys with typed values and `apply-to`, priority, exchange-to-exchange bindings), additively, so existing files keep loading (`M8-04`).
+
+### Users, virtual hosts and permissions in the migration
+
+Decided 2026-11-09 (P2, owner): they are included. Proposed design (the points marked P10 to P13 await the owner):
+
+- **New migration actions** in the M5-04 format (`M8-12`): `declareVhost` (name, description, tags, default queue type if S-K allows), `declareUser` (name, `passwordHash`, `hashingAlgorithm`, tags), `setPermissions` (vhost, user, configure, write, read patterns), `setTopicPermissions` (vhost, user, exchange, write, read). Never a delete of a vhost, user or permission. Order inside a file: vhosts, users, permissions, topic permissions.
+- **Secrets.** `passwordHash` is a secret: the report shows only the user name, tags, algorithm and "has password hash"; the review UI redacts it ("hash hidden"); dry run, the migrations screen's raw view, history, logs, error strings, the compatibility report and every MCP output never contain a hash. The hash only passes through from the export into the migration file; the app never computes, generates or stores a password or hash. A migration file that holds a hash is a secret file: exporting or saving it shows an explicit warning, and the file is written with owner-only permission where the OS allows (POSIX `0600`; on Windows best effort and UNVERIFIED, P13). History keeps version and checksum only.
+- **Guardrails.** Access actions need an administrator-tagged user on the 4.x connection (tags readable from `GET /api/whoami`) and the self-constraint level Full control; each action is checked on its own, the configure permission is not what governs them. A user who lacks either gets the action disabled with the reason. Apply and dry run never need a hash on screen.
+- **Where they apply (V1, P10 proposed).** V1 limits a migration to the connection's own virtual host, but a vhost has to exist before a profile can use it and users are broker-wide. So the generator writes one separate access migration whose actions are broker-level: they are applied from an administrator profile of any virtual host of the 4.x broker and are exempt from the V1 vhost check (this amends V1 for these four actions only, and needs the owner's word). Topology migrations stay one per virtual host and V1-bound. The access migration has the lower version so it is applied first.
+- **Idempotency and conflicts.** An existing vhost or user with identical settings is a no-op. A user that exists with a different hash or different tags, or a permission that exists with different patterns, is a conflict: apply stops, reports the difference without showing the hash, and nothing is overwritten silently. The existing hash is read with an administrator call (`GET /api/users/{name}`, UNVERIFIED, S-A/S-B) and kept only in memory for the comparison.
+- **`guest` (P11 proposed).** The 3.x export normally holds `guest` with the default password. The report warns, and the default decision is skip; accepting it needs an explicit confirmation that the user carries a publicly known password (whether 4.x still restricts it to loopback is UNVERIFIED, S-A).
+- **Hashing algorithms (P12 proposed).** Which algorithms 4.x accepts on import is UNVERIFIED (S-B). A user whose algorithm is not accepted is a blocker finding with the proposal "manual": the app offers no password entry; the user sets a new password on the broker.
+- **Users without a hash** (external authentication) and users with tags such as `administrator` are reported as info and warning respectively: the migration would grant the same tags on 4.x.
+- **Risks the owner accepted by choosing P2:** the migration file is a credential-equivalent that can be cracked offline and leak through synced folders or git; old users and passwords come back alive on the new broker; the profile user needs the administrator tag and Full control; a failure half-way leaves some users or permissions created (the rerun is a no-op for what exists); the app is now an administrator-level tool for the first time.
+
+### Forwarding messages with a dynamic Shovel
+
+Decided 2026-11-09 (owner), with the design rules below by the architect. **This is a new accepted exception to the queue message safety rule, and only in this sense: a Shovel running inside a broker moves messages.** The exact rule, copied into `CLAUDE.md` and the agent files:
+
+- Allowed: the requeue peek (`ManagementQueueMessageInspector`), unchanged; creating, reading the status of and removing a dynamic Shovel through the management API, by `ShovelGateway` only, with the safeguards below.
+- Not allowed, always: any code in the app process (or the MCP server) that gets, consumes, acknowledges, rejects, deletes or purges queue messages other than the requeue peek; deleting a queue as part of forwarding; adding a second read path; a Shovel with any `ack-mode` other than `on-confirm` (v1); starting a Shovel without the confirmation; creating or changing anything on a 3.x broker; a Shovel as a migration action; an MCP tool that creates or removes a Shovel.
+
+Safeguards, all required:
+
+1. **Confirmation** that names the source broker, vhost and queue and the destination broker, vhost and queue, and says: the messages are moved (they leave the source queue when the destination confirms, the app cannot undo it); the source queue itself is not deleted; the shovel keeps credentials on the destination broker until it is removed. The user types the source queue name to confirm (UX rule of this app for destructive actions). Cancel sends nothing.
+2. **Dry run**, no request that changes anything: source message counts (ready and unacknowledged), whether the destination queue exists and its type, whether the shovel plugins are on, whether the user has the policymaker tag, whether a shovel of that name exists. Forwarding is blocked when the destination queue does not exist (the migration creates it first; whether a Shovel would silently declare a classic one is UNVERIFIED, spike S-F) and warned when it is not a quorum queue or stream.
+3. **Visible progress:** state of the Shovel (`GET /api/shovels`) and the source and destination counts on the refresh tick, "moved about N of M", and a Remove shovel button. Field names UNVERIFIED (spike S-F).
+4. **The app never deletes the source queue.** Remove shovel deletes only the Shovel parameter. Queue deletion stays a separate, explicit topology action under the normal rules.
+5. **`ack-mode` is `on-confirm`** (proposed P9, awaiting owner confirmation), not configurable in v1. `src-delete-after` defaults to `queue-length` (the Shovel stops and removes itself after moving the messages that were in the queue; semantics UNVERIFIED, spike S-F); `never` (keep forwarding while clients are switched over) is offered with a warning that the Shovel and its credentials stay until removed (decision P5, decided by the owner 2026-11-09).
+6. **Permissions:** needs the policymaker tag (readable on `GET /api/whoami`) and the self-constraint level Declare and edit on the 4.x connection; removing a Shovel needs Full control, same as every delete (proposed decision P4, awaiting owner confirmation). A deterministic Shovel name (`caerbannog-migrate-<source queue>`) means a second start is refused while one exists; the app never overwrites a Shovel (a `PUT` with an existing name replaces it).
+7. **Secrets.** The Shovel URI carries a user name and password. The URI is built in memory in `data-rabbit` at the moment of the `PUT`, from the profile password in `SecretStore` (the one use of a stored password besides the holder; decision P1, owner 2026-11-09: the profile's user is reused), held in a type whose `toString` redacts, percent-encoded, and never stored in `SessionState`, the migration file, history, logs, error strings, MCP output or the UI. The UI shows `amqps://user@host:5671/vhost`; the app never calls `GET /api/parameters/shovel` (which may show the URI), only `GET /api/shovels`; broker error text is scrubbed of the password and of any `//user:...@` pattern before it is shown. The destination side uses a credential-free local URI if the spike proves it works (S-F), which halves the exposure. The disclosure that the broker stores the credentials until the Shovel is removed is required in the confirmation (P1).
+8. **TLS (D9a).** With TLS on in the profile, the Shovel URIs use `amqps`; there is no fallback to `amqp`. If the AMQP TLS endpoint cannot be used the start is refused with the reason. With TLS off the confirmation and the progress view say "Not encrypted". The AMQP host and port as the broker running the Shovel reaches them are asked in the dialog (they can differ from the host and port the app uses), prefilled from the profile and never saved with a password (proposed P8, awaiting owner confirmation); whether the profile gets an AMQP port field is open (spike S-F, recommended: ask in the dialog).
+9. **One Shovel per queue**, started from one queue at a time; no "forward everything" button.
+10. **Probe of the source.** The dry run reads the source counts through a one-shot, read-only management probe to the source profile (precedent: the Check connection button holds nothing); it is not a held connection and sends only GET.
+
+### Reuse of the migrations feature
+
+The generated file is a `MigrationFile` (M5-04); parse, validate, dry run, history, checksum, apply and export are unchanged and are not reimplemented. M8 adds an analyzer, a proposal and review step in front of it, a widened action model, and, separately, a Shovel gateway that does not go through migrations.
+
+### MCP evaluation (architectural rule)
+
+| Capability | Decision |
+| --- | --- |
+| Compatibility report | Yes, read-only: `caerbannog_analyze_3x_definitions` (`M8-10`). Same output as the UI report, no secrets |
+| Review and conversion | No. The point is a human decision per item; the generated migration is an ordinary migration and uses whatever migration tools exist |
+| Any tool that returns a migration or definitions content | Must redact: no MCP tool may return a password hash or any credential. The apply tools (if built) refuse a migration that holds vhost, user or permission actions; those are applied by a human in the UI |
+| Shovel status | Yes, read-only: `caerbannog_list_shovels`, never returns a URI |
+| Shovel create and remove | No. It moves data between brokers, needs the typed confirmation, and handles credentials; an agent must not do it |
+
+(Discrepancy found 2026-11-09: the M5-04 brief lists `caerbannog_list_migrations`, `caerbannog_dry_run_migration` and `caerbannog_apply_migrations` in its scope, but `:mcp-server` registers only the eleven tools listed in `M-MCP-01` and M6-06. Not a blocker for M8; to be cleaned up by the owner's word.)
+
 ## Testing: TDD and BDD
 
 Every feature is built test-first, and its behavior is written as BDD scenarios that run automatically; both are requirements, not extras. The `core` module has no RabbitMQ imports and talks to the stream and management clients through interfaces, so most tests run against fakes without a broker.
@@ -282,7 +391,7 @@ Every feature is built test-first, and its behavior is written as BDD scenarios 
 | --- | --- | --- |
 | Unit (TDD) | Paging math, offset resolution, migration ordering and idempotency, permission guardrails, payload detection | JUnit 5, coroutines test, fakes behind the `core` interfaces |
 | BDD scenarios | User-visible behavior as Given/When/Then, such as paging at stream edges and blocked topology edits without configure permission | Gherkin features with Cucumber-JVM and Kotlin step definitions |
-| Integration | Real stream and management calls against a RabbitMQ 4.x broker over TLS and over plain | Testcontainers RabbitMQ module (needs Podman or Docker) |
+| Integration | Real stream and management calls against a RabbitMQ 4.x broker over TLS and over plain; for M8 also a RabbitMQ 3.13 source (`rabbitmq:3.13-management`, tag `broker-3x`, two containers on one network) | Testcontainers RabbitMQ module (needs Podman or Docker) |
 | UI | Screens render and respond: stream list, message browser, publish dialog | Compose Multiplatform UI test API on desktop |
 
 ```gherkin
@@ -307,7 +416,7 @@ The two scenarios are examples of the style, one per milestone area; the full li
 
 ## Milestones, risks and open questions
 
-The plan has five milestones in order; each ends with a gate that must pass before the next starts. Durations are not estimated yet. Each gate also requires that milestone's tests to pass: unit tests written first, plus its BDD scenarios.
+The plan has milestones M1 to M8 in order; each ends with a gate that must pass before the next starts. Durations are not estimated yet. Each gate also requires that milestone's tests to pass: unit tests written first, plus its BDD scenarios.
 
 | Milestone | Scope | Gate |
 | --- | --- | --- |
@@ -318,6 +427,7 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 | M5 Publish, manage, package | Publish, create and delete, topology edits, installers | Installers run on macOS and Windows |
 | M6 MQTT plugin support | MQTT port, sessions and subscriptions, MQTT publisher and dialog, MCP tools | MQTT publish reaches a stream through `amq.topic` on a real broker |
 | M7 Visual monitoring and inspection | Log tape, sparklines, pipeline graph, partition balance, queue message inspection, headers | `RealBrokerM7GateTest`: queue inspection non-destructive and repeatable on a real broker (added after acceptance) |
+| M8 Migrate from RabbitMQ 3.x to 4.x | Spike on live 3.13 and 4.x, definitions parser (file and live), compatibility report, reviewed conversion into a normal migration, broker-side dynamic Shovel forwarding with safeguards, read-only MCP tools | `RealBrokerM8GateTest` (`@gate-M8`, tag `broker-3x`): a 3.13 topology in Testcontainers is analysed, converted, applied to a 4.x container, and one message is moved by a Shovel into the new quorum queue, a migrated user logs in on 4.x with its old password (hash passed through); the source queue still exists, no secret is in any log |
 
 **Milestone status**
 
@@ -328,6 +438,7 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 - M5 Publish, manage, package: accepted on 2026-11-08; gate passed (`@gate-M5` stream creation/deletion, message publishing, MQTT plugin session tracking & TLS QoS 2 publishing, and MQTT-to-stream routing in `RealBrokerM5GateTest`; macOS DMG installer built cleanly via `:desktopApp:packageDmg`, 125 MB).
 - M6 MQTT Plugin Support: accepted on 2026-11-08; client sessions and subscriptions discovery, MQTT publisher engine (QoS 0/1/2, Retain) with UI dialog, dev broker MQTT listeners (1883/8883), and MCP server tools (`caerbannog_list_mqtt_clients`, `caerbannog_publish_mqtt`).
 - M7 Visual monitoring and inspection: accepted by the product owner on 2026-11-09 (built as M7-01 to M7-09 plus follow-ups: log tape, sparklines and lag trends, pipeline graph, partition balance, queue message inspection, headers and properties, MQTT headers). Acceptance covers the shipped behaviour described in "Monitoring views" and "Queue message inspection", including the requeue peek as an accepted exception to the old "never read queue messages" rule. The retroactive briefs are `docs/tasks/M7-01` to `M7-11`. Gate (`@gate-M7`, added after acceptance, passing): `RealBrokerM7GateTest` proves on a real broker that queue inspection is non-destructive and repeatable, shows properties and headers, never marks messages acknowledged, does not trigger the delivery limit and refuses an unknown queue. The visual views are pure `core` functions with unit tests; the stream-side inputs are covered by `RealBrokerStreamExchangeAnnotationsTest` and `RealBrokerMqttHeadersTest`. No `tests/bdd` scenarios exist for M7 yet (see the briefs for the list of suggested ones).
+- M8 Migrate from RabbitMQ 3.x to 4.x: planned 2026-11-09 (product decisions recorded in "Migrating from RabbitMQ 3.x (M8)"); nothing built. Briefs `docs/tasks/M8-00` to `M8-12`, scenarios `tests/bdd/features/16_migrate_from_3x.feature` `17_forward_messages_with_shovel.feature` and `18_migrate_access_from_3x.feature`. Starts with the spike `M8-00`; no rule of the analyzer is built before the spike has measured it.
 
 **Risks**
 
@@ -341,9 +452,15 @@ The plan has five milestones in order; each ends with a gate that must pass befo
 - Resolved in `M2-01-connection-session` (architect review 2026-11-04): `ConnectionSession` now keeps only the result of the latest started check per profile name (token), `forget` invalidates a running check, and the session holds the current connection. `open` returns its own check's result even when superseded, so callers must read session state, never the return value, for what is current. The earlier waiver (a private `StateFlow` implementation in `ConnectionsViewModel`) is resolved in `M2-01b-session-single-state`: the session has one atomic public `state`, the view model exposes a plain `StateFlow`, and no `ExperimentalForInheritanceCoroutinesApi` opt-in is left.
 - The stream client brings about 10 MB of compression libraries (zstd-jni, snappy, lz4) into the installer when it moves from test to production scope (M2-02 spike); check the installer size when it does (decision D5, task M3).
 - Migration history is kept per machine, so two people can apply the same migration to one broker; every action must be idempotent (declaring something that already exists with the same settings is a no-op).
+- M8: nothing in the 3.x export or in 3.x behaviour may be assumed. Every compatibility rule needs a measured fixture from a real 3.13 and 4.x broker (`M8-00`); a rule without evidence ships as "unverified" in the report or does not ship. A wrong rule is worse than a missing one: a false "compatible" loses features silently.
+- M8: a Shovel stores the source (and possibly destination) credentials on the broker that runs it, until it is removed, and shows up in that broker's exported definitions. See "Forwarding messages with a dynamic Shovel".
+- M8 (P2): the generated access migration holds password hashes, which are secrets at rest; see "Users, virtual hosts and permissions in the migration" for the guardrails and the accepted risks.
+- M8: moving messages with a Shovel removes them from the source queue once the destination confirms; it is a move, not a copy. A mistake cannot be undone by the app.
 
 **Open questions**
 
+- [ ] M8, product decisions still OPEN (architect's recommendations; decided so far by the owner on 2026-11-09: P1, P2, P5): P3 one topology migration per source virtual host; P4 removing a Shovel needs Full control; P6 automatic 3.x detection, no profile flag; P7 the Shovel runs on the 4.x broker; P8 AMQP host and port asked in the dialog; P9 `on-confirm` only; P10 broker-level access actions exempt from V1, in their own file, applied from an administrator profile; P11 `guest` skipped by default; P12 users with an unsupported hash algorithm are a manual step; P13 hash-holding migration files written owner-only with an export warning.
+- [ ] M8, UNVERIFIED until the spike `M8-00` (each is a spike item S-A to S-M there): exact shape of 3.x `GET /api/definitions` and whether a non-administrator may call it; which queue arguments quorum queues reject; which policy keys have no effect or are rejected on 4.x; whether classic queues with those arguments are still declarable on 4.x; global QoS removal and other client-visible changes; what 4.x's definitions import rejects when given a 3.x export as is; classic to quorum semantic changes (ordering, redelivery, delivery limit, priorities); Shovel URI redaction in `GET /api/shovels`, a credential-free local destination URI, `src-delete-after` semantics, plugin detection; whether leftover mirroring policies stop a 4.x node from starting (claimed only by a Tanzu RabbitMQ 10.x knowledge-base article, not verified for upstream).
 - [x] Queue message inspection and the delivery limit: resolved 2026-11-09, requeue peeking does not count toward it (`RealBrokerM7GateTest`).
 - [ ] Not answered by the spike: browsing (consuming) for a user without a management tag (M3); unnamed-producer and super-stream-producer publisher rows; cluster fields; `first_timestamp` after retention; case-sensitivity of `name`; what `offset_lag` means for a caught-up named consumer (understood in M2-02c: lag 1 per tracking entry written after its last read, 0 if it never stored; decided in M2-06: Caught up only at 0, otherwise "N behind" with a hint).
 

@@ -49,13 +49,15 @@ Repeat until the architect says Accepted and your report has no open blocker or 
 - Assert outcomes, not implementation details. Failure messages say what was expected and what happened.
 - Test the sad path as much as the happy path: broker refuses, connection drops, permission missing, retention deletes data mid-browse, empty stream, huge payload, invalid regex, malformed migration file.
 - Never test against a production broker. Never put real credentials in tests or fixtures.
+- Queue messages are never consumed, acknowledged, rejected, deleted or purged by the app's own process. The only read path is the requeue peek (`ManagementQueueMessageInspector`); the only accepted way messages move is a broker-side dynamic Shovel with the safeguards in `docs/spec.md` (M8). RabbitMQ 3.x is a read-only migration source: send it GET requests only.
+- Real-broker setup for M8: `rabbitmq:3.13-management` plus `rabbitmq:4-management` on one Testcontainers network (tag `broker-3x`), shovel plugins enabled by exec. Use a request recorder that asserts the app sends only GETs to the 3.x broker, and a log guard that asserts no password or Shovel URI is ever logged or returned.
 - A flaky test is a bug: fix it, quarantine it with a tag and a note to the architect, or delete it. Never ignore it.
 
 # Exploratory checks (beyond the scenarios)
 
 Before you report, try to break the change:
 
-- **Safety rules:** is there any path that reads or purges queue messages? That browsing changes broker state or offsets? That a topology action runs without the configure permission, or a publish without write permission? Any plain (non-TLS) connection that is not behind the per-profile "Use TLS" switch, or a plain profile without the "Not encrypted" warning? Any secret in logs, errors or files?
+- **Safety rules:** is there any path that reads queue messages other than the requeue peek, or that moves them other than the Shovel path, or that writes to a 3.x broker? That browsing changes broker state or offsets? That a topology action runs without the configure permission, or a publish without write permission? Any plain (non-TLS) connection that is not behind the per-profile "Use TLS" switch, or a plain profile without the "Not encrypted" warning? Any secret in logs, errors or files?
 - **Boundaries:** first and last page, page size 1 and the maximum, offset 0, offset beyond the end, timestamp before the first message, a stream with one message, an empty stream, 10,000-message scan limit and Cancel.
 - **Concurrency and time:** retention moves the first offset while the user pages; publishers connect while the list refreshes; the user switches connection or screen mid-read; Cancel arrives late.
 - **Failure:** broker down, TLS error, wrong certificate, timeout, permission changed after connecting, management API missing the plugin.

@@ -27,6 +27,10 @@ tests/bdd/
     12_stream_management.feature
     13_connection_lifecycle.feature
     14_mcp_server.feature
+    15_mqtt_publishing.feature
+    16_migrate_from_3x.feature
+    17_forward_messages_with_shovel.feature
+    18_migrate_access_from_3x.feature
 ```
 
 ## Tags
@@ -34,11 +38,13 @@ tests/bdd/
 | Tag | Meaning |
 | --- | --- |
 | `@M1` to `@M7` | Milestone that must make the scenario pass (see the milestones table in `docs/spec.md`) |
-| `@gate-M2`, `@gate-M3`, `@gate-M4`, `@gate-M5`, `@gate-M7` | Scenario that is the gate check for that milestone |
+| `@gate-M2`, `@gate-M3`, `@gate-M4`, `@gate-M5`, `@gate-M7`, `@gate-M8` | Scenario that is the gate check for that milestone |
 | `@smoke` | Smallest set that proves the feature works; run on every commit |
 | `@fake-broker` | Runs against in-memory fakes of the stream and management clients; no broker needed |
 | `@broker` | Needs a real RabbitMQ 4.x broker with TLS and plain listeners (Testcontainers, needs Docker) |
 | `@headers` | MQTT headers (MQTT 5 user properties) of the Publish MQTT dialog, M7-10; runs with `@fake-broker`. The `@M7 @fake-broker` queue-inspection scenarios in `09` run in the topology suite (filter `(@M2 or @M7) and @fake-broker`) against `FakeQueueMessageInspector`; their live twins are `@M7 @broker @gate-M7` (`RealBrokerM7GateTest`) |
+| `@broker-3x` | M8 only: needs a real RabbitMQ 3.13 broker (`rabbitmq:3.13-management`) and, for the gate, a 4.x broker on the same container network. 3.x is a read-only migration source; no other feature is tested on 3.x. Run with `@broker` in the separate broker job |
+| `@migrate-3x`, `@shovel`, `@access`, `@mcp` | M8 scenarios (`16`, `17`); `@shovel` marks forwarding with a broker-side dynamic Shovel; `@mcp` an MCP tool scenario |
 | `@negative` | Checks a refusal, an error or a safety rule |
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
@@ -78,6 +84,9 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 11 global search | Goals (global search), Screens | M2, M3 |
 | 12 stream management | Goals (publish and manage), UX rules | M5 |
 | 13 connection lifecycle | Connection lifecycle (decisions D1, D2, D6, D7) | M2 |
+| 16 migrate from 3.x | Migrating from RabbitMQ 3.x (M8): sources, report, review, generated migration, MCP | M8 |
+| 17 forward messages with Shovel | Forwarding messages with a dynamic Shovel (M8): safeguards, secrets, TLS | M8 |
+| 18 migrate access from 3.x | Users, virtual hosts and permissions in the migration (M8, owner decision P2) | M8 |
 
 Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`):
 

@@ -34,7 +34,8 @@ Prefer the `task` wrappers (`task --list`); Fedora installs it as `go-task`.
 ## Safety rules (never break)
 
 - Streams: read only with an unnamed or `noTrackingStrategy()` consumer, so browsing changes nothing on the broker.
-- Queues: the only way to see messages is `ManagementQueueMessageInspector` (management API `get` with `ack_requeue_true`). Never ack, delete, purge or consume queue messages, and never add another read path. Verified live that requeue peeking does not count toward quorum-queue delivery limits (`RealBrokerM7GateTest`); keep that test green when touching the inspector.
+- Queues: the app's own process never gets, consumes, acknowledges, rejects, deletes or purges queue messages. The only way the app reads messages is `ManagementQueueMessageInspector` (management API `get` with `ack_requeue_true`); never add another read path. The one accepted way messages are moved is a broker-side dynamic Shovel (M8, owner decision 2026-11-09), created, read and removed only through `ShovelGateway` with the safeguards in `docs/spec.md` "Forwarding messages with a dynamic Shovel": typed confirmation naming source and destination, dry run, `ack-mode` `on-confirm` only, never delete the source queue, never write to a 3.x broker, Shovel URIs (they carry credentials) never logged, shown or returned, no Shovel as a migration action, no MCP tool that creates or removes a Shovel. Keep `RealBrokerM7GateTest` and `RealBrokerM8GateTest` green when touching either.
+- RabbitMQ 3.x is supported only as a read-only migration source (M8): send it GET requests only.
 - Passwords live only in the OS keychain and in the per-connection holder's memory. Never put them in `SessionState`, logs, error strings or MCP output.
 - No silent fallback between TLS and plain; the profile switch decides.
 - Topology changes and publishing respect the profile's declared permissions and topology control level.

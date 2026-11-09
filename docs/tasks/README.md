@@ -112,6 +112,24 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M7-10-mqtt-headers-default-payload | MQTT headers (MQTT 5 user properties), editable default payload, MCP `headers` argument, Paho MQTT 5 client | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commits 85987cc, 09f1d91) |
 | M7-11-review-follow-ups | Review follow-ups: BodyPreview, clipboard helper, copy toolbar, routes scrollbar, live annotation test | M7 | done (accepted by the product owner 2026-11-09, retroactive brief; commits 9134e60, dc5f82b; number assigned in commit order) |
 
+## Milestone M8 (Migrate from RabbitMQ 3.x to 4.x, planned 2026-11-09; scenarios `16_migrate_from_3x.feature`, `17_forward_messages_with_shovel.feature`)
+
+| ID | Title | Milestone | Status |
+| --- | --- | --- | --- |
+| M8-00-spike-live-3x-vs-4x | Spike on live 3.13 and 4.x: definitions shape, quorum and policy rejects, 4.x import of a 3.x export, Shovel details, version detection (items S-A to S-L); first task, nothing else starts before it | M8 | briefed (architect, 2026-11-09); depends on none; needs Docker |
+| M8-01-definitions-model-and-file-import | Definitions model (hashes only as redacting pass-through), parser, file import | M8 | briefed (architect, 2026-11-09); depends on M8-00 |
+| M8-02-live-3x-source | 3.x version detection, read-only source role, live definitions fetch (GET only) | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-01 |
+| M8-03-compatibility-analyzer | Pure core compatibility rules, severity, proposals, JSON report | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-01 |
+| M8-04-widen-migration-model | Typed arguments, exchange flags, policy apply-to and priority, backward compatible | M8 | briefed (architect, 2026-11-09); depends on M8-00 |
+| M8-05-conversion-proposals-and-review-core | Accept, change, skip; generate one topology migration per vhost plus one access migration | M8 | briefed (architect, 2026-11-09); depends on M8-03, M8-04, M8-12 |
+| M8-06-report-and-review-ui | Migrate-from-3.x screen (needs a UX mockup first) | M8 | briefed (architect, 2026-11-09); depends on M8-02, M8-05 |
+| M8-07-shovel-core-and-safeguards | ShovelGateway interface, dry run, planner rules, fake | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-02 |
+| M8-08-shovel-management-implementation | Management API Shovel gateway, secret handling, live tests on 3.13 and 4.x | M8 | briefed (architect, 2026-11-09); depends on M8-07 |
+| M8-09-forwarding-ui | Dry run, typed confirmation, progress, remove | M8 | briefed (architect, 2026-11-09); depends on M8-07, M8-08, M8-06 |
+| M8-10-mcp-report-and-shovel-status | MCP: caerbannog_analyze_3x_definitions and caerbannog_list_shovels (read-only) | M8 | briefed (architect, 2026-11-09); depends on M8-03, M8-08 |
+| M8-11-gate-3x-to-4x | `@gate-M8` RealBrokerM8GateTest: 3.13 to 4.x, one shovelled message | M8 | briefed (architect, 2026-11-09); depends on M8-06, M8-08, M8-09, M8-10, M8-12 |
+| M8-12-access-migration-actions | Vhost, user (hash pass-through), permission and topic-permission actions: secrets, administrator and Full control guardrails, conflicts, owner-only file (owner decision P2, 2026-11-09) | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-04 |
+
 ## Later milestones (planned)
 
 | ID | Title | Milestone | Status |

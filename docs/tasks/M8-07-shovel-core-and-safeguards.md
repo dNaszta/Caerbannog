@@ -1,0 +1,32 @@
+# Shovel forwarding: core interface, dry run, safeguards
+
+Milestone: M8    Depends on: M8-00 (S-F), M8-02 for the source profile probe    Size: M
+
+## Goal
+`core` defines `ShovelGateway` and a `ForwardingPlanner` that decide, from a dry run and the permissions, whether forwarding of one queue may start, with every safeguard of the spec as pure, tested rules. A fake gateway exists.
+
+## Why
+Spec "Forwarding messages with a dynamic Shovel". This is the one place the app moves messages, so the rules are written and tested before any request exists.
+
+## Scope
+In: `ShovelGateway` (dryRun, start, status, remove; nothing else, in particular no get, consume, ack, purge, delete-queue), `ForwardingRequest` (source profile, source vhost and queue, destination queue, `SrcDeleteAfter`, fixed `AckMode.ON_CONFIRM`), `DryRunResult` (source counts, destination exists and type, plugins on, policymaker tag, existing shovel), `ForwardingPlanner` rules (blocked: destination missing, level Read-only, no policymaker, plugins off, existing shovel; warning: destination not quorum or stream; confirmation requires the typed source queue name), `ShovelAddress` type with redacting `toString` and no password field in anything that can be logged, TLS rule (profile TLS means `amqps`, no fallback), `FakeShovelGateway` in `core-testing` that records every request so tests can assert "no get, no consume".
+Out: HTTP implementation (`M8-08`), UI (`M8-09`).
+
+## Acceptance
+- BDD (`17_forward_messages_with_shovel.feature`): "A dry run shows what forwarding would do and sends nothing", "Forwarding is blocked when the destination queue does not exist", "A destination that is not a quorum queue gets a warning", "The confirmation names both queues and the consequences", "Cancelling the confirmation sends nothing", "Starting creates one confirmed dynamic shovel on the 4.x broker", "The app itself never reads or settles queue messages while forwarding", "Removing the shovel never deletes the source queue", "Removing a shovel needs Full control" (@needs-decision P4), "A user without the policymaker tag cannot forward", "A broker without the shovel plugins cannot forward", "Forwarding is blocked when the level is Read-only", "An existing shovel is never overwritten", "One queue at a time", "A TLS profile never falls back to plain for the shovel", "A plain profile says it is not encrypted".
+- Unit: a structural test that `ShovelGateway` exposes only the four operations; redaction test (`toString`, string templates, data-class `copy`).
+
+## Design notes
+Interfaces in `core`, no RabbitMQ types. Strategy for the rules (each safeguard a small rule). Names: `caerbannog-migrate-<queue>` deterministic. Uses effective permission from the spec (Declare and edit to start, Full control to remove).
+
+## UX
+`M8-09`.
+
+## MCP
+None here. Decision (spec MCP evaluation): shovel create and remove are NOT exposed (moves data, typed confirmation, credentials); status read-only in `M8-10`.
+
+## Open points
+P1 and P5 decided (2026-11-09); P4, P7, P9 proposed, awaiting the owner; field and behaviour details from S-F.
+
+## Definition of done
+Tests first and passing, the safety wording of the spec is quoted in the KDoc of `ShovelGateway`, spec updated.
