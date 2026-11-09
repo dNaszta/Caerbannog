@@ -71,7 +71,7 @@ internal class EntryReader(val section: String, private val json: JsonObject) {
 /** Converts a JSON value; [level] is the nesting level of a list or table (a container directly in an argument map is level 1). */
 private fun JsonElement.toArgument(section: String, level: Int): ArgumentValue = when (this) {
     is JsonNull -> ArgumentValue.Nothing
-    is JsonPrimitive -> toScalarArgument()
+    is JsonPrimitive -> toScalarArgument(section)
     is JsonArray -> {
         if (level > MAX_ARGUMENT_DEPTH) throw MalformedSectionException(section)
         ArgumentValue.Items(map { it.toArgument(section, level + 1) })
@@ -82,8 +82,13 @@ private fun JsonElement.toArgument(section: String, level: Int): ArgumentValue =
     }
 }
 
-private fun JsonPrimitive.toScalarArgument(): ArgumentValue = when {
+/**
+ * The tree reader also accepts bare words (`abc`, `NaN`) as non-string primitives, so a number must be checked:
+ * anything that is not a finite number makes the section malformed. No non-finite [ArgumentValue.Decimal] can exist.
+ */
+private fun JsonPrimitive.toScalarArgument(section: String): ArgumentValue = when {
     isString -> ArgumentValue.Text(content)
     booleanOrNull != null -> ArgumentValue.Flag(content == "true")
-    else -> content.toLongOrNull()?.let { ArgumentValue.Whole(it) } ?: ArgumentValue.Decimal(content.toDouble())
+    else -> content.toLongOrNull()?.let { ArgumentValue.Whole(it) }
+        ?: ArgumentValue.Decimal(content.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw MalformedSectionException(section))
 }
