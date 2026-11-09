@@ -1,0 +1,15 @@
+{
+ "bindings": [],
+ "exchanges": [],
+ "parameters": [],
+ "policies": [],
+ "queues": [
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "name": "v1-q"
+  }
+ ],
+ "rabbit_version": "3.13.7"
+}

@@ -1,0 +1,359 @@
+{
+ "bindings": [
+  {
+   "arguments": {},
+   "destination": "classic-dlx",
+   "destination_type": "queue",
+   "routing_key": "dead",
+   "source": "dlx",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x": "y"
+   },
+   "destination": "classic-plain",
+   "destination_type": "queue",
+   "routing_key": "k1",
+   "source": "ex-ae",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "destination": "dlx",
+   "destination_type": "exchange",
+   "routing_key": "e2e",
+   "source": "ex-e2e",
+   "vhost": "/"
+  }
+ ],
+ "exchanges": [
+  {
+   "arguments": {
+    "alternate-exchange": "dlx"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "internal": false,
+   "name": "ex-ae",
+   "type": "fanout",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": true,
+   "durable": false,
+   "internal": false,
+   "name": "ex-delayed",
+   "type": "topic",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "internal": false,
+   "name": "ex-e2e",
+   "type": "direct",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "internal": false,
+   "name": "dlx",
+   "type": "direct",
+   "vhost": "/"
+  }
+ ],
+ "global_parameters": [
+  {
+   "name": "cluster_name",
+   "value": "old-cluster"
+  },
+  {
+   "name": "internal_cluster_id",
+   "value": "rabbitmq-cluster-id-wNtaX2Ns3Bq-Kx_jrmkp7Q"
+  }
+ ],
+ "parameters": [
+  {
+   "component": "operator_policy",
+   "name": "op-limit",
+   "value": {
+    "apply-to": "queues",
+    "definition": {
+     "max-length": 100000
+    },
+    "pattern": ".*",
+    "priority": 0
+   },
+   "vhost": "/"
+  },
+  {
+   "component": "federation-upstream",
+   "name": "up1",
+   "value": {
+    "expires": 3600000,
+    "uri": "amqp://x:REDACTED@other"
+   },
+   "vhost": "/"
+  }
+ ],
+ "permissions": [
+  {
+   "configure": "^svc-.*",
+   "read": ".*",
+   "user": "svc",
+   "vhost": "/",
+   "write": ".*"
+  },
+  {
+   "configure": ".*",
+   "read": ".*",
+   "user": "svc",
+   "vhost": "v1",
+   "write": ".*"
+  },
+  {
+   "configure": ".*",
+   "read": ".*",
+   "user": "guest",
+   "vhost": "/",
+   "write": ".*"
+  },
+  {
+   "configure": ".*",
+   "read": ".*",
+   "user": "guest",
+   "vhost": "v1",
+   "write": ".*"
+  }
+ ],
+ "policies": [
+  {
+   "apply-to": "all",
+   "definition": {
+    "dead-letter-exchange": "dlx",
+    "expires": 99999999,
+    "max-length": 500,
+    "message-ttl": 1000
+   },
+   "name": "limits",
+   "pattern": "^classic-ttl$",
+   "priority": 0,
+   "vhost": "/"
+  },
+  {
+   "apply-to": "queues",
+   "definition": {
+    "ha-mode": "all",
+    "ha-promote-on-shutdown": "always",
+    "ha-sync-mode": "automatic"
+   },
+   "name": "ha-all",
+   "pattern": "^classic-mirrored$",
+   "priority": 1,
+   "vhost": "/"
+  },
+  {
+   "apply-to": "queues",
+   "definition": {
+    "ha-mode": "exactly",
+    "ha-params": 2,
+    "queue-master-locator": "client-local",
+    "queue-mode": "lazy"
+   },
+   "name": "ha-exactly",
+   "pattern": "^classic-plain$",
+   "priority": 2,
+   "vhost": "/"
+  }
+ ],
+ "product_name": "RabbitMQ",
+ "product_version": "3.13.7",
+ "queues": [
+  {
+   "arguments": {
+    "x-queue-type": "quorum"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "quorum-q",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-mirrored",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-single-active-consumer": true
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-sac",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-plain",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-max-priority": 5
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-prio",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-expires": 3600000,
+    "x-max-length": 1000,
+    "x-message-ttl": 60000,
+    "x-overflow": "reject-publish"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-ttl",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": false,
+   "name": "classic-transient",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-queue-master-locator": "min-masters"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-locator",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-dead-letter-exchange": "dlx",
+    "x-dead-letter-routing-key": "dead"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-dlx",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-max-length-bytes": 1048576
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-maxlen-bytes",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": true,
+   "durable": false,
+   "name": "classic-autodel",
+   "vhost": "/"
+  },
+  {
+   "arguments": {
+    "x-queue-mode": "lazy"
+   },
+   "auto_delete": false,
+   "durable": true,
+   "name": "classic-lazy",
+   "vhost": "/"
+  },
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "name": "v1-q",
+   "vhost": "v1"
+  }
+ ],
+ "rabbit_version": "3.13.7",
+ "rabbitmq_version": "3.13.7",
+ "topic_permissions": [
+  {
+   "exchange": "ex-delayed",
+   "read": "^b.*",
+   "user": "svc",
+   "vhost": "/",
+   "write": "^a.*"
+  }
+ ],
+ "users": [
+  {
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "limits": {},
+   "name": "mon",
+   "password_hash": "xcKGg5BqNptKeKlbXpEVEvcpCyw/R3GWFXlOvyz1PAw0Mhq9",
+   "tags": [
+    "monitoring"
+   ]
+  },
+  {
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "limits": {},
+   "name": "adm",
+   "password_hash": "oXhMJp5wqETzHRh+ANZ+ASfTjdlVxdKZhJ1hw020rk0SQfa8",
+   "tags": [
+    "administrator"
+   ]
+  },
+  {
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "limits": {},
+   "name": "guest",
+   "password_hash": "1N9fNu/7DVHSPEPOWD/iue0qQJopfB0DRBvStitsHuICCC2S",
+   "tags": [
+    "administrator"
+   ]
+  },
+  {
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "limits": {},
+   "name": "svc",
+   "password_hash": "OaoYLygKLLb8k2WnHlV5i4ywL0oDg4leSLdpteqLCkV2OvMp",
+   "tags": [
+    "management",
+    "policymaker"
+   ]
+  }
+ ],
+ "vhosts": [
+  {
+   "description": "Default virtual host",
+   "metadata": {
+    "description": "Default virtual host",
+    "tags": []
+   },
+   "name": "/",
+   "tags": []
+  },
+  {
+   "description": "",
+   "metadata": {
+    "description": "",
+    "tags": []
+   },
+   "name": "v1",
+   "tags": []
+  }
+ ]
+}
