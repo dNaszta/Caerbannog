@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeTopologyMigrationExecutor
 import dev.caerbannog.core.migrations.InMemoryMigrationFileRepository
 import dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationApplyResult
 import dev.caerbannog.core.migrations.MigrationDryRun
@@ -15,6 +16,7 @@ import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationValidationResult
 import dev.caerbannog.core.migrations.MigrationsViewModel
+import dev.caerbannog.core.migrations.fakes.MigrationFixtures
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
@@ -30,6 +32,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 
 class TopologyMigrationsSteps {
@@ -434,6 +437,15 @@ class TopologyMigrationsSteps {
                 """.trimIndent()
                 lastImportResult = getVm().importFile(json)
             }
+            "declares a queue type inside the arguments" -> lastImportResult = getVm().importFile(
+                """{ "version": "0098", "up": [ { "action": "declareQueue", "name": "q", "arguments": { "x-queue-type": "quorum" } } ] }""",
+            )
+            "has a policy with an unknown apply-to" -> lastImportResult = getVm().importFile(
+                """{ "version": "0098", "up": [ { "action": "declarePolicy", "name": "p", "pattern": ".*", "applyTo": "everything" } ] }""",
+            )
+            "has a binding with an unknown destination type" -> lastImportResult = getVm().importFile(
+                """{ "version": "0098", "up": [ { "action": "declareBinding", "exchange": "e", "queue": "q", "destinationType": "topic" } ] }""",
+            )
             "is nested ten thousand levels deep" ->
                 lastImportResult = getVm().importFile("[".repeat(10_000) + "]".repeat(10_000))
             else -> lastImportResult = getVm().importFile("invalid")
@@ -518,5 +530,177 @@ class TopologyMigrationsSteps {
         assertTrue(result is MigrationApplyResult.Success)
         assertTrue((result as MigrationApplyResult.Success).appliedVersions.isEmpty())
         assertTrue(executor.executedActions.isEmpty())
+    }
+
+    // ---- M8-04: the format carries what a converted 3.x topology needs ----
+
+    private fun migrationFile(vararg actions: String) =
+        """{ "version": "0090", "description": "M8-04", "up": [ ${actions.joinToString(", ")} ] }"""
+
+    private fun lastDeclaredQueue(name: String): MigrationAction.DeclareQueue =
+        executor.declaredQueues[vhost to name] ?: error("the broker received no queue \"$name\"; it received ${executor.executedActions.map { it.description }}")
+
+    private var lastQueueName: String = ""
+
+    @Given("a migration file that declares the quorum queue {string} with the arguments {string} {int}, {string} {int} and {string} {string}")
+    fun aMigrationFileThatDeclaresTheQuorumQueueWithTheArguments(
+        queue: String, k1: String, v1: Int, k2: String, v2: Int, k3: String, v3: String,
+    ) {
+        lastQueueName = queue
+        pendingImportJson = migrationFile(
+            """{ "action": "declareQueue", "name": "$queue", "type": "quorum", "arguments": { "$k1": $v1, "$k2": $v2, "$k3": "$v3" } }""",
+        )
+    }
+
+    @Then("the broker received the queue {string} with {string} as the number {int} and {string} as the number {int}")
+    fun theBrokerReceivedTheQueueWithNumbers(queue: String, k1: String, v1: Int, k2: String, v2: Int) {
+        val arguments = lastDeclaredQueue(queue).arguments
+        assertEquals(ArgumentValue.Whole(v1.toLong()), arguments[k1], "$k1 must be the number $v1, arguments: $arguments")
+        assertEquals(ArgumentValue.Whole(v2.toLong()), arguments[k2], "$k2 must be the number $v2, arguments: $arguments")
+    }
+
+    @Then("{string} is the text {string}")
+    fun isTheText(key: String, text: String) {
+        assertEquals(ArgumentValue.Text(text), lastDeclaredQueue(lastQueueName).arguments[key])
+    }
+
+    @Then("the dry run row for {string} lists the three arguments")
+    fun theDryRunRowForListsTheThreeArguments(queue: String) {
+        val dryRun = getVm().state.value.dryRun
+        assertNotNull(dryRun, "no dry run is shown after the import")
+        val action = dryRun!!.actions.map { it.action }.filterIsInstance<MigrationAction.DeclareQueue>().single { it.name == queue }
+        val detail = action.detail
+        assertNotNull(detail, "the dry run row of \"$queue\" has no detail line")
+        for (key in listOf("x-delivery-limit", "x-message-ttl", "x-dead-letter-exchange")) {
+            assertTrue(detail!!.contains(key), "the detail line \"$detail\" must list $key")
+        }
+    }
+
+    @Given("a migration file that declares the exchange {string} as a topic exchange that is not durable, internal and auto-delete, with the argument {string} {string}")
+    fun aMigrationFileThatDeclaresTheExchange(exchange: String, key: String, value: String) {
+        pendingImportJson = migrationFile(
+            """{ "action": "declareExchange", "name": "$exchange", "type": "topic", "durable": false, "internal": true, "autoDelete": true, "arguments": { "$key": "$value" } }""",
+        )
+    }
+
+    @Then("the broker has the exchange {string} with durable false, internal true and auto-delete true")
+    fun theBrokerHasTheExchangeWithFlags(exchange: String) = runBlocking {
+        val rows = (fakeTopologyCatalog.exchanges(vhost) as dev.caerbannog.core.streams.CatalogResult.Success).value
+        val row = rows.firstOrNull { it.name == exchange } ?: error("the broker has no exchange \"$exchange\"; it has ${rows.map { it.name }}")
+        assertEquals(Triple(false, true, true), Triple(row.durable, row.internal, row.autoDelete), "durable, internal, autoDelete of $exchange")
+    }
+
+    @Given("a migration file that declares the policy {string} on {string} applying to {string} with priority {int} and the definition {string} {int} and {string} {string}")
+    fun aMigrationFileThatDeclaresThePolicy(name: String, pattern: String, applyTo: String, priority: Int, k1: String, v1: Int, k2: String, v2: String) {
+        pendingImportJson = migrationFile(
+            """{ "action": "declarePolicy", "name": "$name", "pattern": "$pattern", "applyTo": "$applyTo", "priority": $priority, "definition": { "$k1": $v1, "$k2": "$v2" } }""",
+        )
+    }
+
+    @Then("the broker received the policy {string} with apply-to {string}, priority {int} and {string} as the number {int}")
+    fun theBrokerReceivedThePolicy(name: String, applyTo: String, priority: Int, key: String, number: Int) {
+        val policy = executor.declaredPolicies[vhost to name] ?: error("the broker received no policy \"$name\"; it received ${executor.executedActions.map { it.description }}")
+        assertEquals(applyTo, policy.applyTo)
+        assertEquals(priority, policy.priority)
+        assertEquals(ArgumentValue.Whole(number.toLong()), policy.definition[key], "$key must be the number $number, definition: ${policy.definition}")
+    }
+
+    @Given("a migration file that declares the operator policy {string} on {string} applying to {string} with the definition {string} {int}")
+    fun aMigrationFileThatDeclaresTheOperatorPolicy(name: String, pattern: String, applyTo: String, key: String, number: Int) {
+        pendingImportJson = migrationFile(
+            """{ "action": "declareOperatorPolicy", "name": "$name", "pattern": "$pattern", "applyTo": "$applyTo", "definition": { "$key": $number } }""",
+        )
+    }
+
+    @Then("the broker received the operator policy {string} with {string} as the number {int}")
+    fun theBrokerReceivedTheOperatorPolicy(name: String, key: String, number: Int) {
+        val policy = executor.declaredOperatorPolicies[vhost to name]
+            ?: error("the broker received no operator policy \"$name\"; it received ${executor.executedActions.map { it.description }}")
+        assertEquals(ArgumentValue.Whole(number.toLong()), policy.definition[key], "$key must be the number $number, definition: ${policy.definition}")
+    }
+
+    @Given("a migration file that binds the exchange {string} to the exchange {string} with routing key {string}")
+    fun aMigrationFileThatBindsTheExchangeToTheExchange(source: String, destination: String, key: String) {
+        pendingImportJson = migrationFile(
+            """{ "action": "declareBinding", "exchange": "$source", "queue": "$destination", "destinationType": "exchange", "routingKey": "$key" }""",
+        )
+    }
+
+    @Then("the broker has a binding from {string} to the exchange {string} with routing key {string}")
+    fun theBrokerHasABindingToTheExchange(source: String, destination: String, key: String) = runBlocking {
+        val rows = (fakeTopologyCatalog.bindings(vhost) as dev.caerbannog.core.streams.CatalogResult.Success).value
+        val match = rows.filter { it.source == source && it.destination == destination && it.routingKey == key }
+        assertTrue(match.isNotEmpty(), "no binding $source -> $destination ($key); the broker has $rows")
+        assertEquals(BindingDestinationType.EXCHANGE, match.first().destinationType, "the destination must be an exchange, not a queue")
+    }
+
+    private val oldFormatActionsBefore: List<MigrationAction> get() = MigrationFixtures.defaultOnlyActions()
+
+    @Given("the migration file {string} in the format of the first release was applied to {string}")
+    fun theMigrationFileInTheFormatOfTheFirstReleaseWasAppliedTo(version: String, profile: String) = runBlocking {
+        profileName = profile
+        val text = MigrationFixtures.read(MigrationFixtures.OLD_FORMAT)
+        assertEquals(version, (MigrationParser.parse(text) as MigrationValidationResult.Valid).migration.version)
+        fileRepository.importFile(text)
+        // What the first release recorded: the checksum written in the fixture helper, not one computed by the parser under test.
+        historyRepository.recordApplied(profile, version, MigrationFixtures.OLD_FORMAT_CHECKSUM)
+    }
+
+    @When("I list the migrations")
+    fun iListTheMigrations() {
+        getVm().setConnectionContext(profileName, vhost, configurePermission, controlLevel)
+    }
+
+    @Then("{string} is shown as applied, not as modified")
+    fun isShownAsAppliedNotAsModified(version: String) {
+        val entry = getVm().state.value.entries.firstOrNull { it.file.version == version }
+        assertNotNull(entry, "\"$version\" is not in the list")
+        assertEquals(MigrationStatus.Applied(MigrationFixtures.OLD_FORMAT_CHECKSUM), entry!!.status)
+        assertNull(getVm().state.value.warningMessage, "no modified warning may be shown")
+    }
+
+    @Then("its actions are the same as before")
+    fun itsActionsAreTheSameAsBefore() {
+        val entry = getVm().state.value.entries.single()
+        assertEquals(oldFormatActionsBefore, entry.file.up)
+    }
+
+    @Given("the broker has a durable queue {string}, a non-durable exchange {string} and a binding between them")
+    fun theBrokerHasADurableQueueANonDurableExchangeAndABinding(queue: String, exchange: String) {
+        theBrokerHasTheQuorumQueueAndTheExchange(queue, exchange)
+        fakeTopologyCatalog.addExchange(ExchangeRow(name = exchange, vhost = "/", type = "topic", durable = false, autoDelete = false, internal = false))
+    }
+
+    @Then("the new migration declares {string}, {string} with durable false, and the binding")
+    fun theNewMigrationDeclares(queue: String, exchange: String) {
+        val file = exportedFile ?: error("nothing was exported")
+        assertTrue(file.up.any { it is MigrationAction.DeclareQueue && it.name == queue })
+        val declared = file.up.filterIsInstance<MigrationAction.DeclareExchange>().singleOrNull { it.name == exchange }
+        assertNotNull(declared, "the export has no exchange \"$exchange\": ${file.up}")
+        assertFalse(declared!!.durable, "the non-durable exchange lost its flag in the export")
+        assertTrue(file.up.any { it is MigrationAction.DeclareBinding && it.queue == queue })
+    }
+
+    @Then("a file without any new feature does not contain the new keys")
+    fun aFileWithoutAnyNewFeatureDoesNotContainTheNewKeys() {
+        val raw = (exportedFile ?: error("nothing was exported")).rawJson
+        for (key in listOf("autoDelete", "internal", "destinationType", "arguments", "definition", "applyTo", "priority")) {
+            assertFalse(raw.contains("\"$key\""), "the export of default rows must not write \"$key\": $raw")
+        }
+    }
+
+    // ---- 16_migrate_from_3x.feature, @m8-04: no Shovel action (run by RunMigrate3xMigrationModelAcceptanceTest, same glue package)
+
+    @Given("a migration file with the action {string}")
+    fun aMigrationFileWithTheAction(action: String) {
+        pendingImportJson = migrationFile("""{ "action": "$action", "name": "x" }""")
+    }
+
+    @Then("it is rejected because the action is unknown")
+    fun itIsRejectedBecauseTheActionIsUnknown() {
+        val result = lastImportResult
+        assertTrue(result is MigrationValidationResult.Invalid, "the file must be refused, got $result")
+        assertTrue((result as MigrationValidationResult.Invalid).reason.endsWith("which action is not supported"), "reason was \"${result.reason}\"")
+        assertTrue(fileRepository.let { runBlocking { it.listFiles() } }.isEmpty(), "a refused file must not be stored")
     }
 }

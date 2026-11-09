@@ -1,5 +1,8 @@
 package dev.caerbannog.core.migrations
 
+import dev.caerbannog.core.json.ArgumentValue // M8-04 STUB: the type lives in M804TestStubs.kt until the senior developer moves the real one
+import dev.caerbannog.core.topology.BindingDestinationType
+
 /**
  * An individual topology action within a migration.
  */
@@ -9,12 +12,16 @@ sealed interface MigrationAction {
     val description: String
     val isDestructive: Boolean get() = false
 
+    /** M8-04 STUB: one-line summary of arguments or definition (null = nothing to show). The real behaviour is the developer's. */
+    val detail: String? get() = null
+
     data class DeclareQueue(
         val name: String,
         val type: String = "quorum",
         override val vhost: String = "/",
         val durable: Boolean = true,
-        val arguments: Map<String, String> = emptyMap(),
+        val arguments: Map<String, ArgumentValue> = emptyMap(),
+        val autoDelete: Boolean = false, // M8-04 STUB field
     ) : MigrationAction {
         override val actionName: String get() = "declareQueue"
         override val description: String get() = "Declare $type queue $name"
@@ -34,6 +41,9 @@ sealed interface MigrationAction {
         val type: String = "direct",
         override val vhost: String = "/",
         val durable: Boolean = true,
+        val autoDelete: Boolean = false, // M8-04 STUB fields
+        val internal: Boolean = false,
+        val arguments: Map<String, ArgumentValue> = emptyMap(),
     ) : MigrationAction {
         override val actionName: String get() = "declareExchange"
         override val description: String get() = "Declare $type exchange $name"
@@ -53,6 +63,8 @@ sealed interface MigrationAction {
         val queue: String,
         val routingKey: String = "",
         override val vhost: String = "/",
+        val destinationType: BindingDestinationType = BindingDestinationType.QUEUE, // M8-04 STUB fields
+        val arguments: Map<String, ArgumentValue> = emptyMap(),
     ) : MigrationAction {
         override val actionName: String get() = "declareBinding"
         override val description: String
@@ -99,11 +111,26 @@ sealed interface MigrationAction {
     data class DeclarePolicy(
         val name: String,
         val pattern: String,
-        val definition: Map<String, String> = emptyMap(),
+        val definition: Map<String, ArgumentValue> = emptyMap(),
         override val vhost: String = "/",
+        val applyTo: String = "all", // M8-04 STUB fields
+        val priority: Int = 0,
     ) : MigrationAction {
         override val actionName: String get() = "declarePolicy"
         override val description: String get() = "Declare policy $name"
+    }
+
+    /** M8-04 STUB of the new action (the real one is the developer's). */
+    data class DeclareOperatorPolicy(
+        val name: String,
+        val pattern: String,
+        val definition: Map<String, ArgumentValue> = emptyMap(),
+        override val vhost: String = "/",
+        val applyTo: String = "all",
+        val priority: Int = 0,
+    ) : MigrationAction {
+        override val actionName: String get() = "declareOperatorPolicy"
+        override val description: String get() = "Declare operator policy $name"
     }
 
     data class DeletePolicy(

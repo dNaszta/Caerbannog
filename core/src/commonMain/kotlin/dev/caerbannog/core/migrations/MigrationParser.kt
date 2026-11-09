@@ -254,6 +254,10 @@ object MigrationParser {
                                 is MigrationAction.DeletePolicy -> {
                                     put("name", action.name)
                                 }
+                                is MigrationAction.DeclareOperatorPolicy -> { // M8-04 STUB: no new keys written yet
+                                    put("name", action.name)
+                                    put("pattern", action.pattern)
+                                }
                             }
                         }
                     )
