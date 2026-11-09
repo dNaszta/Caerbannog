@@ -10,6 +10,9 @@ interface PublishMqttEvents {
     fun setQos(qos: MqttQos)
     fun setRetain(retain: Boolean)
     fun setPayload(payload: String)
+    fun addHeader()
+    fun setHeader(index: Int, key: String, value: String)
+    fun removeHeader(index: Int)
     fun publish()
     fun cancel()
     fun clearFeedback()
@@ -23,6 +26,9 @@ object EmptyPublishMqttEvents : PublishMqttEvents {
     override fun setQos(qos: MqttQos) = Unit
     override fun setRetain(retain: Boolean) = Unit
     override fun setPayload(payload: String) = Unit
+    override fun addHeader() = Unit
+    override fun setHeader(index: Int, key: String, value: String) = Unit
+    override fun removeHeader(index: Int) = Unit
     override fun publish() = Unit
     override fun cancel() = Unit
     override fun clearFeedback() = Unit

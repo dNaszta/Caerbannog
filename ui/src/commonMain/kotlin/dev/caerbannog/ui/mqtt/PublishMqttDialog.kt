@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -183,7 +184,7 @@ fun PublishMqttDialog(
                     OutlinedTextField(
                         value = state.payload,
                         onValueChange = events::setPayload,
-                        placeholder = { Text("""{"temperature": 21.5, "unit": "C"}""") },
+                        placeholder = { Text("Message body") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 140.dp, max = 300.dp)
@@ -192,6 +193,61 @@ fun PublishMqttDialog(
                         maxLines = 15,
                         minLines = 5,
                     )
+                }
+
+                // Headers (MQTT 5 user properties)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Headers",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Sent as MQTT 5 user properties. Rows without a key are ignored.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = events::addHeader, modifier = Modifier.testTag("publishMqttAddHeaderButton")) {
+                            ConnectionIcon(AppIcon.Add, SmallIconSize)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Add header")
+                        }
+                    }
+                    state.headers.forEachIndexed { index, header ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = header.key,
+                                onValueChange = { events.setHeader(index, it, header.value) },
+                                label = { Text("Key") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).testTag("publishMqttHeaderKey:$index"),
+                            )
+                            OutlinedTextField(
+                                value = header.value,
+                                onValueChange = { events.setHeader(index, header.key, it) },
+                                label = { Text("Value") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).testTag("publishMqttHeaderValue:$index"),
+                            )
+                            IconButton(
+                                onClick = { events.removeHeader(index) },
+                                modifier = Modifier.testTag("publishMqttRemoveHeader:$index"),
+                            ) {
+                                ConnectionIcon(AppIcon.Close, IconSize, contentDescription = "Remove header")
+                            }
+                        }
+                    }
                 }
 
                 // Feedback Banners

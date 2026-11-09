@@ -17,6 +17,9 @@ class PublishMqttEventsAdapter(
     override fun setQos(qos: MqttQos) = vm.setQos(qos)
     override fun setRetain(retain: Boolean) = vm.setRetain(retain)
     override fun setPayload(payload: String) = vm.setPayload(payload)
+    override fun addHeader() = vm.addHeader()
+    override fun setHeader(index: Int, key: String, value: String) = vm.setHeader(index, key, value)
+    override fun removeHeader(index: Int) = vm.removeHeader(index)
     override fun publish() = vm.publish { onPublished() }
     override fun cancel() {
         vm.cancel()

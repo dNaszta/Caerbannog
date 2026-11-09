@@ -1,5 +1,7 @@
 package dev.caerbannog.ui.publish
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -10,8 +12,11 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.PublishMqttState
 import dev.caerbannog.core.mqtt.StreamInboundRoute
@@ -64,6 +69,10 @@ class PublishMqttDialogUiTest {
             calls += "setPayload:$payload"
             lastPayload = payload
         }
+
+        override fun addHeader() { calls += "addHeader" }
+        override fun setHeader(index: Int, key: String, value: String) { calls += "setHeader:$index:$key=$value" }
+        override fun removeHeader(index: Int) { calls += "removeHeader:$index" }
 
         override fun publish() {
             calls += "publish"
@@ -168,6 +177,35 @@ class PublishMqttDialogUiTest {
 
         onNodeWithTag("publishMqttPayloadInput").performTextInput("24.5")
         assertEquals("24.5", events.lastPayload)
+    }
+
+    @Test
+    fun `a prefilled default payload can be edited in place`() = runDesktopComposeUiTest(1280, 800) {
+        var state by androidx.compose.runtime.mutableStateOf(defaultState.copy(payload = PublishMqttState.DEFAULT_PAYLOAD))
+        val events = object : PublishMqttEvents by RecordingMqttEvents() {
+            override fun setPayload(payload: String) { state = state.copy(payload = payload) }
+        }
+        setContent { PublishMqttDialog(state = state, events = events) }
+
+        onNodeWithTag("publishMqttPayloadInput").assert(hasText(PublishMqttState.DEFAULT_PAYLOAD))
+        onNodeWithTag("publishMqttPayloadInput").performTextReplacement("""{"temperature": 30}""")
+        assertEquals("""{"temperature": 30}""", state.payload)
+    }
+
+    @Test
+    fun `header rows render and emit add, edit and remove events`() = runDesktopComposeUiTest(1280, 800) {
+        val events = RecordingMqttEvents()
+        val state = defaultState.copy(headers = listOf(MqttHeader("trace-id", "abc")))
+        setContent { PublishMqttDialog(state = state, events = events) }
+
+        onNodeWithTag("publishMqttAddHeaderButton").performClick()
+        onNodeWithTag("publishMqttHeaderKey:0").assert(hasText("trace-id"))
+        onNodeWithTag("publishMqttHeaderValue:0").performTextInput("-2")
+        onNodeWithTag("publishMqttRemoveHeader:0").performClick()
+
+        assertTrue("addHeader" in events.calls)
+        assertTrue(events.calls.any { it.startsWith("setHeader:0:trace-id=") })
+        assertTrue("removeHeader:0" in events.calls)
     }
 
     @Test

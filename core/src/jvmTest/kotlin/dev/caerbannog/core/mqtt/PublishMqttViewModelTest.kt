@@ -26,6 +26,39 @@ class PublishMqttViewModelTest {
     }
 
     @Test
+    fun `payload starts with an editable default message that setPayload replaces`() {
+        val vm = PublishMqttViewModel(publisher = fakePublisher, connectionName = "b", scope = scope)
+
+        assertEquals(PublishMqttState.DEFAULT_PAYLOAD, vm.state.value.payload)
+        vm.setPayload("custom")
+        assertEquals("custom", vm.state.value.payload)
+        vm.setPayload("")
+        assertEquals("", vm.state.value.payload)
+    }
+
+    @Test
+    fun `headers can be added, edited and removed, and publish sends only rows with a key`() {
+        val vm = PublishMqttViewModel(publisher = fakePublisher, connectionName = "b", scope = scope, initialTopic = "a/b")
+
+        vm.addHeader(); vm.addHeader(); vm.addHeader()
+        vm.setHeader(0, " trace-id ", "abc")
+        vm.setHeader(1, "", "orphan value")
+        vm.setHeader(2, "trace-id", "second")
+        vm.setHeader(9, "ignored", "out of range")
+        vm.removeHeader(9)
+        assertEquals(3, vm.state.value.headers.size)
+
+        vm.publish()
+        assertEquals(
+            listOf(MqttHeader("trace-id", "abc"), MqttHeader("trace-id", "second")),
+            fakePublisher.publishedMessages.single().headers,
+        )
+
+        vm.removeHeader(1)
+        assertEquals(listOf(MqttHeader(" trace-id ", "abc"), MqttHeader("trace-id", "second")), vm.state.value.headers)
+    }
+
+    @Test
     fun `initial state reflects connection and validates empty topic`() {
         val vm = PublishMqttViewModel(
             publisher = fakePublisher,

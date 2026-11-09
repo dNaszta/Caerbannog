@@ -1,27 +1,22 @@
 package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.connections.ConnectionProfile
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.PublishMqttRequest
 import dev.caerbannog.core.publish.PublishOutcome
 import kotlinx.coroutines.runBlocking
-import org.eclipse.paho.client.mqttv3.IMqttClient
-import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken
-import org.eclipse.paho.client.mqttv3.IMqttMessageListener
-import org.eclipse.paho.client.mqttv3.IMqttToken
-import org.eclipse.paho.client.mqttv3.MqttCallback
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions
-import org.eclipse.paho.client.mqttv3.MqttException
-import org.eclipse.paho.client.mqttv3.MqttMessage
-import org.eclipse.paho.client.mqttv3.MqttSecurityException
-import org.eclipse.paho.client.mqttv3.MqttTopic
+import org.eclipse.paho.mqttv5.client.MqttClientException
+import org.eclipse.paho.mqttv5.client.MqttConnectionOptions
+import org.eclipse.paho.mqttv5.common.MqttException
+import org.eclipse.paho.mqttv5.common.MqttMessage
+import org.eclipse.paho.mqttv5.common.MqttSecurityException
+import org.eclipse.paho.mqttv5.common.packet.MqttReturnCode
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 class RabbitMqMqttPublisherTest {
 
@@ -36,68 +31,27 @@ class RabbitMqMqttPublisherTest {
         tls = false,
     )
 
-    private open class TestMqttClient(
-        private val uri: String,
-        private val clientId: String,
-    ) : IMqttClient {
-        var connected = AtomicBoolean(false)
-        var closed = AtomicBoolean(false)
-        var disconnectedForcibly = AtomicInteger(0)
-        var lastConnectOptions: MqttConnectOptions? = null
+    private class TestMqttWire : MqttWire {
+        var connected = false
+        var closed = false
+        var disconnectedForcibly = 0
+        var lastConnectOptions: MqttConnectionOptions? = null
         val published = mutableListOf<Pair<String, MqttMessage>>()
-
-        var onConnect: ((MqttConnectOptions) -> Unit)? = null
+        var onConnect: ((MqttConnectionOptions) -> Unit)? = null
         var onPublish: ((String, MqttMessage) -> Unit)? = null
 
-        override fun connect() = connect(MqttConnectOptions())
-
-        override fun connect(options: MqttConnectOptions) {
+        override val isConnected: Boolean get() = connected
+        override fun connect(options: MqttConnectionOptions) {
             lastConnectOptions = options
             onConnect?.invoke(options)
-            connected.set(true)
+            connected = true
         }
-
-        override fun connectWithResult(options: MqttConnectOptions?): IMqttToken = throw UnsupportedOperationException()
-        override fun disconnect() { connected.set(false) }
-        override fun disconnect(quiesceTimeout: Long) { connected.set(false) }
-        override fun disconnectForcibly() { connected.set(false); disconnectedForcibly.incrementAndGet() }
-        override fun disconnectForcibly(quiesceTimeout: Long) { connected.set(false); disconnectedForcibly.incrementAndGet() }
-        override fun disconnectForcibly(quiesceTimeout: Long, disconnectTimeout: Long) { connected.set(false); disconnectedForcibly.incrementAndGet() }
-        override fun subscribe(topic: String?) = Unit
-        override fun subscribe(topicFilters: Array<out String>?) = Unit
-        override fun subscribe(topic: String?, qos: Int) = Unit
-        override fun subscribe(topicFilters: Array<out String>?, qos: IntArray?) = Unit
-        override fun subscribe(topic: String?, messageListener: IMqttMessageListener?) = Unit
-        override fun subscribe(topicFilters: Array<out String>?, messageListeners: Array<out IMqttMessageListener>?) = Unit
-        override fun subscribe(topic: String?, qos: Int, messageListener: IMqttMessageListener?) = Unit
-        override fun subscribe(topicFilters: Array<out String>?, qos: IntArray?, messageListeners: Array<out IMqttMessageListener>?) = Unit
-        override fun subscribeWithResponse(topic: String?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topic: String?, messageListener: IMqttMessageListener?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topic: String?, qos: Int): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topic: String?, qos: Int, messageListener: IMqttMessageListener?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topicFilters: Array<out String>?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topicFilters: Array<out String>?, messageListeners: Array<out IMqttMessageListener>?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topicFilters: Array<out String>?, qos: IntArray?): IMqttToken = throw UnsupportedOperationException()
-        override fun subscribeWithResponse(topicFilters: Array<out String>?, qos: IntArray?, messageListeners: Array<out IMqttMessageListener>?): IMqttToken = throw UnsupportedOperationException()
-        override fun unsubscribe(topic: String?) = Unit
-        override fun unsubscribe(topicFilters: Array<out String>?) = Unit
-        override fun publish(topic: String, payload: ByteArray, qos: Int, retained: Boolean) = Unit
-
         override fun publish(topic: String, message: MqttMessage) {
             onPublish?.invoke(topic, message)
-            published += (topic to message)
+            published += topic to message
         }
-
-        override fun setCallback(callback: MqttCallback?) = Unit
-        override fun getTopic(topic: String?): MqttTopic = throw UnsupportedOperationException()
-        override fun isConnected(): Boolean = connected.get()
-        override fun getClientId(): String = clientId
-        override fun getServerURI(): String = uri
-        override fun getPendingDeliveryTokens(): Array<IMqttDeliveryToken> = emptyArray()
-        override fun setManualAcks(manualAcks: Boolean) = Unit
-        override fun reconnect() = Unit
-        override fun messageArrivedComplete(messageId: Int, qos: Int) = Unit
-        override fun close() { closed.set(true) }
+        override fun disconnectForcibly(timeoutMs: Long) { connected = false; disconnectedForcibly++ }
+        override fun close() { closed = true }
     }
 
     @Test
@@ -107,7 +61,7 @@ class RabbitMqMqttPublisherTest {
             profile = plainProfile,
             password = "guest",
             transport = BrokerTransport.Plain,
-            clientFactory = { u, id -> clientCreated = true; TestMqttClient(u, id) },
+            clientFactory = { u, id -> clientCreated = true; TestMqttWire() },
         )
 
         val blank = publisher.publish(PublishMqttRequest("   ", "payload".encodeToByteArray()))
@@ -127,7 +81,7 @@ class RabbitMqMqttPublisherTest {
 
     @Test
     fun `publish connects via plain tcp, publishes message with QoS and retain, and disconnects`() = runBlocking {
-        lateinit var createdClient: TestMqttClient
+        lateinit var createdClient: TestMqttWire
         val publisher = RabbitMqMqttPublisher(
             profile = plainProfile,
             password = "secret-guest",
@@ -135,7 +89,7 @@ class RabbitMqMqttPublisherTest {
             clientFactory = { uri, id ->
                 assertEquals("tcp://localhost:1883", uri)
                 assertTrue(id.startsWith("caerbannog-pub-"))
-                TestMqttClient(uri, id).also { createdClient = it }
+                TestMqttWire().also { createdClient = it }
             },
         )
 
@@ -155,8 +109,8 @@ class RabbitMqMqttPublisherTest {
         val opts = createdClient.lastConnectOptions
         assertNotNull(opts)
         assertEquals("guest", opts!!.userName)
-        assertArrayEquals("secret-guest".toCharArray(), opts.password)
-        assertTrue(opts.isCleanSession)
+        assertArrayEquals("secret-guest".toByteArray(), opts.password)
+        assertTrue(opts.isCleanStart)
 
         // Verify published message
         assertEquals(1, createdClient.published.size)
@@ -167,8 +121,8 @@ class RabbitMqMqttPublisherTest {
         assertArrayEquals(payload, msg.payload)
 
         // Verify cleanup
-        assertTrue(createdClient.closed.get())
-        assertEquals(1, createdClient.disconnectedForcibly.get())
+        assertTrue(createdClient.closed)
+        assertEquals(1, createdClient.disconnectedForcibly)
     }
 
     @Test
@@ -178,8 +132,8 @@ class RabbitMqMqttPublisherTest {
             password = "guest",
             transport = BrokerTransport.Plain,
             clientFactory = { uri, id ->
-                TestMqttClient(uri, id).apply {
-                    onConnect = { throw MqttSecurityException(MqttException.REASON_CODE_FAILED_AUTHENTICATION.toInt()) }
+                TestMqttWire().apply {
+                    onConnect = { throw MqttSecurityException(MqttClientException.REASON_CODE_FAILED_AUTHENTICATION.toInt()) }
                 }
             },
         )
@@ -190,14 +144,14 @@ class RabbitMqMqttPublisherTest {
     }
 
     @Test
-    fun `publish maps MqttException REASON_CODE_NOT_AUTHORIZED to PublishOutcome Refused`() = runBlocking {
+    fun `publish maps MqttException NOT_AUTHORIZED to PublishOutcome Refused`() = runBlocking {
         val publisher = RabbitMqMqttPublisher(
             profile = plainProfile,
             password = "guest",
             transport = BrokerTransport.Plain,
             clientFactory = { uri, id ->
-                TestMqttClient(uri, id).apply {
-                    onPublish = { _, _ -> throw MqttException(MqttException.REASON_CODE_NOT_AUTHORIZED.toInt()) }
+                TestMqttWire().apply {
+                    onPublish = { _, _ -> throw MqttException(MqttReturnCode.RETURN_CODE_NOT_AUTHORIZED) }
                 }
             },
         )
@@ -208,14 +162,14 @@ class RabbitMqMqttPublisherTest {
     }
 
     @Test
-    fun `publish maps MqttException REASON_CODE_SERVER_CONNECT_ERROR to PublishOutcome Failed`() = runBlocking {
+    fun `publish maps MqttException SERVER_CONNECT_ERROR to PublishOutcome Failed`() = runBlocking {
         val publisher = RabbitMqMqttPublisher(
             profile = plainProfile,
             password = "guest",
             transport = BrokerTransport.Plain,
             clientFactory = { uri, id ->
-                TestMqttClient(uri, id).apply {
-                    onConnect = { throw MqttException(MqttException.REASON_CODE_SERVER_CONNECT_ERROR.toInt()) }
+                TestMqttWire().apply {
+                    onConnect = { throw MqttException(MqttClientException.REASON_CODE_SERVER_CONNECT_ERROR.toInt()) }
                 }
             },
         )
@@ -226,14 +180,14 @@ class RabbitMqMqttPublisherTest {
     }
 
     @Test
-    fun `publish maps MqttException REASON_CODE_CLIENT_TIMEOUT to PublishOutcome Failed`() = runBlocking {
+    fun `publish maps MqttException CLIENT_TIMEOUT to PublishOutcome Failed`() = runBlocking {
         val publisher = RabbitMqMqttPublisher(
             profile = plainProfile,
             password = "guest",
             transport = BrokerTransport.Plain,
             clientFactory = { uri, id ->
-                TestMqttClient(uri, id).apply {
-                    onPublish = { _, _ -> throw MqttException(MqttException.REASON_CODE_CLIENT_TIMEOUT.toInt()) }
+                TestMqttWire().apply {
+                    onPublish = { _, _ -> throw MqttException(MqttClientException.REASON_CODE_CLIENT_TIMEOUT.toInt()) }
                 }
             },
         )
@@ -241,5 +195,26 @@ class RabbitMqMqttPublisherTest {
         val outcome = publisher.publish(PublishMqttRequest("alerts", "payload".encodeToByteArray()))
         assertTrue(outcome is PublishOutcome.Failed)
         assertEquals("MQTT publish timed out after 10 seconds", (outcome as PublishOutcome.Failed).error)
+    }
+
+    @Test
+    fun `headers are sent as MQTT 5 user properties in order, and none are attached when there are no headers`() = runBlocking {
+        val wires = mutableListOf<TestMqttWire>()
+        val publisher = RabbitMqMqttPublisher(
+            profile = plainProfile, password = "guest", transport = BrokerTransport.Plain,
+            clientFactory = { _, _ -> TestMqttWire().also { wires += it } },
+        )
+
+        publisher.publish(
+            PublishMqttRequest(
+                "sensors/t", "x".encodeToByteArray(),
+                headers = listOf(MqttHeader("trace-id", "abc"), MqttHeader("trace-id", "second"), MqttHeader("tenant", "")),
+            ),
+        )
+        publisher.publish(PublishMqttRequest("sensors/t", "x".encodeToByteArray()))
+
+        val props = wires[0].published.single().second.properties.userProperties.map { it.key to it.value }
+        assertEquals(listOf("trace-id" to "abc", "trace-id" to "second", "tenant" to ""), props)
+        assertTrue(wires[1].published.single().second.properties?.userProperties.isNullOrEmpty())
     }
 }

@@ -11,12 +11,16 @@ enum class MqttQos(val value: Int) {
     }
 }
 
+/** One MQTT 5 user property ("header") of a published message. Keys may repeat. */
+data class MqttHeader(val key: String = "", val value: String = "")
+
 /** Request payload and delivery options for publishing an MQTT message. */
 data class PublishMqttRequest(
     val topic: String,
     val payload: ByteArray,
     val qos: MqttQos = MqttQos.AT_MOST_ONCE,
     val retain: Boolean = false,
+    val headers: List<MqttHeader> = emptyList(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -24,6 +28,7 @@ data class PublishMqttRequest(
         if (topic != other.topic) return false
         if (qos != other.qos) return false
         if (retain != other.retain) return false
+        if (headers != other.headers) return false
         if (!payload.contentEquals(other.payload)) return false
         return true
     }
@@ -32,6 +37,7 @@ data class PublishMqttRequest(
         var result = topic.hashCode()
         result = 31 * result + qos.hashCode()
         result = 31 * result + retain.hashCode()
+        result = 31 * result + headers.hashCode()
         result = 31 * result + payload.contentHashCode()
         return result
     }

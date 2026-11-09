@@ -15,7 +15,8 @@ data class PublishMqttState(
     val topic: String = "",
     val qos: MqttQos = MqttQos.AT_MOST_ONCE,
     val retain: Boolean = false,
-    val payload: String = "",
+    val payload: String = DEFAULT_PAYLOAD,
+    val headers: List<MqttHeader> = emptyList(),
     val isPublishing: Boolean = false,
     val confirmation: String? = null,
     val error: String? = null,
@@ -25,6 +26,11 @@ data class PublishMqttState(
         get() = topic.isNotBlank() &&
             topicError == null &&
             !isPublishing
+
+    companion object {
+        /** Editable sample message the dialog opens with, so the field holds real text instead of an inert placeholder. */
+        const val DEFAULT_PAYLOAD: String = "{\"temperature\": 21.5, \"unit\": \"C\"}"
+    }
 
     val warningBanner: String
         get() = "This message will be sent over MQTT to the broker on $connectionName. Connected subscribers with matching topics will receive it."
@@ -71,6 +77,30 @@ class PublishMqttViewModel(
         _state.value = _state.value.copy(payload = payload, confirmation = null, error = null)
     }
 
+    fun addHeader() {
+        _state.value = _state.value.copy(headers = _state.value.headers + MqttHeader(), confirmation = null, error = null)
+    }
+
+    fun setHeader(index: Int, key: String, value: String) {
+        val current = _state.value
+        if (index !in current.headers.indices) return
+        _state.value = current.copy(
+            headers = current.headers.toMutableList().also { it[index] = MqttHeader(key, value) },
+            confirmation = null,
+            error = null,
+        )
+    }
+
+    fun removeHeader(index: Int) {
+        val current = _state.value
+        if (index !in current.headers.indices) return
+        _state.value = current.copy(
+            headers = current.headers.toMutableList().also { it.removeAt(index) },
+            confirmation = null,
+            error = null,
+        )
+    }
+
     fun clearFeedback() {
         _state.value = _state.value.copy(confirmation = null, error = null)
     }
@@ -98,6 +128,8 @@ class PublishMqttViewModel(
             payload = current.payload.encodeToByteArray(),
             qos = current.qos,
             retain = current.retain,
+            // Rows with a blank key are unfinished and are not sent.
+            headers = current.headers.filter { it.key.isNotBlank() }.map { MqttHeader(it.key.trim(), it.value) },
         )
 
         scope.launch {
