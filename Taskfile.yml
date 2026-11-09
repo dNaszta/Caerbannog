@@ -56,6 +56,21 @@ tasks:
     cmds:
       - ./gradlew :desktopApp:packageMsi
 
+  package:rpm:
+    desc: Build the Fedora/RHEL .rpm installer (run on Linux; needs `sudo dnf install rpm-build java-21-openjdk-devel java-21-openjdk-jmods`).
+    cmds:
+      - ./gradlew :desktopApp:packageRpm
+
+  package:deb:
+    desc: Build the Debian/Ubuntu .deb installer (run on Linux; needs `dpkg-dev` and `fakeroot`).
+    cmds:
+      - ./gradlew :desktopApp:packageDeb
+
+  package:
+    desc: Build the installer for the current OS (.dmg on macOS, .msi on Windows, .rpm on Linux).
+    cmds:
+      - task: '{{if eq OS "darwin"}}package:dmg{{else if eq OS "windows"}}package:msi{{else}}package:rpm{{end}}'
+
   # M2-12 / M2-15: local development broker (developer tooling, see dev/README.md). Throwaway secrets only.
   # Defaults to `podman compose` on Linux and `docker compose` on macOS/Windows; pass `CONTAINER_ENGINE=podman|docker` or use `:podman` / `:docker` tasks to override.
   dev:up:

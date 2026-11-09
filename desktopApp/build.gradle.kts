@@ -46,11 +46,12 @@ compose.desktop {
     application {
         mainClass = "dev.caerbannog.desktopapp.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Rpm, TargetFormat.Deb)
             packageName = "Caerbannog"
             // jpackage requires MAJOR > 0 (dotted MAJOR[.MINOR][.PATCH]); this is a packaging-format
             // version, unrelated to any app-visible version string.
             packageVersion = "1.0.0"
+            licenseFile.set(rootProject.file("LICENSE"))
             // Add required Java modules that are not included by default in the bundled JRE.
             // java.net.http is required by Ktor client for HTTP requests (HttpClient, HttpRequest, etc.)
             // Note: javax.net.ssl.* classes are in java.base in Java 11+, so no need for java.ssl module.
@@ -65,6 +66,16 @@ compose.desktop {
             )
             // Rabbit icon for the application (RabbitMQ logo)
             macOS.iconFile.set(file("src/main/resources/rabbit.icns"))
+            // Linux (Fedora .rpm, Debian/Ubuntu .deb): jpackage cannot cross-build, so these run on a Linux host.
+            // The .rpm needs `rpm-build` installed (`sudo dnf install rpm-build`); the .deb needs `dpkg-dev` and `fakeroot`.
+            linux {
+                iconFile.set(file("src/main/resources/rabbit.png"))
+                packageName = "caerbannog"
+                menuGroup = "Development"
+                appCategory = "Development"
+                shortcut = true
+                rpmLicenseType = "MIT"
+            }
         }
     }
 }
