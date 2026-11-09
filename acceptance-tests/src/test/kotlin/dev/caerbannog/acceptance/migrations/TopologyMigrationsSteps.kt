@@ -37,28 +37,45 @@ import org.junit.jupiter.api.Assertions.assertTrue
 
 class TopologyMigrationsSteps {
 
-    private val fakeTopologyCatalog = FakeTopologyCatalog()
+    /** M5-08a: the second step class of this package (M508aExecutorSteps) works on the same scenario state; Cucumber has no DI here. */
+    companion object {
+        @Volatile
+        internal var current: TopologyMigrationsSteps? = null
+    }
+
+    internal val fakeTopologyCatalog = FakeTopologyCatalog()
     private val fakeStreamCatalog = FakeStreamCatalog()
-    private val fileRepository = InMemoryMigrationFileRepository()
-    private val historyRepository = InMemoryMigrationHistoryRepository()
-    private val executor = FakeTopologyMigrationExecutor(fakeTopologyCatalog, fakeStreamCatalog)
-    private val runner = MigrationRunner(historyRepository, executor)
+    internal val fileRepository = InMemoryMigrationFileRepository()
+    internal val historyRepository = InMemoryMigrationHistoryRepository()
+    internal val executor = FakeTopologyMigrationExecutor(fakeTopologyCatalog, fakeStreamCatalog)
+    /** M5-08a: a scenario with the real executor replaces it (before the view model is built). */
+    internal var runner = MigrationRunner(historyRepository, executor)
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    private var profileName: String = "uat-eu"
-    private var vhost: String = "/"
-    private var configurePermission: Boolean = true
-    private var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL
+    internal var profileName: String = "uat-eu"
+    internal var vhost: String = "/"
+    internal var configurePermission: Boolean = true
+    internal var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL
 
-    private var viewModel: MigrationsViewModel? = null
+    internal var viewModel: MigrationsViewModel? = null
     private var dryRunResult: MigrationDryRun? = null
-    private var lastApplyResult: MigrationApplyResult? = null
-    private var lastImportResult: MigrationValidationResult? = null
-    private var exportedFile: MigrationFile? = null
-    private var pendingImportJson: String = ""
+    internal var lastApplyResult: MigrationApplyResult? = null
+    internal var lastImportResult: MigrationValidationResult? = null
+    internal var exportedFile: MigrationFile? = null
+
+    /** M5-08a: set when the export failed because the broker could not be read (the view model throws, shows the error and writes no file). */
+    internal var exportFailure: dev.caerbannog.core.migrations.TopologyReadException? = null
+
+    /** M5-08a: the topology catalog the view model reads; the 150-queue scenario puts a small-page catalog here. */
+    internal var topologyCatalogOverride: dev.caerbannog.core.topology.TopologyCatalog? = null
+
+    /** M5-08a: when a scenario runs against the scripted broker, "the broker topology is unchanged" compares its snapshot instead. */
+    internal var topologyUnchangedCheck: (() -> Unit)? = null
+    internal var pendingImportJson: String = ""
 
     @Before
     fun setUp() {
+        current = this
         fileRepository.clear()
         historyRepository.clear()
         executor.clear()
@@ -73,13 +90,17 @@ class TopologyMigrationsSteps {
         exportedFile = null
         pendingImportJson = ""
         viewModel = null
+        exportFailure = null
+        topologyCatalogOverride = null
+        topologyUnchangedCheck = null
+        runner = MigrationRunner(historyRepository, executor)
     }
 
-    private fun getVm(): MigrationsViewModel {
+    internal fun getVm(): MigrationsViewModel {
         return viewModel ?: MigrationsViewModel(
             fileRepository = fileRepository,
             runner = runner,
-            topologyCatalog = fakeTopologyCatalog,
+            topologyCatalog = topologyCatalogOverride ?: fakeTopologyCatalog,
             profileName = profileName,
             vhost = vhost,
             hasConfigurePermission = configurePermission,
@@ -260,6 +281,7 @@ class TopologyMigrationsSteps {
 
     @Then("the broker topology is unchanged")
     fun theBrokerTopologyIsUnchanged() {
+        topologyUnchangedCheck?.let { it(); return }
         assertNotNull(fakeTopologyCatalog.queueRow("orders", "/"))
     }
 
@@ -383,7 +405,13 @@ class TopologyMigrationsSteps {
 
     @When("I export the current topology")
     fun iExportTheCurrentTopology() = runBlocking {
-        exportedFile = getVm().exportCurrentTopology()
+        exportFailure = null
+        exportedFile = try {
+            getVm().exportCurrentTopology()
+        } catch (e: dev.caerbannog.core.migrations.TopologyReadException) {
+            exportFailure = e
+            null
+        }
     }
 
     @Then("a new migration file {string} is created")

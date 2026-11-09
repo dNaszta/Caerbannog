@@ -68,6 +68,8 @@ class FakeConnectionGateway(
         override val mqtt: dev.caerbannog.core.mqtt.MqttCatalog = FakeMqttCatalog(),
         override val queueInspector: dev.caerbannog.core.topology.QueueMessageInspector = dev.caerbannog.core.topology.UnavailableQueueMessageInspector,
         override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = FakeMqttMessagePublisher(),
+        /** M5-08a: null like a 3.x connection (and like the interface default) unless a test sets one. */
+        override val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -98,6 +100,7 @@ class FakeConnectionGateway(
     private val gates = ConcurrentHashMap<String, Gate>()
     private val catalogs = ConcurrentHashMap<String, FakeStreamCatalog>()
     private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
+    private val migrationExecutors = ConcurrentHashMap<String, dev.caerbannog.core.migrations.TopologyMigrationExecutor>()
     private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
     private val messageReaders = ConcurrentHashMap<String, FakeStreamMessageReader>()
     private val publishers = ConcurrentHashMap<String, FakeMessagePublisher>()
@@ -156,6 +159,9 @@ class FakeConnectionGateway(
     }
 
     /** The catalog every connection opened for [profileName] exposes; configure it before Connect. */
+    /** M5-08a: the migration executor every connection opened for [profileName] exposes (none by default). */
+    fun setMigrationExecutor(profileName: String, executor: dev.caerbannog.core.migrations.TopologyMigrationExecutor) { migrationExecutors[profileName] = executor }
+
     fun catalogOf(profileName: String): FakeStreamCatalog = catalogs.getOrPut(profileName) { FakeStreamCatalog() }
 
     /** M2-08b: the topology every connection opened for [profileName] exposes; configure it before Connect. */
@@ -234,6 +240,7 @@ class FakeConnectionGateway(
             mqtt = mqttOf(name),
             mqttPublisher = mqttPublisherOf(name),
             queueInspector = queueInspectorOf(name),
+            migrationExecutor = migrationExecutors[name],
         )
         opened += held
         log += "opened:$name#${held.number}"

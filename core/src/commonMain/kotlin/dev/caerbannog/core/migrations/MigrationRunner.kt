@@ -58,6 +58,8 @@ class MigrationRunner(
         migration: MigrationFile,
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
+        // M5-08a STUB: accepted and ignored until the runner implements the V1 rule. The default keeps the existing callers compiling.
+        vhost: String = "/",
     ): MigrationDryRun {
         if (!hasConfigurePermission) {
             val actions = migration.up.map {
@@ -134,6 +136,8 @@ class MigrationRunner(
         files: List<MigrationFile>,
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
+        // M5-08a STUB: accepted and ignored until the runner implements the V1 rule.
+        vhost: String = "/",
     ): MigrationApplyResult {
         if (!hasConfigurePermission) {
             return MigrationApplyResult.Blocked("The user has no configure permission on this connection")
@@ -170,6 +174,8 @@ class MigrationRunner(
                         return MigrationApplyResult.ActionFailed(
                             version = migration.version,
                             action = action,
+                            index = 0, // M5-08a STUB
+                            total = 0, // M5-08a STUB
                             reason = outcome.reason,
                         )
                     }

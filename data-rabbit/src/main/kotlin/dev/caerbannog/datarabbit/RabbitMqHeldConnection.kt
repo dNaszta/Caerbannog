@@ -31,6 +31,8 @@ class RabbitMqHeldConnection(
     override val mqtt: MqttCatalog = UnavailableMqttCatalog,
     override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher,
     override val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
+    /** M5-08a: the management migration executor of this connection (the gateway passes it); null when none. */
+    override val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 

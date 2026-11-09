@@ -231,6 +231,10 @@ sealed interface MigrationApplyResult {
     data class ActionFailed(
         val version: String,
         val action: MigrationAction,
+        /** M5-08a: 1-based position of the failed action in the migration (M5-08a STUB: the runner passes 0 until implemented). */
+        val index: Int,
+        /** M5-08a: number of actions of the migration (STUB: 0). */
+        val total: Int,
         val reason: String,
     ) : MigrationApplyResult
     data class Blocked(val reason: String) : MigrationApplyResult

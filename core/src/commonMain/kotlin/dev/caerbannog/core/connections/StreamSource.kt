@@ -60,6 +60,8 @@ class StreamSource(
     val mqttPublisher: MqttMessagePublisher = UnavailableMqttMessagePublisher,
     /** M7-08: the non-destructive queue message inspector of the same held connection, guarded like [publisher]. */
     val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
+    /** M5-08a: the migration executor of the same held connection, guarded like [manager]; null when the connection has none. */
+    val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
 )

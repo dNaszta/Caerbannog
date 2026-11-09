@@ -59,4 +59,10 @@ interface HeldConnection : AutoCloseable {
 
     /** M7-08: non-destructive queue message inspector over Management API in requeue mode. */
     val queueInspector: QueueMessageInspector get() = UnavailableQueueMessageInspector
+
+    /**
+     * M5-08a: the one object that may change topology for a migration over the management API of this connection; null for a
+     * connection that has none (a 3.x source, M8-02). Default null like [manager].
+     */
+    val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? get() = null
 }
