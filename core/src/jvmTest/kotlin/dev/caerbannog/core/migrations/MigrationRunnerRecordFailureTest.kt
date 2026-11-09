@@ -82,6 +82,21 @@ class MigrationRunnerRecordFailureTest {
     }
 
     @Test
+    fun `a cancellation while recording keeps cancelling and is never turned into NotRecorded`() {
+        // On the JVM a CancellationException is an IllegalStateException: the narrow catch must not swallow it.
+        assertFailsWith<kotlinx.coroutines.CancellationException> { apply(FailingHistory(kotlinx.coroutines.CancellationException("cancelled")), "0001") }
+    }
+    }
+
+    @Test
+    fun `subclasses of IOException are caught too and an Error still propagates`() {
+        for (failure in listOf(java.nio.file.AccessDeniedException("x"), java.nio.file.NoSuchFileException("x"), java.nio.file.FileSystemException("x"), java.io.FileNotFoundException("x"))) {
+            assertIs<MigrationApplyResult.NotRecorded>(apply(FailingHistory(failure), "0001"), "$failure should give NotRecorded")
+        }
+        assertFailsWith<OutOfMemoryError> { apply(FailingHistory(OutOfMemoryError("x")), "0001") }
+    }
+
+    @Test
     fun `the view model shows the fixed text for NotRecorded, from apply pending and from apply single`() = runBlocking {
         val files = InMemoryMigrationFileRepository().also { it.addFile(migration("0001")) }
         val vm = MigrationsViewModel(
