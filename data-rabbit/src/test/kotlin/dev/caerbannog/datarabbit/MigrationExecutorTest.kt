@@ -66,7 +66,7 @@ class MigrationExecutorTest {
         val before = broker.snapshot()
         assertEquals(M508a.conflict("orders"), M508a.failedReason(exec(orders)))
         assertEquals(before, broker.snapshot(), "the queue changed")
-        assertEquals(listOf("PUT /api/queues/%2F/orders"), wire(), "exactly one PUT: no DELETE, no second PUT, no read-back after a conflict")
+        assertEquals(listOf("PUT /api/queues/%2F/orders", "GET /api/queues/%2F/orders"), wire(), "one PUT, then one GET of the resource that explains the 400 (F1): no DELETE, no second PUT")
     }
 
     @Test
