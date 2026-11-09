@@ -27,6 +27,7 @@ No mockup exists. The architect produces `docs/ux/Migrate3x.dc.html` (source pic
 None (UI). The report is exposed by `M8-10`.
 
 ## Open points
+P17 (owner 2026-11-09): when `DefinitionsParser.parse` returns `NeedsVirtualHost` (a per-vhost export), the screen asks for the virtual host name (prefilled with nothing, no default `/`), calls `assignVirtualHost`, shows `InvalidName` as an inline error, and analyses nothing until it gets `Assigned`; it may trim the typed text before calling (the core function does not). The report says that the access migration is empty and why. UI states and a Compose test belong here.
 Mockup. Where the entry lives (recommendation: a button on the Migrations screen and on a 3.x connection's pill).
 
 ## Spike findings (M8-00)
