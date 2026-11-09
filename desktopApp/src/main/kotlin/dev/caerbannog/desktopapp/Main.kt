@@ -195,7 +195,8 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
             },
         )
     }
-    val hasMqttOnStream = source?.mqttPublisher != null || inboundRoutes.any { it.isMqttTopicExchange }
+    // Only a profile with an MQTT port can publish over MQTT; an amq.topic binding alone does not make the broker reachable by MQTT.
+    val hasMqttOnStream = source?.hasMqtt == true
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -378,7 +379,7 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         showPublishMqttDialog = showPublishMqttDialog,
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
-        onOpenPublishMqttDialog = { showPublishMqttDialog = true },
+        onOpenPublishMqttDialog = if (source?.hasMqtt == true) ({ showPublishMqttDialog = true }) else null,
         onOpenStream = { streamName ->
             composition.navigation.open(AppDestination.Streams)
             composition.navigation.openStream(streamName)

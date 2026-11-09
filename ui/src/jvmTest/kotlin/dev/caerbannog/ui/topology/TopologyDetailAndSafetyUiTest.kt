@@ -36,7 +36,7 @@ import kotlin.test.assertTrue
 
 /**
  * M2-08c step 2: the queue detail (mockup top block, "orders" sheet), the rule of T4 (NO write control anywhere, scenarios "The M2 topology screen
- * offers no action that changes topology" and "Queue messages cannot be read") and copying cells (UI1). Window 1280 x 800 dp. RED on the compile stub.
+ * offers no action that changes topology" and "Queue messages cannot be consumed, acknowledged, deleted or purged") and copying cells (UI1). Window 1280 x 800 dp. RED on the compile stub.
  * Tag contract, in addition to [TopologyScreenUiTest]:
  *  - `queueDetail` exists iff `state.selectedQueue != null` (on the Queues tab, under the table): title `detailTitle` = "<name>" and "<typeText>"
  *   (both strings in that node's text), the value nodes `detailValue:Leader`, `detailValue:Members`, `detailValue:MembersOnline`,

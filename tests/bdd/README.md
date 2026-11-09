@@ -33,8 +33,8 @@ tests/bdd/
 
 | Tag | Meaning |
 | --- | --- |
-| `@M1` to `@M5` | Milestone that must make the scenario pass (see the milestones table in `docs/spec.md`) |
-| `@gate-M2`, `@gate-M4`, `@gate-M5` | Scenario that is the gate check for that milestone |
+| `@M1` to `@M7` | Milestone that must make the scenario pass (see the milestones table in `docs/spec.md`) |
+| `@gate-M2`, `@gate-M3`, `@gate-M4`, `@gate-M5`, `@gate-M7` | Scenario that is the gate check for that milestone |
 | `@smoke` | Smallest set that proves the feature works; run on every commit |
 | `@fake-broker` | Runs against in-memory fakes of the stream and management clients; no broker needed |
 | `@broker` | Needs a real RabbitMQ 4.x broker with TLS and plain listeners (Testcontainers, needs Docker) |

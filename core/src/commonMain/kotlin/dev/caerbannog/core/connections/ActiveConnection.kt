@@ -112,7 +112,7 @@ class ActiveConnection(
                     (generation == mine).also {
                         if (it) {
                             held = opened.connection
-                            _source.value = guardedSource(opened.connection, profile.virtualHost)
+                            _source.value = guardedSource(opened.connection, profile.virtualHost, profile.hasMqtt)
                             _state.value = LinkState.Connected(name)
                         }
                     }
@@ -133,7 +133,7 @@ class ActiveConnection(
         OpenResult.Failed(ConnectionFailureReason.UNEXPECTED)
     }
 
-    private fun guardedSource(connection: HeldConnection, vhost: String): StreamSource {
+    private fun guardedSource(connection: HeldConnection, vhost: String, hasMqtt: Boolean): StreamSource {
         val isCurrent = { held === connection }
         return StreamSource(
             catalog = GuardedCatalog(connection.catalog, isCurrent),
@@ -146,6 +146,7 @@ class ActiveConnection(
             mqtt = GuardedMqttCatalog(connection.mqtt, isCurrent),
             mqttPublisher = GuardedMqttPublisher(connection.mqttPublisher, isCurrent),
             queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
+            hasMqtt = hasMqtt,
         )
     }
 

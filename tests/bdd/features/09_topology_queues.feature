@@ -50,10 +50,13 @@ Feature: Topology and quorum queues
     When I open the topology screen on the "Queues" tab with the "Quorum" filter
     Then only "orders" is listed
 
-  @M2 @negative @safety
-  Scenario: Queue messages cannot be read
+  # Covered by TopologyDetailAndSafetyUiTest (UI test, not run as a fake-broker scenario). Since M7-08 the one way to see
+  # queue messages is the requeue peek; nothing may consume, acknowledge, delete or purge them.
+  @M2 @M7 @negative @safety
+  Scenario: Queue messages cannot be consumed, acknowledged, deleted or purged
     When I select the queue "orders"
-    Then there is no control to browse, get, consume or purge its messages
+    Then there is no control to consume, acknowledge, delete or purge its messages
+    And the only control that shows its messages is the requeue peek, labelled "Not acknowledged (requeued)"
 
   @M5 @fake-broker
   Scenario: Declare a quorum queue when allowed
@@ -277,9 +280,10 @@ Feature: Topology and quorum queues
     When I open the topology screen on the "Queues" tab
     Then the screen says the counts are approximate
 
-  # The only requests the app makes about a queue are reads of its statistics.
+  # The topology gateway only reads topology and statistics. Peeking at messages (M7-08) is a separate, explicit action of the
+  # user through the queue inspector, which always requeues; see the @M7 scenarios at the end of this file.
   @M2 @negative @safety @fake-broker
-  Scenario: The app never asks the broker for a queue's messages
+  Scenario: Opening the topology screen never asks the topology gateway for a queue's messages
     Given a quorum queue "orders"
     When I open the topology screen on every tab and select the queue "orders"
     Then every request the app made to the broker was a read of topology or statistics
@@ -301,3 +305,26 @@ Feature: Topology and quorum queues
     And the connection "uat-eu" is set to the "Read-only" topology level
     When I open the topology screen on the "Queues" tab
     Then the topology screen explains that the connection is set to read-only
+
+
+  # M7-08: the requeue peek. Live scenarios are RealBrokerM7GateTest (@gate-M7); the labels are in TopologyDetailAndSafetyUiTest.
+  @M7 @broker @gate-M7 @safety
+  Scenario: Inspecting a queue leaves its messages in place
+    Given a quorum queue "orders" with 5 messages that carry properties and headers
+    When I inspect the queue "orders" three times
+    Then each time I see the same 5 messages in the same order with their properties and headers
+    And every inspected message is shown as "Not acknowledged (requeued)"
+    And the queue still holds 5 messages
+    And a consumer afterwards receives all 5 messages
+
+  @M7 @broker @gate-M7 @safety
+  Scenario: Inspecting more often than the delivery limit loses no message
+    Given a quorum queue "limited" with a delivery limit of 2 and 2 messages
+    When I inspect the queue "limited" 8 times
+    Then no message is dropped
+    And a consumer afterwards receives both messages
+
+  @M7 @broker @gate-M7
+  Scenario: Inspecting a queue that does not exist is refused
+    When I inspect the queue "no-such-queue"
+    Then the app says the queue was not found and shows no messages

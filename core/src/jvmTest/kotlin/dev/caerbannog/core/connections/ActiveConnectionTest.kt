@@ -43,6 +43,15 @@ class ActiveConnectionTest {
     }
 
     @Test
+    fun `the source says whether the profile has an MQTT port, so the UI offers MQTT publishing only then`() = runBlocking<Unit> {
+        h.active.connect(h.uat)
+        assertEquals(false, h.active.source?.hasMqtt, "a profile without an MQTT port")
+
+        h.active.connect(h.prod.copy(mqttPort = 1883))
+        assertEquals(true, h.active.source?.hasMqtt, "a profile with an MQTT port")
+    }
+
+    @Test
     fun `connect runs in the documented order - select, Connecting, permission check, open clients, Connected`() = runBlocking<Unit> {
         var linkAtCheck: LinkState? = null
         var currentAtCheck: String? = null
