@@ -4,7 +4,6 @@ import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.json.ArgumentValueJson
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.topology.BindingDestinationType
-import dev.caerbannog.datarabbit.ManagementRequests.Companion.encode
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -35,6 +34,10 @@ internal object MigrationRequests {
         is MigrationAction.DeletePolicy,
         -> null
     }
+
+    /** A path segment; one made only of dots is written as `%2E` per dot so no `.` or `..` segment can reach the URL. */
+    private fun encode(value: String): String =
+        if (value.isNotEmpty() && value.all { it == '.' }) "%2E".repeat(value.length) else ManagementRequests.encode(value)
 
     private fun put(collection: String, vhost: String, name: String, body: JsonObject) =
         ManagementWrite("PUT", "/api/$collection/${encode(vhost)}/${encode(name)}", body)

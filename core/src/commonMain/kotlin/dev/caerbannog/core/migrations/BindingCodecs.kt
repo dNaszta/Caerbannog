@@ -6,12 +6,12 @@ import kotlinx.serialization.json.JsonObject
 private const val BINDING_INCOMPLETE = "binding requires exchange and queue"
 
 /** The destination name: `queue`, or its synonym `destination`. */
-private fun JsonObject.destinationName(): String? = text("queue") ?: text("destination")
+private fun JsonObject.destinationName(): String? = identifier("queue") ?: identifier("destination")
 
 internal val declareBindingCodec = codec<MigrationAction.DeclareBinding>(
     name = "declareBinding",
     read = { entry ->
-        val exchange = entry.text("exchange")
+        val exchange = entry.identifier("exchange")
         val destination = entry.destinationName()
         val destinationType = entry.destinationType()
         val arguments = entry.typedEntries("arguments")
@@ -19,11 +19,11 @@ internal val declareBindingCodec = codec<MigrationAction.DeclareBinding>(
             exchange.isNullOrBlank() || destination.isNullOrBlank() -> refused(BINDING_INCOMPLETE)
             destinationType == null -> refused(DESTINATION_TYPE_UNSUPPORTED)
             arguments == null -> refused(ARGUMENTS_INVALID)
-            else -> read(
+            else -> accepted(
                 MigrationAction.DeclareBinding(
                     exchange = exchange,
                     queue = destination,
-                    routingKey = entry.text("routingKey") ?: "",
+                    routingKey = entry.string("routingKey") ?: "",
                     vhost = entry.vhost(),
                     destinationType = destinationType,
                     arguments = arguments,
@@ -43,12 +43,12 @@ internal val declareBindingCodec = codec<MigrationAction.DeclareBinding>(
 internal val deleteBindingCodec = codec<MigrationAction.DeleteBinding>(
     name = "deleteBinding",
     read = { entry ->
-        val exchange = entry.text("exchange")
+        val exchange = entry.identifier("exchange")
         val destination = entry.destinationName()
         if (exchange.isNullOrBlank() || destination.isNullOrBlank()) {
             refused(BINDING_INCOMPLETE)
         } else {
-            read(MigrationAction.DeleteBinding(exchange, destination, entry.text("routingKey") ?: "", entry.vhost()))
+            accepted(MigrationAction.DeleteBinding(exchange, destination, entry.string("routingKey") ?: "", entry.vhost()))
         }
     },
     write = { action, out ->

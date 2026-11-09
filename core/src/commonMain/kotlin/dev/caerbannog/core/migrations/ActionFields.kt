@@ -8,9 +8,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 // Field access shared by the action codecs. The fixed refusal messages live here, in one place.
 
@@ -19,21 +17,53 @@ internal const val QUEUE_TYPE_IN_ARGUMENTS = "the queue type belongs in \"type\"
 internal const val APPLY_TO_UNSUPPORTED = "the policy apply-to is not supported"
 internal const val DESTINATION_TYPE_UNSUPPORTED = "the binding destination type must be queue or exchange"
 internal const val PRIORITY_NOT_WHOLE = "the policy priority must be a whole number"
+internal const val DOT_NAME = "a name must not be \".\" or \"..\""
 
 private val APPLY_TO_VALUES = setOf("all", "queues", "classic_queues", "quorum_queues", "streams", "exchanges")
 
 internal fun refused(reason: String): ActionReadResult = ActionReadResult.Refused(reason)
 
-internal fun read(action: MigrationAction): ActionReadResult = ActionReadResult.Read(action)
+internal fun accepted(action: MigrationAction): ActionReadResult = ActionReadResult.Read(action)
 
-internal fun JsonObject.text(key: String): String? = this[key]?.jsonPrimitive?.content
+/**
+ * Control flow of the reader: a field of an untrusted file cannot be accepted. Never leaves [MigrationParser.parse], which turns it into
+ * a refusal. The [reason] is a fixed text from this code; nothing of the input is ever put in it.
+ */
+internal open class FieldRefusal(val reason: String) : RuntimeException(null, null, false, false)
 
-internal fun JsonObject.vhost(): String = text("vhost") ?: "/"
+/** The value under [key] has the wrong JSON type. [key] is a fixed identifier from the code, never input. */
+internal class WrongTypeException(val key: String) : FieldRefusal("the value of \"$key\" has the wrong type")
 
-internal fun JsonObject.flag(key: String, default: Boolean): Boolean = this[key]?.jsonPrimitive?.booleanOrNull ?: default
+private fun dotName(): Nothing = throw FieldRefusal(DOT_NAME)
 
 /** The key's value, or null when the key is absent or JSON null (same rule as the 3.x definitions reader). */
 private fun JsonObject.present(key: String): JsonElement? = this[key]?.takeUnless { it is JsonNull }
+
+/** The text under [key]: null when absent or JSON null; any other type than a JSON string is a [WrongTypeException]. */
+internal fun JsonObject.string(key: String): String? = when (val value = present(key)) {
+    null -> null
+    is JsonPrimitive -> if (value.isString) value.content else throw WrongTypeException(key)
+    else -> throw WrongTypeException(key)
+}
+
+/** Like [string] for a name (entity, vhost): `.` and `..` are refused, they are path segments for a URL. */
+internal fun JsonObject.identifier(key: String): String? = string(key)?.also { if (it == "." || it == "..") dotName() }
+
+internal fun JsonObject.vhost(): String = identifier("vhost") ?: "/"
+
+/** The root `version`: a string, or a number (older files; its text); null when absent or JSON null. */
+internal fun JsonObject.versionText(): String? = when (val value = present("version")) {
+    null -> null
+    is JsonPrimitive -> if (value.isString || value.content.toDoubleOrNull() != null) value.content else throw WrongTypeException("version")
+    else -> throw WrongTypeException("version")
+}
+
+/** A JSON boolean or the text `true` / `false`; [default] when absent or JSON null. */
+internal fun JsonObject.flag(key: String, default: Boolean): Boolean = when (val value = present(key)) {
+    null -> default
+    is JsonPrimitive -> value.content.takeIf { it == "true" || it == "false" }?.toBooleanStrict() ?: throw WrongTypeException(key)
+    else -> throw WrongTypeException(key)
+}
 
 /** Typed entries of the object under [key]: empty when absent or null, null when it is not an object or a value is refused. */
 internal fun JsonObject.typedEntries(key: String): Map<String, ArgumentValue>? {
@@ -44,7 +74,8 @@ internal fun JsonObject.typedEntries(key: String): Map<String, ArgumentValue>? {
     return converted
 }
 
-private fun JsonObject.plainString(key: String): String? = (present(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
+/** A JSON string (an object, array, number or boolean is a [WrongTypeException]), or null when absent. */
+private fun JsonObject.plainString(key: String): String? = string(key)
 
 /** The `applyTo` value, "all" when absent; null when it is not one of the known values. */
 internal fun JsonObject.applyTo(): String? =
@@ -63,9 +94,10 @@ internal fun JsonObject.destinationType(): BindingDestinationType? =
     }
 
 /** The `priority` value, 0 when absent; null when it is not a whole number. */
-internal fun JsonObject.priority(): Int? {
-    val value = present("priority") ?: return 0
-    return (value as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
+internal fun JsonObject.priority(): Int? = when (val value = present("priority")) {
+    null -> 0
+    is JsonPrimitive -> value.takeUnless { it.isString }?.intOrNull
+    else -> throw WrongTypeException("priority")
 }
 
 internal fun JsonObjectBuilder.putTyped(key: String, entries: Map<String, ArgumentValue>) {

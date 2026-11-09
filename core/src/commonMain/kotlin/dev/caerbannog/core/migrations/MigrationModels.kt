@@ -170,9 +170,9 @@ private fun shown(value: ArgumentValue): String = when (value) {
     is ArgumentValue.Items, is ArgumentValue.Table -> ArgumentValueJson.encode(value).toString()
 }
 
-/** Control characters become spaces so the text stays on one line; cut to [MAX_DETAIL_LENGTH] with an ellipsis. */
+/** Control characters and the Unicode line and paragraph separators become spaces so the text stays on one line; cut to [MAX_DETAIL_LENGTH] with an ellipsis. */
 private fun oneLine(text: String): String {
-    val flat = text.map { if (it.isISOControl()) ' ' else it }.joinToString("")
+    val flat = text.map { if (it.isISOControl() || it == '\u2028' || it == '\u2029') ' ' else it }.joinToString("")
     return if (flat.length > MAX_DETAIL_LENGTH) flat.take(MAX_DETAIL_LENGTH - 1) + "…" else flat
 }
 

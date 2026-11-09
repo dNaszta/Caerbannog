@@ -18,7 +18,7 @@ private data class PolicyFields(
 )
 
 private fun readPolicy(entry: JsonObject, create: (PolicyFields) -> MigrationAction): ActionReadResult {
-    val name = entry.text("name")
+    val name = entry.identifier("name")
     val definition = entry.typedEntries("definition")
     val applyTo = entry.applyTo()
     val priority = entry.priority()
@@ -27,7 +27,7 @@ private fun readPolicy(entry: JsonObject, create: (PolicyFields) -> MigrationAct
         definition == null -> refused(ARGUMENTS_INVALID)
         applyTo == null -> refused(APPLY_TO_UNSUPPORTED)
         priority == null -> refused(PRIORITY_NOT_WHOLE)
-        else -> read(create(PolicyFields(name, entry.text("pattern") ?: ".*", definition, entry.vhost(), applyTo, priority)))
+        else -> accepted(create(PolicyFields(name, entry.string("pattern") ?: ".*", definition, entry.vhost(), applyTo, priority)))
     }
 }
 

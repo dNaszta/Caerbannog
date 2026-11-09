@@ -8,8 +8,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -50,7 +48,14 @@ object MigrationParser {
     fun parse(
         rawJson: String,
         existingVersions: Set<String> = emptySet(),
-    ): MigrationValidationResult {
+    ): MigrationValidationResult = try {
+        parseFields(rawJson, existingVersions)
+    } catch (refusal: FieldRefusal) {
+        // The one place that turns a wrong-typed or refused field into a result; the reason never holds input.
+        MigrationValidationResult.Invalid(refusal.reason)
+    }
+
+    private fun parseFields(rawJson: String, existingVersions: Set<String>): MigrationValidationResult {
         val rootElement: JsonElement = when (val parsed = parseUntrustedJson(rawJson, MAX_FILE_DEPTH, lenientJson)) {
             is UntrustedJson.Parsed -> parsed.element
             UntrustedJson.TooDeep -> return MigrationValidationResult.Invalid("the file is nested too deep")
@@ -60,8 +65,7 @@ object MigrationParser {
         val root = rootElement as? JsonObject
             ?: return MigrationValidationResult.Invalid("the file is not valid JSON")
 
-        val versionElement = root["version"]?.jsonPrimitive
-        val version = versionElement?.content
+        val version = root.versionText()
         if (version.isNullOrBlank()) {
             return MigrationValidationResult.Invalid("the file has no version")
         }
@@ -70,7 +74,7 @@ object MigrationParser {
             return MigrationValidationResult.Invalid("that version already exists")
         }
 
-        val description = root["description"]?.jsonPrimitive?.content ?: ""
+        val description = root.string("description") ?: ""
         val upArray = root["up"] as? JsonArray
             ?: return MigrationValidationResult.Invalid("the file has no up actions")
 
@@ -79,7 +83,7 @@ object MigrationParser {
             val itemObj = item as? JsonObject
                 ?: return MigrationValidationResult.Invalid("which action is not supported")
 
-            val actionName = itemObj["action"]?.jsonPrimitive?.content
+            val actionName = itemObj.string("action")
             if (actionName.isNullOrBlank()) {
                 return MigrationValidationResult.Invalid("which action is not supported")
             }

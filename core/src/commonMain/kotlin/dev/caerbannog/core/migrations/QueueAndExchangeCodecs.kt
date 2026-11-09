@@ -3,16 +3,16 @@ package dev.caerbannog.core.migrations
 internal val declareQueueCodec = codec<MigrationAction.DeclareQueue>(
     name = "declareQueue",
     read = { entry ->
-        val name = entry.text("name")
+        val name = entry.identifier("name")
         val arguments = entry.typedEntries("arguments")
         when {
             name.isNullOrBlank() -> refused("queue name is required")
             arguments == null -> refused(ARGUMENTS_INVALID)
             "x-queue-type" in arguments -> refused(QUEUE_TYPE_IN_ARGUMENTS)
-            else -> read(
+            else -> accepted(
                 MigrationAction.DeclareQueue(
                     name = name,
-                    type = entry.text("type") ?: "quorum",
+                    type = entry.string("type") ?: "quorum",
                     vhost = entry.vhost(),
                     durable = entry.flag("durable", true),
                     arguments = arguments,
@@ -33,15 +33,15 @@ internal val declareQueueCodec = codec<MigrationAction.DeclareQueue>(
 internal val declareExchangeCodec = codec<MigrationAction.DeclareExchange>(
     name = "declareExchange",
     read = { entry ->
-        val name = entry.text("name")
+        val name = entry.identifier("name")
         val arguments = entry.typedEntries("arguments")
         when {
             name.isNullOrBlank() -> refused("exchange name is required")
             arguments == null -> refused(ARGUMENTS_INVALID)
-            else -> read(
+            else -> accepted(
                 MigrationAction.DeclareExchange(
                     name = name,
-                    type = entry.text("type") ?: "direct",
+                    type = entry.string("type") ?: "direct",
                     vhost = entry.vhost(),
                     durable = entry.flag("durable", true),
                     autoDelete = entry.flag("autoDelete", false),

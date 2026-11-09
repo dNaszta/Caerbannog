@@ -11,8 +11,8 @@ internal inline fun <reified A : MigrationAction> namedCodec(
 ): ActionCodec = codec<A>(
     name = name,
     read = { entry ->
-        val actionName = entry.text("name")
-        if (actionName.isNullOrBlank()) refused(missingNameMessage) else read(create(actionName, entry.vhost()))
+        val actionName = entry.identifier("name")
+        if (actionName.isNullOrBlank()) refused(missingNameMessage) else accepted(create(actionName, entry.vhost()))
     },
     write = { action, out -> out.putText("name", nameOf(action)) },
 )
