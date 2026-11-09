@@ -14,4 +14,11 @@ object DefinitionsFixtures {
         val stream = DefinitionsFixtures::class.java.classLoader.getResourceAsStream(path) ?: error("missing fixture $path")
         return stream.use { it.readBytes().toString(Charsets.UTF_8) }
     }
+
+    /** M8-03: extra expected files and hand-made fixtures of the analyzer tests, `fixtures/m8-03/`. */
+    fun readM803(name: String): String {
+        val path = "fixtures/m8-03/$name"
+        val stream = DefinitionsFixtures::class.java.classLoader.getResourceAsStream(path) ?: error("missing fixture $path")
+        return stream.use { it.readBytes().toString(Charsets.UTF_8) }
+    }
 }

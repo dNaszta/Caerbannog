@@ -1,0 +1,76 @@
+{
+  "schema": "caerbannog.compat-report/1",
+  "source": {
+    "name": "legacy-eu",
+    "sourceVersion": "3.13.7",
+    "live": true,
+    "singleVirtualHost": null
+  },
+  "summary": {
+    "topologyItems": 2,
+    "compatibleItems": 1,
+    "needDecision": 1,
+    "blockers": 1,
+    "warnings": 1,
+    "infos": 1,
+    "messageLoss": 1
+  },
+  "findings": [
+    {
+      "id": "classic-index-v1|/|Queue|orders|",
+      "rule": "classic-index-v1",
+      "severity": "blocker",
+      "class": "messageLoss",
+      "kind": "queue",
+      "vhost": "/",
+      "name": "orders",
+      "about": [],
+      "appliesWhen": "always",
+      "message": "message one",
+      "why": "why one",
+      "proposal": {"type": "manual", "title": "Migrate", "text": "Use a new broker", "recommended": true},
+      "alternatives": [
+        {"type": "manual", "title": "Policy", "text": "Set queue-version", "recommended": false}
+      ],
+      "defaultDecision": "accept",
+      "verified": true,
+      "evidence": "liveQueueStats"
+    },
+    {
+      "id": "classic-not-replicated|/|Queue|jobs|",
+      "rule": "classic-not-replicated",
+      "severity": "warning",
+      "class": "behaviourChange",
+      "kind": "queue",
+      "vhost": "/",
+      "name": "jobs",
+      "about": ["x-max-length", "x-message-ttl"],
+      "appliesWhen": "always",
+      "message": "message two",
+      "why": "why two",
+      "proposal": {"type": "convertQueueType", "target": "quorum", "acknowledgement": "Ordering by priority may change"},
+      "alternatives": [{"type": "keepClassic"}],
+      "defaultDecision": "accept",
+      "verified": true,
+      "evidence": "definitions"
+    },
+    {
+      "id": "classic-to-quorum-unmeasured|-|Global|-|",
+      "rule": "classic-to-quorum-unmeasured",
+      "severity": "info",
+      "class": "behaviourChange",
+      "kind": "global",
+      "vhost": null,
+      "name": null,
+      "about": [],
+      "appliesWhen": "always",
+      "message": "message three",
+      "why": "why three",
+      "proposal": {"type": "none"},
+      "alternatives": [],
+      "defaultDecision": "skip",
+      "verified": false,
+      "evidence": "knownBrokerBehaviour"
+    }
+  ]
+}

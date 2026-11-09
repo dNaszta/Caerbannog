@@ -197,3 +197,75 @@ Tests first and passing (the `@m8-03` scenarios and the unit tests), every shipp
 - Changed in step 1: this brief rewritten against the merged M8-01 code (exact model, entry point, live-facts input with defaults for the file case, complete rule table, sort order, counting rule, mirroring helper, message-loss handling, JSON and text, acceptance and mutation list); `tests/bdd/features/16_migrate_from_3x.feature` (tag `@m8-03` on 25 scenarios, `@needs-spike` removed from the unverified-differences scenario, quorum outline row and step adjusted); `tests/bdd/features/18_migrate_access_from_3x.feature` (tag `@m8-03` on 5 scenarios); `tests/bdd/README.md` (tag row); `docs/spec.md` (two clarifications, see Open points).
 - Contradictions found and resolved: (1) the old acceptance said "reported as having no effect" for mirroring keys, the scenario and the spike say rejected on 4.x; (2) the old acceptance still listed `@needs-spike` scenarios that the spike had already closed; (3) the spec asked for a tick on "any classic queue kept as is", P15 says conversion to quorum only: spec corrected; (4) the file-only message-loss rule did not say what an explicit `x-queue-version: 1` and a live version that never appears give: decided (blocker); (5) "Input is a DefinitionsDocument only" conflicted with the live facts (`storage_version`, deprecated features): input is the document plus optional `LiveSourceFacts`.
 - Open product decisions: none blocking; four architect defaults for the owner to veto (Open points).
+
+- Step 2 (test developer, tests first): DONE 2026-11-09. Round 0. Red for the right reason. Stubs: `core/src/commonMain/.../migrate3x/M803TestStubs.kt` (the brief's types and signatures; `analyze` returns an empty report, `encode` returns `{}`, `render` returns `""`, `RuleCatalog.all` is empty); the senior developer replaces the whole file and deletes it.
+- Tests written: unit (`core/src/jvmTest/.../migrate3x/`): `PolicyRulesTest`, `QueueRulesTest`, `ClassicIndexRuleTest`, `AccessRulesTest`, `GlobalRulesTest`, `MirroringTest`, `ReportOrderAndSummaryTest`, `FullFixtureGoldenTest`, `ReportSecretsTest`, `RuleCatalogTest` (includes a kitchen-sink input that must emit all 35 rule ids), `ReportJsonTest`, `ReportTextTest`, `ReportLargeInputTest` (+ `AnalyzerTestSupport`, `ReportFixtures`); builders `DefinitionsDocuments` (`core-testing`), fixtures `core-testing/.../fixtures/m8-03/` (`report-expected.json`, `full-fixture-golden.txt`). Acceptance: `RunMigrate3xAnalyzerAcceptanceTest` (46 scenarios: 40 in `16`, 6 in `18` after outline expansion), glue `Migrate3xAnalyzerSteps`, `Migrate3xWorld` (shared scenario state + reset hook), `Migrate3xDefinitionsSteps` (state moved to the world, "I analyse the file" now parse then analyse).
+- Red run: `:core:jvmTest --tests '*migrate3x*'` 299 tests, 187 red (all the new ones that need a finding, assertion failures "expected exactly one '<rule>' finding but got 0"; the 109 M8-01 tests green); `RunMigrate3xAnalyzerAcceptanceTest` 46 of 46 scenarios red (assertions, no undefined or ambiguous step); `RunMigrate3xDefinitionsAcceptanceTest` (M8-01) green, unaffected. Negative tests assert first that the analyzer produced a report (`assertAnalyzed`: `clients-global-qos` is present), so they are red on the stub too.
+- Golden list of the full 3.13.7 fixture (`full-fixture-golden.txt`; one line `rule|kind|vhost|name|about`, report order; derived by the test developer from the rule table; ARCHITECT REVIEW REQUESTED). 62 findings: 9 blockers, 36 warnings, 17 infos, 10 message loss; summary `topologyItems 24, compatibleItems 10, needDecision 14`. Only the `classic-mirrored` and `classic-plain` queues are mirrored (by `ha-all`, `ha-exactly`). Derivation notes: non-durable classic queues get `queue-not-durable` and `classic-to-quorum-ordering` but not `classic-not-replicated` or `classic-index-v1` (see question 1); every durable classic queue gets the file-only `classic-index-v1` warning (no `x-queue-version`).
+```
+classic-index-v1|Queue|/|classic-dlx|-
+classic-index-v1|Queue|/|classic-lazy|-
+classic-index-v1|Queue|/|classic-locator|-
+classic-index-v1|Queue|/|classic-maxlen-bytes|-
+classic-index-v1|Queue|/|classic-mirrored|-
+classic-index-v1|Queue|/|classic-plain|-
+classic-index-v1|Queue|/|classic-prio|-
+classic-index-v1|Queue|/|classic-sac|-
+classic-index-v1|Queue|/|classic-ttl|-
+classic-index-v1|Queue|v1|v1-q|-
+access-declare-vhost|VirtualHost|-|/|-
+access-declare-vhost|VirtualHost|-|v1|-
+access-declare-user|User|-|adm|-
+user-administrator-tag|User|-|adm|-
+user-administrator-tag|User|-|guest|-
+user-guest|User|-|guest|-
+access-declare-user|User|-|mon|-
+access-declare-user|User|-|svc|-
+classic-to-quorum-unmeasured|Global|-|-|-
+clients-amqp-address-v1|Global|-|-|-
+clients-global-qos|Global|-|-|-
+clients-transient-queues|Global|-|-|-
+not-covered-global-parameter|Global|-|-|cluster_name
+not-covered-global-parameter|Global|-|-|internal_cluster_id
+classic-to-quorum-ordering|Queue|/|classic-autodel|-
+queue-not-durable|Queue|/|classic-autodel|-
+quorum-rejected-setting|Queue|/|classic-autodel|auto_delete
+classic-not-replicated|Queue|/|classic-dlx|-
+classic-to-quorum-ordering|Queue|/|classic-dlx|-
+classic-not-replicated|Queue|/|classic-lazy|-
+classic-to-quorum-ordering|Queue|/|classic-lazy|-
+quorum-rejected-setting|Queue|/|classic-lazy|x-queue-mode
+classic-not-replicated|Queue|/|classic-locator|-
+classic-to-quorum-ordering|Queue|/|classic-locator|-
+queue-master-locator-argument|Queue|/|classic-locator|x-queue-master-locator
+classic-not-replicated|Queue|/|classic-maxlen-bytes|-
+classic-to-quorum-ordering|Queue|/|classic-maxlen-bytes|-
+classic-not-replicated|Queue|/|classic-mirrored|-
+classic-to-quorum-ordering|Queue|/|classic-mirrored|-
+classic-not-replicated|Queue|/|classic-plain|-
+classic-to-quorum-ordering|Queue|/|classic-plain|-
+classic-not-replicated|Queue|/|classic-prio|-
+classic-to-quorum-ordering|Queue|/|classic-prio|-
+quorum-rejected-setting|Queue|/|classic-prio|x-max-priority
+classic-not-replicated|Queue|/|classic-sac|-
+classic-to-quorum-ordering|Queue|/|classic-sac|-
+classic-to-quorum-ordering|Queue|/|classic-transient|-
+queue-not-durable|Queue|/|classic-transient|-
+classic-not-replicated|Queue|/|classic-ttl|-
+classic-to-quorum-ordering|Queue|/|classic-ttl|-
+ha-policy-key|Policy|/|ha-all|ha-mode,ha-promote-on-shutdown,ha-sync-mode
+ha-policy-key|Policy|/|ha-exactly|ha-mode,ha-params
+policy-queue-mode|Policy|/|ha-exactly|queue-mode
+queue-master-locator-policy-key|Policy|/|ha-exactly|queue-master-locator
+access-set-permissions|Permission|/|guest|-
+access-set-permissions|Permission|/|svc|-
+access-set-topic-permissions|TopicPermission|/|svc|ex-delayed
+not-covered-parameter|Parameter|/|up1|federation-upstream
+classic-not-replicated|Queue|v1|v1-q|-
+classic-to-quorum-ordering|Queue|v1|v1-q|-
+access-set-permissions|Permission|v1|guest|-
+access-set-permissions|Permission|v1|svc|-
+```
+- Questions for the architect (the tests assume the answer in brackets): (1) `classic-not-replicated` item column says "Q classic, durable", its condition says "every classic queue", `classic-to-quorum-ordering` says "every classic queue": [durable only for not-replicated and index-v1; ordering, rejected-setting and rejected-argument for every classic queue]. (2) `name` and `about` of the items the table leaves open: [Permission and TopicPermission: `name` = user, topic permission `about` = [exchange]; `not-covered-parameter`: kind Parameter, `name` = parameter name, `about` = [component]; `not-covered-global-parameter`: `name` null, `about` = [parameter name]; VirtualHost `name` = the vhost, `vhost` null]. (3) `queue-master-locator-argument` message: the table says "rejected on classic and quorum queues", the scenario says "RabbitMQ 4 does not allow it" for both rows [tests require both phrases]. (4) The ordering message: the brief says "always orders messages by priority", the scenario says "orders messages by priority" [tests require the shorter phrase]. (5) `defaultDecision`: only `user-guest` is Skip, every other finding Accept [asserted]. (6) `ReportSource.name` for a file report is not specified [only `live = false` is asserted]. (7) JSON field names of the proposal types other than convertQueueType, manual and declareUser are not in the brief [only the `"type"` value, lower camel case of the class name, is asserted; declareUser: `name`, `tags`, `hasPasswordHash`, `acknowledgement`]. (8) The summary rule names a binding `source->destination:routingKey`, but no rule emits a binding finding, so that naming cannot be tested [binding is only checked as a counted compatible item]. (9) The mirroring helper has no signature in the brief: it is tested through the analyzer (the `classic-not-replicated` message names the mirroring policy). (10) "no in-place upgrade as safe": asserted as every proposal text that says "in place" or "in-place" also says "not" or "never".
+- Mutation checks a to f: recorded in step 4 (need the implementation); the tests that must go red are `ReportOrderAndSummaryTest` + "The message-loss findings come first" (a), "A classic queue with the new index is not flagged" + `ClassicIndexRuleTest` (b), `ReportSecretsTest` + "Secrets in a 3.x export never reach the report" (c), the mirroring-key outline + `PolicyRulesTest` (d), `ReportOrderAndSummaryTest` summary tests (e), `RuleCatalogTest` kitchen sink (f).
+- Not run in step 2: `verifyTestDiscovery` (filtered runs make it fail by design), the full suite, the UI tests, `@broker`.
