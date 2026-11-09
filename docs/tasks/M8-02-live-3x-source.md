@@ -28,5 +28,8 @@ None here (`M8-10`).
 ## Open points
 Whether `GET /api/definitions` needs the administrator tag (UNVERIFIED, S-A). Large exports (S-L).
 
+## Spike findings (M8-00, 2026-11-09)
+Measured: `GET /api/definitions` needs the administrator tag (401 "Not administrator user" for management, policymaker and monitoring users; also per vhost), so the live source needs an administrator profile and everything else falls back to the file import with the stated reason; `rabbitmq_version` is `"3.13.7"`; `whoami` and `permissions` have the same shape on 3.13, so Connect and the permission check need no change; `/api/stream/...` is 404 on 3.x (already handled); 1000 queues export in about 10 ms (84 KiB), no streaming. Also read `GET /api/deprecated-features/used` from the 3.x source when allowed (it reported `classic_queue_mirroring` for a mirroring policy) and hand it to the analyzer as an extra signal; the call is a GET and its failure never fails the fetch.
+
 ## Definition of done
 Tests first and passing, GET-only test green, no 4.x behaviour changed, spec updated.

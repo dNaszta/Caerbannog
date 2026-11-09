@@ -7,7 +7,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
   Owner decision 2026-11-09 (P2): they are part of the generated migration. The password hash of a user
   is passed through from the export into the migration file; the app never computes, stores or shows it.
   Access actions need an administrator and the level Full control. Decisions P10 to P13 were
-  accepted by the owner on 2026-11-09; scenarios marked @needs-spike depend on measurements of M8-00 (S-M).
+  accepted by the owner on 2026-11-09; scenarios marked @needs-spike depend on measurements not yet taken (M8-13).
   See docs/spec.md "Users, virtual hosts and permissions in the migration".
 
   Background:
@@ -60,6 +60,13 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And I am told that this needs the level Full control
 
   @fake-broker
+  Scenario: Access needs the full export of the source
+    Given a live 3.x connection whose user is an administrator
+    When I analyse it
+    Then the users, virtual hosts and permissions come from the full export
+    And not from a per-virtual-host export
+
+  @fake-broker
   Scenario: The access migration applies from an administrator profile of any virtual host
     Given the connection "new-eu" has the virtual host "/"
     And the virtual host "/orders" does not exist on the 4.x broker
@@ -96,13 +103,44 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And the proposal for "guest" is to skip it
     And accepting it asks for an explicit confirmation
 
-  @negative @fake-broker @needs-spike
-  Scenario: A user with an unsupported hash algorithm is a manual step
-    Given the export contains a user whose hashing algorithm the 4.x broker does not accept
+  @negative @fake-broker
+  Scenario Outline: A user whose hash algorithm 4.x does not accept is a manual step
+    Given the export contains a user whose hashing algorithm is "<algorithm>"
     When I analyse the file
     Then there is a blocker for that user
     And the proposal is to set a new password on the broker outside the app
     And the app offers no field to type a password
+
+    Examples:
+      | algorithm                       |
+      | rabbit_password_hashing_bcrypt  |
+      | a_name_nobody_knows             |
+
+  @fake-broker
+  Scenario Outline: Hash algorithms of the allow-list are carried over
+    Given the export contains a user whose hashing algorithm is "<algorithm>"
+    When I generate the access migration
+    Then the user is declared with its hash and the algorithm "<algorithm>"
+
+    Examples:
+      | algorithm                         |
+      | rabbit_password_hashing_sha256    |
+      | rabbit_password_hashing_sha512    |
+      | rabbit_password_hashing_md5       |
+
+  @fake-broker
+  Scenario: The user is always declared with the hashing algorithm
+    Given the export contains a user with a hash and no hashing algorithm
+    When I analyse the file
+    Then the user is reported as a blocker because without the algorithm the login would fail
+
+  @security @fake-broker
+  Scenario: A different hash is never overwritten, the comparison reads the target definitions
+    Given the user "svc" exists on "new-eu" with another password hash
+    When I apply the access migration
+    Then the app compared the hashes before writing
+    And the apply stops with a conflict and the existing hash is unchanged
+    And a shovel password that the target definitions contain is not kept anywhere
 
   @fake-broker
   Scenario: A user without a password hash is reported

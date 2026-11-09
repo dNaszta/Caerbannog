@@ -31,6 +31,7 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
     Then forwarding is blocked
     And I am told to apply the migration that declares "orders" first
+    And no destination queue is created by the shovel
 
   @fake-broker
   Scenario: A destination that is not a quorum queue gets a warning
@@ -143,3 +144,50 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     When I open the forwarding of "orders"
     Then I can forward only that queue
     And there is no action that forwards every queue
+
+  @negative @fake-broker
+  Scenario: A shovel that cannot reach the source is reported as failed
+    Given I confirmed forwarding "orders" from "legacy-eu" to "new-eu"
+    And the broker accepts the shovel but its state becomes "terminated" with the reason "failed to connect to source"
+    When the screen polls the shovel status
+    Then I am told the forwarding failed with that reason
+    And the shovel is removed so no stored credentials remain
+
+  @fake-broker
+  Scenario: A finished shovel is gone and messages published meanwhile are reported
+    Given the forwarding of "orders" moved the messages that were present when it started
+    And 20 more messages were published to the source meanwhile
+    When the shovel finishes and removes itself
+    Then I see that about 20 messages stayed on the source
+    And no shovel and no stored credentials remain on "new-eu"
+
+  @safety @security @fake-broker
+  Scenario: The confirmation says that administrators of the 4.x broker can read the source password
+    When I choose to forward "orders" from "legacy-eu" to "new-eu"
+    Then the confirmation says the source password is stored on "new-eu" in clear text
+    And it says any administrator of "new-eu" can read it until the shovel finishes or is removed
+
+  @security @fake-broker
+  Scenario: The app never reads the shovel parameters
+    Given a shovel "caerbannog-migrate-orders" exists on "new-eu"
+    When I open the forwarding of "orders"
+    Then the app read the shovel status only through the shovel status endpoint
+    And it never requested the shovel parameter endpoints
+
+  @negative @fake-broker
+  Scenario: A user who can create shovels but not read their status is told
+    Given the user of "new-eu" has the policymaker tag but no monitoring or administrator tag
+    When I open the forwarding of "orders"
+    Then I am told the user cannot read the shovel status and needs the monitoring tag
+
+  @fake-broker
+  Scenario: The destination of the shovel is the local broker without credentials
+    Given I confirmed forwarding "orders" from "legacy-eu" to "new-eu"
+    When the forwarding starts
+    Then the shovel destination carries no user name and no password
+    And only the source address has credentials
+
+  @fake-broker @needs-decision
+  Scenario: Use another user for this shovel
+    When I choose "Use another user for this Shovel" and type a user name and password
+    Then they are used for this shovel only and are not saved anywhere

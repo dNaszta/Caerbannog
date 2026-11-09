@@ -29,5 +29,8 @@ No tool returns a hash; an apply tool (if one exists) refuses migrations with th
 ## Open points
 P10 (V1 exemption and separate file), P11 (`guest`), P12 (unsupported algorithm), P13 (owner-only file) are decided (2026-11-09); S-M answers the algorithm, `guest`, read-back and body shapes.
 
+## Spike findings (M8-00, 2026-11-09)
+Measured (S-M, spike results): allow-list of hashing algorithms is `rabbit_password_hashing_sha256`, `sha512`, `md5`; bcrypt or any other name is a blocker finding (3.13 accepted any name) with the manual step; the executor ALWAYS sends `hashing_algorithm` with `password_hash` (without it the login fails on both versions); 4.x silently overwrites a different hash, so compare before write: `GET /api/users/{name}` hides the hash on 4.4, so the comparison reads the target's `GET /api/definitions` through the redacting parser (it also contains Shovel source passwords in clear, which the parser drops) and keeps the hash in memory only; an imported hash keeps the old password working (live test: login on 4.x with the old password); the per-vhost export has no users, so the generator needs the full export; `guest` loopback behaviour outside the container image is not measured (S-P). `@needs-spike` removed from the scenarios of this brief that S-M answered.
+
 ## Definition of done
 Tests first and passing, no hash anywhere outside the file and the executor request body, spec updated with the measured facts.

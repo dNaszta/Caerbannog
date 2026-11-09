@@ -29,5 +29,8 @@ None (UI). The report is exposed by `M8-10`.
 ## Open points
 Mockup. Where the entry lives (recommendation: a button on the Migrations screen and on a 3.x connection's pill).
 
+## Spike findings (M8-00)
+The review sheet shows the ordering warning with the required tick "Ordering by priority may change" for every classic to quorum conversion (P15, awaiting the owner; default proposal for `x-max-priority` queues is keep classic), the global warnings (in-place upgrade can lose classic queue messages; client-visible checks) and the "unverified" marker on unmeasured differences.
+
 ## Definition of done
 Tests first and passing, `./gradlew test` green, screenshots looked at, spec screens table updated.

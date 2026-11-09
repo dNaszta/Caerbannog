@@ -28,5 +28,8 @@ None (UI); see `M8-10` for what is exposed.
 ## Open points
 P5 decided (default `queue-length`, `never` only with a warning); P4 (Full control to remove) and P8 (AMQP host and port asked in the dialog) decided 2026-11-09. The confirmation must state that the broker stores the credentials until the Shovel is removed (P1).
 
+## Spike findings (M8-00, 2026-11-09)
+Spike consequences: the confirmation shows the strengthened disclosure (source password stored in clear on the 4.x broker, readable by any administrator of it until the Shovel finishes or is removed); progress polls the Shovel status and shows `terminated` with its reason as a failure with a Remove shovel action; after completion the screen says how many messages stayed on the source because they were published meanwhile ("about N", an exact cut-over needs the publishers stopped); a missing destination queue is shown as blocked, never as a start. If P14 is accepted the dialog offers "Use another user for this Shovel" (typed, memory only).
+
 ## Definition of done
 Tests first and passing, screenshots looked at, spec screens table updated.

@@ -28,5 +28,8 @@ None (the report tool is covered by `M8-10`).
 ## Open points
 Packaging impact of any new dependency (none expected).
 
+## Spike findings (M8-00, 2026-11-09)
+Gate additions from the spike: the 3.13 fixture also holds a transient queue and a `x-queue-master-locator` queue (the analyzer must flag them and the apply must not rely on the import), a priority-carrying message (the report shows the ordering warning and the tick is required), a user with a bcrypt or unknown hash (blocker, manual step) next to a sha256 user that logs in on 4.x; after the apply the runner's read-back finds every declared queue; the Shovel is polled to completion and, once finished, its parameter is gone; a deliberate wrong-source-password run ends `terminated` and is reported as failed; the destination-missing case is blocked (no durable classic queue appears); no source password appears in any log, screen text or exported file, including after a read of the 4.x definitions. The in-place upgrade is NOT part of the gate (S-N).
+
 ## Definition of done
 Gate passes on a machine with Docker or Podman, mutations of the key safeguards (confirmation bypass, ack mode, queue delete) are killed by tests, spec milestone status updated with the date.

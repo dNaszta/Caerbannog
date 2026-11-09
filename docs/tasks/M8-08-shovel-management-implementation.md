@@ -28,5 +28,8 @@ None here.
 ## Open points
 P1 decided 2026-11-09: the profile's user is reused, so its password is read from `SecretStore` at PUT time. P7 (Shovel on 4.x) and P8 decided 2026-11-09.
 
+## Spike findings (M8-00, 2026-11-09)
+Measured (S-F, S-J): never call `GET /api/parameters/shovel[...]`; `GET /api/definitions` of the 4.x broker returns the source URI password in clear, so any such read (only for the user hash comparison of `M8-12`) goes through the redacting parser and a test proves the password is dropped; the log guard also covers response bodies; `dest-uri` is `amqp://` (local, no credentials), so only the source password is built into a URI; PUT does not validate, so the implementation polls `GET /api/shovels` until `running`, `terminated` (read `reason`, delete the Shovel, scrub the text) or gone (finished); plugin detection is `GET /api/shovels` 404; the live test also checks the wrong-password case (201, then terminated) and that the parameter disappears after `queue-length`.
+
 ## Definition of done
 Tests first and passing, live tests clean up shovels and queues, no secret in any output, spec updated with the measured field names.

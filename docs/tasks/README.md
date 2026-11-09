@@ -116,7 +116,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
-| M8-00-spike-live-3x-vs-4x | Spike on live 3.13 and 4.x: definitions shape, quorum and policy rejects, 4.x import of a 3.x export, Shovel details, version detection (items S-A to S-L); first task, nothing else starts before it | M8 | briefed (architect, 2026-11-09); depends on none; needs Docker |
+| M8-00-spike-live-3x-vs-4x | Spike on live 3.13 and 4.x: definitions shape, quorum and policy rejects, 4.x import of a 3.x export, Shovel details, version detection (items S-A to S-L); first task, nothing else starts before it | M8 | DONE 2026-11-09 (results `M8-00-spike-results.md`, tests `RealBrokerM8Spike*Test`; 23 tests pass; findings folded into spec and briefs) |
 | M8-01-definitions-model-and-file-import | Definitions model (hashes only as redacting pass-through), parser, file import | M8 | briefed (architect, 2026-11-09); depends on M8-00 |
 | M8-02-live-3x-source | 3.x version detection, read-only source role, live definitions fetch (GET only) | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-01 |
 | M8-03-compatibility-analyzer | Pure core compatibility rules, severity, proposals, JSON report | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-01 |
@@ -129,6 +129,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M8-10-mcp-report-and-shovel-status | MCP: caerbannog_analyze_3x_definitions and caerbannog_list_shovels (read-only) | M8 | briefed (architect, 2026-11-09); depends on M8-03, M8-08 |
 | M8-11-gate-3x-to-4x | `@gate-M8` RealBrokerM8GateTest: 3.13 to 4.x, one shovelled message | M8 | briefed (architect, 2026-11-09); depends on M8-06, M8-08, M8-09, M8-10, M8-12 |
 | M8-12-access-migration-actions | Vhost, user (hash pass-through), permission and topic-permission actions: secrets, administrator and Full control guardrails, conflicts, owner-only file (owner decision P2, 2026-11-09) | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-04 |
+| M8-13-follow-up-spikes | Follow-up spikes: S-N in-place upgrade classic message loss (first), S-O exclusive/redelivery/global QoS (needs an AMQP client dependency), S-Q amqps Shovel, S-P guest loopback, S-R cluster export, S-T, S-S | M8 | briefed (architect, 2026-11-09); depends on M8-00 (done) |
 
 ## Later milestones (planned)
 

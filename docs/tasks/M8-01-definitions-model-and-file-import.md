@@ -28,5 +28,8 @@ None here (the report tool is `M8-10`).
 ## Open points
 Shape of the real export is UNVERIFIED until `M8-00` S-A; the tests use its fixture, not a hand-written one.
 
+## Spike findings (M8-00, 2026-11-09)
+Measured shape of the 3.13 export (`M8-00-spike-results.md` S-A, fixtures in `data-rabbit/src/test/resources/fixtures/m8-00/`): queue entries have NO `type` key (the type is `arguments.x-queue-type`, missing means classic; a 4.x export adds `type`); operator policies are `parameters` entries with `component: operator_policy`, not a top-level key; users have `password_hash`, `hashing_algorithm` (any name on 3.13), `tags` as an array, `limits`; vhost `metadata` holds `description`, `tags`, `default_queue_type` (3.13 also at top level); `guest` is exported; the per-vhost export holds no users, vhosts or permissions, so the live source uses the full export. The parser tests run on these fixtures. Parameter values (federation and shovel URIs) can hold passwords in clear and are dropped by the parser; this includes a 4.x `GET /api/definitions` read for the user hash comparison (`M8-12`) and a 3.x export taken while a Shovel exists. `@needs-spike` is gone from the scenarios of this brief.
+
 ## Definition of done
 Tests first and passing, no unrelated changes, `16` steps written, spec updated if the export shape differs from this brief.
