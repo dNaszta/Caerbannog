@@ -1,10 +1,15 @@
 package dev.caerbannog.core.browser
 
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+
+/** Message bodies are chosen by any publisher: real JSON nests below about 20, the reader fails near 10,000. */
+private const val MAX_FORMAT_DEPTH = 128
 
 /**
  * Kind of presentation view for a message payload.
@@ -114,15 +119,15 @@ class PayloadFormatter(
         if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
             return JsonFormatResult.Invalid("The body is not valid JSON")
         }
-        return try {
-            val element = json.parseToJsonElement(trimmed)
-            if (element !is JsonObject && element !is JsonArray) {
-                return JsonFormatResult.Invalid("The body is not valid JSON")
-            }
-            JsonFormatResult.Valid(json.encodeToString(JsonElement.serializer(), element))
-        } catch (_: Exception) {
-            JsonFormatResult.Invalid("The body is not valid JSON")
+        val element = when (val parsed = parseUntrustedJson(trimmed, MAX_FORMAT_DEPTH, json)) {
+            is UntrustedJson.Parsed -> parsed.element
+            UntrustedJson.TooDeep -> return JsonFormatResult.Invalid("The body is nested too deeply to format")
+            UntrustedJson.NotJson -> return JsonFormatResult.Invalid("The body is not valid JSON")
         }
+        if (element !is JsonObject && element !is JsonArray) {
+            return JsonFormatResult.Invalid("The body is not valid JSON")
+        }
+        return JsonFormatResult.Valid(json.encodeToString(JsonElement.serializer(), element))
     }
 
     /**

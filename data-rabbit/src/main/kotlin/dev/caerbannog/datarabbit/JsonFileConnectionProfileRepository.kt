@@ -5,8 +5,10 @@ import dev.caerbannog.core.connections.ConnectionProfileRepository
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.json.JsonNestingScan
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -15,6 +17,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import java.io.File
+
+/** Valid files nest about 3 levels; the app's own small files stay far below the reader's failure point near 10,000. */
+private const val MAX_FILE_DEPTH = 32
 
 /**
  * JSON-file-backed [ConnectionProfileRepository] (docs/tasks/M1-02-connection-profiles.md Scope: "a
@@ -96,6 +101,10 @@ class JsonFileConnectionProfileRepository(private val file: File) : ConnectionPr
         if (!file.exists()) return emptyList()
         val text = file.readText()
         if (text.isBlank()) return emptyList()
+        if (JsonNestingScan.findTooDeep(text, MAX_FILE_DEPTH) != null) {
+            // Same path as a corrupt file: callers fail instead of treating it as empty and overwriting the user's data.
+            throw SerializationException("connections.json is nested too deep")
+        }
         return json.decodeFromString(text)
     }
 

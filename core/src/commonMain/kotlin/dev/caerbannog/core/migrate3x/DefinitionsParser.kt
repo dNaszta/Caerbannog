@@ -1,5 +1,6 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.JsonNestingScan
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +35,9 @@ sealed interface DefinitionsParseResult {
     data class Rejected(val reason: DefinitionsRejection) : DefinitionsParseResult
 }
 
+/** Brackets nested deeper than this cannot be part of a definitions file (the deepest valid value sits about 37 levels down). */
+internal const val MAX_TEXT_DEPTH: Int = 64
+
 /** Reads the text of a RabbitMQ 3.x or 4.x definitions export into a [DefinitionsDocument]. Pure; never throws for bad input. */
 object DefinitionsParser {
 
@@ -43,7 +47,7 @@ object DefinitionsParser {
     )
 
     fun parse(text: String): DefinitionsParseResult {
-        JsonNestingScan.findTooDeep(text)?.let { return rejectTooDeep(it) }
+        JsonNestingScan.findTooDeep(text, MAX_TEXT_DEPTH)?.let { return rejectTooDeep(it) }
         val root = try {
             Json.parseToJsonElement(text)
         } catch (_: SerializationException) {

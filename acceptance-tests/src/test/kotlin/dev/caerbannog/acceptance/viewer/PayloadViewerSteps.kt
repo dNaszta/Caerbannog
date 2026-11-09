@@ -138,6 +138,17 @@ class PayloadViewerSteps {
         messages[offset] = msg
     }
 
+    // M5-07: the body is N nested JSON arrays, e.g. 3 gives [[[]]]; "ten thousand" in the scenario is the number 10000.
+    @Given("^the message at offset (\\d+) has content type \"(.*)\" and a body of (\\d+) nested JSON arrays$")
+    fun messageHasContentTypeAndDeepArrays(offset: Long, contentType: String, depth: Int) {
+        messages[offset] = StreamMessage(
+            offset = offset,
+            timestamp = 1700000000000L,
+            payload = ("[".repeat(depth) + "]".repeat(depth)).encodeToByteArray(),
+            properties = mapOf("content-type" to contentType),
+        )
+    }
+
     @Given("^the message at offset (\\d+) has a body larger than the display cap$")
     fun messageHasBodyLargerThanDisplayCap(offset: Long) {
         val largeText = "Large message body content. ".repeat(3000)
@@ -278,6 +289,28 @@ class PayloadViewerSteps {
         val insp = formatter.inspect(msg, requestedKind = PayloadViewKind.JSON)
         assertNotNull(insp.validationWarning)
         assertTrue(insp.validationWarning!!.contains("not valid JSON", ignoreCase = true))
+    }
+
+    @Then("^the \"JSON\" view tells me the body is nested too deeply to format$")
+    fun jsonViewTellsNestedTooDeeply() {
+        val msg = checkNotNull(selectedMessage)
+        val insp = formatter.inspect(msg, requestedKind = PayloadViewKind.JSON)
+        assertEquals("The body is nested too deeply to format", insp.validationWarning)
+    }
+
+    @Then("^the \"Hex\" view still shows the body$")
+    fun hexViewStillShowsTheBody() {
+        val msg = checkNotNull(selectedMessage)
+        val insp = formatter.inspect(msg, requestedKind = PayloadViewKind.HEX)
+        assertEquals(PayloadViewKind.HEX, insp.currentKind)
+        val firstBytes = msg.payload.take(3).joinToString(" ") { "%02x".format(it) }
+        assertTrue(insp.displayText.contains(firstBytes), "expected the hex dump to start with the body bytes $firstBytes")
+    }
+
+    // In the fake, "still running" means the selection returned a result: a StackOverflowError would have failed the earlier step.
+    @Then("^the app is still running$")
+    fun theAppIsStillRunning() {
+        assertNotNull(lastInspection, "selecting the message returned no inspection")
     }
 
     @Then("^the \"Text\" view still shows the body$")

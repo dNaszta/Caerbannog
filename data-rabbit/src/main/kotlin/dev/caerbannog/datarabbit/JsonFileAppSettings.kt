@@ -1,5 +1,7 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.RefreshInterval
@@ -13,6 +15,9 @@ import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+
+/** settings.json is a flat object; the app's own small files stay far below the reader's failure point near 10,000. */
+private const val MAX_FILE_DEPTH = 32
 
 /**
  * [AppSettings] kept in `settings.json` (`{"streamListRefreshSeconds": 5}`). The value is read once, when the object is made,
@@ -46,11 +51,23 @@ class JsonFileAppSettings(
 
     // Null for a missing, empty or unreadable file or one that is not a JSON object.
     private fun readObject(): JsonObject? = try {
-        if (file.isFile) json.parseToJsonElement(file.readText()).asObjectOrNull() else null
+        if (file.isFile) readTree(file.readText()) else null
     } catch (e: Exception) {
         // Corrupt JSON (SerializationException) or an unreadable file: fall back, the next write replaces it.
         log("settings.json could not be read, using defaults: ${e.javaClass.simpleName}")
         null
+    }
+
+    private fun readTree(text: String): JsonObject? = when (val parsed = parseUntrustedJson(text, MAX_FILE_DEPTH, json)) {
+        is UntrustedJson.Parsed -> parsed.element.asObjectOrNull()
+        UntrustedJson.TooDeep -> {
+            log("settings.json is nested too deep, using defaults")
+            null
+        }
+        UntrustedJson.NotJson -> {
+            log("settings.json is not valid JSON, using defaults")
+            null
+        }
     }
 
     private fun JsonElement.asObjectOrNull(): JsonObject? = runCatching { jsonObject }.getOrNull()

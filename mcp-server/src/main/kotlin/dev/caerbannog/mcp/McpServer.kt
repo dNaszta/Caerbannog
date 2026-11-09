@@ -6,6 +6,7 @@ import dev.caerbannog.core.browser.MessageFilterCriteria
 import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.browser.StreamScanner
+import dev.caerbannog.core.json.JsonNestingScan
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.publish.PublishMessageRequest
 import dev.caerbannog.core.publish.PublishOutcome
@@ -54,6 +55,12 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.PrintStream
+
+/** A request is a small JSON-RPC envelope; far below the reader's failure point near 10,000. */
+private const val MAX_REQUEST_DEPTH = 64
+
+/** Written as a constant: the encoder drops null fields, but JSON-RPC 2.0 wants `"id":null` when the id cannot be read. */
+private const val PARSE_ERROR_RESPONSE = """{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}"""
 
 private fun TopologyControlLevel.toDisplayName(): String = when (this) {
     TopologyControlLevel.READ_ONLY -> "Read-only"
@@ -356,7 +363,13 @@ class McpServer(
         )
     )
 
-    fun handleRequest(requestString: String): String? = runBlocking {
+    fun handleRequest(requestString: String): String? {
+        // The typed decoder recurses on params and id: refuse hostile nesting before it can overflow the stack and end the process.
+        if (JsonNestingScan.findTooDeep(requestString, MAX_REQUEST_DEPTH) != null) return PARSE_ERROR_RESPONSE
+        return handleParsedRequest(requestString)
+    }
+
+    private fun handleParsedRequest(requestString: String): String? = runBlocking {
         try {
             val req = json.decodeFromString<JsonRpcRequest>(requestString)
             when (req.method) {
