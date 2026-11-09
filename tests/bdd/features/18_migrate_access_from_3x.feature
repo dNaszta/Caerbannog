@@ -161,10 +161,11 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     Then no action deletes a virtual host, a user or a permission
 
   @negative @mcp @safety @fake-broker
-  Scenario: The MCP apply tools refuse access actions
+  Scenario: No MCP tool applies a migration, so access actions can only be applied in the app
     Given a migration with a "declareUser" action
-    When an agent asks to apply it
-    Then it is refused and told to use the app
+    When an agent lists the available tools
+    Then there is no tool that applies a migration
+    And the dry run tool lists the action as "Declare user" without any hash
 
   @broker-3x
   Scenario: A real hash from RabbitMQ 3.13 lets the user log in on 4.x

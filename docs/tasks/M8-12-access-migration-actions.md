@@ -24,7 +24,7 @@ Strategy per action kind, sealed results (`Applied`, `NoOp`, `Conflict`, `Refuse
 Dry run rows: "Declare user svc (administrator), password hash hidden". Warning dialog on saving or exporting a file with hashes.
 
 ## MCP
-No tool returns a hash; an apply tool (if one exists) refuses migrations with these actions (spec MCP table).
+No tool returns a hash; there is no MCP apply tool (owner decision 2026-11-09, `M5-09`): access actions are only applied in the app, and the read-only dry-run tool shows `Declare user <name>` without a hash.
 
 ## Open points
 Depends on `M5-08-real-migration-execution` for its APPLY half (2026-11-09): the desktop app has no real executor today (see `M8-04`). The model, generation and fake-based scenarios of this task do not wait for it; the live apply, read-back and the `@broker` scenarios do.
