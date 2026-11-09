@@ -307,6 +307,43 @@ class McpSteps {
         lastResponseJson = json.parseToJsonElement(response).jsonObject
     }
 
+    // M5-07: a request line nested too deep for the JSON tree reader must come back as a parse error, not kill the server.
+    private var lastRequestLine: String = ""
+    private var lastRawResponse: String? = null
+
+    @When("the client sends an MCP request whose params are nested {int} levels deep")
+    fun sendDeeplyNestedRequest(depth: Int) {
+        lastRequestLine = """{"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": ${"[".repeat(depth)}${"]".repeat(depth)}}"""
+        lastRawResponse = server.handleRequest(lastRequestLine)
+        assertNotNull(lastRawResponse, "a request that cannot be parsed is answered")
+        lastResponseJson = json.parseToJsonElement(lastRawResponse!!).jsonObject
+    }
+
+    @Then("the response is a JSON-RPC error with code {int}")
+    fun assertJsonRpcErrorCode(expectedCode: Int) {
+        val error = lastResponseJson?.get("error")?.jsonObject
+        assertNotNull(error, "expected an error object in $lastRawResponse")
+        assertEquals(expectedCode, error["code"]?.jsonPrimitive?.intOrNull)
+        assertEquals("Parse error", error["message"]?.jsonPrimitive?.content)
+    }
+
+    @Then("the error message does not contain any part of the request")
+    fun assertErrorDoesNotEchoRequest() {
+        val message = lastResponseJson?.get("error")?.jsonObject?.get("message")?.jsonPrimitive?.content.orEmpty()
+        assertFalse(message.contains("[[["), "the message echoes the request: $message")
+        assertFalse(message.contains("tools/call"), "the message echoes the request: $message")
+        assertFalse(lastRawResponse.orEmpty().contains("[[["), "the response echoes the request")
+    }
+
+    @Then("the server answers the next valid request")
+    fun assertServerAnswersNextRequest() {
+        val response = server.handleRequest("""{"jsonrpc": "2.0", "id": 6, "method": "ping"}""")
+        assertNotNull(response, "the server did not answer the next request")
+        val obj = json.parseToJsonElement(response).jsonObject
+        assertEquals(6, obj["id"]?.jsonPrimitive?.intOrNull)
+        assertNotNull(obj["result"])
+    }
+
     @Then("the response is an MCP error with code {int} and message {string}")
     fun assertMcpError(expectedCode: Int, expectedMsg: String) {
         val error = lastResponseJson?.get("error")?.jsonObject

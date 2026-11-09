@@ -434,6 +434,8 @@ class TopologyMigrationsSteps {
                 """.trimIndent()
                 lastImportResult = getVm().importFile(json)
             }
+            "is nested ten thousand levels deep" ->
+                lastImportResult = getVm().importFile("[".repeat(10_000) + "]".repeat(10_000))
             else -> lastImportResult = getVm().importFile("invalid")
         }
     }
