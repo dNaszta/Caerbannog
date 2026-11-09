@@ -187,7 +187,15 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     Then the shovel destination carries no user name and no password
     And only the source address has credentials
 
-  @fake-broker @needs-decision
+  @security @fake-broker
   Scenario: Use another user for this shovel
-    When I choose "Use another user for this Shovel" and type a user name and password
-    Then they are used for this shovel only and are not saved anywhere
+    Given I chose to forward "orders" from "legacy-eu" to "new-eu"
+    When I choose "Use another user for this Shovel" and type a user name and a password
+    Then the shovel source address uses that user instead of the profile user
+    And the typed password is masked on screen and is not saved in the profile, the keychain, the history or the logs
+    And the password is cleared when the dialog closes
+
+  @fake-broker
+  Scenario: By default the profile user is used for the shovel source
+    When I choose to forward "orders" from "legacy-eu" to "new-eu" and keep the default user
+    Then the shovel source address uses the user of the profile "legacy-eu"

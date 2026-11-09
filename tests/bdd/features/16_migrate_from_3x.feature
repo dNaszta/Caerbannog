@@ -188,6 +188,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     When I analyse the file
     Then the default proposal for "prio" is to keep it a classic queue and to say it is not replicated on 4.x
     And converting to a quorum queue is offered as an alternative with the ordering warning
+    And accepting the quorum alternative needs the tick "Ordering by priority may change"
 
   @fake-broker @needs-spike
   Scenario: Classic to quorum differences the spike has not measured are shown as unverified
@@ -249,7 +250,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Given the report proposes to declare the classic queue "orders" as a quorum queue
     When I try to accept that proposal without ticking "Ordering by priority may change"
     Then the proposal is not accepted
-    And after I tick it I can accept the proposal
+    And the conversion is not blocked: after I tick it I can accept the proposal
 
   @fake-broker
   Scenario: Applying a generated migration reads back every declared queue

@@ -14,4 +14,4 @@ desktop app's runtime classpath (versions pinned in the Gradle build files).
 | dbus-java, secret-service, SLF4J | MIT |
 | OpenJDK runtime embedded by jpackage | GPL-2.0 with Classpath Exception |
 
-Test-only dependencies (JUnit, Testcontainers, Ktor mock engine) are not shipped in the installers.
+Test-only dependencies (JUnit, Testcontainers, Ktor mock engine, and, from M8-13, `com.rabbitmq:amqp-client`, the RabbitMQ Java AMQP 0-9-1 client; used under its Apache-2.0 license option, the client being offered under Apache-2.0, MPL-2.0 or GPL-2.0-or-later) are not shipped in the installers. `amqp-client` is added to test source sets only (approved by the product owner on 2026-11-09) and must never appear on the runtime classpath of `desktopApp` or `mcp-server`.
