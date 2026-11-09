@@ -86,7 +86,6 @@ class MigrationRunnerRecordFailureTest {
         // On the JVM a CancellationException is an IllegalStateException: the narrow catch must not swallow it.
         assertFailsWith<kotlinx.coroutines.CancellationException> { apply(FailingHistory(kotlinx.coroutines.CancellationException("cancelled")), "0001") }
     }
-    }
 
     @Test
     fun `subclasses of IOException are caught too and an Error still propagates`() {
