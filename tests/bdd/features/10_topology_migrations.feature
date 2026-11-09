@@ -351,12 +351,14 @@ Feature: Topology migrations
     When I open the migrations screen
     Then "Apply pending" is disabled and the reason says the level is Read-only
 
-  # Needs the 3.x detection of M8-02: that task builds the glue; until then the suite excludes @m8-02.
-  @m5-08 @m8-02 @fake-broker @negative
+  # Fail closed (M5-08a review, F3): the executor exists only for a broker whose GET /api/overview reports a 4.x or later version; M8-02 owns the
+  # connection pill text, the forced Read-only level and the live 3.x source reading.
+  @m5-08 @m5-08a @fake-broker @negative
   Scenario: A 3.x source connection cannot apply migrations
-    Given the connection "legacy-eu" is a RabbitMQ 3.x migration source
-    When I open the migrations screen
-    Then "Apply pending" is disabled and no executor exists for this connection
+    Given a connection "legacy-eu" to a broker whose overview reports RabbitMQ 3.13.7
+    When I connect to "legacy-eu"
+    Then the connection has no migration executor and says migrations are not offered because it is a migration source only
+    And no request that changes anything was sent to "legacy-eu"
 
   @m5-08 @m5-08c @fake-broker
   Scenario: A failed apply shows which action failed and why

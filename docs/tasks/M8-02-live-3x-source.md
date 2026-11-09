@@ -26,6 +26,7 @@ Pill wording in the spec; the Connections screen mockup gets the pill variant (`
 None here (`M8-10`).
 
 ## Open points
+M5-08a review (2026-11-09, F3): the 3.x version check that keeps a 3.x connection from getting a migration executor is done in `M5-08a` (`brokerMajorVersion` in `core`, one `GET /api/overview` when the connection opens; unknown or 3.x means no executor and a fixed reason). This task still owns: reading the live 3.x source (definitions, `storage_version` with retry, deprecated features), the connection pill "RabbitMQ 3.x: migration source only", the forced Read-only level, disabled stream features, the held connection's version field (reuse the one overview read, do not add a second), and the analysis from a live connection. Scenario "A 3.x source connection cannot apply migrations" moved to `M5-08a`; the screen wording of that case is `M5-08c`.
 Whether `GET /api/definitions` needs the administrator tag (UNVERIFIED, S-A). Large exports (S-L).
 
 ## Spike findings (M8-00, 2026-11-09)
