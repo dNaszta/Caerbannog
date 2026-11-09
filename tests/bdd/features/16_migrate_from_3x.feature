@@ -213,11 +213,13 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     When I analyse "legacy-eu"
     Then there is no message-loss finding for "events"
 
-  @fake-broker @needs-decision
+  @fake-broker
   Scenario: The message-loss findings come first in the report
     Given a live report with a mirroring policy finding and a message-loss blocker
     When I open the report
     Then the message-loss blocker is the first item
+    And the report recommends a new 4.x broker with topology migration and a Shovel
+    And the policy fix and the upgrade through 4.0 to 4.2 are shown as secondary options done by hand
     And the report never offers an in-place upgrade as a safe option
 
   @fake-broker

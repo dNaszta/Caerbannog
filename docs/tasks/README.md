@@ -114,6 +114,8 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 
 ## Milestone M8 (Migrate from RabbitMQ 3.x to 4.x, planned 2026-11-09; scenarios `16_migrate_from_3x.feature`, `17_forward_messages_with_shovel.feature`)
 
+**Status: paused 2026-11-09 (owner).** Planning and spikes are done, no product code written. Next steps in order: (1) file-based first slice M8-01, M8-03, M8-04, M8-05 (with M8-12); (2) UX mockup `docs/ux/Migrate3x.dc.html` before M8-06 and M8-09; (3) M8-02 live source and the Shovel track M8-07, M8-08, M8-09; (4) M8-10 and the M8-11 gate; (5) remaining spikes of M8-13 as needed.
+
 | ID | Title | Milestone | Status |
 | --- | --- | --- | --- |
 | M8-00-spike-live-3x-vs-4x | Spike on live 3.13 and 4.x: definitions shape, quorum and policy rejects, 4.x import of a 3.x export, Shovel details, version detection (items S-A to S-L); first task, nothing else starts before it | M8 | DONE 2026-11-09 (results `M8-00-spike-results.md`, tests `RealBrokerM8Spike*Test`; 23 tests pass; findings folded into spec and briefs) |

@@ -33,7 +33,7 @@ Mockup. Where the entry lives (recommendation: a button on the Migrations screen
 The review sheet shows the ordering warning with the required tick "Ordering by priority may change" for every classic to quorum conversion (P15, decided 2026-11-09; default proposal for `x-max-priority` queues is keep classic, quorum the alternative), the global warnings (in-place upgrade can lose classic queue messages; client-visible checks) and the "unverified" marker on unmeasured differences.
 
 ## Spike S-N finding
-S-N: the first block of the report is the message-loss banner ("In-place upgrade to RabbitMQ 4.3 or later would silently empty N classic queues") with the queue list, the three fixes and the recommended blue-green path; the loss cannot be detected after the upgrade and the text says so (P16, awaiting the owner). It uses the suggested wording of `M8-00-spike-results.md` S-N.
+S-N: the first block of the report is the message-loss banner ("In-place upgrade to RabbitMQ 4.3 or later would silently empty N classic queues") with the queue list, the three fixes and the recommended blue-green path; the loss cannot be detected after the upgrade and the text says so (P16, decided 2026-11-09: always the first block; the new broker plus Shovel is shown as the recommended path, the other two fixes as secondary hand-done options, "upgrade in place" never as a green option). It uses the suggested wording of `M8-00-spike-results.md` S-N.
 
 ## Definition of done
 Tests first and passing, `./gradlew test` green, screenshots looked at, spec screens table updated.
