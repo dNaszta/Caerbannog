@@ -70,7 +70,7 @@ The project is built test-first: unit tests with fakes, BDD scenarios in `tests/
 | `desktopApp` | `main()`, wiring, packaging |
 | `mcp-server` | MCP server over stdio |
 
-Design and decisions live in [`docs/spec.md`](docs/spec.md); task briefs in `docs/tasks/`; UX mockups in `docs/ux/`. Platform guides: [Fedora](docs/DEVELOPING_ON_FEDORA.md), [Windows](docs/DEVELOPING_ON_WINDOWS.md). Contributor and agent conventions are in [`CLAUDE.md`](CLAUDE.md).
+Design and decisions live in [`docs/spec.md`](docs/spec.md); task briefs in `docs/tasks/`; UX mockups in `docs/ux/`. Platform guides: [macOS](docs/DEVELOPING_ON_MACOS.md), [Fedora](docs/DEVELOPING_ON_FEDORA.md), [Windows](docs/DEVELOPING_ON_WINDOWS.md). Contributor and agent conventions are in [`CLAUDE.md`](CLAUDE.md).
 
 ## License
 
