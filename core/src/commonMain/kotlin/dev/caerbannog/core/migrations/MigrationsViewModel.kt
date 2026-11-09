@@ -196,7 +196,10 @@ class MigrationsViewModel(
                 _state.update { it.copy(errorMessage = error) }
                 loadMigrations()
             }
-            is MigrationApplyResult.NotRecorded -> {} // M5-08b R1 STUB
+            is MigrationApplyResult.NotRecorded -> {
+                _state.update { it.copy(errorMessage = result.reason) }
+                loadMigrations()
+            }
             is MigrationApplyResult.Blocked -> {
                 _state.update { it.copy(errorMessage = result.reason) }
             }
@@ -210,7 +213,8 @@ class MigrationsViewModel(
             ?: return MigrationApplyResult.Blocked("Migration file not found")
         applyBlockReason()?.let { return MigrationApplyResult.Blocked(it) }
         return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel, vhost)
-            .also {
+            .also { result ->
+                if (result is MigrationApplyResult.NotRecorded) _state.update { it.copy(errorMessage = result.reason) }
                 loadMigrations()
             }
     }

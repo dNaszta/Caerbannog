@@ -94,7 +94,7 @@ class JsonFileAppSettings(
             val others = readObject().orEmpty() - key
             val content = JsonObject(if (value is JsonNull) others else others + change)
             file.absoluteFile.parentFile.mkdirs()
-            AtomicFileWriter.write(file.toPath(), json.encodeToString(JsonObject.serializer(), content).toByteArray(Charsets.UTF_8), NioFileMover)
+            AtomicFileWriter.write(file.toPath(), json.encodeToString(JsonObject.serializer(), content).toByteArray(Charsets.UTF_8), NioFileMover, ownerOnly = true)
         } catch (e: Exception) {
             log("settings.json could not be written, the setting is kept for this run only: ${e.javaClass.simpleName}: ${e.message}")
         }

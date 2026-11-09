@@ -15,14 +15,14 @@ sealed interface HistoryMoveResult {
 
 /**
  * Keeps the applied history in step with the profile list: a rename moves the entries (REPLACING any leftover already under the new name),
- * a delete removes them.
+ * a delete removes them. The history is changed FIRST: when it cannot be, the caller leaves the profile as it is.
  */
 interface ProfileHistoryKeys {
     fun rename(oldName: String, newName: String): HistoryKeyResult
     fun delete(profileName: String): HistoryKeyResult
 }
 
-/** M5-08b R1 STUB: the answer of a history key change; [Failed.reason] is fixed text. An unreadable history file counts as [Done]. */
+/** The answer of a history key change; [Failed.reason] is fixed text. An unreadable history file counts as [Done]. */
 sealed interface HistoryKeyResult {
     data object Done : HistoryKeyResult
     data class Failed(val reason: String) : HistoryKeyResult

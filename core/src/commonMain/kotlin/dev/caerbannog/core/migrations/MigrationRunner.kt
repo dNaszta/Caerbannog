@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import kotlinx.coroutines.CancellationException
 
 /**
  * Result of executing a single migration action on the broker.
@@ -204,11 +205,29 @@ class MigrationRunner(
                 }
             }
 
-            // Record as applied upon completing all actions in the migration
-            historyRepository.recordApplied(profileName, migration.version, migration.checksum)
+            // Record as applied upon completing all actions in the migration; if that fails, nothing later may run.
+            if (!recorded(profileName, migration)) {
+                return MigrationApplyResult.NotRecorded(migration.version, NOT_RECORDED)
+            }
             appliedVersions += migration.version
         }
 
         return MigrationApplyResult.Success(appliedVersions)
+    }
+
+    /** False when the history refused or could not write the record; the broker change was made and every action is safe to run again. */
+    private suspend fun recorded(profileName: String, migration: MigrationFile): Boolean =
+        try {
+            historyRepository.recordApplied(profileName, migration.version, migration.checksum)
+            true
+        } catch (failure: CancellationException) {
+            // A cancellation is an IllegalStateException on the JVM; it must keep cancelling.
+            throw failure
+        } catch (failure: Exception) {
+            if (failure is IllegalStateException || failure.isIoFailure()) false else throw failure
+        }
+
+    private companion object {
+        const val NOT_RECORDED = "The migration was applied but could not be recorded; running it again is safe"
     }
 }

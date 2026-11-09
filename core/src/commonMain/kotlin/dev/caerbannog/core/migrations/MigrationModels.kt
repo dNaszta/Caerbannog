@@ -238,6 +238,6 @@ sealed interface MigrationApplyResult {
         val reason: String,
     ) : MigrationApplyResult
     data class Blocked(val reason: String) : MigrationApplyResult
-    /** M5-08b R1 STUB: every action was applied on the broker but the history could not be written; [reason] is fixed text. */
+    /** Every action was applied on the broker but the history could not be written; [reason] is fixed text. */
     data class NotRecorded(val version: String, val reason: String) : MigrationApplyResult
 }

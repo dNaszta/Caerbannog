@@ -52,7 +52,7 @@ internal fun JsonObject.identifier(key: String): String? = string(key)?.also { i
 internal fun JsonObject.vhost(): String = identifier("vhost") ?: "/"
 
 /**
- * The root `version`: a string of letters, digits, `_` and `-`, or a whole number (older files; its text); null when absent or JSON null.
+ * The root `version`: a string of letters, digits, `_` and `-`, or a whole number (older files; its text), but not a Windows device name; null when absent or JSON null.
  * The version becomes a file name, so nothing else may pass; the refusal never echoes the value.
  */
 internal fun JsonObject.versionText(): String? = when (val value = present("version")) {
@@ -63,9 +63,12 @@ internal fun JsonObject.versionText(): String? = when (val value = present("vers
 
 private val VERSION_TEXT = Regex("[A-Za-z0-9_-]+")
 
+/** Names Windows reserves as devices: a file called `CON.json` cannot be made there, whatever the case. */
+private val WINDOWS_DEVICE = Regex("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]", RegexOption.IGNORE_CASE)
+
 private fun JsonPrimitive.versionOrNull(): String? = when {
     // A blank text stays and is reported as "no version" by the parser.
-    isString -> content.takeIf { it.isBlank() || VERSION_TEXT.matches(it) }
+    isString -> content.takeIf { it.isBlank() || (VERSION_TEXT.matches(it) && !WINDOWS_DEVICE.matches(it)) }
     else -> content.toLongOrNull()?.toString()
 }
 

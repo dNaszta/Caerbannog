@@ -29,6 +29,7 @@ private const val NOT_JSON = "The file is not valid JSON"
 private const val TOO_DEEP = "The file is nested too deep"
 private const val WRONG_SHAPE = "The file does not have the expected shape"
 private const val NOT_READ = "The file cannot be read"
+private const val KEYS_NOT_UPDATED = "The migration history file could not be written"
 
 private typealias Profiles = Map<String, Map<String, String>>
 
@@ -74,23 +75,21 @@ class JsonFileMigrationHistoryRepository(
 
     /**
      * Moves the entries of [oldName] to [newName]; whatever was under [newName] is REPLACED (a leftover of a deleted profile must not be
-     * merged). Does nothing while the file is unreadable. A failed write leaves the entries where they were: the migrations then show as
-     * pending under the new name, never as applied by mistake.
+     * merged). Done without a write while the file is unreadable (nothing may be written over it) or when there is nothing to move;
+     * [HistoryKeyResult.Failed] when the write fails, and the entries then stay where they were.
      */
     override fun rename(oldName: String, newName: String): HistoryKeyResult {
         if (oldName == newName) return HistoryKeyResult.Done
-        change { profiles ->
+        return change { profiles ->
             if (oldName !in profiles && newName !in profiles) return@change null
             val moved = profiles[oldName]
             (profiles - oldName - newName) + listOfNotNull(moved?.let { newName to it })
         }
-        return HistoryKeyResult.Done // M5-08b R1 STUB
     }
 
-    /** Removes the entries of [profileName]. Does nothing while the file is unreadable or when there is nothing to remove. */
+    /** Removes the entries of [profileName]. Done without a write while the file is unreadable or when there is nothing to remove. */
     override fun delete(profileName: String): HistoryKeyResult {
-        change { profiles -> if (profileName in profiles) profiles - profileName else null }
-        return HistoryKeyResult.Done // M5-08b R1 STUB
+        return change { profiles -> if (profileName in profiles) profiles - profileName else null }
     }
 
     override fun asideFileName(): String = synchronized(lock) { freeAsideName() }
@@ -106,16 +105,14 @@ class JsonFileMigrationHistoryRepository(
         }
     }
 
-    // Best effort for the key changes: they cannot fail a profile edit that already happened.
-    private fun change(transform: (Profiles) -> Profiles?) {
-        synchronized(lock) {
-            val profiles = (read() as? Snapshot.Loaded)?.profiles ?: return
-            val changed = transform(profiles) ?: return
-            try {
-                write(changed)
-            } catch (_: IOException) {
-                return
-            }
+    private fun change(transform: (Profiles) -> Profiles?): HistoryKeyResult = synchronized(lock) {
+        val profiles = (read() as? Snapshot.Loaded)?.profiles ?: return@synchronized HistoryKeyResult.Done
+        val changed = transform(profiles) ?: return@synchronized HistoryKeyResult.Done
+        try {
+            write(changed)
+            HistoryKeyResult.Done
+        } catch (_: IOException) {
+            HistoryKeyResult.Failed(KEYS_NOT_UPDATED)
         }
     }
 
@@ -134,7 +131,7 @@ class JsonFileMigrationHistoryRepository(
             ),
         )
         Files.createDirectories(file.toAbsolutePath().parent)
-        AtomicFileWriter.write(file, json.encodeToString(JsonObject.serializer(), tree).toByteArray(Charsets.UTF_8), mover)
+        AtomicFileWriter.write(file, json.encodeToString(JsonObject.serializer(), tree).toByteArray(Charsets.UTF_8), mover, ownerOnly = true)
     }
 
     private fun read(): Snapshot {

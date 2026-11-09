@@ -113,7 +113,7 @@ class FolderMigrationFileRepository(
 
     private fun writeOrInvalid(target: Path, result: MigrationValidationResult.Valid): MigrationValidationResult =
         try {
-            AtomicFileWriter.write(target, result.migration.rawJson.toByteArray(Charsets.UTF_8), mover)
+            AtomicFileWriter.write(target, result.migration.rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = false)
             result
         } catch (_: IOException) {
             MigrationValidationResult.Invalid(NOT_WRITTEN)
@@ -125,7 +125,7 @@ class FolderMigrationFileRepository(
         val rawJson = MigrationParser.exportToJson(version, description, actions)
         val parsed = MigrationParser.parse(rawJson) as? MigrationValidationResult.Valid ?: throw MigrationWriteException(NOT_WRITTEN)
         try {
-            AtomicFileWriter.write(target, rawJson.toByteArray(Charsets.UTF_8), mover)
+            AtomicFileWriter.write(target, rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = false)
         } catch (_: IOException) {
             throw MigrationWriteException(NOT_WRITTEN)
         }
