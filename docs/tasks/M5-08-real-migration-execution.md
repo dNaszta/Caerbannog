@@ -30,7 +30,7 @@ Recommended order: a, b, c, then M5-09 (M5-09 may run in parallel with c). M8-05
 | --- | --- | --- | --- | --- | --- |
 | `declareQueue` | `PUT /api/queues/{v}/{n}` | 201 | 204: no-op | 400 `PRECONDITION_FAILED`: `Failed("<name> exists with different settings")`, nothing deleted or recreated | `GET` detail: exists; type, durable and every declared argument equal (numbers as numbers) |
 | `declareExchange` | `PUT /api/exchanges/...` | 201 | 204: no-op | 400: same conflict | exists; type, flags, arguments |
-| `declareBinding` | `POST /api/bindings/.../e/{src}/q or e/{dst}` | 201 | 204: no-op | not possible: a binding is its source, destination, routing key and arguments; another key is another binding | the binding list of source to destination contains it |
+| `declareBinding` | `POST /api/bindings/.../e/{src}/q or e/{dst}` | 201 | 201 (measured on 4.x: a repeated POST answers 201, not 204): no-op | not possible: a binding is its source, destination, routing key and arguments; another key is another binding | the binding list of source to destination contains it |
 | `declarePolicy`, `declareOperatorPolicy` | `GET` first, then `PUT` | absent: `PUT` | equal (pattern, apply-to, priority, every definition key, numbers numeric): no request at all | different: conflict failure, NO `PUT` | `GET`: equal |
 | `declareStream` | `StreamManager.createStream` | `Success` | "already exists" refusal: no-op (stream settings are not in the action) | n/a | the stream is listed |
 | `delete*` (Full control only) | `DELETE` | 204 | n/a | n/a | `GET` answers 404 |
