@@ -180,4 +180,85 @@ class MigrationTypedValuesTest {
         assertEquals("Declare quorum queue orders", MigrationAction.DeclareQueue("orders", "quorum", arguments = mapOf("a" to ArgumentValue.Whole(1))).description)
         assertEquals("Declare policy p", MigrationAction.DeclarePolicy("p", ".*", mapOf("a" to ArgumentValue.Whole(1)), applyTo = "queues", priority = 2).description)
     }
+
+    // ---- detail format pinned by the architect (step 2 answers)
+
+    @Test
+    fun `a policy detail is exactly apply-to, priority, then the sorted definition pairs`() {
+        val policy = MigrationAction.DeclarePolicy(
+            "limits", "^orders",
+            definition = mapOf("overflow" to ArgumentValue.Text("reject-publish"), "max-length" to ArgumentValue.Whole(1000)),
+            applyTo = "quorum_queues", priority = 7,
+        )
+        assertEquals("apply-to=quorum_queues, priority=7; max-length=1000, overflow=reject-publish", policy.detail)
+        val operator = MigrationAction.DeclareOperatorPolicy("op", ".*", mapOf("max-length" to ArgumentValue.Whole(5)), applyTo = "queues", priority = 2)
+        assertEquals("apply-to=queues, priority=2; max-length=5", operator.detail)
+    }
+
+    @Test
+    fun `a default policy and a default operator policy have a detail, never null`() {
+        assertEquals("apply-to=all, priority=0", MigrationAction.DeclarePolicy("p", ".*").detail)
+        assertEquals("apply-to=all, priority=0", MigrationAction.DeclareOperatorPolicy("o", ".*").detail)
+    }
+
+    @Test
+    fun `a control character in a key or value becomes a space and the detail is one line`() {
+        val queue = MigrationAction.DeclareQueue("q", "quorum", arguments = mapOf("x-note" to ArgumentValue.Text("line1\nline2\ttab\r")))
+        assertEquals("x-note=line1 line2 tab ", queue.detail)
+        val policy = MigrationAction.DeclarePolicy("p", ".*", mapOf("a\nb" to ArgumentValue.Text("v")))
+        assertEquals("apply-to=all, priority=0; a b=v", policy.detail)
+        assertFalse(queue.detail!!.any { it.isISOControl() })
+    }
+
+    @Test
+    fun `the detail is cut at 120 characters in total, 119 plus an ellipsis, also for a policy`() {
+        val queue = MigrationAction.DeclareQueue("q", "quorum", arguments = mapOf("x-long" to ArgumentValue.Text("v".repeat(500))))
+        assertEquals(120, queue.detail!!.length)
+        assertEquals("x-long=" + "v".repeat(112) + "…", queue.detail)
+        val policy = MigrationAction.DeclarePolicy("p", ".*", mapOf("max" to ArgumentValue.Text("w".repeat(500))))
+        assertEquals(120, policy.detail!!.length)
+        assertTrue(policy.detail!!.startsWith("apply-to=all, priority=0; max=www") && policy.detail!!.endsWith("…"))
+        val exactly120 = MigrationAction.DeclareQueue("q", "quorum", arguments = mapOf("k" to ArgumentValue.Text("v".repeat(118))))
+        assertEquals(120, exactly120.detail!!.length)
+        assertFalse(exactly120.detail!!.endsWith("…"), "120 characters fit and are not cut")
+    }
+
+    // ---- JSON null as the whole arguments or definition means absent; a non-object does not
+
+    @Test
+    fun `null as the whole arguments or definition value means none`() {
+        val queue = only(fileWith("""{ "action": "declareQueue", "name": "q", "arguments": null }""")) as MigrationAction.DeclareQueue
+        assertEquals(only(fileWith("""{ "action": "declareQueue", "name": "q" }""")), queue)
+        assertTrue(queue.arguments.isEmpty())
+        val exchange = only(fileWith("""{ "action": "declareExchange", "name": "x", "arguments": null }""")) as MigrationAction.DeclareExchange
+        assertTrue(exchange.arguments.isEmpty())
+        val binding = only(fileWith("""{ "action": "declareBinding", "exchange": "e", "queue": "q", "arguments": null }""")) as MigrationAction.DeclareBinding
+        assertTrue(binding.arguments.isEmpty())
+        for (kind in listOf("declarePolicy", "declareOperatorPolicy")) {
+            val a = only(fileWith("""{ "action": "$kind", "name": "p", "pattern": ".*", "definition": null }"""))
+            assertEquals(only(fileWith("""{ "action": "$kind", "name": "p", "pattern": ".*" }""")), a)
+        }
+    }
+
+    @Test
+    fun `a number, boolean or list as the whole arguments or definition stays refused`() {
+        for (bad in listOf("5", "true", "[]", "\"text\"")) {
+            assertEquals("the arguments are not valid or nested too deep", reason(fileWith("""{ "action": "declareQueue", "name": "q", "arguments": $bad }""")), bad)
+            assertEquals("the arguments are not valid or nested too deep", reason(fileWith("""{ "action": "declarePolicy", "name": "p", "pattern": ".*", "definition": $bad }""")), bad)
+        }
+    }
+
+    // ---- x-queue-type is refused for declareQueue arguments only
+
+    @Test
+    fun `exchange arguments, binding arguments and policy definitions may carry an x-queue-type key`() {
+        val x = only(fileWith("""{ "action": "declareExchange", "name": "x", "arguments": { "x-queue-type": "quorum" } }""")) as MigrationAction.DeclareExchange
+        assertEquals(ArgumentValue.Text("quorum"), x.arguments["x-queue-type"])
+        val b = only(fileWith("""{ "action": "declareBinding", "exchange": "e", "queue": "q", "arguments": { "x-queue-type": "quorum" } }""")) as MigrationAction.DeclareBinding
+        assertEquals(ArgumentValue.Text("quorum"), b.arguments["x-queue-type"])
+        val p = only(fileWith("""{ "action": "declarePolicy", "name": "p", "pattern": ".*", "definition": { "x-queue-type": "quorum" } }""")) as MigrationAction.DeclarePolicy
+        assertEquals(ArgumentValue.Text("quorum"), p.definition["x-queue-type"])
+        val o = only(fileWith("""{ "action": "declareOperatorPolicy", "name": "p", "pattern": ".*", "definition": { "x-queue-type": "quorum" } }""")) as MigrationAction.DeclareOperatorPolicy
+        assertEquals(ArgumentValue.Text("quorum"), o.definition["x-queue-type"])
+    }
 }
