@@ -116,3 +116,59 @@ Only what the brokers themselves state: `/api/deprecated-features` on 4.4 marks 
 - **Federation upstream/shovel static parameters on 3.x**: only measured as "parameters are exported verbatim with credentials"; the federation plugin was off.
 - **Clusters** (mirrored queues with real mirrors, `slave_nodes`): single nodes only; the export shape for a clustered 3.x broker may add node-related fields.
 - **Windows/Podman and Intel images:** run on Docker/aarch64 only.
+
+## S-N: classic queue messages after in-place upgrade
+
+Measured 2026-11-09 (M8-13), same hosts as above (3.13.7; `rabbitmq:4.0` = 4.0.9, `4.1` = 4.1.8, `4.2` = 4.2.9, `4.3` = 4.3.7, `4` = 4.4.0). Living proof: `RealBrokerM8SpikeUpgradeTest` (6 tests, two clean runs). Method: one Docker volume is the broker data directory; a 3.13 node is stopped with `docker stop -t 60` (or killed) and another image is started on the same volume with the same host name (node name `rabbit@upg-host`). Messages are counted with a requeueing peek (exact, no statistics lag). Every queue held 3 persistent messages unless noted.
+
+**Verdict: cause found. It is the classic queue index version, not feature flags, not the stop mode and not the volume.** RabbitMQ 3.13 creates classic queues with the **version 1** index by default (management API field `storage_version` = 1). RabbitMQ **4.3 and later cannot recover a version-1 index**: the queue process crashes at start with `{case_clause,undefined}` in `rabbit_classic_queue_index_v2:recover/4` (`Queue ... failed to initialise`), and the queue comes back **empty**. Versions 4.0, 4.1 and 4.2 still convert a version-1 index to version 2 on recovery and keep the messages.
+
+### What is lost and what survives (direct 3.13.7 -> 4.4.0, graceful stop)
+
+| 3.13 queue | Messages on 4.4 |
+| --- | --- |
+| classic, declared without arguments (the 3.13 default, version 1) | **0, lost** |
+| classic, `x-queue-version: 1`; also `x-queue-mode: lazy`, `x-max-priority`, 6 KB bodies, empty | **0, lost** (an empty one is recreated empty) |
+| classic, `x-queue-version: 2` (also with `x-max-priority`, 6 KB bodies) | 3, kept |
+| quorum | 3, kept |
+| any queue, **transient** messages (`delivery_mode` 1) | 0 (lost by every restart, unrelated to the version) |
+| non-durable queue | queue gone (unrelated to the version) |
+
+### The loss is silent
+
+After the upgrade the node boots normally, the queue is `state: running`, accepts publishes and is listed in the API with `messages: 0`. **Nothing in the management API says that messages were lost.** The only trace is in the broker log: `Queue <pid> failed to initialise: {{case_clause,undefined},[{rabbit_classic_queue_index_v2,recover,4,...` (one crash block per queue, repeated). The app can therefore only prevent it, never detect it afterwards.
+
+### Where the boundary is (direct jump from 3.13.7, one fresh volume per target)
+
+| Target | v1 queue | v2 queue |
+| --- | --- | --- |
+| 4.0.9, 4.1.8, 4.2.9 | 3, converted and kept | 3 |
+| 4.3.7, 4.4.0 | **0, lost** | 3 |
+| 3.13 -> 4.0 -> 4.4 (two hops, graceful stop each) | 3 for every classic variant, 3 on 4.4 | 3 |
+
+So going **through 4.0 (or 4.1/4.2) first** converts the queues and the next jump to 4.4 is clean. (The 4.3 release notes were not fetched; the boundary is measured, not cited.)
+
+### Hypotheses tested and refuted
+
+- **Feature flags:** on 3.13.7 every stable feature flag was already enabled; only `khepri_db` was disabled and 4.x enabled it by itself during boot (Mnesia to Khepri migration, logged, no problem). The hop through 4.0 works with exactly the same flags, so flags are not the cause. (Not measured: a node with a stable flag deliberately disabled, which a current 3.13 does not allow.)
+- **Unclean stop:** a forced `docker kill` of 3.13 loses nothing on 3.13 itself (control: restart of the same image keeps all queues), and the 4.4 result after a kill is the same as after a graceful stop (v2 kept, v1 lost).
+- **Persistent vs transient, durable vs not, lazy mode, priorities, large bodies (index vs store):** none changes the outcome for version 1 (all lost) or version 2 (all kept; transient messages lost as always).
+- **Volume copy vs same volume, management publish vs AMQP publish:** not varied (the cause is the index version of the queue, which neither can change; AMQP publishing needs the AMQP client dependency, not added in this spike).
+
+### How to tell, and how to convert, on the 3.13 broker
+
+- **Detection:** `GET /api/queues/{vhost}/{name}` and the list endpoint `GET /api/queues/{vhost}` on 3.13 return `storage_version` (1 or 2) for classic queues (absent for quorum). It appears with the queue's first statistics, a few seconds after the queue starts or is declared, so a scan must tolerate a missing value (poll or retry). `GET /api/definitions` does NOT carry it (only `x-queue-version` when the application set it), and a queue without that argument is version 1 on 3.13. `rabbitmqctl list_queues name version` is not a valid column.
+- **Conversion on 3.13:** a policy `queue-version: 2` plus a **graceful restart of the 3.13 node** converts the queue (after the restart `storage_version` = 2, the 3 messages are still there, and they survive a direct jump to 4.4). Setting the policy on a running node makes the API report version 2 immediately, but whether the on-disk index is converted by the time the node stops was **not deterministic**: queues survived in two runs (policy 2 s and 25 s before the stop) and one queue was lost in a run where the node was stopped 3 s after the policy. So the API value alone is not proof; verify after a restart.
+- **Node-wide default:** `classic_queue.default_version = 2` in `rabbitmq.conf` makes new classic queues version 2; it does not convert existing ones (not measured separately).
+
+### What the app should say and recommend (suggested wording for M8-03/M8-06)
+
+Blocker for every classic queue with `storage_version` 1 (or without a known version) on a 3.13 source, when the target is 4.3 or later:
+
+> "Queue `orders` uses the old classic queue index (version 1). RabbitMQ 4.3 and later cannot read it: **an in-place upgrade to 4.3+ would silently empty this queue (messages lost, no error in the management API).** Convert it first: set the policy `queue-version: 2` on this broker and restart the node, then check that the queue shows version 2. Or upgrade through RabbitMQ 4.0, 4.1 or 4.2 before 4.3+. The safest way is not to upgrade in place: migrate the topology to a new 4.x broker and forward the messages with a Shovel (the Shovel path is not affected)."
+
+Recommendations: (1) the report must contain this as a **blocker with severity "message loss"** and must not offer "upgrade in place" as a green option; (2) the live scan should read `storage_version` per classic queue and the report should list every version-1 queue by name; for a definitions file (no version field) it must warn for **every classic queue** that does not have `x-queue-version: 2`; (3) the recommended path stays blue-green (new 4.x broker, topology migration, Shovel), which does not read the old index; (4) the mirrored-queue and transient-queue findings (S-D, S-E) are separate from this one.
+
+### Not measured in S-N
+
+Release-note confirmation of the 4.3 change, `classic_queue.default_version` in `rabbitmq.conf`, a 3.12 -> 4.x jump, AMQP-published messages, a clustered upgrade, a volume copy (`docker cp`) instead of the same volume, the non-deterministic policy-without-restart conversion (timing), and x86_64 (aarch64 images only).
