@@ -17,7 +17,7 @@ Out: UI screen (`M8-06`), analysis.
 - The existing 4.x scenarios in `01`, `02`, `13` stay green unedited.
 
 ## Design notes
-Version rule lives in `core` as a pure function. Keep the "one held connection" rule: the fetch result is an in-memory model owned by an M8 session object, not by `SessionState`. Missing or unparsable version: treat as unknown and say so, never assume 4.x. Do not add a profile field (proposed decision P6, awaiting owner confirmation) unless `M8-00` S-H shows `rabbitmq_version` is not reliable.
+Version rule lives in `core` as a pure function. Keep the "one held connection" rule: the fetch result is an in-memory model owned by an M8 session object, not by `SessionState`. Missing or unparsable version: treat as unknown and say so, never assume 4.x. Do not add a profile field (decision P6, 2026-11-09) unless `M8-00` S-H shows `rabbitmq_version` is not reliable.
 
 ## UX
 Pill wording in the spec; the Connections screen mockup gets the pill variant (`docs/ux/Main.dc.html` update by the architect before step 2).

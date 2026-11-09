@@ -26,7 +26,7 @@ None.
 None here.
 
 ## Open points
-P1 decided 2026-11-09: the profile's user is reused, so its password is read from `SecretStore` at PUT time. P7 (Shovel on 4.x) and P8 proposed.
+P1 decided 2026-11-09: the profile's user is reused, so its password is read from `SecretStore` at PUT time. P7 (Shovel on 4.x) and P8 decided 2026-11-09.
 
 ## Definition of done
 Tests first and passing, live tests clean up shovels and queues, no secret in any output, spec updated with the measured field names.

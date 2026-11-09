@@ -8,7 +8,7 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
   messages. The app itself never gets, consumes, acknowledges, deletes or purges queue messages, never
   deletes the source queue, and never writes anything to the 3.x broker. The messages are moved: they
   leave the source queue once the destination confirms. See docs/spec.md "Forwarding messages with a
-  dynamic Shovel". Shovel field names and behaviour that the M8-00 spike has not measured are proposals.
+  dynamic Shovel". Decisions P1 to P9 were taken by the owner on 2026-11-09. Shovel field names and behaviour that the M8-00 spike has not measured are proposals.
 
   Background:
     Given the 4.x connection "new-eu" is the held connection
@@ -82,7 +82,7 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     Then the shovel "caerbannog-migrate-orders" is deleted on "new-eu"
     And no queue is deleted on either broker
 
-  @negative @fake-broker @needs-decision
+  @negative @fake-broker
   Scenario: Removing a shovel needs Full control
     Given a forwarding of "orders" is running
     When I try to remove the shovel at the level Declare and edit

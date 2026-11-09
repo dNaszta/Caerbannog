@@ -3,7 +3,7 @@
 Milestone: M8    Depends on: M8-03, M8-04, M8-12    Size: L
 
 ## Goal
-A `ConversionReview` takes a report, lets each finding be accepted, changed or skipped, and generates one ordinary topology migration per source virtual host (P3, proposed) and one access migration (vhosts, users, permissions; P10, proposed) once everything is decided.
+A `ConversionReview` takes a report, lets each finding be accepted, changed or skipped, and generates one ordinary topology migration per source virtual host (P3) and one access migration (vhosts, users, permissions; P10) once everything is decided.
 
 ## Why
 Spec decision 2 and "Review and the generated migration".
@@ -26,7 +26,7 @@ Review states in `M8-06`.
 No tool: the point is a human decision per item (spec MCP evaluation). A generated migration is an ordinary file, usable by the migration tools.
 
 ## Open points
-P3 and P10 are proposed, awaiting the owner; P2 is decided. The review state and any log or `toString` never include a hash.
+P2, P3 and P10 are decided (2026-11-09). The review state and any log or `toString` never include a hash.
 
 ## Definition of done
 Tests first and passing, existing migration suites unedited and green, spec updated.

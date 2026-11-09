@@ -26,7 +26,7 @@ Mockup `docs/ux/Migrate3x.dc.html` (forwarding section, from `M8-06`). Blocked u
 None (UI); see `M8-10` for what is exposed.
 
 ## Open points
-P5 decided (default `queue-length`, `never` only with a warning); P4 and P8 (AMQP host and port asked in the dialog) proposed, awaiting the owner. The confirmation must state that the broker stores the credentials until the Shovel is removed (P1).
+P5 decided (default `queue-length`, `never` only with a warning); P4 (Full control to remove) and P8 (AMQP host and port asked in the dialog) decided 2026-11-09. The confirmation must state that the broker stores the credentials until the Shovel is removed (P1).
 
 ## Definition of done
 Tests first and passing, screenshots looked at, spec screens table updated.

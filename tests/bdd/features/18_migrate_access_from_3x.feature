@@ -6,8 +6,8 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
 
   Owner decision 2026-11-09 (P2): they are part of the generated migration. The password hash of a user
   is passed through from the export into the migration file; the app never computes, stores or shows it.
-  Access actions need an administrator and the level Full control. Scenarios marked @needs-decision
-  depend on proposals the owner has not confirmed (P10 to P13); @needs-spike on measurements of M8-00 (S-M).
+  Access actions need an administrator and the level Full control. Decisions P10 to P13 were
+  accepted by the owner on 2026-11-09; scenarios marked @needs-spike depend on measurements of M8-00 (S-M).
   See docs/spec.md "Users, virtual hosts and permissions in the migration".
 
   Background:
@@ -59,7 +59,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     Then "Apply pending" is disabled
     And I am told that this needs the level Full control
 
-  @fake-broker @needs-decision
+  @fake-broker
   Scenario: The access migration applies from an administrator profile of any virtual host
     Given the connection "new-eu" has the virtual host "/"
     And the virtual host "/orders" does not exist on the 4.x broker
@@ -88,7 +88,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     When I apply the access migration
     Then the apply stops with a conflict and the permissions are unchanged
 
-  @fake-broker @needs-decision
+  @fake-broker
   Scenario: guest is proposed for skipping
     Given the export contains the user "guest" with the default password hash
     When I analyse the file
@@ -96,7 +96,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And the proposal for "guest" is to skip it
     And accepting it asks for an explicit confirmation
 
-  @negative @fake-broker @needs-spike @needs-decision
+  @negative @fake-broker @needs-spike
   Scenario: A user with an unsupported hash algorithm is a manual step
     Given the export contains a user whose hashing algorithm the 4.x broker does not accept
     When I analyse the file

@@ -45,7 +45,7 @@ None (spike).
 
 ## Open points
 - Decided by the owner (2026-11-09): P1 reuse the profile user for the Shovel, with disclosure in the confirmation; P5 `src-delete-after` default `queue-length`; P2 users, vhosts and permissions ARE part of the generated migration (`M8-12`). The spike results can change P1 and P5 (credential-free destination URI) and must answer the hash questions below.
-- STILL OPEN (architect's recommendations, awaiting the owner): P3 one topology migration per source vhost; P4 removing a Shovel needs Full control; P6 automatic 3.x detection; P7 Shovel on the 4.x broker; P8 AMQP host and port asked in the dialog; P9 `on-confirm` only; P10 access actions exempt from V1 in their own file; P11 `guest` skipped by default; P12 unsupported hash algorithm is a manual step; P13 owner-only file and export warning.
+- Also decided by the owner (2026-11-09, accepting the architect's recommendations): P3 one topology migration per source vhost; P4 removing a Shovel needs Full control; P6 automatic 3.x detection; P7 Shovel on the 4.x broker; P8 AMQP host and port asked in the dialog; P9 `on-confirm` only; P10 access actions exempt from V1, own file; P11 `guest` skipped by default; P12 unsupported hash algorithm is a manual step; P13 owner-only file and export warning. Nothing product-wise is open; the first M8 step is this spike.
 
 ## Definition of done
 Spike tests pass on a machine with Docker or Podman, fixtures committed, Status written (what was measured, floated image versions, what could not be measured), spec and `16`/`17` updated, no product code changed.
