@@ -15,6 +15,7 @@ import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.Retention
@@ -485,6 +486,34 @@ class McpServerTest {
         assertEquals("24.5", sent.payload.decodeToString())
         assertEquals(MqttQos.AT_LEAST_ONCE, sent.qos)
         assertTrue(sent.retain)
+    }
+
+    @Test
+    fun `publish mqtt tool passes headers as user properties and rejects malformed headers`() {
+        repo.add(
+            ConnectionProfile(
+                name = "mqtt-headers-prof", host = "localhost", virtualHost = "/", username = "guest",
+                tls = true, mqttPort = 1883, topologyControlLevel = TopologyControlLevel.DECLARE_AND_EDIT,
+            )
+        )
+        fun call(id: Int, headers: String): String {
+            val req = """{"jsonrpc": "2.0", "id": $id, "method": "tools/call", "params": {"name": "caerbannog_publish_mqtt", "arguments": {"profile": "mqtt-headers-prof", "topic": "a/b", "payload": "x", "headers": $headers}}}"""
+            val resp = server.handleRequest(req)
+            return json.parseToJsonElement(resp!!).jsonObject["result"]?.jsonObject
+                ?.get("content")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+        }
+
+        val ok = call(60, """{"trace-id": "abc", "tenant": "acme"}""")
+        assertTrue(ok.contains("\"success\":true") || ok.contains("\"success\": true"))
+        assertEquals(
+            listOf(MqttHeader("trace-id", "abc"), MqttHeader("tenant", "acme")),
+            mqttPublisher.publishedMessages.single().headers,
+        )
+
+        assertTrue(call(61, """{"n": 5}""").startsWith("Invalid 'headers'"))
+        assertTrue(call(62, """["a"]""").startsWith("Invalid 'headers'"))
+        assertTrue(call(63, """{" ": "v"}""").startsWith("Invalid 'headers'"))
+        assertEquals(1, mqttPublisher.publishedMessages.size, "malformed headers must not publish")
     }
 
     @Test

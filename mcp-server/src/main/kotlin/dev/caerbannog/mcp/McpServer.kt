@@ -14,6 +14,7 @@ import dev.caerbannog.core.publish.PublishTargetKind
 import dev.caerbannog.core.mqtt.MqttCatalog
 import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.mqtt.MqttMessagePublisher
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.mqtt.PublishMqttRequest
@@ -339,6 +340,11 @@ class McpServer(
                     putJsonObject("retain") {
                         put("type", "boolean")
                         put("description", "Whether the broker should retain this message. Defaults to false.")
+                    }
+                    putJsonObject("headers") {
+                        put("type", "object")
+                        put("description", "Optional message headers, sent as MQTT 5 user properties (string keys and string values). Requires RabbitMQ 4+.")
+                        putJsonObject("additionalProperties") { put("type", "string") }
                     }
                 }
                 putJsonArray("required") {
@@ -1075,6 +1081,11 @@ class McpServer(
         }
         val qos = MqttQos.fromInt(qosInt)
         val retain = args["retain"]?.jsonPrimitive?.booleanOrNull ?: false
+        val headers = parseMqttHeaders(args["headers"])
+            ?: return McpCallToolResult(
+                listOf(McpContent(text = "Invalid 'headers': must be an object with non-blank string keys and string values")),
+                isError = true,
+            )
 
         if (profile.topologyControlLevel == TopologyControlLevel.READ_ONLY) {
             return McpCallToolResult(
@@ -1107,6 +1118,7 @@ class McpServer(
             payload = payloadStr.encodeToByteArray(),
             qos = qos,
             retain = retain,
+            headers = headers,
         )
 
         return when (val outcome = publisher.publish(request)) {
@@ -1117,6 +1129,7 @@ class McpServer(
                     put("topic", topic.trim())
                     put("qos", qos.value)
                     put("retain", retain)
+                    put("headers", headers.size)
                 })))
             )
             is PublishOutcome.Refused -> McpCallToolResult(
@@ -1141,5 +1154,16 @@ class McpServer(
                 output.flush()
             }
         }
+    }
+}
+
+/** Parses the optional `headers` argument; null means it is present but malformed. Absent or JSON null means no headers. */
+private fun parseMqttHeaders(element: JsonElement?): List<MqttHeader>? {
+    if (element == null || element is kotlinx.serialization.json.JsonNull) return emptyList()
+    val obj = element as? JsonObject ?: return null
+    return obj.entries.map { (key, value) ->
+        val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        if (key.isBlank()) return null
+        MqttHeader(key, text)
     }
 }
