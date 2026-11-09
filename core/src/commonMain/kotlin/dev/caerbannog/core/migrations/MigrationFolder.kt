@@ -1,8 +1,5 @@
 package dev.caerbannog.core.migrations
 
-// M5-08b STUB FILE (test-first compile stubs, written by the test developer). The senior developer replaces every body, moves the
-// types to their proper files and DELETES this file; M508bStubGuardTest stays red until then. Nothing here is behaviour.
-
 /** The folder the user chose for migration files, kept per machine (`settings.json`, key `migrationsFolder`); null means "ask". */
 interface MigrationFolderStore {
     var folder: String?
@@ -46,30 +43,6 @@ sealed interface FolderListing {
 
     data class Unavailable(val path: String, val problem: FolderProblem) : FolderListing
 }
-
-/** The typed answer of the history repository. */
-sealed interface HistoryResult {
-    data class Loaded(val applied: Map<String, String>) : HistoryResult
-    data class Unreadable(val path: String, val reason: String) : HistoryResult
-}
-
-sealed interface HistoryMoveResult {
-    /** [fileName] is the new name inside the same folder, for example `migration-history.json.unreadable-20261109-143005`. */
-    data class Moved(val fileName: String) : HistoryMoveResult
-    data class Failed(val reason: String) : HistoryMoveResult
-}
-
-/**
- * Keeps the applied history in step with the profile list: a rename moves the entries (REPLACING any leftover already under the new name),
- * a delete removes them.
- */
-interface ProfileHistoryKeys {
-    fun rename(oldName: String, newName: String)
-    fun delete(profileName: String)
-}
-
-/** A migration file could not be written; [reason] is fixed text, never file content or a system message. */
-class MigrationWriteException(val reason: String) : Exception(reason)
 
 /** The state of the folder part of the Migrations screen. */
 sealed interface MigrationFolderState {

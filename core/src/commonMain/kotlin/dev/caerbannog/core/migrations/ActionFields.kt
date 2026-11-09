@@ -51,11 +51,22 @@ internal fun JsonObject.identifier(key: String): String? = string(key)?.also { i
 
 internal fun JsonObject.vhost(): String = identifier("vhost") ?: "/"
 
-/** The root `version`: a string, or a number (older files; its text); null when absent or JSON null. */
+/**
+ * The root `version`: a string of letters, digits, `_` and `-`, or a whole number (older files; its text); null when absent or JSON null.
+ * The version becomes a file name, so nothing else may pass; the refusal never echoes the value.
+ */
 internal fun JsonObject.versionText(): String? = when (val value = present("version")) {
     null -> null
-    is JsonPrimitive -> if (value.isString || value.content.toDoubleOrNull() != null) value.content else throw WrongTypeException("version")
+    is JsonPrimitive -> value.versionOrNull() ?: throw WrongTypeException("version")
     else -> throw WrongTypeException("version")
+}
+
+private val VERSION_TEXT = Regex("[A-Za-z0-9_-]+")
+
+private fun JsonPrimitive.versionOrNull(): String? = when {
+    // A blank text stays and is reported as "no version" by the parser.
+    isString -> content.takeIf { it.isBlank() || VERSION_TEXT.matches(it) }
+    else -> content.toLongOrNull()?.toString()
 }
 
 /** A JSON boolean or the text `true` / `false`; [default] when absent or JSON null. */

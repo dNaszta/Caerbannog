@@ -28,7 +28,7 @@ data class MigrationsScreenState(
     val warningMessage: String? = null,
     val errorMessage: String? = null,
     val isApplying: Boolean = false,
-    // M5-08b STUB fields (the defaults are the old in-memory behaviour).
+    // The defaults are the old in-memory behaviour (no folder, no history problem).
     val folder: MigrationFolderState = MigrationFolderState.Ready(null),
     val invalidFiles: List<InvalidMigrationFile> = emptyList(),
     val historyProblem: HistoryUnreadable? = null,
@@ -49,7 +49,7 @@ class MigrationsViewModel(
     var vhost: String = "/",
     var hasConfigurePermission: Boolean = true,
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
-    /** M5-08b: when set, files come from `ports.repositoryFor(chosen folder)` and [fileRepository] is not used. */
+    /** When set, files come from `repositoryFor(chosen folder)` and [fileRepository] is not used. */
     private val folderPorts: MigrationFolderPorts? = null,
     private val scope: CoroutineScope,
 ) {
@@ -82,7 +82,10 @@ class MigrationsViewModel(
 
     fun loadMigrations() {
         scope.launch {
-            val files = fileRepository.listFiles()
+            val listing = readListing()
+            val history = folderPorts?.history?.load(profileName)
+            val historyProblem = (history as? HistoryResult.Unreadable)?.let { HistoryUnreadable(it.path, it.reason) }
+            val files = (listing as? FolderListing.Listed)?.files.orEmpty()
             val entries = runner.resolveStatuses(profileName, files)
             val selected = _state.value.selectedVersion?.let { ver ->
                 entries.firstOrNull { it.file.version == ver }
@@ -93,13 +96,11 @@ class MigrationsViewModel(
                 runner.dryRun(it, hasConfigurePermission, controlLevel, vhost)
             }
 
+            val canApply = hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY && historyProblem == null
             val hasPending = entries.any { it.status is MigrationStatus.Pending }
-            val canApplyPending = hasPending && hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY &&
+            val canApplyPending = hasPending && canApply &&
                 entries.filter { it.status is MigrationStatus.Pending }.all { belongsToConnection(it.file) }
-            val canApplySingle = selected?.status is MigrationStatus.Pending &&
-                (dryRun?.canApply == true) &&
-                hasConfigurePermission &&
-                controlLevel != TopologyControlLevel.READ_ONLY
+            val canApplySingle = selected?.status is MigrationStatus.Pending && (dryRun?.canApply == true) && canApply
 
             val hasModified = entries.any { it.status is MigrationStatus.Modified }
             val warning = if (hasModified) {
@@ -109,6 +110,9 @@ class MigrationsViewModel(
             val banner = if (!hasConfigurePermission) {
                 "Apply is disabled: the permission check found that user cannot change topology on $profileName. You can still edit, validate and export this file, then apply it on a connection that allows it."
             } else null
+
+            val folder = folderState(listing)
+            val canWrite = folder is MigrationFolderState.Ready
 
             _state.update { current ->
                 current.copy(
@@ -124,8 +128,29 @@ class MigrationsViewModel(
                     vhost = vhost,
                     warningMessage = warning,
                     bannerMessage = banner,
+                    folder = folder,
+                    invalidFiles = (listing as? FolderListing.Listed)?.invalid.orEmpty(),
+                    historyProblem = historyProblem,
+                    isImportEnabled = canWrite,
+                    isExportEnabled = canWrite,
                 )
             }
+        }
+    }
+
+    /** The repository of the folder in use; null while no folder is chosen (nothing is read or written then). */
+    private fun currentRepository(): MigrationFileRepository? =
+        if (folderPorts == null) fileRepository else folderPorts.store.folder?.let(folderPorts.repositoryFor)
+
+    private suspend fun readListing(): FolderListing? = currentRepository()?.load()
+
+    private fun folderState(listing: FolderListing?): MigrationFolderState {
+        val path = folderPorts?.store?.folder
+        return when {
+            listing == null -> MigrationFolderState.ChooseFolder
+            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem.message)
+            listing is FolderListing.Listed && listing.readOnly && path != null -> MigrationFolderState.FolderReadOnly(path)
+            else -> MigrationFolderState.Ready(path)
         }
     }
 
@@ -155,8 +180,12 @@ class MigrationsViewModel(
     }
 
     suspend fun applyPending(): MigrationApplyResult {
+        applyBlockReason()?.let { reason ->
+            _state.update { it.copy(errorMessage = reason) }
+            return MigrationApplyResult.Blocked(reason)
+        }
         _state.update { it.copy(isApplying = true, errorMessage = null) }
-        val files = fileRepository.listFiles()
+        val files = currentRepository()?.listFiles().orEmpty()
         val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost)
         when (result) {
             is MigrationApplyResult.Success -> {
@@ -178,14 +207,27 @@ class MigrationsViewModel(
     suspend fun applySingle(version: String): MigrationApplyResult {
         val entry = _state.value.entries.firstOrNull { it.file.version == version }
             ?: return MigrationApplyResult.Blocked("Migration file not found")
+        applyBlockReason()?.let { return MigrationApplyResult.Blocked(it) }
         return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel, vhost)
             .also {
                 loadMigrations()
             }
     }
 
+    /** The fixed reason nothing may be applied right now, or null: the history cannot be trusted, or there is no folder to read from. */
+    private fun applyBlockReason(): String? {
+        val current = _state.value
+        return when {
+            current.historyProblem != null -> HISTORY_UNREADABLE
+            current.folder is MigrationFolderState.ChooseFolder -> NO_FOLDER
+            current.folder is MigrationFolderState.FolderUnavailable -> current.folder.reason
+            else -> null
+        }
+    }
+
     suspend fun importFile(rawJson: String): MigrationValidationResult {
-        val result = fileRepository.importFile(rawJson)
+        val repository = writableRepository() ?: return refuseWrite()
+        val result = repository.importFile(rawJson)
         if (result is MigrationValidationResult.Valid) {
             loadMigrations()
             selectVersion(result.migration.version)
@@ -200,16 +242,26 @@ class MigrationsViewModel(
      * [MigrationsScreenState.errorMessage] set and NO file written, when any catalog call fails (never an empty or partial file). Never throws.
      */
     suspend fun exportCurrentTopology(): MigrationFile? {
+        val repository = writableRepository()
+        if (repository == null) {
+            refuseWrite()
+            return null
+        }
         val actions = readTopologyActions()
         if (actions == null) {
             _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ) }
             return null
         }
-        val exported = fileRepository.exportTopology(
-            version = fileRepository.nextVersion(),
-            description = "Exported broker topology",
-            actions = actions,
-        )
+        val exported = try {
+            repository.exportTopology(
+                version = repository.nextVersion(),
+                description = "Exported broker topology",
+                actions = actions,
+            )
+        } catch (_: MigrationWriteException) {
+            _state.update { it.copy(errorMessage = FILE_NOT_WRITTEN) }
+            return null
+        }
         loadMigrations()
         selectVersion(exported.version)
         return exported
@@ -269,13 +321,52 @@ class MigrationsViewModel(
             )
         }
 
-    // M5-08b STUBS: the folder actions.
-    fun chooseFolder(): Unit = throw NotImplementedError("M5-08b STUB")
-    fun changeFolder(): Unit = throw NotImplementedError("M5-08b STUB")
-    fun retry(): Unit = throw NotImplementedError("M5-08b STUB")
-    fun startWithEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
-    fun confirmEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
-    fun cancelEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
+    private fun writableRepository(): MigrationFileRepository? = if (_state.value.isImportEnabled) currentRepository() else null
+
+    private fun refuseWrite(): MigrationValidationResult.Invalid {
+        val reason = (_state.value.folder as? MigrationFolderState.FolderReadOnly)?.reason ?: FOLDER_NOT_WRITABLE
+        _state.update { it.copy(errorMessage = reason) }
+        return MigrationValidationResult.Invalid(reason)
+    }
+
+    /** Asks the user for a folder (the dialog starts in the current one) and, unless cancelled, remembers and lists it. */
+    fun chooseFolder() {
+        val ports = folderPorts ?: return
+        scope.launch {
+            val picked = ports.chooser.choose(ports.store.folder) ?: return@launch
+            ports.store.folder = picked
+            loadMigrations()
+        }
+    }
+
+    fun changeFolder() = chooseFolder()
+
+    /** Reads the folder and the history again; nothing is created or chosen. */
+    fun retry() = loadMigrations()
+
+    /** Asks before the unreadable history file is moved aside; nothing moves until [confirmEmptyHistory]. */
+    fun startWithEmptyHistory() {
+        val ports = folderPorts ?: return
+        if (_state.value.historyProblem == null) return
+        val question = "Move migration-history.json to ${ports.history.asideFileName()} and start with an empty history? The old file is kept."
+        _state.update { it.copy(confirmation = question) }
+    }
+
+    fun confirmEmptyHistory() {
+        val ports = folderPorts ?: return
+        if (_state.value.confirmation == null) return
+        _state.update { it.copy(confirmation = null) }
+        scope.launch {
+            when (ports.history.moveAside()) {
+                is HistoryMoveResult.Moved -> loadMigrations()
+                is HistoryMoveResult.Failed -> _state.update { it.copy(errorMessage = HISTORY_NOT_MOVED) }
+            }
+        }
+    }
+
+    fun cancelEmptyHistory() {
+        _state.update { it.copy(confirmation = null) }
+    }
 
     fun dismissError() {
         _state.update { it.copy(errorMessage = null) }
@@ -283,5 +374,10 @@ class MigrationsViewModel(
 
     private companion object {
         const val TOPOLOGY_NOT_READ = "The topology could not be read"
+        const val FILE_NOT_WRITTEN = "The file could not be written"
+        const val HISTORY_UNREADABLE = "The applied history cannot be read, so nothing can be applied"
+        const val HISTORY_NOT_MOVED = "The history file could not be moved aside; it was not changed"
+        const val NO_FOLDER = "Choose a migrations folder first"
+        const val FOLDER_NOT_WRITABLE = "Choose a usable migrations folder first"
     }
 }

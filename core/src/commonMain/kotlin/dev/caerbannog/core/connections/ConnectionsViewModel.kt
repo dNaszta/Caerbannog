@@ -1,5 +1,6 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.migrations.ProfileHistoryKeys
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +26,8 @@ class ConnectionsViewModel(
     private val caCertificateValidator: CaCertificateValidator,
     private val session: ConnectionSession? = null,
     private val active: ActiveConnection? = null,
-    /** M5-08b STUB: accepted and not used yet (a successful rename calls `rename` once, a confirmed delete calls `delete`). */
-    private val historyKeys: dev.caerbannog.core.migrations.ProfileHistoryKeys? = null,
+    /** Keeps the applied-migrations history under the profile's name: a successful rename moves it, a confirmed delete removes it. */
+    private val historyKeys: ProfileHistoryKeys? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 
@@ -201,6 +202,7 @@ class ConnectionsViewModel(
             if (passwordToKeep != null) secretStore.store(updated.name, passwordToKeep)
             secretStore.delete(originalName)
             repository.delete(originalName)
+            historyKeys?.rename(originalName, updated.name)
         }
         return result
     }
@@ -280,6 +282,7 @@ class ConnectionsViewModel(
         if (_state.value.selectedProfileName == name) panelEpoch++
         repository.delete(name)
         secretStore.delete(name)
+        historyKeys?.delete(name)
         session?.forget(name)
         active?.profileDeleted(name)
         _state.update {

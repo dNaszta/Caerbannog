@@ -27,11 +27,11 @@ interface MigrationHistoryRepository {
     /** Typed answer: [HistoryResult.Unreadable] when the history file exists but cannot be read; the default never fails. */
     suspend fun load(profileName: String): HistoryResult = HistoryResult.Loaded(getAppliedMigrations(profileName))
 
-    /** M5-08b STUB: the name [moveAside] would give the unreadable file now (with its collision suffix). */
-    fun asideFileName(): String = throw NotImplementedError("M5-08b STUB")
+    /** The name [moveAside] would give the unreadable file now (with its collision suffix). */
+    fun asideFileName(): String = throw UnsupportedOperationException("this history has no file to move aside")
 
-    /** M5-08b STUB: renames the unreadable history file to [asideFileName], never deleting or overwriting. */
-    suspend fun moveAside(): HistoryMoveResult = throw NotImplementedError("M5-08b STUB")
+    /** Renames the unreadable history file to [asideFileName], never deleting or overwriting. */
+    suspend fun moveAside(): HistoryMoveResult = HistoryMoveResult.Failed("this history has no file to move aside")
 }
 
 /**
