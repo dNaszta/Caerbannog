@@ -112,4 +112,54 @@ class ReportJsonTest {
         assertEquals(JsonArray(emptyList()), root["findings"])
         assertEquals("caerbannog.compat-report/1", (root["schema"] as JsonPrimitive).content)
     }
+
+    // ---- architect answers 6 and 7 ----
+
+    private fun proposalJson(p: Proposal): JsonObject {
+        val report = smallReport().copy(findings = listOf(smallReport().findings.first().copy(proposal = p, alternatives = emptyList())))
+        return (parse(CompatibilityReportJson.encode(report))["findings"] as JsonArray).first().jsonObject["proposal"]!!.jsonObject
+    }
+
+    private fun obj(vararg entries: Pair<String, kotlinx.serialization.json.JsonElement>) = JsonObject(mapOf(*entries))
+    private fun s(v: String) = JsonPrimitive(v)
+
+    @Test
+    fun `every proposal type has exactly the documented JSON shape`() {
+        val tick = "Ordering by priority may change"
+        val known = "This user has a publicly known password"
+        val cases: List<Pair<Proposal, JsonObject>> = listOf(
+            Proposal.ConvertQueueType(QueueKind.Quorum, Acknowledgement.OrderingByPriorityMayChange) to obj("type" to s("convertQueueType"), "target" to s("quorum"), "acknowledgement" to s(tick)),
+            Proposal.ConvertQueueType(QueueKind.Quorum, null) to obj("type" to s("convertQueueType"), "target" to s("quorum"), "acknowledgement" to kotlinx.serialization.json.JsonNull),
+            Proposal.KeepClassic to obj("type" to s("keepClassic")),
+            Proposal.RemoveArgument("x-max-priority") to obj("type" to s("removeArgument"), "argument" to s("x-max-priority")),
+            Proposal.SetArgument("x-queue-version", ArgumentValue.Whole(2)) to obj("type" to s("setArgument"), "argument" to s("x-queue-version"), "value" to JsonPrimitive(2)),
+            Proposal.SetArgument("x-a", ArgumentValue.Text("t")) to obj("type" to s("setArgument"), "argument" to s("x-a"), "value" to s("t")),
+            Proposal.SetArgument("x-a", ArgumentValue.Flag(true)) to obj("type" to s("setArgument"), "argument" to s("x-a"), "value" to JsonPrimitive(true)),
+            Proposal.SetArgument("x-a", ArgumentValue.Nothing) to obj("type" to s("setArgument"), "argument" to s("x-a"), "value" to kotlinx.serialization.json.JsonNull),
+            Proposal.ClearAutoDelete to obj("type" to s("clearAutoDelete")),
+            Proposal.MakeDurable to obj("type" to s("makeDurable")),
+            Proposal.DropPolicyKeys(listOf("ha-mode", "ha-params")) to obj("type" to s("dropPolicyKeys"), "keys" to JsonArray(listOf(s("ha-mode"), s("ha-params")))),
+            Proposal.DeclareVirtualHost("orders") to obj("type" to s("declareVirtualHost"), "name" to s("orders")),
+            Proposal.DeclareUser("guest", listOf("administrator"), "rabbit_password_hashing_sha256", true, Acknowledgement.PubliclyKnownPassword) to
+                obj("type" to s("declareUser"), "name" to s("guest"), "tags" to JsonArray(listOf(s("administrator"))), "hashingAlgorithm" to s("rabbit_password_hashing_sha256"), "hasPasswordHash" to JsonPrimitive(true), "acknowledgement" to s(known)),
+            Proposal.DeclareUser("ext", emptyList(), null, false, null) to
+                obj("type" to s("declareUser"), "name" to s("ext"), "tags" to JsonArray(emptyList()), "hashingAlgorithm" to kotlinx.serialization.json.JsonNull, "hasPasswordHash" to JsonPrimitive(false), "acknowledgement" to kotlinx.serialization.json.JsonNull),
+            Proposal.SetPermissions("/", "svc") to obj("type" to s("setPermissions"), "vhost" to s("/"), "user" to s("svc")),
+            Proposal.SetTopicPermissions("/", "svc", "ex") to obj("type" to s("setTopicPermissions"), "vhost" to s("/"), "user" to s("svc"), "exchange" to s("ex")),
+            Proposal.Manual("a", "b", true) to obj("type" to s("manual"), "title" to s("a"), "text" to s("b"), "recommended" to JsonPrimitive(true)),
+            Proposal.None to obj("type" to s("none")),
+        )
+        for ((proposal, expected) in cases) assertEquals(expected, proposalJson(proposal), "JSON of $proposal")
+    }
+
+    @Test
+    fun `source name is null for a file report and the connection name for a live report, in the model and in the JSON`() {
+        val doc = D.document()
+        val file = analyze(doc)
+        val live = analyze(doc, D.liveFacts(connectionName = "legacy-eu"))
+        assertEquals(null, file.source.name)
+        assertEquals("legacy-eu", live.source.name)
+        assertEquals(kotlinx.serialization.json.JsonNull, parse(CompatibilityReportJson.encode(file))["source"]!!.jsonObject["name"])
+        assertEquals("legacy-eu", (parse(CompatibilityReportJson.encode(live))["source"]!!.jsonObject["name"] as JsonPrimitive).content)
+    }
 }
