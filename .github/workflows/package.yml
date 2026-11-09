@@ -1,0 +1,75 @@
+name: Package installers
+
+# Builds the desktop installers on their native OS (jpackage cannot cross-build).
+# Run it by hand (Actions tab), or push a tag like v1.0.0 to also attach the installers to a GitHub release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS .dmg
+            runner: macos-latest
+            task: packageDmg
+            glob: desktopApp/build/compose/binaries/main/dmg/*.dmg
+          - name: Windows .msi
+            runner: windows-latest
+            task: packageMsi
+            glob: desktopApp/build/compose/binaries/main/msi/*.msi
+          - name: Ubuntu .deb
+            runner: ubuntu-latest
+            task: packageDeb
+            glob: desktopApp/build/compose/binaries/main/deb/*.deb
+          - name: Fedora .rpm
+            runner: ubuntu-latest
+            container: fedora:42
+            task: packageRpm
+            glob: desktopApp/build/compose/binaries/main/rpm/*.rpm
+    steps:
+      # The Fedora job runs in a container: install git, the JDK with its jmods (Fedora ships them separately) and rpm-build first.
+      - name: Install Fedora build tools
+        if: matrix.container == 'fedora:42'
+        run: dnf install -y git java-21-openjdk-devel java-21-openjdk-jmods rpm-build binutils fakeroot
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        if: matrix.container != 'fedora:42'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build installer
+        shell: bash
+        run: ./gradlew :desktopApp:${{ matrix.task }} --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.task }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+
+  release:
+    name: Attach to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          pattern: installer-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: installers/*
