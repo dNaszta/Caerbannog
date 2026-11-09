@@ -1,6 +1,6 @@
 package dev.caerbannog.core.migrate3x.fakes
 
-import dev.caerbannog.core.migrate3x.ArgumentValue
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrate3x.BindingDefinition
 import dev.caerbannog.core.migrate3x.BindingTarget
 import dev.caerbannog.core.migrate3x.ClassicIndexVersion

@@ -1,4 +1,4 @@
-package dev.caerbannog.core.migrate3x
+package dev.caerbannog.core.json
 
 /** Nesting limit of [ArgumentValue.Items] and [ArgumentValue.Table] (the top-level map is level 0). Guards untrusted input. */
 const val MAX_ARGUMENT_DEPTH: Int = 32

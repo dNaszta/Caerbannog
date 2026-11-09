@@ -1,6 +1,6 @@
 package dev.caerbannog.acceptance.migrate3x
 
-import dev.caerbannog.core.migrate3x.ArgumentValue
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrate3x.CompatibilityAnalyzer
 import dev.caerbannog.core.migrate3x.DefinitionsDocument
 import dev.caerbannog.core.migrate3x.DefinitionsOrigin

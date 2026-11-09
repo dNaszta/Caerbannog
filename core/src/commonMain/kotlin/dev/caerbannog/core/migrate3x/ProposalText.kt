@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+
 /** The tick the user must give before this proposal is applied, if any. */
 internal val Proposal.acknowledgement: Acknowledgement?
     get() = when (this) {

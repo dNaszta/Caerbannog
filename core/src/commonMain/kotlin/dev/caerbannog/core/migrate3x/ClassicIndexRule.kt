@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+
 /**
  * The message-loss rule (S-N, P16): a durable classic queue on an index version 1 is silently emptied by an in-place upgrade to
  * RabbitMQ 4.3 or later. Live facts decide when present; a file decides only when it states `x-queue-version`. A source that is
