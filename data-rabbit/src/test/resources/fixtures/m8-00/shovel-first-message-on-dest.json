@@ -1,0 +1,23 @@
+{
+ "first_message": {
+  "payload_bytes": 6,
+  "redelivered": false,
+  "exchange": "",
+  "routing_key": "ship-q",
+  "message_count": 125,
+  "properties": {
+   "message_id": "id-0",
+   "priority": 3,
+   "delivery_mode": 2,
+   "headers": {
+    "h": "v0",
+    "n": 0
+   },
+   "content_type": "text/plain"
+  },
+  "payload": "body-0",
+  "payload_encoding": "string"
+ },
+ "dest_count": 126,
+ "source_after": 120
+}

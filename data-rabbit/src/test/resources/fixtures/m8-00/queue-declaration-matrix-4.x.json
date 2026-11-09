@@ -1,0 +1,481 @@
+[
+ [
+  "classic",
+  "plain",
+  201,
+  {},
+  ""
+ ],
+ [
+  "classic",
+  "x-queue-mode=lazy",
+  201,
+  {
+   "x-queue-mode": "lazy"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-queue-mode=default",
+  201,
+  {
+   "x-queue-mode": "default"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-queue-version=1",
+  400,
+  null,
+  "invalid arg 'x-queue-version' for queue 'm-classic-3' in vhost '/': \"unsupported queue version '1'\""
+ ],
+ [
+  "classic",
+  "x-queue-version=2",
+  201,
+  {
+   "x-queue-version": 2
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-max-priority=5",
+  201,
+  {
+   "x-max-priority": 5
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-max-priority=255",
+  201,
+  {
+   "x-max-priority": 255
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-queue-master-locator=min-masters",
+  400,
+  null,
+  "Feature `queue_master_locator` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; actu"
+ ],
+ [
+  "classic",
+  "x-single-active-consumer=true",
+  201,
+  {
+   "x-single-active-consumer": true
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-message-ttl=60000",
+  201,
+  {
+   "x-message-ttl": 60000
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-expires=3600000",
+  201,
+  {
+   "x-expires": 3600000
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-max-length=1000",
+  201,
+  {
+   "x-max-length": 1000
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-max-length-bytes=1048576",
+  201,
+  {
+   "x-max-length-bytes": 1048576
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-overflow=drop-head",
+  201,
+  {
+   "x-overflow": "drop-head"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-overflow=reject-publish",
+  201,
+  {
+   "x-overflow": "reject-publish"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-overflow=reject-publish-dlx",
+  201,
+  {
+   "x-overflow": "reject-publish-dlx"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-dead-letter-exchange+key",
+  201,
+  {
+   "x-dead-letter-exchange": "amq.direct",
+   "x-dead-letter-routing-key": "k"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "x-dead-letter-strategy=at-least-once(+overflow reject-publish)",
+  400,
+  null,
+  "invalid arg 'x-dead-letter-strategy' for queue 'm-classic-17' in vhost '/' of queue type rabbit_classic_queue"
+ ],
+ [
+  "classic",
+  "x-delivery-limit=5",
+  400,
+  null,
+  "invalid arg 'x-delivery-limit' for queue 'm-classic-18' in vhost '/' of queue type rabbit_classic_queue"
+ ],
+ [
+  "classic",
+  "x-quorum-initial-group-size=1",
+  400,
+  null,
+  "invalid arg 'x-quorum-initial-group-size' for queue 'm-classic-19' in vhost '/' of queue type rabbit_classic_queue"
+ ],
+ [
+  "classic",
+  "x-max-in-memory-length=100",
+  400,
+  null,
+  "invalid arg 'x-max-in-memory-length' for queue 'm-classic-20' in vhost '/' of queue type rabbit_classic_queue"
+ ],
+ [
+  "classic",
+  "x-max-in-memory-bytes=100000",
+  400,
+  null,
+  "invalid arg 'x-max-in-memory-bytes' for queue 'm-classic-21' in vhost '/' of queue type rabbit_classic_queue"
+ ],
+ [
+  "classic",
+  "x-queue-leader-locator=balanced",
+  201,
+  {
+   "x-queue-leader-locator": "balanced"
+  },
+  ""
+ ],
+ [
+  "classic",
+  "durable=false",
+  400,
+  null,
+  "Feature `transient_nonexcl_queues` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; "
+ ],
+ [
+  "classic",
+  "durable=false auto_delete=true",
+  400,
+  null,
+  "Feature `transient_nonexcl_queues` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; "
+ ],
+ [
+  "classic",
+  "durable=true auto_delete=true",
+  201,
+  {},
+  ""
+ ],
+ [
+  "quorum",
+  "plain",
+  201,
+  {},
+  ""
+ ],
+ [
+  "quorum",
+  "x-queue-mode=lazy",
+  400,
+  null,
+  "invalid arg 'x-queue-mode' for queue 'm-quorum-1' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-queue-mode=default",
+  400,
+  null,
+  "invalid arg 'x-queue-mode' for queue 'm-quorum-2' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-queue-version=1",
+  400,
+  null,
+  "invalid arg 'x-queue-version' for queue 'm-quorum-3' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-queue-version=2",
+  400,
+  null,
+  "invalid arg 'x-queue-version' for queue 'm-quorum-4' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-max-priority=5",
+  400,
+  null,
+  "invalid arg 'x-max-priority' for queue 'm-quorum-5' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-max-priority=255",
+  400,
+  null,
+  "invalid arg 'x-max-priority' for queue 'm-quorum-6' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-queue-master-locator=min-masters",
+  400,
+  null,
+  "invalid arg 'x-queue-master-locator' for queue 'm-quorum-7' in vhost '/' of queue type rabbit_quorum_queue"
+ ],
+ [
+  "quorum",
+  "x-single-active-consumer=true",
+  201,
+  {
+   "x-single-active-consumer": true
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-message-ttl=60000",
+  201,
+  {
+   "x-message-ttl": 60000
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-expires=3600000",
+  201,
+  {
+   "x-expires": 3600000
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-max-length=1000",
+  201,
+  {
+   "x-max-length": 1000
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-max-length-bytes=1048576",
+  201,
+  {
+   "x-max-length-bytes": 1048576
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-overflow=drop-head",
+  201,
+  {
+   "x-overflow": "drop-head"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-overflow=reject-publish",
+  201,
+  {
+   "x-overflow": "reject-publish"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-overflow=reject-publish-dlx",
+  201,
+  {
+   "x-overflow": "reject-publish-dlx"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-dead-letter-exchange+key",
+  201,
+  {
+   "x-dead-letter-exchange": "amq.direct",
+   "x-dead-letter-routing-key": "k"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-dead-letter-strategy=at-least-once(+overflow reject-publish)",
+  201,
+  {
+   "x-dead-letter-exchange": "amq.direct",
+   "x-dead-letter-strategy": "at-least-once",
+   "x-overflow": "reject-publish"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-delivery-limit=5",
+  201,
+  {
+   "x-delivery-limit": 5
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-quorum-initial-group-size=1",
+  201,
+  {
+   "x-quorum-initial-group-size": 1
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-max-in-memory-length=100",
+  201,
+  {
+   "x-max-in-memory-length": 100
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-max-in-memory-bytes=100000",
+  201,
+  {
+   "x-max-in-memory-bytes": 100000
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "x-queue-leader-locator=balanced",
+  201,
+  {
+   "x-queue-leader-locator": "balanced"
+  },
+  ""
+ ],
+ [
+  "quorum",
+  "durable=false",
+  400,
+  null,
+  "Feature `transient_nonexcl_queues` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; "
+ ],
+ [
+  "quorum",
+  "durable=false auto_delete=true",
+  400,
+  null,
+  "Feature `transient_nonexcl_queues` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; "
+ ],
+ [
+  "quorum",
+  "durable=true auto_delete=true",
+  400,
+  null,
+  "invalid property 'auto-delete' for queue 'm-quorum-25' in vhost '/'"
+ ],
+ [
+  "stream",
+  "plain",
+  201,
+  {},
+  ""
+ ],
+ [
+  "stream",
+  "x-queue-mode=lazy",
+  400,
+  null,
+  "invalid arg 'x-queue-mode' for queue 'm-stream-1' in vhost '/' of queue type rabbit_stream_queue"
+ ],
+ [
+  "stream",
+  "x-max-priority=5",
+  400,
+  null,
+  "invalid arg 'x-max-priority' for queue 'm-stream-5' in vhost '/' of queue type rabbit_stream_queue"
+ ],
+ [
+  "stream",
+  "x-single-active-consumer=true",
+  400,
+  null,
+  "invalid arg 'x-single-active-consumer' for queue 'm-stream-8' in vhost '/' of queue type rabbit_stream_queue"
+ ],
+ [
+  "stream",
+  "x-message-ttl=60000",
+  400,
+  null,
+  "invalid arg 'x-message-ttl' for queue 'm-stream-9' in vhost '/' of queue type rabbit_stream_queue"
+ ],
+ [
+  "stream",
+  "x-max-length-bytes=1048576",
+  201,
+  {
+   "x-max-length-bytes": 1048576
+  },
+  ""
+ ],
+ [
+  "stream",
+  "durable=false",
+  400,
+  null,
+  "Feature `transient_nonexcl_queues` is deprecated. By default, this feature is not permitted anymore. The feature will be removed from a future major RabbitMQ version, regardless of the configuration; "
+ ]
+]
