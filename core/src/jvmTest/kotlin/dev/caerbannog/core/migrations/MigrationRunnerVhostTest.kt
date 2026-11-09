@@ -54,6 +54,14 @@ class MigrationRunnerVhostTest {
     }
 
     @Test
+    fun `the wider echo set is named, dash and dot and the vhost slash`() {
+        val toSlash = runner.dryRun(migration("0001", queue("a", "order-events")), true, TopologyControlLevel.FULL_CONTROL, vhost = "/")
+        assertEquals("The action belongs to virtual host order-events; this connection is for /", toSlash.actions.single().reason)
+        val fromSlash = runner.dryRun(migration("0001", queue("a", "/")), true, TopologyControlLevel.FULL_CONTROL, vhost = "orders.v2")
+        assertEquals("The action belongs to virtual host /; this connection is for orders.v2", fromSlash.actions.single().reason)
+    }
+
+    @Test
     fun `dry run allows the actions of the connection's own virtual host`() {
         val dry = runner.dryRun(migration("0001", queue("a", "/orders"), queue("b", "/orders")), true, TopologyControlLevel.FULL_CONTROL, vhost = "/orders")
         assertTrue(dry.canApply, "blocked: ${dry.blockedReason}")
@@ -69,7 +77,7 @@ class MigrationRunnerVhostTest {
 
     @Test
     fun `an unusual virtual host name is never echoed, the wording keeps naming virtual hosts`() {
-        val hostile = listOf("a\"quoted", "line\nbreak", "<script>alert(1)</script>", "x".repeat(65), "tab\there", "back\\slash")
+        val hostile = listOf("a\"quoted", "line\nbreak", "<script>alert(1)</script>", "x".repeat(65), "tab\there", "back\\slash", "a b", "/orders", "..")
         for (name in hostile) {
             val dry = runner.dryRun(migration("0001", queue("a", name)), true, TopologyControlLevel.FULL_CONTROL, vhost = "/")
             val reason = dry.actions.single().reason ?: error("not blocked for ${name.take(20)}")

@@ -131,13 +131,20 @@ class RerunSafetyTest {
 
     @Test
     fun `a name that is not short and plain is not echoed, the wording stays the same`() {
-        val hostile = listOf("a\"quoted", "line\nbreak", "<script>alert(1)</script>", "x".repeat(65), "back\\slash", "tab\there", "unicode- -sep")
+        val hostile = listOf("a\"quoted", "line\nbreak", "<script>alert(1)</script>", "x".repeat(65), "back\\slash", "a b", "tab\there", "unicode- -sep")
         for (name in hostile) {
             val reason = refused(file(q("declareQueue", name), q("deleteQueue", name)))
             assertTrue(reason.contains("declares and deletes"), reason)
             assertTrue(reason.endsWith("split it into two migrations"), reason)
             assertFalse(reason.contains(name), "echoes the name: $reason")
             assertFalse(reason.contains("\n"), "multi-line reason")
+        }
+    }
+
+    @Test
+    fun `names with dot, underscore and dash are named too`() {
+        for (name in listOf("order-events", "orders.v2", "my_queue", "Q-1.a_b")) {
+            assertTrue(refused(file(q("declareQueue", name), q("deleteQueue", name))).contains("\"$name\""), name)
         }
     }
 

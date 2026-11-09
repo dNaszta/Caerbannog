@@ -162,7 +162,7 @@ class RealBrokerM5MigrationTest {
             topologyCatalog = ManagementTopologyCatalog(httpA, requestsA), vhost = vhost,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
         )
-        val exported = runBlocking { viewModel.exportCurrentTopology() }
+        val exported = runBlocking { viewModel.exportCurrentTopology() }!!
 
         broker("rabbitmq:4-management").use { b ->
             b.start()

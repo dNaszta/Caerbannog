@@ -79,7 +79,7 @@ class MigrationsViewModel(
 
             val selectedFile = selected?.file
             val dryRun = selectedFile?.let {
-                runner.dryRun(it, hasConfigurePermission, controlLevel)
+                runner.dryRun(it, hasConfigurePermission, controlLevel, vhost = "/") // M5-08a STUB: pass the connection's vhost
             }
 
             val hasPending = entries.any { it.status is MigrationStatus.Pending }
@@ -121,7 +121,7 @@ class MigrationsViewModel(
         scope.launch {
             val entry = _state.value.entries.firstOrNull { it.file.version == version }
             val file = entry?.file
-            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel) }
+            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost = "/") } // M5-08a STUB: pass the connection's vhost
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
                 hasConfigurePermission &&
@@ -142,7 +142,7 @@ class MigrationsViewModel(
     suspend fun applyPending(): MigrationApplyResult {
         _state.update { it.copy(isApplying = true, errorMessage = null) }
         val files = fileRepository.listFiles()
-        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel)
+        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost = "/") // M5-08a STUB
         when (result) {
             is MigrationApplyResult.Success -> {
                 loadMigrations()
@@ -163,7 +163,7 @@ class MigrationsViewModel(
     suspend fun applySingle(version: String): MigrationApplyResult {
         val entry = _state.value.entries.firstOrNull { it.file.version == version }
             ?: return MigrationApplyResult.Blocked("Migration file not found")
-        return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel)
+        return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel, vhost = "/") // M5-08a STUB
             .also {
                 loadMigrations()
             }
@@ -180,7 +180,8 @@ class MigrationsViewModel(
         return result
     }
 
-    suspend fun exportCurrentTopology(): MigrationFile {
+    // M5-08a STUB: the type is final (null = the topology could not be read, error in the state, no file); the behaviour is not built yet.
+    suspend fun exportCurrentTopology(): MigrationFile? {
         val nextVersion = fileRepository.nextVersion()
         val actions = mutableListOf<MigrationAction>()
 

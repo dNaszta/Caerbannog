@@ -63,9 +63,6 @@ class TopologyMigrationsSteps {
     internal var lastImportResult: MigrationValidationResult? = null
     internal var exportedFile: MigrationFile? = null
 
-    /** M5-08a: set when the export failed because the broker could not be read (the view model throws, shows the error and writes no file). */
-    internal var exportFailure: dev.caerbannog.core.migrations.TopologyReadException? = null
-
     /** M5-08a: the topology catalog the view model reads; the 150-queue scenario puts a small-page catalog here. */
     internal var topologyCatalogOverride: dev.caerbannog.core.topology.TopologyCatalog? = null
 
@@ -90,7 +87,6 @@ class TopologyMigrationsSteps {
         exportedFile = null
         pendingImportJson = ""
         viewModel = null
-        exportFailure = null
         topologyCatalogOverride = null
         topologyUnchangedCheck = null
         runner = MigrationRunner(historyRepository, executor)
@@ -312,7 +308,7 @@ class TopologyMigrationsSteps {
     fun iRunADryRunOf(version: String) = runBlocking {
         val files = fileRepository.listFiles()
         val file = files.first { it.version == version }
-        dryRunResult = runner.dryRun(file, configurePermission, controlLevel)
+        dryRunResult = runner.dryRun(file, configurePermission, controlLevel, vhost = "/")
     }
 
     @Then("I see each action and whether it is allowed")
@@ -405,13 +401,7 @@ class TopologyMigrationsSteps {
 
     @When("I export the current topology")
     fun iExportTheCurrentTopology() = runBlocking {
-        exportFailure = null
-        exportedFile = try {
-            getVm().exportCurrentTopology()
-        } catch (e: dev.caerbannog.core.migrations.TopologyReadException) {
-            exportFailure = e
-            null
-        }
+        exportedFile = getVm().exportCurrentTopology()
     }
 
     @Then("a new migration file {string} is created")

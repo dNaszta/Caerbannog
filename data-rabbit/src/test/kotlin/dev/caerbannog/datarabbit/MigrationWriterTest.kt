@@ -186,9 +186,17 @@ class MigrationWriterTest {
     }
 
     @Test
+    fun `a name with dot, underscore and dash is echoed in the conflict reason, the vhost slash too`() {
+        val precondition = """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x'"}"""
+        for (name in listOf("order-events", "orders.v2", "my_queue")) {
+            assertEquals(M508a.conflict(name), M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition))))
+        }
+    }
+
+    @Test
     fun `a name that is not short and plain is not echoed in the conflict reason`() {
         val precondition = """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x'"}"""
-        for (name in listOf("a\"quote", "line\nbreak", "<script>x</script>", "x".repeat(65), "back\\slash")) {
+        for (name in listOf("a\"quote", "line\nbreak", "<script>x</script>", "x".repeat(65), "back\\slash", "a b")) {
             val reason = M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition)))
             assertTrue(reason.contains("exists with different settings"), reason)
             assertFalse(reason.contains(name), "echoes the name: $reason")

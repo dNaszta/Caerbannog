@@ -223,22 +223,22 @@ class MigrationsViewModelTest {
         val migrationFile = parseResult.migration
 
         // Case 1: no configure permission -> all blocked
-        val dryRunNoPerm = runner.dryRun(migrationFile, hasConfigurePermission = false, TopologyControlLevel.FULL_CONTROL)
+        val dryRunNoPerm = runner.dryRun(migrationFile, hasConfigurePermission = false, TopologyControlLevel.FULL_CONTROL, vhost = "/")
         assertFalse(dryRunNoPerm.canApply)
         assertTrue(dryRunNoPerm.actions.all { !it.allowed })
 
         // Case 2: Read-only level -> blocked
-        val dryRunReadOnly = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.READ_ONLY)
+        val dryRunReadOnly = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.READ_ONLY, vhost = "/")
         assertFalse(dryRunReadOnly.canApply)
 
         // Case 3: Declare and edit level -> deleteQueue blocked, declareQueue allowed
-        val dryRunDeclareEdit = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.DECLARE_AND_EDIT)
+        val dryRunDeclareEdit = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.DECLARE_AND_EDIT, vhost = "/")
         assertFalse(dryRunDeclareEdit.canApply)
         assertTrue(dryRunDeclareEdit.actions[0].allowed)
         assertFalse(dryRunDeclareEdit.actions[1].allowed)
 
         // Case 4: Full control -> all allowed
-        val dryRunFull = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.FULL_CONTROL)
+        val dryRunFull = runner.dryRun(migrationFile, hasConfigurePermission = true, TopologyControlLevel.FULL_CONTROL, vhost = "/")
         assertTrue(dryRunFull.canApply)
         assertTrue(dryRunFull.actions.all { it.allowed })
     }
@@ -328,7 +328,7 @@ class MigrationsViewModelTest {
 
         fileRepo.importFile(sampleJson("0004"))
 
-        val exported = vm.exportCurrentTopology()
+        val exported = vm.exportCurrentTopology()!!
         assertEquals("0005", exported.version)
         assertTrue(exported.up.any { it is MigrationAction.DeclareQueue && it.name == "orders" })
         assertTrue(exported.up.any { it is MigrationAction.DeclareExchange && it.name == "events" })

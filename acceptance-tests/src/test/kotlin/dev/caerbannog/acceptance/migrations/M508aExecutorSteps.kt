@@ -408,7 +408,7 @@ class M508aExecutorSteps {
 
     @Then("I am told the topology could not be read and no migration file was written")
     fun toldTopologyNotReadNoFile() = runBlocking {
-        assertNotNull(s.exportFailure, "the export did not fail")
+        assertEquals(null, s.exportedFile, "the export returned a file although the broker could not be read")
         assertEquals("The topology could not be read", s.getVm().state.value.errorMessage)
         assertTrue(s.fileRepository.listFiles().isEmpty(), "a migration file was written: ${s.fileRepository.listFiles().map { it.version }}")
     }
@@ -429,7 +429,7 @@ class M508aExecutorSteps {
 
     @Then("the new migration declares all {int} queues")
     fun newMigrationDeclaresAll(count: Int) {
-        assertNotNull(s.exportedFile, "no migration was exported; failure: ${s.exportFailure}")
+        assertNotNull(s.exportedFile, "no migration was exported; error: ${s.getVm().state.value.errorMessage}")
         val queues = s.exportedFile!!.up.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name }
         assertEquals(count, queues.size, "queues in the exported file")
         assertEquals(count, queues.toSet().size, "a queue was exported twice")

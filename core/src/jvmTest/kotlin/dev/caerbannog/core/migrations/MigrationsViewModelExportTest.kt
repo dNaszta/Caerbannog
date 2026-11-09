@@ -4,7 +4,7 @@ import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.PagedTopologyCatalog
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.topology.TopologyCatalog
-import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeTopologyMigrationExecutor
@@ -36,7 +36,7 @@ class MigrationsViewModelExportTest {
             topologyCatalog = catalog,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
         )
-        return runBlocking { vm.exportCurrentTopology() }
+        return runBlocking { vm.exportCurrentTopology() }!!
     }
 
     /** Recorded from the first release's exporter (pretty print, 4 spaces). */
@@ -125,7 +125,7 @@ class MigrationsViewModelExportTest {
         val paged = PagedTopologyCatalog(fake, pageSize = 40)
         val rig = Rig(paged)
 
-        val file = runBlocking { rig.vm.exportCurrentTopology() }
+        val file = runBlocking { rig.vm.exportCurrentTopology() }!!
 
         val declared = file.up.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name }
         assertEquals(150, declared.size, "queues in the exported file")
@@ -139,7 +139,7 @@ class MigrationsViewModelExportTest {
         for ((count, pages) in listOf(1 to listOf(1), 0 to listOf(1), 80 to listOf(1, 2))) {
             val fake = FakeTopologyCatalog().apply { queuesNamed(count).forEach { addQueue(it) } }
             val paged = PagedTopologyCatalog(fake, pageSize = 40)
-            val file = runBlocking { Rig(paged).vm.exportCurrentTopology() }
+            val file = runBlocking { Rig(paged).vm.exportCurrentTopology() }!!
             assertEquals(count, file.up.filterIsInstance<MigrationAction.DeclareQueue>().size, "count $count")
             assertEquals(pages, paged.pagesRequested.toList(), "count $count")
         }
@@ -151,14 +151,14 @@ class MigrationsViewModelExportTest {
             queuesNamed(3).forEach { addQueue(it) }; addStream("audit"); addExchange(exchange("events"))
             addBinding(BindingRow("events", "/", "queue-001", BindingDestinationType.QUEUE, "k"))
         }
-        val file = runBlocking { Rig(PagedTopologyCatalog(fake, pageSize = 2)).vm.exportCurrentTopology() }
+        val file = runBlocking { Rig(PagedTopologyCatalog(fake, pageSize = 2)).vm.exportCurrentTopology() }!!
         assertEquals(3, file.up.filterIsInstance<MigrationAction.DeclareQueue>().size)
         assertEquals(1, file.up.filterIsInstance<MigrationAction.DeclareExchange>().size)
         assertEquals(1, file.up.filterIsInstance<MigrationAction.DeclareBinding>().size)
     }
 
     private fun assertFailsLoudlyAndWritesNothing(rig: Rig, why: String) {
-        assertFailsWith<TopologyReadException>(why) { runBlocking { rig.vm.exportCurrentTopology() } }
+        assertNull(runBlocking { rig.vm.exportCurrentTopology() }, "$why: a file was returned")
         assertEquals("The topology could not be read", rig.vm.state.value.errorMessage, why)
         assertTrue(runBlocking { rig.files.listFiles() }.isEmpty(), "$why: a file was written")
         assertTrue(rig.vm.state.value.entries.isEmpty(), "$why: the list shows a file")
@@ -197,11 +197,11 @@ class MigrationsViewModelExportTest {
     fun `the error can be dismissed and a later export works`() {
         val fake = FakeTopologyCatalog().apply { addQueue(queue("orders")); failCall("queues", CatalogResult.Unreachable) }
         val rig = Rig(fake)
-        assertFailsWith<TopologyReadException> { runBlocking { rig.vm.exportCurrentTopology() } }
+        assertNull(runBlocking { rig.vm.exportCurrentTopology() })
         rig.vm.dismissError()
         assertEquals(null, rig.vm.state.value.errorMessage)
         fake.clearFailures()
-        val file = runBlocking { rig.vm.exportCurrentTopology() }
+        val file = runBlocking { rig.vm.exportCurrentTopology() }!!
         assertNotNull(file)
         assertEquals(1, file.up.filterIsInstance<MigrationAction.DeclareQueue>().size)
     }

@@ -46,11 +46,15 @@ class ExecutorPathAllowListTest {
     }
 
     @Test
-    fun `a segment named get, contents or purge is refused anywhere, so a queue with that name is never touched`() {
+    fun `get, contents and purge are names like any other when they stand in a name position`() {
         for (word in listOf("get", "contents", "purge")) {
-            assertFalse(ExecutorPathAllowList.isAllowed("PUT", "/api/queues/%2F/$word"), word)
-            assertFalse(ExecutorPathAllowList.isAllowed("DELETE", "/api/queues/%2F/$word"), word)
-            assertFalse(ExecutorPathAllowList.isAllowed("GET", "/api/bindings/%2F/e/$word/q/orders"), word)
+            assertTrue(ExecutorPathAllowList.isAllowed("PUT", "/api/queues/%2F/$word"), word)
+            assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/exchanges/%2F/$word"), word)
+            assertTrue(ExecutorPathAllowList.isAllowed("GET", "/api/bindings/%2F/e/$word/q/$word"), word)
+            assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/$word/q/$word/$word"), word)
+            // ... but never as a suffix after a name
+            assertFalse(ExecutorPathAllowList.isAllowed("POST", "/api/queues/%2F/$word/$word"), word)
+            assertFalse(ExecutorPathAllowList.isAllowed("GET", "/api/queues/%2F/orders/$word"), word)
         }
     }
 
@@ -73,7 +77,7 @@ class ExecutorPathAllowListTest {
 
     private val hostileNames = listOf(
         "orders", "", " ", "a b", "a/b", "/", "..", ".", "...", "a/../b", "%2F", "%2e%2e", "a%b", "a?b=c", "a#b", "a\\b", "ünï", "日本語",
-        "a\nb", "a\u0000b", "<script>", "x".repeat(300), "a+b", "'q'", "\"dq\"", "~", "a~b", "-", "a&b", "a;b",
+        "a\nb", "a\u0000b", "<script>", "x".repeat(300), "a+b", "'q'", "\"dq\"", "~", "a~b", "-", "a&b", "a;b", "get", "contents", "purge",
     )
 
     private fun actionsWith(name: String, vhost: String): List<MigrationAction> = listOf(
@@ -103,7 +107,6 @@ class ExecutorPathAllowListTest {
         val s = segments.drop(1)
         if (s.any { it.isEmpty() }) return "empty segment"
         if (s.any { it == "." || it == ".." }) return "raw dot segment"
-        if (s.any { it.equals("get", true) || it.equals("contents", true) || it.equals("purge", true) }) return "message path segment"
         if (path.any { it == '?' || it == '#' || it == '\\' || it.code < 0x20 || it == ' ' || it.code > 0x7e }) return "unencoded character"
         val expected = when (s.getOrNull(1)) {
             "queues", "exchanges", "policies", "operator-policies" -> listOf(4)
@@ -111,6 +114,9 @@ class ExecutorPathAllowListTest {
             else -> return "collection ${s.getOrNull(1)} is not allowed"
         }
         if (s.firstOrNull() != "api" || s.size !in expected) return "${s.size} segments instead of $expected"
+        if (s[1] == "bindings" && (s[3] != "e" || s[5] != "q" && s[5] != "e")) return "binding literals e/q|e are not where they belong"
+        if (s[1] == "bindings" && s.size == 8 && method != "DELETE") return "a properties key outside a DELETE"
+        if (s[1] != "bindings" && method == "POST") return "POST outside a binding"
         return null
     }
 
@@ -128,9 +134,6 @@ class ExecutorPathAllowListTest {
                         val where = "${action.actionName} $label=${hostile.take(20).replace("\n", "\\n")} -> ${request.method} ${request.path}"
                         assertTrue(ExecutorPathAllowList.isAllowed(request.method, request.path), "not allowed: $where")
                         assertEquals(null, structurallyFine(request.method, request.path), where)
-                        if (request.method == "PUT" || request.method == "DELETE" || request.method == "POST") {
-                            assertFalse(request.path.contains("/get") || request.path.contains("/contents") || request.path.contains("/purge"), where)
-                        }
                     }
                 }
             }
@@ -139,15 +142,18 @@ class ExecutorPathAllowListTest {
     }
 
     @Test
-    fun `a queue named get, contents or purge is refused and nothing is sent`() {
+    fun `a queue, exchange or policy named get, contents or purge is declared and deleted like any other`() {
         for (word in listOf("get", "contents", "purge")) {
-            for (action in listOf(MigrationAction.DeclareQueue(word), MigrationAction.DeleteQueue(word), MigrationAction.DeclareExchange(word))) {
-                val seen = mutableListOf<M508a.Seen>()
-                val executor = ManagementTopologyMigrationExecutor(M508a.http(M508a.answering(200, "{}", seen)), M508a.requests(), noStreams) { }
-                val result = runBlocking { executor.execute(action) }
-                assertTrue(result is dev.caerbannog.core.migrations.ActionResult.Failed, "${action.actionName} $word gave $result")
-                assertTrue(seen.isEmpty(), "${action.actionName} $word sent ${seen.map { it.method + " " + it.path }}")
+            val broker = dev.caerbannog.core.migrations.fakes.FakeManagementBroker()
+            val seen = mutableListOf<M508a.Seen>()
+            val executor = M508a.executor(broker, seen = seen)
+            runBlocking {
+                assertEquals(dev.caerbannog.core.migrations.ActionResult.Success, executor.execute(MigrationAction.DeclareQueue(word)))
+                assertEquals(dev.caerbannog.core.migrations.ActionResult.Success, executor.execute(MigrationAction.DeclareExchange(word)))
+                assertEquals(dev.caerbannog.core.migrations.ActionResult.Success, executor.execute(MigrationAction.DeleteQueue(word)))
             }
+            assertTrue(seen.map { it.method + " " + it.path }.containsAll(listOf("PUT /api/queues/%2F/$word", "PUT /api/exchanges/%2F/$word", "DELETE /api/queues/%2F/$word")), seen.toString())
+            assertTrue(broker.hasExchange("/", word) && !broker.hasQueue("/", word))
         }
     }
 

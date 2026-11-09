@@ -164,6 +164,20 @@ class StreamManagementViewModelTest {
     }
 
     @Test
+    fun `delete of a stream that is not there shows the existing refusal with the fixed text`() = runBlocking<Unit> {
+        fakeManager.notFoundOnDelete = true
+        val vm = createViewModel()
+        vm.openDelete("audit-log")
+        vm.setDeleteConfirmation("audit-log")
+        val result = vm.confirmDelete()
+
+        assertFalse(result)
+        assertEquals("The stream does not exist", vm.deleteState.value.error)
+        assertTrue(vm.deleteState.value.isOpen)
+        assertFalse(vm.deleteState.value.isDeleting)
+    }
+
+    @Test
     fun `actions are gated when user has no configure permission`() = runBlocking<Unit> {
         val vm = createViewModel(configurePermission = false)
 

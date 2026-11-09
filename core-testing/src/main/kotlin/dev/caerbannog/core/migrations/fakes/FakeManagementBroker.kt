@@ -146,7 +146,7 @@ class FakeManagementBroker {
 
         override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
             if (queues.remove(Key(vhost, name)) != null) StreamManagementResult.Success
-            else StreamManagementResult.Refused("Broker refused to delete stream '$name': Error while deleting stream $name (STREAM_DOES_NOT_EXIST)")
+            else StreamManagementResult.NotFound
     }
 
     // ---- the API ---------------------------------------------------------------------------------------------

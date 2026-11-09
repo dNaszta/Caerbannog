@@ -256,6 +256,13 @@ class MigrationExecutorTest {
     }
 
     @Test
+    fun `the typed NotFound of the manager is the no-op, a refusal whose text says STREAM_DOES_NOT_EXIST is not`() {
+        assertEquals(ActionResult.Success, exec(MigrationAction.DeleteStream("old"), FakeStreamManager().apply { notFoundOnDelete = true }))
+        val reason = M508a.failedReason(exec(MigrationAction.DeleteStream("old"), FakeStreamManager().apply { refuseDeleteWith = "Broker refused to delete stream 'old': STREAM_DOES_NOT_EXIST" }))
+        assertFalse(reason.contains("STREAM_DOES_NOT_EXIST"), reason)
+    }
+
+    @Test
     fun `any other refusal to delete a stream fails with a fixed reason`() {
         broker.addQueue("/", "old", type = "stream")
         val manager = FakeStreamManager().apply { refuseDeleteWith = "Broker refused to delete stream 'old': ACCESS_REFUSED SENTINEL-del" }

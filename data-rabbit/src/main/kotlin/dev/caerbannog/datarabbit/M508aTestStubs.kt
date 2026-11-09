@@ -76,13 +76,24 @@ internal class ReadBack(
  *  - GET, PUT, POST, DELETE only; PUT and DELETE only where the action needs them (never anywhere else);
  *  - `/api/queues/{v}/{n}`, `/api/exchanges/{v}/{n}`, `/api/policies/{v}/{n}`, `/api/operator-policies/{v}/{n}` (exactly 4 segments:
  *    GET, PUT, DELETE), `/api/bindings/{v}/e/{src}/{q|e}/{dst}` (7 segments: GET, POST) and `.../{properties key}` (8 segments: DELETE);
- *  - no query string or fragment, no empty segment, no raw `.` or `..` segment, no segment `get`, `contents` or `purge`
- *    (so no message path, and a queue literally named `get` is refused rather than risked).
+ *  - no query string or fragment, no empty segment, no raw `.` or `..` segment. A segment named `get`, `contents` or `purge` is a NAME and is
+ *    allowed in a name position; what is refused is any SUFFIX after a name (`.../orders/get`), which the exact shapes exclude.
  * The stub allows everything (wrong), so `ExecutorPathAllowListTest` is red.
  */
 internal object ExecutorPathAllowList {
     fun isAllowed(method: String, path: String): Boolean = true
 }
+
+// ---- stream adapter mapping (ONE place that knows the client's "does not exist" failure) -----------------------------------------------
+
+/**
+ * Maps what the stream client threw on a DELETE to a typed result: a `StreamException` with response code 2 (STREAM_DOES_NOT_EXIST) or a
+ * `StreamDoesNotExistException` is [dev.caerbannog.core.streams.StreamManagementResult.NotFound]; everything else is `Refused` with a text that
+ * names the stream (as `RabbitMqStreamManager` does today). The mapping looks at the exception type and code, never at the message text.
+ * `RabbitMqStreamManager.deleteStream` calls it. The stub answers Refused for everything (wrong).
+ */
+internal fun mapStreamDeleteFailure(name: String, failure: Exception): dev.caerbannog.core.streams.StreamManagementResult =
+    dev.caerbannog.core.streams.StreamManagementResult.Refused("Broker refused to delete stream '$name': ${failure.message}")
 
 // ---- the executor -------------------------------------------------------------------------------------------------------------------
 
