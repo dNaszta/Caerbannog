@@ -31,7 +31,12 @@ private const val MAX_FILE_DEPTH = 32
 class JsonFileAppSettings(
     private val file: File,
     private val log: (String) -> Unit = { System.err.println(it) },
-) : AppSettings {
+) : AppSettings, dev.caerbannog.core.migrations.MigrationFolderStore {
+    // M5-08b STUB: the `migrationsFolder` key; the developer implements it (read at construction, merged write, corrupt file means null).
+    override var folder: String?
+        get() = null
+        set(_) = Unit
+
     private val json = Json { prettyPrint = true }
 
     @Volatile

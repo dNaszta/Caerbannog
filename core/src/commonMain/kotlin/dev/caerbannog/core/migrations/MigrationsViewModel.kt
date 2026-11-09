@@ -28,6 +28,14 @@ data class MigrationsScreenState(
     val warningMessage: String? = null,
     val errorMessage: String? = null,
     val isApplying: Boolean = false,
+    // M5-08b STUB fields (the defaults are the old in-memory behaviour).
+    val folder: MigrationFolderState = MigrationFolderState.Ready(null),
+    val invalidFiles: List<InvalidMigrationFile> = emptyList(),
+    val historyProblem: HistoryUnreadable? = null,
+    val isImportEnabled: Boolean = true,
+    val isExportEnabled: Boolean = true,
+    /** The question waiting for Confirm or Cancel, or null. */
+    val confirmation: String? = null,
 ) {
     val selectedEntry: MigrationEntry?
         get() = entries.firstOrNull { it.file.version == selectedVersion }
@@ -41,6 +49,8 @@ class MigrationsViewModel(
     var vhost: String = "/",
     var hasConfigurePermission: Boolean = true,
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+    /** M5-08b: when set, files come from `ports.repositoryFor(chosen folder)` and [fileRepository] is not used. */
+    private val folderPorts: MigrationFolderPorts? = null,
     private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow(
@@ -258,6 +268,14 @@ class MigrationsViewModel(
                 destinationType = row.destinationType,
             )
         }
+
+    // M5-08b STUBS: the folder actions.
+    fun chooseFolder(): Unit = throw NotImplementedError("M5-08b STUB")
+    fun changeFolder(): Unit = throw NotImplementedError("M5-08b STUB")
+    fun retry(): Unit = throw NotImplementedError("M5-08b STUB")
+    fun startWithEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
+    fun confirmEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
+    fun cancelEmptyHistory(): Unit = throw NotImplementedError("M5-08b STUB")
 
     fun dismissError() {
         _state.update { it.copy(errorMessage = null) }

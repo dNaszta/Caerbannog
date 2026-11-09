@@ -58,6 +58,9 @@ class TopologyMigrationsSteps {
     internal var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL
 
     internal var viewModel: MigrationsViewModel? = null
+
+    /** M5-08b: a scenario with the real folder repositories (M508bPersistenceSteps) builds its view model here; null keeps the in-memory one. */
+    internal var vmFactory: (() -> MigrationsViewModel)? = null
     private var dryRunResult: MigrationDryRun? = null
     internal var lastApplyResult: MigrationApplyResult? = null
     internal var lastImportResult: MigrationValidationResult? = null
@@ -87,13 +90,14 @@ class TopologyMigrationsSteps {
         exportedFile = null
         pendingImportJson = ""
         viewModel = null
+        vmFactory = null
         topologyCatalogOverride = null
         topologyUnchangedCheck = null
         runner = MigrationRunner(historyRepository, executor)
     }
 
     internal fun getVm(): MigrationsViewModel {
-        return viewModel ?: MigrationsViewModel(
+        return viewModel ?: (vmFactory?.invoke() ?: MigrationsViewModel(
             fileRepository = fileRepository,
             runner = runner,
             topologyCatalog = topologyCatalogOverride ?: fakeTopologyCatalog,
@@ -102,7 +106,7 @@ class TopologyMigrationsSteps {
             hasConfigurePermission = configurePermission,
             controlLevel = controlLevel,
             scope = scope,
-        ).also { viewModel = it }
+        )).also { viewModel = it }
     }
 
     private fun buildSampleJson(version: String, description: String = "Migration $version"): String = """

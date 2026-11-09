@@ -10,6 +10,9 @@ interface MigrationFileRepository {
     ): MigrationFile
     suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult
     suspend fun nextVersion(): String
+
+    /** Valid migrations, the invalid files and the folder state in one answer; the default suits repositories without a folder. */
+    suspend fun load(): FolderListing = FolderListing.Listed(listFiles())
 }
 
 class InMemoryMigrationFileRepository : MigrationFileRepository {
