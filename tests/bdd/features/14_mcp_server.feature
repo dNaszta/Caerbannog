@@ -67,3 +67,19 @@ Feature: Model Context Protocol (MCP) server
     Given the profile "dev-local" has MQTT port 1883 and topology control level "Full control"
     When the client calls MCP tool "caerbannog_publish_mqtt" with profile "dev-local", topic "sensors/temperature", payload "21.5", qos 1
     Then the tool result indicates a successful MQTT publish to "sensors/temperature"
+
+  Scenario: MCP server publishes an MQTT message with headers as user properties
+    Given the profile "dev-local" has MQTT port 1883 and topology control level "Full control"
+    When the client calls MCP tool "caerbannog_publish_mqtt" with profile "dev-local", topic "sensors/temperature" and payload "21.5" and these headers
+      | trace-id | abc |
+      | tenant   | acme |
+    Then the tool result indicates a successful MQTT publish to "sensors/temperature"
+    And the published MQTT message carries these headers
+      | trace-id | abc  |
+      | tenant   | acme |
+
+  Scenario: MCP server refuses malformed headers and publishes nothing
+    Given the profile "dev-local" has MQTT port 1883 and topology control level "Full control"
+    When the client calls MCP tool "caerbannog_publish_mqtt" with profile "dev-local", topic "sensors/temperature" and payload "21.5" and the raw headers argument '["a"]'
+    Then the tool result indicates an error "Invalid 'headers'"
+    And no MQTT message was published

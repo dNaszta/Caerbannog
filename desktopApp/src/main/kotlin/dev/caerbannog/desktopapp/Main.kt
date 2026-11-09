@@ -139,11 +139,11 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         PublishEventsAdapter(
             vm = publishVm,
             onClose = { showPublishDialog = false },
-            onPublished = {
-                browserVm?.browseLastPage()
-                composition.streamClients.refreshNow()
-                composition.streamList.refreshNow()
-            },
+            onPublished = afterStreamPublish(
+                browseLastPage = browserVm?.let { vm -> { vm.browseLastPage() } },
+                refreshClients = { composition.streamClients.refreshNow() },
+                refreshStreamList = { composition.streamList.refreshNow() },
+            ),
         )
     }
     val manager = source?.manager ?: UnavailableStreamManager
@@ -167,9 +167,7 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         val topo = source?.topology ?: return@LaunchedEffect
         when (val res = topo.bindings(vhost)) {
             is CatalogResult.Success -> {
-                inboundRoutes = res.value
-                    .filter { it.destination == stream && it.source.isNotEmpty() }
-                    .map { StreamInboundRoute(exchange = it.source, routingKey = it.routingKey, arguments = it.arguments) }
+                inboundRoutes = inboundRoutesFor(res.value, stream)
             }
             else -> Unit
         }
@@ -188,15 +186,13 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         PublishMqttEventsAdapter(
             vm = publishMqttVm,
             onClose = { showPublishMqttDialog = false },
-            onPublished = {
-                browserVm?.browseLastPage()
-                composition.streamClients.refreshNow()
-                composition.streamList.refreshNow()
-            },
+            onPublished = afterStreamPublish(
+                browseLastPage = browserVm?.let { vm -> { vm.browseLastPage() } },
+                refreshClients = { composition.streamClients.refreshNow() },
+                refreshStreamList = { composition.streamList.refreshNow() },
+            ),
         )
     }
-    // Only a profile with an MQTT port can publish over MQTT; an amq.topic binding alone does not make the broker reachable by MQTT.
-    val hasMqttOnStream = source?.hasMqtt == true
     val now = rememberNowMillis()
     StreamScreen(
         stream = stream,
@@ -228,14 +224,7 @@ private fun StreamWindowContent(composition: AppComposition, control: Connection
         showPublishMqttDialog = showPublishMqttDialog,
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
-        onOpenPublishMqttDialog = if (hasMqttOnStream) {
-            { suggestedTopic ->
-                suggestedTopic?.let(publishMqttVm::setTopic)
-                showPublishMqttDialog = true
-            }
-        } else {
-            null
-        },
+        onOpenPublishMqttDialog = streamMqttOpener(source, setTopic = publishMqttVm::setTopic, openDialog = { showPublishMqttDialog = true }),
     )
 }
 
@@ -334,10 +323,10 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         PublishMqttEventsAdapter(
             vm = publishMqttVm,
             onClose = { showPublishMqttDialog = false },
-            onPublished = {
-                composition.topology.refreshNow()
-                composition.streamList.refreshNow()
-            },
+            onPublished = afterTopologyPublish(
+                refreshTopology = { composition.topology.refreshNow() },
+                refreshStreamList = { composition.streamList.refreshNow() },
+            ),
         )
     }
 
@@ -379,7 +368,7 @@ private fun TopologyWindowContent(composition: AppComposition, control: Connecti
         showPublishMqttDialog = showPublishMqttDialog,
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
-        onOpenPublishMqttDialog = if (source?.hasMqtt == true) ({ showPublishMqttDialog = true }) else null,
+        onOpenPublishMqttDialog = topologyMqttOpener(source, openDialog = { showPublishMqttDialog = true }),
         onOpenStream = { streamName ->
             composition.navigation.open(AppDestination.Streams)
             composition.navigation.openStream(streamName)

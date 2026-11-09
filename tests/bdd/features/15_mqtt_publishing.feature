@@ -43,3 +43,41 @@ Feature: Publish an MQTT message
     Given the MQTT broker will refuse publication with "Not authorized"
     When I publish an MQTT message to "restricted/topic" with QoS 1 and payload "secret"
     Then the MQTT publish is refused with reason "Not authorized"
+
+  # M7-10: the dialog's headers and default message, through the real PublishMqttViewModel. Headers are MQTT 5 user properties.
+  @fake-broker @headers
+  Scenario: Headers are sent as user properties, in the order given, and keys may repeat
+    Given I open the MQTT publish dialog for "sensors/room1"
+    And I add these MQTT headers
+      | trace-id | abc-123 |
+      | tenant   | acme    |
+      | trace-id | second  |
+    When I publish the dialog message
+    Then the MQTT broker receives the message on "sensors/room1" with these headers
+      | trace-id | abc-123 |
+      | tenant   | acme    |
+      | trace-id | second  |
+
+  @fake-broker @headers
+  Scenario: Header rows without a key are ignored
+    Given I open the MQTT publish dialog for "sensors/room1"
+    And I add these MQTT headers
+      |          | orphan value |
+      | trace-id | abc-123      |
+    When I publish the dialog message
+    Then the MQTT broker receives the message on "sensors/room1" with these headers
+      | trace-id | abc-123 |
+
+  @fake-broker @headers
+  Scenario: A message without headers is sent without user properties
+    Given I open the MQTT publish dialog for "sensors/room1"
+    When I publish the dialog message
+    Then the MQTT broker receives the message on "sensors/room1" without headers
+
+  @fake-broker
+  Scenario: The dialog opens with an editable sample message
+    Given I open the MQTT publish dialog for "sensors/room1"
+    Then the dialog payload is the sample message
+    When I change the dialog payload to "21.5"
+    And I publish the dialog message
+    Then the MQTT broker receives the message on "sensors/room1" with payload "21.5"

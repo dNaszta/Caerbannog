@@ -11,6 +11,7 @@ import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeMqttCatalog
 import dev.caerbannog.core.connections.fakes.FakeMqttMessagePublisher
 import dev.caerbannog.core.mqtt.MqttClientRow
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.Retention
 import dev.caerbannog.core.streams.StreamSummary
@@ -19,6 +20,7 @@ import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.mcp.McpServer
+import io.cucumber.datatable.DataTable
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -356,6 +358,27 @@ class McpSteps {
     @When("the client calls MCP tool {string} with profile {string}, topic {string}, payload {string}, qos {int}")
     fun callPublishMqtt(toolName: String, profile: String, topic: String, payload: String, qos: Int) {
         callTool(toolName, """{"profile": "$profile", "topic": "$topic", "payload": "$payload", "qos": $qos}""")
+    }
+
+    @When("the client calls MCP tool {string} with profile {string}, topic {string} and payload {string} and these headers")
+    fun callPublishMqttWithHeaders(toolName: String, profile: String, topic: String, payload: String, table: DataTable) {
+        val headers = table.asLists().joinToString(", ") { "\"${it[0]}\": \"${it[1]}\"" }
+        callTool(toolName, """{"profile": "$profile", "topic": "$topic", "payload": "$payload", "headers": {$headers}}""")
+    }
+
+    @When("the client calls MCP tool {string} with profile {string}, topic {string} and payload {string} and the raw headers argument {string}")
+    fun callPublishMqttWithRawHeaders(toolName: String, profile: String, topic: String, payload: String, rawHeaders: String) {
+        callTool(toolName, """{"profile": "$profile", "topic": "$topic", "payload": "$payload", "headers": $rawHeaders}""")
+    }
+
+    @Then("the published MQTT message carries these headers")
+    fun assertPublishedHeaders(table: DataTable) {
+        assertEquals(table.asLists().map { MqttHeader(it[0], it[1]) }, fakeMqttPublisher.publishedMessages.single().headers)
+    }
+
+    @Then("no MQTT message was published")
+    fun assertNoMqttPublished() {
+        assertTrue(fakeMqttPublisher.publishedMessages.isEmpty(), "published: ${fakeMqttPublisher.publishedMessages}")
     }
 
     @Then("the tool result includes MQTT client {string} with subscription {string}")
