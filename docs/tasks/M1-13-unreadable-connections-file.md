@@ -22,31 +22,110 @@ In:
 Out: repairing the JSON, a backup scheme, a settings.json equivalent (it already falls back to defaults and the next write replaces it by design), changing the file format.
 
 ## Acceptance
-Scenarios to be written by the architect at step 1 of this task (names proposed), in `tests/bdd/features/01_connections.feature` (`@fake-broker`) and `14_mcp_server.feature`:
-- "The app starts with an unreadable connections file and says so" (@negative): window state shows the path and reason, add and connect are disabled, the file bytes are unchanged.
-- "A connections file nested too deep is treated like a corrupt one" (@negative).
-- "Keeping the unreadable file" (per the decision): the offered actions behave as chosen; with "start fresh" the old file is renamed, not deleted, and the new list is empty and writable.
-- "MCP server reports an unreadable profiles file as a tool error" (@negative): `isError` true, fixed text, no file content in the result or in stderr, the server keeps running.
-Unit tests: JSON repository `load()` for corrupt, too deep, empty, missing and valid files; view model state transitions; no secret or file content in any message. Mutation check: make the view model rethrow, the start-up test goes red.
+Owner decision 2026-11-09 (option B) fixes the behaviour. The architect copies the scenarios below into `tests/bdd/features/01_connections.feature` and `14_mcp_server.feature` at step 1 of this task (tags in the headings; `@fake-broker`). Fixed texts: reason "The file is not valid JSON" or "The file is nested too deep"; line "Your file has not been changed"; confirmation "Move connections.json to connections.json.unreadable-<timestamp> and start with an empty list? The old file is kept." where `<timestamp>` is the real name chosen at that moment (format `yyyyMMdd-HHmmss`, local time from an injected clock; if that name exists, `-2`, `-3`, and so on). Buttons: "Try again", "Show folder", "Start with an empty list" (opens the confirmation; the confirmation has "Move file and start" and "Cancel").
+
+```gherkin
+@negative @fake-broker
+Scenario: The app starts with an unreadable connections file and says so
+  Given the connections file contains text that is not valid JSON
+  When I start the app
+  Then the connections screen shows the path of the file and the reason "The file is not valid JSON"
+  And it says "Your file has not been changed"
+  And "Add connection" and "Connect" are disabled
+  And the connections file still has exactly its original bytes
+
+@negative @fake-broker
+Scenario: A connections file nested too deep is treated like a corrupt one
+  Given the connections file nests arrays ten thousand levels deep
+  When I start the app
+  Then the connections screen shows the reason "The file is nested too deep"
+  And the connections file still has exactly its original bytes
+
+@fake-broker
+Scenario: Try again reads the file again
+  Given the app shows that the connections file is unreadable
+  And I fix the connections file so that it holds the profile "uat-eu"
+  When I choose "Try again"
+  Then the profile "uat-eu" is listed and the message is gone
+
+@fake-broker
+Scenario: Try again with the file still unreadable changes nothing
+  Given the app shows that the connections file is unreadable
+  When I choose "Try again"
+  Then the same message is shown
+  And the connections file still has exactly its original bytes
+
+@fake-broker
+Scenario: Show folder opens the folder of the file
+  Given the app shows that the connections file is unreadable
+  When I choose "Show folder"
+  Then the folder that holds the connections file is opened
+  And the connections file still has exactly its original bytes
+
+@fake-broker
+Scenario: Start with an empty list moves the file aside after a confirmation
+  Given the app shows that the connections file is unreadable
+  And the clock says 2026-11-09 14:30:05
+  When I choose "Start with an empty list"
+  Then I am asked "Move connections.json to connections.json.unreadable-20261109-143005 and start with an empty list? The old file is kept."
+  When I confirm
+  Then the file "connections.json.unreadable-20261109-143005" holds the original bytes
+  And the connection list is empty and I can add a connection
+  And nothing was deleted
+
+@fake-broker
+Scenario: Cancelling the confirmation changes nothing
+  Given the app shows that the connections file is unreadable
+  When I choose "Start with an empty list"
+  And I cancel
+  Then the connections file still has exactly its original bytes
+  And the unreadable message is still shown
+
+@negative @fake-broker
+Scenario: The moved-aside name is never reused
+  Given the app shows that the connections file is unreadable
+  And a file "connections.json.unreadable-20261109-143005" already exists
+  And the clock says 2026-11-09 14:30:05
+  When I choose "Start with an empty list" and confirm
+  Then the old file is moved to "connections.json.unreadable-20261109-143005-2"
+  And the existing file "connections.json.unreadable-20261109-143005" is unchanged
+
+@negative @fake-broker
+Scenario: The file is never overwritten without that choice
+  Given the app shows that the connections file is unreadable
+  Then no way in the app adds, edits or deletes a connection until I try again successfully or move the file aside
+  And the connections file still has exactly its original bytes
+
+# in 14_mcp_server.feature
+@negative
+Scenario: MCP server reports an unreadable profiles file as a tool error
+  Given the profiles file contains text that is not valid JSON and holds the word "SENTINEL-FILE-TEXT"
+  When the client calls MCP tool "caerbannog_list_profiles"
+  Then the tool result is an error with the text "The connection profiles file could not be read: The file is not valid JSON"
+  And the result and the server's log contain no part of the file, not "SENTINEL-FILE-TEXT"
+  And the response is not a JSON-RPC internal error
+  And the profiles file still has exactly its original bytes
+  And the server answers the next request
+```
+The same tool-error scenario holds for every tool that resolves a profile (one parameterised example row per tool, or a unit test over the tool list). No MCP tool moves, repairs or deletes the file.
+Unit tests: JSON repository `load()` for corrupt, too deep, empty (is `Loaded(empty)`), missing (is `Loaded(empty)`) and valid files; `moveAside()` (name format, collision suffix, original bytes preserved, original path gone, no deletion, failure to rename gives a fixed-text error and leaves the file); view model transitions (Unavailable, retry success, retry failure, confirm, cancel); no secret or file content in any message, log or result. Mutation checks: view model rethrows (start-up scenario red); `moveAside` copies and deletes instead of renaming atomically is allowed only if the data survives; make it delete instead of move (data scenario red).
 
 ## Design notes
-UI free of file code: the view model gets the typed result from the repository interface; the rename action (if chosen) is a repository or file-service method behind an interface with a fake. Sealed state, no boolean flags. The reason texts are fixed constants.
+UI free of file code: the view model gets the typed result from the repository interface; the rename action is `moveAside(): MoveAsideResult` on a small interface (repository or file service) with a fake; it uses an atomic move, never a delete, and takes the timestamp from an injected clock. `Show folder` is a desktop-only port (`FolderOpener`) with a fake. Sealed state, no boolean flags. The reason texts are fixed constants.
 
 ## UX
-`docs/ux/Main.dc.html` (Connections) has no unreadable state. Step 1 of this task adds a mockup state: banner or empty-state panel with path, reason, buttons. Material 3, states: unreadable (new), empty, loaded.
+`docs/ux/Main.dc.html` (Connections) has NO unreadable state, so the mockup needs a NEW state. This is step-1 work for this task (the architect draws it before the build; not written yet): an empty-state panel or error banner on the Connections screen with the file path, the fixed reason, the line "Your file has not been changed", the buttons "Try again", "Show folder", "Start with an empty list", and the confirmation dialog with the exact text above and "Move file and start" / "Cancel". Material 3; states: unreadable (new), empty, loaded; add and connect disabled in the unreadable state.
 
 ## MCP
 No new tool. Existing profile tools change their failure answer only (see Scope 4). No MCP action repairs, moves or deletes the file.
 
-## Open points / product decision (needs the owner)
-What may the app offer when the file is unreadable?
-- Option A: message only (path, reason, "file not changed"), plus "Try again" and "Show folder". The user fixes the file by hand. Safest, least work; the app is unusable for profiles until then.
-- Option B (recommended): A plus an explicit "Start with an empty list" button that RENAMES the file to `connections.json.unreadable-<timestamp>` (never deletes it), after a confirmation naming the new file name; then the app works and the user can recover the old file by hand. Gives a way out without data loss.
-- Option C: also an in-app JSON repair. Out of proportion; not recommended.
-Blocked until decided: the actions in Scope 3, the scenario "Keeping the unreadable file" and the UX state. Scope 1, 2 and 4 are not blocked.
+## Open points / product decision
+DECIDED by the owner on 2026-11-09: option B (message with path and fixed reason, "Try again", "Show folder", and an explicit "Start with an empty list" that renames the file to `connections.json.unreadable-<timestamp>`, never deletes it, after a confirmation that names the new file). Options A (message only) and C (in-app repair) were not chosen. No open product question remains. Open engineering detail: the timestamp format `yyyyMMdd-HHmmss` and the `-2` collision suffix are the architect's choice here, change only with a test.
 
 ## Definition of done
-Tests first and passing, scenarios pass, file never changed without an explicit user action, no unrelated changes, spec section on connection profiles updated with the decision.
+Tests first and passing, scenarios pass, file never changed without an explicit user action, no unrelated changes, `docs/spec.md` connection profiles section updated with the decision (step 1 of the task).
 
 ## Status
-- Step 1 (architect, brief): DONE 2026-11-09. Not started. Waiting for the owner's choice among A, B, C (recommend B).
+- Step 1a (architect, brief): DONE 2026-11-09.
+- Owner decision 2026-11-09: option B. Recorded above; scenarios made exact; no wait left. The brief is ready for step 1b: the architect writes the scenarios into the feature files, adds the unreadable state to `docs/ux/Main.dc.html` and the spec line, then tests first.
+- Not started (code).
