@@ -13,7 +13,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- Sources ---------------------------------------------------------------------------------
 
-  @smoke @fake-broker
+  @smoke @fake-broker @m8-03
   Scenario: Analyse a definitions file exported from RabbitMQ 3.x
     Given a definitions file exported from RabbitMQ 3.13 with 3 queues, 2 exchanges and 4 bindings in "/"
     When I analyse the file
@@ -103,7 +103,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the text form of the document, of the user and of every parameter contains neither the password hash nor the password
     And the shovel parameter is listed by its component and name only
 
-  @security @fake-broker
+  @security @fake-broker @m8-03
   Scenario: Secrets in a 3.x export never reach the report
     Given a definitions file with a user "svc" that has a password hash
     And a shovel parameter whose URI contains a password
@@ -138,21 +138,21 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- Compatibility report ----------------------------------------------------------------------
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Every finding says what, how serious, why and what to do on 4.x
     Given a definitions file with a classic queue "orders" that is mirrored by a policy
     When I analyse the file
     Then every finding shows the severity, the item, a reason and a proposed 4.x equivalent
     And the severity is one of blocker, warning or info
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Mirroring settings of a policy are reported as rejected on 4.x
     Given a definitions file with the policy "ha-all" that sets "ha-mode" and "ha-sync-mode" on "^orders"
     When I analyse the file
     Then there is a blocker for "ha-all" that RabbitMQ 4 rejects these keys when the policy is created or imported
     And the proposal is to drop the mirroring keys and to move the matching queues to quorum queues
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario Outline: Every mirroring policy key is a blocker
     Given a definitions file with a policy that sets "<key>"
     When I analyse the file
@@ -168,41 +168,43 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
       | ha-promote-on-failure  |
       | queue-master-locator   |
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A live 3.x broker that uses mirroring is flagged by its deprecated feature list
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the broker reports the deprecated feature "classic_queue_mirroring" as in use
     When I analyse "legacy-eu"
     Then the report says mirroring is in use on this broker
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A mirrored classic queue is proposed as a quorum queue
     Given a definitions file with the classic queue "orders" matched by a mirroring policy
     When I analyse the file
     Then the report proposes to declare "orders" as a quorum queue
     And the report says classic queues are no longer replicated on 4.x
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A queue entry without a type is a classic queue
     Given a definitions file whose queue "orders" has no "type" and no "x-queue-type" argument
     When I analyse the file
     Then "orders" is treated as a classic queue
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario Outline: Queue settings that a quorum queue rejects block that conversion
     Given a definitions file with a classic queue "legacy" with <setting>
     When I analyse the file
     Then there is a blocker for converting "legacy" to a quorum queue about <setting>
+    And the proposal for that blocker is to remove <setting> when the queue is converted
 
+    # x-queue-master-locator is rejected on classic and on quorum queues alike: it is covered by the
+    # next outline, where it is a blocker whatever the target type is.
     Examples:
       | setting                    |
       | x-max-priority 5           |
       | x-queue-mode lazy          |
-      | x-queue-master-locator     |
       | x-queue-version 1          |
       | auto-delete set            |
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario Outline: Transient queues and master-locator queues are blockers because a 4.x import skips them silently
     Given a definitions file with the queue "legacy" with <setting>
     When I analyse the file
@@ -214,7 +216,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
       | durable set to false    |
       | x-queue-master-locator  |
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario Outline: Settings a quorum queue accepts convert as they are
     Given a definitions file with a classic queue "jobs" with <setting>
     When I analyse the file
@@ -229,14 +231,14 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
       | x-single-active-consumer true   |
       | x-dead-letter-exchange "dlx"    |
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Converting a classic queue to quorum warns that ordering follows message priority
     Given a definitions file with a classic queue "jobs" without "x-max-priority"
     When I analyse the file
     Then there is a warning for "jobs" that a quorum queue on 4.x orders messages by priority
     And the warning says messages that carry a priority may be delivered in a different order than in a classic queue
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A queue with x-max-priority is proposed to stay classic
     Given a definitions file with a classic queue "prio" with "x-max-priority" 5
     When I analyse the file
@@ -244,13 +246,13 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And converting to a quorum queue is offered as an alternative with the ordering warning
     And accepting the quorum alternative needs the tick "Ordering by priority may change"
 
-  @fake-broker @needs-spike
+  @fake-broker @m8-03
   Scenario: Classic to quorum differences the spike has not measured are shown as unverified
     Given a definitions file with a classic queue "jobs"
     When I analyse the file
     Then the report names redelivery, the delivery limit and exclusive consumers as "unverified" differences
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A classic queue with the old index is a message-loss blocker
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the classic queue "orders" reports storage version 1
@@ -260,14 +262,14 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And it offers three fixes: set the policy "queue-version" to 2 and restart the node, upgrade through 4.0 to 4.2 first, or migrate to a new 4.x broker and move the messages with a Shovel
     And it recommends the new broker with the Shovel as the safest way
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A classic queue with the new index is not flagged
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the classic queue "events" reports storage version 2
     When I analyse "legacy-eu"
     Then there is no message-loss finding for "events"
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: The message-loss findings come first in the report
     Given a live report with a mirroring policy finding and a message-loss blocker
     When I open the report
@@ -276,7 +278,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the policy fix and the upgrade through 4.0 to 4.2 are shown as secondary options done by hand
     And the report never offers an in-place upgrade as a safe option
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A definitions file cannot tell the index version, so every classic queue is warned about
     Given a definitions file with the classic queues "orders" and "events" where "events" has "x-queue-version" 2
     When I analyse the file
@@ -292,46 +294,46 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the storage version of "orders" is read after a retry
     And a queue whose version never appears is treated as version 1 and reported as unknown
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: The report says the loss cannot be detected after an upgrade
     Given a message-loss blocker in the report
     When I open its details
     Then it says the management API does not show the loss after the upgrade
     And it says only the broker log shows it
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Client-visible changes are listed as checks, not as definition findings
     Given a definitions file from RabbitMQ 3.13
     When I analyse the file
     Then the report lists "check your clients" items for global QoS, transient queues and AMQP 1.0 address v1
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Operator policies are read from the parameters
     Given a definitions file whose parameters contain an operator policy that sets "queue-mode"
     When I analyse the file
     Then the operator policy is reported and its keys are checked like a policy
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Items that need no change are not listed as problems
     Given a definitions file with the quorum queue "events", the exchange "events.x" and a binding between them
     When I analyse the file
     Then there is no blocker and no warning
     And the report says all 3 items are compatible as they are
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Users, virtual hosts and permissions become proposals for the access migration
     Given a definitions file with the virtual host "/orders", the user "svc" and its permissions
     When I analyse the file
     Then the report proposes to declare the virtual host, the user and its permissions on the 4.x broker
     And these proposals belong to the access migration and not to a topology migration
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Parameters the app does not migrate are listed as not covered
     Given a definitions file with a federation upstream and a static policy for federation
     When I analyse the file
     Then the report lists them as not covered by the migration
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Export the report
     Given the report for "legacy-eu" is shown
     When I export the report

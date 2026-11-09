@@ -95,7 +95,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     When I apply the access migration
     Then the apply stops with a conflict and the permissions are unchanged
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: guest is proposed for skipping
     Given the export contains the user "guest" with the default password hash
     When I analyse the file
@@ -103,7 +103,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And the proposal for "guest" is to skip it
     And accepting it asks for an explicit confirmation
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-03
   Scenario Outline: A user whose hash algorithm 4.x does not accept is a manual step
     Given the export contains a user whose hashing algorithm is "<algorithm>"
     When I analyse the file
@@ -128,7 +128,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
       | rabbit_password_hashing_sha512    |
       | rabbit_password_hashing_md5       |
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: The user is always declared with the hashing algorithm
     Given the export contains a user with a hash and no hashing algorithm
     When I analyse the file
@@ -142,13 +142,13 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And the apply stops with a conflict and the existing hash is unchanged
     And a shovel password that the target definitions contain is not kept anywhere
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: A user without a password hash is reported
     Given the export contains a user with no password hash
     When I analyse the file
     Then the user is reported as info and the app does not invent a password
 
-  @fake-broker
+  @fake-broker @m8-03
   Scenario: Administrator tags are called out
     Given the export contains a user with the tag "administrator"
     When I analyse the file

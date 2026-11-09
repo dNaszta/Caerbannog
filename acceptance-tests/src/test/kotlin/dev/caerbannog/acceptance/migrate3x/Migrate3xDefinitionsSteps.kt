@@ -1,6 +1,7 @@
 package dev.caerbannog.acceptance.migrate3x
 
 import dev.caerbannog.core.migrate3x.ArgumentValue
+import dev.caerbannog.core.migrate3x.CompatibilityAnalyzer
 import dev.caerbannog.core.migrate3x.DefinitionsDocument
 import dev.caerbannog.core.migrate3x.DefinitionsOrigin
 import dev.caerbannog.core.migrate3x.DefinitionsParseResult
@@ -16,17 +17,25 @@ import io.cucumber.java.en.When
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 
 /**
- * M8-01 step definitions for the `@m8-01` scenarios of 16_migrate_from_3x.feature. One class: the scenario state (text, result, draft,
+ * M8-01 step definitions for the `@m8-01` scenarios of 16_migrate_from_3x.feature (M8-03 changed "I analyse the file" to parse and then analyse). One class: the scenario state (text, result, draft,
  * assignment) lives in plain fields, no dependency injection. No logic in the steps beyond calling `DefinitionsParser` and asserting.
  */
 class Migrate3xDefinitionsSteps {
-    private var text: String = ""
-    private var result: DefinitionsParseResult? = null
-    private var assignment: VirtualHostAssignment? = null
+    // State lives in Migrate3xWorld so the M8-03 step class sees the same text and result.
+    private var text: String
+        get() = Migrate3xWorld.text
+        set(value) { Migrate3xWorld.text = value }
+    private var result: DefinitionsParseResult?
+        get() = Migrate3xWorld.result
+        set(value) { Migrate3xWorld.result = value }
+    private var assignment: VirtualHostAssignment?
+        get() = Migrate3xWorld.assignment
+        set(value) { Migrate3xWorld.assignment = value }
 
     private fun document(): DefinitionsDocument = when (val r = result ?: fail("No file has been read")) {
         is DefinitionsParseResult.Parsed -> r.document
@@ -79,10 +88,19 @@ class Migrate3xDefinitionsSteps {
         result = DefinitionsParser.parse(text)
     }
 
-    /** M8-01 binding: the model half. M8-03 re-binds this step to the full analysis. */
+    /**
+     * M8-03 binding: parse the file text (or use the hand-made document of the Given steps), then analyse when the result is Parsed.
+     * Rejected and NeedsVirtualHost mean no report, so the M8-01 rejection outline keeps passing. File only: no live facts.
+     */
     @When("I analyse the file")
     fun iAnalyseTheFile() {
+        val built = Migrate3xWorld.document
+        if (built != null) {
+            Migrate3xWorld.report = CompatibilityAnalyzer.analyze(built)
+            return
+        }
         result = DefinitionsParser.parse(text)
+        (result as? DefinitionsParseResult.Parsed)?.let { Migrate3xWorld.report = CompatibilityAnalyzer.analyze(it.document) }
     }
 
     @When("^I give the virtual host name (.+)$")
@@ -110,6 +128,7 @@ class Migrate3xDefinitionsSteps {
         // M8-01: no report exists yet; "no report" means the result is not a parsed document.
         assertFalse(result is DefinitionsParseResult.Parsed, "Expected no document to come out of the file but got $result")
         assertNotNull(result)
+        assertNull(Migrate3xWorld.report, "no report may exist for a file that was not accepted")
     }
 
     @Then("I am asked which virtual host name to give the content of this file")

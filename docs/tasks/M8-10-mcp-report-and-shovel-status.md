@@ -26,6 +26,8 @@ None.
 This brief is the MCP part. Not exposed, with reasons: review and conversion (human decision per item); shovel create and remove (moves data, typed confirmation, credentials).
 
 ## Open points
+Report size (M8-03 review, 2026-11-09): the report tool returns the summary plus one page of findings (`limit`, `offset`, a fixed maximum page size, a response size cap), not the whole report; a 60,000-queue file gives about 240,000 findings. Add a scenario for the paging and for the cap.
+
 Note for the owner: the M5-04 brief names three migration MCP tools that `:mcp-server` does not register; reconcile separately.
 
 ## Definition of done
