@@ -100,6 +100,77 @@ class MigrationExecutorTest {
         assertFalse(broker.hasQueue("/", "orders"))
     }
 
+    // ---- F1: a 400 is explained by FACTS (the resource), never by the broker's text ----------------------------------------------------
+
+    @Test
+    fun `a 400 for an unknown exchange type, the exchange absent, is a refusal and the resource was looked at`() {
+        val reason = M508a.failedReason(exec(MigrationAction.DeclareExchange("e2", "nosuch")))
+        assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("different settings"), reason)
+        assertEquals(listOf("PUT /api/exchanges/%2F/e2", "GET /api/exchanges/%2F/e2"), wire())
+        assertFalse(broker.hasExchange("/", "e2"))
+    }
+
+    @Test
+    fun `a 400 whose body says PRECONDITION_FAILED but the resource is absent is a refusal, the word has no effect`() {
+        broker.answer("PUT", "/api/queues/%2F/orders", 400, """{"error":"bad_request","reason":"PRECONDITION_FAILED - inequivalent arg 'x'"}""")
+        val reason = M508a.failedReason(exec(orders))
+        assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("different settings"), reason)
+        assertEquals(listOf("PUT /api/queues/%2F/orders", "GET /api/queues/%2F/orders"), wire())
+    }
+
+    @Test
+    fun `a 400 with an unrelated body but the resource existing is a conflict, the body is not read`() {
+        broker.addQueue("/", "orders", arguments = mapOf("x-delivery-limit" to JsonPrimitive(3)))
+        broker.answer("PUT", "/api/queues/%2F/orders", 400, """{"error":"bad_request","reason":"something nobody matches"}""")
+        assertEquals(M508a.conflict("orders"), M508a.failedReason(exec(orders)))
+        assertEquals(listOf("PUT /api/queues/%2F/orders", "GET /api/queues/%2F/orders"), wire())
+        assertTrue(broker.deletes.isEmpty())
+    }
+
+    @Test
+    fun `an existing queue with an extra broker argument that the file does not declare is a conflict`() {
+        broker.addQueue("/", "orders", arguments = mapOf("x-delivery-limit" to JsonPrimitive(5), "x-max-length" to JsonPrimitive(10)))
+        val before = broker.snapshot()
+        assertEquals(M508a.conflict("orders"), M508a.failedReason(exec(orders)))
+        assertEquals(before, broker.snapshot())
+    }
+
+    @Test
+    fun `a 400 on an exchange that exists is a conflict, on a queue the same`() {
+        broker.addExchange("/", "events", "direct")
+        assertEquals(M508a.conflict("events"), M508a.failedReason(exec(events)))
+    }
+
+    @Test
+    fun `a 400 whose resource cannot be read afterwards is a refusal, not a conflict and not a guess`() {
+        broker.addQueue("/", "orders", arguments = mapOf("x-delivery-limit" to JsonPrimitive(3)))
+        broker.answerContaining("GET", "/api/queues/%2F/orders", 500, "SENTINEL-read")
+        val reason = M508a.failedReason(exec(orders))
+        assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("SENTINEL") && !reason.contains("different settings"), reason)
+    }
+
+    @Test
+    fun `a policy the broker answers 400 for (not recognised settings) is a refusal`() {
+        broker.answer("PUT", "/api/policies/%2F/limits", 400, """{"error":"bad_request","reason":"Validation failed\n\n[{<<\"bad-key\">>,1}] are not recognised policy settings\n"}""")
+        val reason = M508a.failedReason(exec(limits(500)))
+        assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("different settings"), reason)
+        assertFalse(reason.contains("bad-key"))
+        assertEquals(0, broker.policyWrites)
+    }
+
+    @Test
+    fun `names with dot, underscore and dash and the vhost slash are named in the conflict reason, others never`() {
+        for (name in listOf("order-events", "orders.v2", "my_queue")) {
+            broker.addQueue("/", name, arguments = mapOf("x-delivery-limit" to JsonPrimitive(3)))
+            assertEquals(M508a.conflict(name), M508a.failedReason(exec(MigrationAction.DeclareQueue(name, "quorum", arguments = limit5))), name)
+        }
+        for (name in listOf("a b", "a\"q", "line\nbreak", "<script>", "x".repeat(65), "back\\slash")) {
+            broker.addQueue("/", name, arguments = mapOf("x-delivery-limit" to JsonPrimitive(3)))
+            val reason = M508a.failedReason(exec(MigrationAction.DeclareQueue(name, "quorum", arguments = limit5)))
+            assertTrue(reason.contains("exists with different settings") && !reason.contains(name) && !reason.contains("\n"), reason)
+        }
+    }
+
     // ---- exchanges and bindings ---------------------------------------------------------------------------------------------
 
     private val events = MigrationAction.DeclareExchange("events", "topic")

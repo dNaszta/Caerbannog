@@ -19,20 +19,14 @@ import java.net.URLDecoder
 import java.util.Collections
 
 /**
- * M5-08a: an honest in-memory model of the management API that a migration executor talks to (queues, exchanges, bindings,
- * policies, operator policies of 4.x), WITHOUT any HTTP library: the data-rabbit tests and the acceptance glue wrap [handle] in a
- * Ktor mock engine. Rules, each one a fact of the real broker (the live test `RealBrokerM5MigrationTest` measures them again):
- *  - PUT of a queue or exchange: new gives 201; the same settings give 204; other durable, auto_delete, type or arguments give 400 with a
- *    `inequivalent arg ...` reason that names the resource and the values (a test uses it as a sentinel: the app must
- *    never copy it); a name that decodes to `.` or `..` gives 405 and creates nothing (measured on 4.x, M8-04); an unknown vhost gives 404.
- *  - argument values are compared as typed JSON: `5` and `"5"` differ, `5` and `5.0` differ (the broker compares typed AMQP values).
- *  - PUT of a policy REPLACES an existing one (201 new, 204 replaced): so a test that counts [policyWrites] sees an overwrite the app should not make.
- *  - DELETE of something absent gives 404; GET of something absent gives 404 `{"error":"Object Not Found","reason":"Not Found"}`.
- *  - POST of a binding gives 201 new and 204 for the same source, destination, routing key and arguments; the source must exist (the `amq.`
- *    exchanges always do) and so must the destination, else 404. The properties key of a binding without arguments is its routing key, `~`
- *    for the empty one (RabbitMQ documentation; the live test measures it).
- *  - a path the migration executor must never send (`/get`, `/contents`, `/purge`, more segments than the API has for a resource, a path
- *    outside the five collections) is NOT answered with a status: [handle] throws, so the test fails loudly and the request is in [requests].
+ * M5-08a: an honest in-memory model of the management API that a migration executor talks to (queues, exchanges, bindings, policies, operator
+ * policies of 4.x), WITHOUT any HTTP library: the data-rabbit tests and the acceptance glue wrap [handle] in a Ktor mock engine. EVERY status and
+ * every body shape comes from [ManagementStatusTable], which `RealBrokerM5MigrationTest` measures on a real 4.x broker; this class only decides
+ * WHICH row applies. Other rules, each a measured fact: a name that decodes to `.` or `..` gives 405 and creates nothing; argument values are
+ * compared as typed JSON (`5` and `"5"` differ); a PUT of a policy REPLACES an existing one (a test counts [policyWrites] to see an overwrite);
+ * the properties key of a binding is its routing key quoted like a form (`~` for the empty one); a binding DELETE resolves its last segment the way
+ * the real plugin does (see the comment at the DELETE); a path the migration executor must never send (more segments than the API has for a
+ * resource, a path outside the five collections) is NOT answered with a status: [handle] throws, so the test fails loudly.
  * Honest limits: no statistics, no pagination, no permission model (use [answer] to script a 401 or 403), one node.
  */
 class FakeManagementBroker {
@@ -51,7 +45,8 @@ class FakeManagementBroker {
     private class Queue(val durable: Boolean, val autoDelete: Boolean, val arguments: JsonObject)
     private class Exchange(val type: String, val durable: Boolean, val autoDelete: Boolean, val internal: Boolean, val arguments: JsonObject)
     private data class Binding(val vhost: String, val source: String, val toExchange: Boolean, val destination: String, val routingKey: String, val arguments: JsonObject) {
-        val propertiesKey: String get() = if (arguments.isEmpty()) routingKey.ifEmpty { "~" } else routingKey.ifEmpty { "~" } + "_" + arguments.hashCode()
+        /** MEASURED: "~" for an empty key, otherwise the key quoted like a form (space is "+", "~" is %7E, "+" is %2B, "/" is %2F, "%" is %25); with arguments a hash follows. */
+        val propertiesKey: String get() = (if (routingKey.isEmpty()) "~" else java.net.URLEncoder.encode(routingKey, Charsets.UTF_8)) + (if (arguments.isEmpty()) "" else "_" + arguments.hashCode())
     }
     private class Policy(val pattern: String, val applyTo: String, val priority: Int, val definition: JsonObject)
 
@@ -169,36 +164,52 @@ class FakeManagementBroker {
         }
     }
 
+    private fun unquote(text: String): String {
+        val out = java.io.ByteArrayOutputStream()
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            val hex = if (c == '%' && i + 2 < text.length + 0 && i + 2 <= text.length - 1 + 0) text.substring(i + 1, i + 3).toIntOrNull(16) else null
+            when {
+                c == '+' -> { out.write(' '.code); i++ }
+                hex != null -> { out.write(hex); i += 3 }
+                else -> { out.write(c.toString().toByteArray(Charsets.UTF_8)); i++ }
+            }
+        }
+        return out.toString(Charsets.UTF_8)
+    }
+
     private fun forbid(request: Request): Nothing = throw ForbiddenPath("the executor sent a request the management allow-list does not permit: $request")
 
     private fun decode(segment: String): String = URLDecoder.decode(segment.replace("+", "%2B"), Charsets.UTF_8)
 
-    private fun notFound() = Reply(404, """{"error":"Object Not Found","reason":"Not Found"}""")
-    private val dotName = Reply(405, """{"error":"method not allowed"}""")
+        private val dotName = Reply(405, """{"error":"method not allowed"}""")
 
     private fun parse(body: String?): JsonObject = if (body.isNullOrBlank()) JsonObject(emptyMap()) else Json.parseToJsonElement(body).jsonObject
 
     private fun precondition(what: String, name: String, vhost: String, arg: String, received: String, current: String) =
-        Reply(400, """{"error":"bad_request","reason":"inequivalent arg '$arg' for $what '$name' in vhost '$vhost': received '$received' but current is '$current'"}""")
+        ManagementStatusTable.reply("$what.put.other-settings", "'$arg' for $what '$name' in vhost '$vhost': received '$received' but current is '$current'")
+
+    private fun t(id: String) = ManagementStatusTable.reply(id)
 
     private fun queue(method: String, vhost: String, name: String, body: String?): Reply {
         val key = Key(vhost, name)
         return when (method) {
             "PUT" -> {
                 if (name == "." || name == "..") return dotName
-                if (vhost !in vhosts) return notFound()
+                if (vhost !in vhosts) return t("vhost.put.queue.missing-vhost")
                 val json = parse(body)
                 val wanted = Queue(json["durable"]?.jsonPrimitive?.boolean ?: true, json["auto_delete"]?.jsonPrimitive?.boolean ?: false, json["arguments"]?.jsonObject ?: JsonObject(emptyMap()))
                 val existing = queues[key]
                 when {
-                    existing == null -> { if (key !in silent) queues[key] = wanted; Reply(201) }
+                    existing == null -> { if (key !in silent) queues[key] = wanted; t("queue.put.created") }
                     existing.durable != wanted.durable -> precondition("queue", name, vhost, "durable", wanted.durable.toString(), existing.durable.toString())
                     existing.autoDelete != wanted.autoDelete -> precondition("queue", name, vhost, "auto_delete", wanted.autoDelete.toString(), existing.autoDelete.toString())
                     existing.arguments != wanted.arguments -> {
                         val differing = (existing.arguments.keys + wanted.arguments.keys).first { existing.arguments[it] != wanted.arguments[it] }
                         precondition("queue", name, vhost, differing, wanted.arguments[differing].toString(), existing.arguments[differing].toString())
                     }
-                    else -> Reply(204)
+                    else -> t("queue.put.repeated")
                 }
             }
             "GET" -> queues[key]?.let {
@@ -206,8 +217,8 @@ class FakeManagementBroker {
                     put("name", name); put("vhost", vhost); put("type", (it.arguments["x-queue-type"] as? JsonPrimitive)?.contentOrNull ?: "classic")
                     put("durable", it.durable); put("auto_delete", it.autoDelete); put("arguments", it.arguments)
                 }.toString())
-            } ?: notFound()
-            "DELETE" -> if (queues.remove(key) != null) { bindings.removeAll { it.vhost == vhost && !it.toExchange && it.destination == name }; Reply(204) } else notFound()
+            } ?: t("queue.get.absent")
+            "DELETE" -> if (queues.remove(key) != null) { bindings.removeAll { it.vhost == vhost && !it.toExchange && it.destination == name }; t("queue.delete.present") } else t("queue.delete.absent")
             else -> Reply(405)
         }
     }
@@ -217,8 +228,11 @@ class FakeManagementBroker {
         return when (method) {
             "PUT" -> {
                 if (name == "." || name == "..") return dotName
-                if (vhost !in vhosts) return notFound()
+                if (vhost !in vhosts) return t("vhost.put.exchange.missing-vhost")
                 val json = parse(body)
+                val wantedType = json["type"]?.jsonPrimitive?.content ?: "direct"
+                // honest limit: the plugin exchange types are not modelled; anything but the four built-in types is "unknown" like on a broker without the plugin
+                if (wantedType !in setOf("direct", "fanout", "topic", "headers")) return ManagementStatusTable.reply("exchange.put.unknown-type", "'$wantedType'")
                 val wanted = Exchange(
                     json["type"]?.jsonPrimitive?.content ?: "direct", json["durable"]?.jsonPrimitive?.boolean ?: true,
                     json["auto_delete"]?.jsonPrimitive?.boolean ?: false, json["internal"]?.jsonPrimitive?.boolean ?: false,
@@ -226,13 +240,13 @@ class FakeManagementBroker {
                 )
                 val existing = exchanges[key]
                 when {
-                    existing == null -> { exchanges[key] = wanted; Reply(201) }
+                    existing == null -> { exchanges[key] = wanted; t("exchange.put.created") }
                     existing.type != wanted.type -> precondition("exchange", name, vhost, "type", wanted.type, existing.type)
                     existing.durable != wanted.durable -> precondition("exchange", name, vhost, "durable", wanted.durable.toString(), existing.durable.toString())
                     existing.autoDelete != wanted.autoDelete -> precondition("exchange", name, vhost, "auto_delete", wanted.autoDelete.toString(), existing.autoDelete.toString())
                     existing.internal != wanted.internal -> precondition("exchange", name, vhost, "internal", wanted.internal.toString(), existing.internal.toString())
                     existing.arguments != wanted.arguments -> precondition("exchange", name, vhost, "arguments", wanted.arguments.toString(), existing.arguments.toString())
-                    else -> Reply(204)
+                    else -> t("exchange.put.repeated")
                 }
             }
             "GET" -> exchanges[key]?.let {
@@ -240,18 +254,19 @@ class FakeManagementBroker {
                     put("name", name); put("vhost", vhost); put("type", it.type); put("durable", it.durable)
                     put("auto_delete", it.autoDelete); put("internal", it.internal); put("arguments", it.arguments)
                 }.toString())
-            } ?: notFound()
-            "DELETE" -> if (exchanges.remove(key) != null) { bindings.removeAll { it.vhost == vhost && it.source == name }; Reply(204) } else notFound()
+            } ?: t("exchange.get.absent")
+            "DELETE" -> if (exchanges.remove(key) != null) { bindings.removeAll { it.vhost == vhost && it.source == name }; t("exchange.delete.present") } else t("exchange.delete.absent")
             else -> Reply(405)
         }
     }
 
     private fun policy(method: String, vhost: String, name: String, body: String?, operator: Boolean): Reply {
         val map = if (operator) operatorPolicies else policies
+        val kind = if (operator) "operator-policy" else "policy"
         val key = Key(vhost, name)
         return when (method) {
             "PUT" -> {
-                if (vhost !in vhosts) return notFound()
+                if (vhost !in vhosts) return t("vhost.put.queue.missing-vhost")
                 policyWrites++
                 val json = parse(body)
                 val created = key !in map
@@ -259,15 +274,15 @@ class FakeManagementBroker {
                     json["pattern"]?.jsonPrimitive?.content ?: "", json["apply-to"]?.jsonPrimitive?.content ?: "all",
                     json["priority"]?.jsonPrimitive?.int ?: 0, json["definition"]?.jsonObject ?: JsonObject(emptyMap()),
                 )
-                Reply(if (created) 201 else 204)
+                t("$kind.put." + if (created) "created" else "replaced")
             }
             "GET" -> map[key]?.let {
                 Reply(200, buildJsonObject {
                     put("vhost", vhost); put("name", name); put("pattern", it.pattern); put("apply-to", it.applyTo)
                     put("definition", it.definition); put("priority", it.priority)
                 }.toString())
-            } ?: notFound()
-            "DELETE" -> if (map.remove(key) != null) Reply(204) else notFound()
+            } ?: t("$kind.get.absent")
+            "DELETE" -> if (map.remove(key) != null) t("$kind.delete.present") else t("$kind.delete.absent")
             else -> Reply(405)
         }
     }
@@ -276,10 +291,10 @@ class FakeManagementBroker {
     private fun binding(method: String, s: List<String>, body: String?, request: Request): Reply {
         if (s.size !in 7..8 || s[3] != "e" || (s[5] != "q" && s[5] != "e")) forbid(request)
         val vhost = s[2]; val source = s[4]; val toExchange = s[5] == "e"; val destination = s[6]
-        if (vhost !in vhosts) return notFound()
+        if (vhost !in vhosts) return t("vhost.get.queue.missing-vhost")
         val between = bindings.filter { it.vhost == vhost && it.source == source && it.toExchange == toExchange && it.destination == destination }
         return when {
-            s.size == 7 && method == "GET" -> Reply(200, JsonArray(between.map {
+            s.size == 7 && method == "GET" -> Reply(ManagementStatusTable.status(if (between.isEmpty()) "binding.get.absent-items" else "binding.get.list"), JsonArray(between.map {
                 buildJsonObject {
                     put("source", it.source); put("vhost", vhost); put("destination", it.destination)
                     put("destination_type", if (it.toExchange) "exchange" else "queue"); put("routing_key", it.routingKey)
@@ -289,14 +304,20 @@ class FakeManagementBroker {
             s.size == 7 && method == "POST" -> {
                 val sourceExists = source.startsWith("amq.") || Key(vhost, source) in exchanges
                 val destinationExists = if (toExchange) Key(vhost, destination) in exchanges else Key(vhost, destination) in queues
-                if (!sourceExists || !destinationExists) return notFound()
+                if (!sourceExists) return ManagementStatusTable.reply("binding.post.missing-source", "'$source' in vhost '$vhost'")
+                if (!destinationExists) return ManagementStatusTable.reply("binding.post.missing-destination", "'$destination' in vhost '$vhost'")
                 val json = parse(body)
                 val wanted = Binding(vhost, source, toExchange, destination, json["routing_key"]?.jsonPrimitive?.content ?: "", json["arguments"]?.jsonObject ?: JsonObject(emptyMap()))
-                if (bindings.any { it == wanted }) Reply(204) else { bindings += wanted; Reply(201) }
+                if (bindings.any { it == wanted }) t("binding.post.repeated") else { bindings += wanted; t("binding.post.created") }
             }
             s.size == 8 && method == "DELETE" -> {
-                val found = between.firstOrNull { it.propertiesKey == s[7] }
-                if (found != null) { bindings.remove(found); Reply(204) } else notFound()
+                // MEASURED on 4.x (round 1 probe): the path segment is percent-decoded once by the HTTP layer (s[7]); the management plugin then drops
+                // every "~" (so "~" alone is the EMPTY routing key and "x~y" is "xy") and unquotes the rest ("+" is a space, %XX a byte), and
+                // deletes the binding without arguments that has that routing key. So the segment that names key K is quote(K) with each "%" written
+                // as "%25" (the properties_key as the broker lists it, escaped once more), never the properties_key verbatim.
+                val key = unquote(s[7].replace("~", ""))
+                val found = between.firstOrNull { it.routingKey == key && it.arguments.isEmpty() }
+                if (found != null) { bindings.remove(found); t("binding.delete.present") } else t("binding.delete.absent")
             }
             else -> Reply(405)
         }

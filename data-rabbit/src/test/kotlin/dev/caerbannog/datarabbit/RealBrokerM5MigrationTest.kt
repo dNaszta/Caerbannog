@@ -15,6 +15,7 @@ import dev.caerbannog.core.migrations.MigrationParser
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
+import dev.caerbannog.core.migrations.fakes.ManagementStatusTable
 import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.BindingDestinationType
 import io.ktor.client.request.HttpRequestPipeline
@@ -347,5 +348,92 @@ class RealBrokerM5MigrationTest {
         assertEquals(queuesBefore, api.get("/api/queues/%2F").arr.map { it.jsonObject["name"]!!.jsonPrimitive.content }.toSet())
         assertEquals(exchangesBefore, api.get("/api/exchanges/%2F").arr.map { it.jsonObject["name"]!!.jsonPrimitive.content }.toSet())
         assertTrue(sent.none { path -> path.split(" ")[1].split('/').any { it == ".." || it == "." } }, "a raw dot segment reached the wire: $sent")
+    }
+
+    // ---- round 1: the status table the fake answers from is MEASURED here, row by row --------------------------------------------------
+
+    @Test
+    fun `every status and body fact of the table the fake broker answers from is what the real broker answers`() {
+        val q = unique("st-q"); val x = unique("st-x"); val p = unique("st-p"); val o = unique("st-o"); val ghost = unique("no-such-vhost")
+        track("/api/queues/%2F/$q"); track("/api/exchanges/%2F/$x"); track("/api/policies/%2F/$p"); track("/api/operator-policies/%2F/$o")
+        val measured = linkedMapOf<String, MgmtApi.Reply>()
+        fun m(id: String, reply: MgmtApi.Reply) { measured[id] = reply }
+        val queue = """{"durable":true,"arguments":{"x-queue-type":"quorum"}}"""
+        val pattern = "^never-matches-$run$"
+        val policy = { n: Int -> """{"pattern":"$pattern","apply-to":"queues","priority":0,"definition":{"max-length":$n}}""" }
+
+        m("queue.get.absent", api.get("/api/queues/%2F/$q"))
+        m("queue.put.created", api.put("/api/queues/%2F/$q", queue))
+        m("queue.put.repeated", api.put("/api/queues/%2F/$q", queue))
+        m("queue.put.other-settings", api.put("/api/queues/%2F/$q", """{"durable":true,"arguments":{"x-queue-type":"quorum","x-delivery-limit":9}}"""))
+        m("exchange.get.absent", api.get("/api/exchanges/%2F/$x"))
+        m("exchange.put.created", api.put("/api/exchanges/%2F/$x", """{"type":"direct","durable":true}"""))
+        m("exchange.put.repeated", api.put("/api/exchanges/%2F/$x", """{"type":"direct","durable":true}"""))
+        m("exchange.put.other-settings", api.put("/api/exchanges/%2F/$x", """{"type":"topic","durable":true}"""))
+        m("exchange.put.unknown-type", api.put("/api/exchanges/%2F/${x}-bad", """{"type":"nosuch","durable":true}"""))
+        m("binding.get.absent-items", api.get("/api/bindings/%2F/e/${x}-none/q/${q}-none"))
+        m("binding.post.missing-source", api.post("/api/bindings/%2F/e/${x}-none/q/$q", """{"routing_key":"k"}"""))
+        m("binding.post.missing-destination", api.post("/api/bindings/%2F/e/$x/q/${q}-none", """{"routing_key":"k"}"""))
+        m("binding.post.created", api.post("/api/bindings/%2F/e/$x/q/$q", """{"routing_key":"k"}"""))
+        m("binding.post.repeated", api.post("/api/bindings/%2F/e/$x/q/$q", """{"routing_key":"k"}"""))
+        m("binding.get.list", api.get("/api/bindings/%2F/e/$x/q/$q"))
+        m("binding.delete.present", api.delete("/api/bindings/%2F/e/$x/q/$q/k"))
+        m("binding.delete.absent", api.delete("/api/bindings/%2F/e/$x/q/$q/k"))
+        m("policy.get.absent", api.get("/api/policies/%2F/$p"))
+        m("policy.put.created", api.put("/api/policies/%2F/$p", policy(5)))
+        m("policy.put.replaced", api.put("/api/policies/%2F/$p", policy(6)))
+        m("policy.put.unrecognised-key", api.put("/api/policies/%2F/${p}-bad", """{"pattern":"$pattern","definition":{"bad-key":1}}"""))
+        m("policy.delete.present", api.delete("/api/policies/%2F/$p"))
+        m("policy.delete.absent", api.delete("/api/policies/%2F/$p"))
+        m("operator-policy.get.absent", api.get("/api/operator-policies/%2F/$o"))
+        m("operator-policy.put.created", api.put("/api/operator-policies/%2F/$o", policy(5)))
+        m("operator-policy.put.replaced", api.put("/api/operator-policies/%2F/$o", policy(6)))
+        m("operator-policy.delete.present", api.delete("/api/operator-policies/%2F/$o"))
+        m("operator-policy.delete.absent", api.delete("/api/operator-policies/%2F/$o"))
+        m("vhost.put.queue.missing-vhost", api.put("/api/queues/$ghost/$q", queue))
+        m("vhost.put.exchange.missing-vhost", api.put("/api/exchanges/$ghost/$x", """{"type":"direct"}"""))
+        m("vhost.get.queue.missing-vhost", api.get("/api/queues/$ghost/$q"))
+        m("exchange.delete.present", api.delete("/api/exchanges/%2F/$x"))
+        m("exchange.delete.absent", api.delete("/api/exchanges/%2F/$x"))
+        m("queue.delete.present", api.delete("/api/queues/%2F/$q"))
+        m("queue.delete.absent", api.delete("/api/queues/%2F/$q"))
+
+        println("M5-08a MEASURED STATUS TABLE on rabbitmq:4-management: " + measured.map { (id, r) -> "$id=${r.status}" })
+        val mismatches = mutableListOf<String>()
+        for (row in ManagementStatusTable.rows) {
+            val reply = measured[row.id]
+            if (reply == null) { mismatches += "${row.id}: not measured by this test"; continue }
+            if (reply.status != row.status) mismatches += "${row.id}: the table says ${row.status}, the broker answered ${reply.status} ${reply.body.take(120)}"
+            else if (row.bodyHas != null && !reply.body.contains(row.bodyHas!!)) mismatches += "${row.id}: the body does not contain \"${row.bodyHas}\": ${reply.body.take(160)}"
+        }
+        assertTrue(mismatches.isEmpty(), "the shared status table differs from the real broker: $mismatches")
+        assertTrue(measured.keys.containsAll(ManagementStatusTable.rows.map { it.id }), "rows without a measurement")
+    }
+
+    @Test
+    fun `a 3x broker gets no executor through the real gateway and nothing is created on it`() {
+        val old = broker("rabbitmq:3.13-management")
+        old.start()
+        try {
+            val secrets = object : SecretStore {
+                override fun store(profileName: String, password: String) = Unit
+                override fun retrieve(profileName: String): String? = old.adminPassword
+                override fun delete(profileName: String) = Unit
+            }
+            val profile = ConnectionProfile(
+                name = "m5-08a-3x", host = old.host, virtualHost = "/", username = old.adminUsername,
+                managementPort = old.getMappedPort(15672), streamPort = 5552, tls = false, topologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+            )
+            val connection = (runBlocking { RabbitMqConnectionGateway(secrets).open(profile) } as OpenResult.Opened).connection
+            toClose += connection
+            assertEquals(null, connection.migrationExecutor, "a 3.x broker must not get a migration executor")
+            assertEquals("This broker runs RabbitMQ 3.x: it is a migration source only", connection.migrationUnavailableReason)
+            val oldApi = MgmtApi(old)
+            val queues = oldApi.get("/api/queues/%2F").arr.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+            val exchanges = oldApi.get("/api/exchanges/%2F").arr.map { it.jsonObject["name"]!!.jsonPrimitive.content }.filter { it.isNotEmpty() && !it.startsWith("amq.") }
+            assertTrue(queues.isEmpty() && exchanges.isEmpty(), "something exists on the 3.x broker: queues $queues exchanges $exchanges")
+        } finally {
+            old.stop()
+        }
     }
 }

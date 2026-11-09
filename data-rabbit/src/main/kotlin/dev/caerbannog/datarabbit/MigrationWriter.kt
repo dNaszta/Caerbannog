@@ -9,12 +9,22 @@ import dev.caerbannog.core.migrations.MigrationAction
  * `ManagementHttp.put` and `delete` (guard test). Status table: 2xx success; 404 on a DELETE success (already gone); 400 with a
  * `PRECONDITION_FAILED` reason is the conflict; 401 and 403 not allowed; 5xx and silence no answer; anything else a refusal.
  */
+/**
+ * M5-08a R1 STUB (test developer): what the writer says about the ONE request it sent. [BadRequest] is a 400 on a queue or exchange declare:
+ * the writer does NOT decide what it means (the executor reads the resource and decides; no broker text is ever matched). [Failed] carries a fixed reason.
+ */
+internal sealed interface WriteOutcome {
+    data object Success : WriteOutcome
+    data object BadRequest : WriteOutcome
+    data class Failed(val reason: String) : WriteOutcome
+}
+
 internal class MigrationWriter(private val http: ManagementHttp, private val requests: ManagementRequests) {
 
     /** @throws PathNotAllowedException when the request is not of an allowed shape; nothing is sent then. */
-    suspend fun write(action: MigrationAction): ActionResult {
+    suspend fun write(action: MigrationAction): WriteOutcome { // M5-08a R1 STUB: still decides by text
         val request = MigrationRequests.requestFor(action) ?: MigrationDeleteRequests.requestFor(action)
-            ?: return ExecutorReasons.failed(ExecutorReasons.NOT_A_REQUEST)
+            ?: return WriteOutcome.Failed(ExecutorReasons.NOT_A_REQUEST)
         val url = requests.absolute(ExecutorPathAllowList.checked(request.method, request.path))
         val reply = when (request.method) {
             "PUT" -> http.put(url, request.body.toString())
@@ -24,13 +34,13 @@ internal class MigrationWriter(private val http: ManagementHttp, private val req
         return outcome(action, request.method, reply)
     }
 
-    private fun outcome(action: MigrationAction, method: String, reply: ManagementReply): ActionResult {
-        if (reply !is ManagementReply.Response) return ExecutorReasons.forReply(reply)
+    private fun outcome(action: MigrationAction, method: String, reply: ManagementReply): WriteOutcome {
+        if (reply !is ManagementReply.Response) return WriteOutcome.Failed(ExecutorReasons.forReply(reply).reason)
         return when {
-            reply.status in SUCCESS_RANGE -> ActionResult.Success
-            reply.status == NOT_FOUND && method == "DELETE" -> ActionResult.Success
-            reply.status == BAD_REQUEST && PRECONDITION_FAILED in reply.body -> ExecutorReasons.conflict(action)
-            else -> ExecutorReasons.forReply(reply)
+            reply.status in SUCCESS_RANGE -> WriteOutcome.Success
+            reply.status == NOT_FOUND && method == "DELETE" -> WriteOutcome.Success
+            reply.status == BAD_REQUEST && PRECONDITION_FAILED in reply.body -> WriteOutcome.Failed(ExecutorReasons.conflict(action).reason)
+            else -> WriteOutcome.Failed(ExecutorReasons.forReply(reply).reason)
         }
     }
 

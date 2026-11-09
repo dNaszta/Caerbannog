@@ -12,6 +12,7 @@ import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.migrations.fakes.FakeManagementBroker
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.datarabbit.ManagementTopologyMigrationExecutor
+import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -436,5 +437,67 @@ class M508aExecutorSteps {
         assertEquals(count, queues.size, "queues in the exported file")
         assertEquals(count, queues.toSet().size, "a queue was exported twice")
         assertEquals(listOf(1, 2, 3, 4), pagedCatalog!!.pagesRequested.toList(), "the pages the export asked for")
+    }
+
+    // ---- A 3.x source connection cannot apply migrations (F3, fail closed) ------------------------------------------------------
+
+    private var versionServer: com.sun.net.httpserver.HttpServer? = null
+    private val versionRequests = java.util.concurrent.CopyOnWriteArrayList<String>()
+    private var versionProfile: dev.caerbannog.core.connections.ConnectionProfile? = null
+    private var heldConnection: dev.caerbannog.core.connections.HeldConnection? = null
+
+    @After
+    fun stopVersionServer() {
+        runCatching { heldConnection?.close() }
+        versionServer?.stop(0)
+        versionServer = null
+        heldConnection = null
+    }
+
+    @Given("a connection {string} to a broker whose overview reports RabbitMQ {word}")
+    fun connectionToBrokerReporting(name: String, version: String) {
+        val server = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 10)
+        server.createContext("/") { ex ->
+            versionRequests += "${ex.requestMethod} ${ex.requestURI.rawPath}"
+            val body = when (ex.requestURI.rawPath) {
+                "/api/whoami" -> """{"name":"svc","tags":["administrator"]}"""
+                "/api/overview" -> """{"rabbitmq_version":"$version","erlang_version":"26"}"""
+                else -> "{}"
+            }.toByteArray()
+            ex.sendResponseHeaders(if (ex.requestURI.rawPath == "/api/whoami" || ex.requestURI.rawPath == "/api/overview") 200 else 404, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        server.start()
+        versionServer = server
+        versionProfile = dev.caerbannog.core.connections.ConnectionProfile(
+            name = name, host = "127.0.0.1", virtualHost = "/", username = "svc", streamPort = 1, managementPort = server.address.port, tls = false,
+        )
+    }
+
+    @When("I connect to {string}")
+    fun iConnectTo(name: String) = runBlocking {
+        val profile = checkNotNull(versionProfile) { "no connection was described" }
+        assertEquals(name, profile.name)
+        val secrets = object : dev.caerbannog.core.connections.SecretStore {
+            override fun store(profileName: String, password: String) = Unit
+            override fun retrieve(profileName: String): String = "pw"
+            override fun delete(profileName: String) = Unit
+        }
+        val result = dev.caerbannog.datarabbit.RabbitMqConnectionGateway(secrets).open(profile)
+        heldConnection = (result as? dev.caerbannog.core.connections.OpenResult.Opened)?.connection
+        assertNotNull(heldConnection, "the connection did not open: $result")
+    }
+
+    @Then("the connection has no migration executor and says migrations are not offered because it is a migration source only")
+    fun noExecutorSourceOnly() {
+        val connection = checkNotNull(heldConnection)
+        assertEquals(null, connection.migrationExecutor, "a 3.x connection must have no migration executor")
+        assertEquals("This broker runs RabbitMQ 3.x: it is a migration source only", connection.migrationUnavailableReason)
+    }
+
+    @Then("no request that changes anything was sent to {string}")
+    fun noWriteSent(name: String) {
+        assertTrue(versionRequests.isNotEmpty(), "the scenario never reached the broker")
+        assertTrue(versionRequests.all { it.startsWith("GET ") }, "a request that changes something was sent: $versionRequests")
     }
 }

@@ -59,6 +59,26 @@ class ExecutorPathAllowListTest {
     }
 
     @Test
+    fun `a plus is allowed ONLY in the properties key segment of a binding DELETE`() {
+        assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/a+b"))
+        assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/+"))
+        assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/a%252Bb"))
+        for ((method, path) in listOf(
+            "PUT" to "/api/queues/%2F/a+b", "GET" to "/api/queues/%2F/a+b", "DELETE" to "/api/queues/%2F/a+b", "PUT" to "/api/exchanges/%2F/a+b",
+            "GET" to "/api/policies/%2F/a+b", "PUT" to "/api/operator-policies/%2F/a+b", "GET" to "/api/queues/a+b/q",
+            "POST" to "/api/bindings/%2F/e/ev+ents/q/orders", "GET" to "/api/bindings/%2F/e/events/q/or+ders", "GET" to "/api/bindings/%2F/e/events/e/or+ders",
+            "DELETE" to "/api/bindings/%2F/e/ev+ents/q/orders/k", "DELETE" to "/api/bindings/%2F/e/events/q/or+ders/k", "DELETE" to "/api/bindings/+/e/events/q/orders/k",
+        )) assertFalse(ExecutorPathAllowList.isAllowed(method, path), "$method $path: a plus outside the properties key segment must be refused")
+    }
+
+    @Test
+    fun `every other character is still refused in the properties key segment`() {
+        for (bad in listOf(" ", "a b", "\u00e9", "a/b", "a?b", "a#b", "a\\b", "a;b", "a=b", "a&b", "a,b", "a:b", "a@b", "a!b", "a\$b", "a'b", "a(b", "a)b", "a[b", "a]b", "a{b", "a}b", "a<b", "a>b", "a|b", "a^b", "a`b", "a\"b", "%2", "%zz", "%", "a%", "", "..", ".")) {
+            assertFalse(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/$bad"), "properties key segment [$bad] must be refused")
+        }
+    }
+
+    @Test
     fun `other API areas and wrong verbs are refused`() {
         for ((method, path) in listOf(
             "GET" to "/api/overview", "GET" to "/api/definitions", "POST" to "/api/definitions", "GET" to "/api/users", "PUT" to "/api/users/x",

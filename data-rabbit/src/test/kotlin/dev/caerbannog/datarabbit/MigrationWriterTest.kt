@@ -24,7 +24,7 @@ class MigrationWriterTest {
     private val sentinel = "SENTINEL-broker-text-9f3a"
     private val brokerBody = """{"error":"bad_request","reason":"$sentinel orders password=hunter2 amqp://user:secret@host"}"""
 
-    private fun write(action: MigrationAction, engine: MockEngine): ActionResult =
+    private fun write(action: MigrationAction, engine: MockEngine): WriteOutcome =
         M508a.http(engine).use { http -> runBlocking { MigrationWriter(http, M508a.requests()).write(action) } }
 
     private fun sent(action: MigrationAction, status: Int = 200): M508a.Seen {
@@ -97,14 +97,6 @@ class MigrationWriterTest {
     }
 
     @Test
-    fun `a binding delete names the binding by its properties key, the tilde for an empty routing key`() {
-        val empty = sent(MigrationAction.DeleteBinding("events", "old"), 204).path
-        assertTrue(empty == "/api/bindings/%2F/e/events/q/old/~" || empty == "/api/bindings/%2F/e/events/q/old/%7E", "empty routing key: $empty")
-        assertEquals("/api/bindings/%2F/e/events/q/old/order.created", sent(MigrationAction.DeleteBinding("events", "old", "order.created"), 204).path)
-        assertEquals("DELETE", sent(MigrationAction.DeleteBinding("events", "old", "k"), 204).method)
-    }
-
-    @Test
     fun `names and the virtual host are encoded, a dot-only name is written with %2E and never as a dot segment`() {
         assertEquals("/api/queues/team%20a%2Fb/my%20queue", sent(MigrationAction.DeclareQueue("my queue", vhost = "team a/b")).path)
         val dots = sent(MigrationAction.DeclareQueue(".."), 405).path
@@ -119,37 +111,49 @@ class MigrationWriterTest {
 
     @Test
     fun `200, 201 and 204 are success for a declare`() {
-        for (status in listOf(200, 201, 204)) assertEquals(ActionResult.Success, write(declare, M508a.answering(status)), "status $status")
+        for (status in listOf(200, 201, 204)) assertEquals(WriteOutcome.Success, write(declare, M508a.answering(status)), "status $status")
     }
 
     @Test
     fun `200 and 204 are success for a delete and 404 is a no-op success`() {
-        for (status in listOf(200, 204, 404)) assertEquals(ActionResult.Success, write(delete, M508a.answering(status)), "status $status")
+        for (status in listOf(200, 204, 404)) assertEquals(WriteOutcome.Success, write(delete, M508a.answering(status)), "status $status")
     }
 
     @Test
-    fun `a 400 precondition failure is the conflict reason with the name`() {
-        val body = """{"error":"bad_request","reason":"inequivalent arg 'x-delivery-limit' for queue 'orders' in vhost '/': received '5' but current is '3'"}"""
-        assertEquals(M508a.conflict("orders"), M508a.failedReason(write(declare, M508a.answering(400, body))))
-        assertEquals(M508a.conflict("limits"), M508a.failedReason(write(MigrationAction.DeclareExchange("limits"), M508a.answering(400, body))))
-    }
-
-    @Test
-    fun `the 400 bodies measured on a real 4x broker, an inequivalent argument is a conflict, an unknown type or a bad policy key is a refusal`() {
-        val inequivalent = """{"error":"bad_request","reason":"inequivalent arg 'durable' for queue 'q1' in vhost '/': received 'false' but current is 'true'"}"""
-        assertEquals(M508a.conflict("q1"), M508a.failedReason(write(MigrationAction.DeclareQueue("q1"), M508a.answering(400, inequivalent))))
-        for (body in listOf(
+    fun `a 400 on a queue or exchange declare is BadRequest, whatever the body says, the writer decides nothing about it`() {
+        val bodies = listOf(
+            """{"error":"bad_request","reason":"inequivalent arg 'durable' for queue 'q1' in vhost '/': received 'false' but current is 'true'"}""",
+            """{"error":"bad_request","reason":"PRECONDITION_FAILED - something"}""",
             """{"error":"bad_request","reason":"unknown exchange type 'nosuch'"}""",
-            """{"error":"bad_request","reason":"Validation failed\n\n[{<<\"bad-key\">>,1}] are not recognised policy settings\n"}""",
-        )) {
-            val reason = M508a.failedReason(write(MigrationAction.DeclareExchange("e2"), M508a.answering(400, body)))
-            assertTrue(reason.contains(M508a.REFUSED) && !reason.contains("different settings"), reason)
+            "", "not json", brokerBody,
+        )
+        for (body in bodies) {
+            for (action in listOf<MigrationAction>(MigrationAction.DeclareQueue("q1"), MigrationAction.DeclareExchange("e1"))) {
+                assertEquals(WriteOutcome.BadRequest, write(action, M508a.answering(400, body)), "${action.actionName} body: ${body.take(40)}")
+            }
         }
     }
 
     @Test
-    fun `any other 400, a 404 on a declare, 409 and a redirect are a fixed refusal, not a conflict`() {
-        for (status in listOf(400, 404, 409, 302)) {
+    fun `the writer never produces a conflict text, that is the executor's decision after it read the resource`() {
+        val results = mutableListOf<WriteOutcome>()
+        for (status in listOf(400, 401, 403, 404, 409, 500, 302)) for (action in listOf(declare, MigrationAction.DeclareExchange("e"), MigrationAction.DeclareBinding("e", "q"), MigrationAction.DeclarePolicy("p", "^x"), delete)) {
+            results += write(action, M508a.answering(status, """{"reason":"PRECONDITION_FAILED inequivalent arg"}"""))
+        }
+        assertTrue(results.none { it is WriteOutcome.Failed && it.reason.contains("different settings") }, results.toString())
+    }
+
+    @Test
+    fun `a 400 on a binding, a policy or a delete is a plain refusal`() {
+        for (action in listOf<MigrationAction>(MigrationAction.DeclareBinding("e", "q", "k"), MigrationAction.DeclarePolicy("p", "^x"), MigrationAction.DeclareOperatorPolicy("p", "^x"), MigrationAction.DeleteQueue("q"), MigrationAction.DeletePolicy("p"))) {
+            val reason = M508a.failedReason(write(action, M508a.answering(400, """{"reason":"are not recognised policy settings"}""")))
+            assertTrue(reason.contains(M508a.REFUSED), "${action.actionName}: $reason")
+        }
+    }
+
+    @Test
+    fun `a 404 on a declare, 409 and a redirect are a fixed refusal, not a conflict`() {
+        for (status in listOf(404, 409, 302)) {
             val reason = M508a.failedReason(write(declare, M508a.answering(status, brokerBody)))
             assertTrue(reason.contains(M508a.REFUSED), "$status: $reason")
             assertFalse(reason.contains("different settings"), "$status looks like a conflict: $reason")
@@ -186,7 +190,7 @@ class MigrationWriterTest {
         val results = mutableListOf<String>()
         for (status in statuses) {
             for (action in listOf(declare, delete, MigrationAction.DeclareBinding("e", "q"), MigrationAction.DeclarePolicy("p", "^x"))) {
-                (write(action, M508a.answering(status, brokerBody)) as? ActionResult.Failed)?.let { results += it.reason }
+                (write(action, M508a.answering(status, brokerBody)) as? WriteOutcome.Failed)?.let { results += it.reason }
             }
         }
         results += M508a.failedReason(write(declare, MockEngine { throw IOException(brokerBody) }))
@@ -199,29 +203,10 @@ class MigrationWriterTest {
     }
 
     @Test
-    fun `a name with dot, underscore and dash is echoed in the conflict reason, the vhost slash too`() {
-        val precondition = """{"error":"bad_request","reason":"inequivalent arg 'x'"}"""
-        for (name in listOf("order-events", "orders.v2", "my_queue")) {
-            assertEquals(M508a.conflict(name), M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition))))
-        }
-    }
-
-    @Test
-    fun `a name that is not short and plain is not echoed in the conflict reason`() {
-        val precondition = """{"error":"bad_request","reason":"inequivalent arg 'x'"}"""
-        for (name in listOf("a\"quote", "line\nbreak", "<script>x</script>", "x".repeat(65), "back\\slash", "a b")) {
-            val reason = M508a.failedReason(write(MigrationAction.DeclareQueue(name), M508a.answering(400, precondition)))
-            assertTrue(reason.contains("exists with different settings"), reason)
-            assertFalse(reason.contains(name), "echoes the name: $reason")
-            assertFalse(reason.contains("\n"))
-        }
-    }
-
-    @Test
     fun `the writer never sends a stream action, it has no management request`() {
         val seen = mutableListOf<M508a.Seen>()
         val result = runCatching { write(MigrationAction.DeclareStream("audit"), M508a.answering(200, "", seen)) }
         assertTrue(seen.isEmpty(), "a stream action reached the management API: $seen")
-        assertTrue(result.isFailure || result is Result<*> && (result.getOrNull() as? ActionResult.Failed) != null, "a stream action is not the writer's job")
+        assertTrue(result.isFailure || result.getOrNull() is WriteOutcome.Failed, "a stream action is not the writer's job")
     }
 }

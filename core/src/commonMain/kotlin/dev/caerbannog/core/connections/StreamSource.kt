@@ -65,6 +65,8 @@ class StreamSource(
     val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
     /** M5-08a: the migration executor of the same held connection, guarded like [manager]; null when the connection has none. */
     val migrationExecutor: TopologyMigrationExecutor? = null,
+    /** M5-08a R1: the fixed reason there is no [migrationExecutor], passed on as it is. */
+    val migrationUnavailableReason: String? = null,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
 )

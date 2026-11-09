@@ -23,6 +23,13 @@ internal object MigrationDeleteRequests {
     private fun delete(collection: String, vhost: String, name: String) =
         ManagementWrite("DELETE", MigrationRequests.collectionPath(collection, vhost, name), null)
 
+    /**
+     * M5-08a R1 STUB: the DELETE path of a binding whose properties key the BROKER reported (the executor reads the binding list first).
+     * MEASURED: the broker decodes the segment once and again reads the key out of it, so the segment is the properties key with each `%`
+     * written as `%25` (`+` and `~` stay); anything else deleted the wrong binding or none. The stub ignores [propertiesKey] (wrong).
+     */
+    fun bindingDeletePath(action: MigrationAction.DeleteBinding, propertiesKey: String): String = bindingDeletePath(action)
+
     private fun bindingDeletePath(action: MigrationAction.DeleteBinding): String {
         val list = MigrationRequests.bindingPath(action.vhost, action.exchange, BindingDestinationType.QUEUE, action.queue)
         val key = if (action.routingKey.isEmpty()) EMPTY_ROUTING_KEY else MigrationRequests.encode(action.routingKey)

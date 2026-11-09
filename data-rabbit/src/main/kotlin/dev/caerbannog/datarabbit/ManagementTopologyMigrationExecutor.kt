@@ -39,9 +39,10 @@ class ManagementTopologyMigrationExecutor internal constructor(
     }
 
     private suspend fun writeAndVerify(action: MigrationAction): ActionResult =
-        when (val written = writer.write(action)) {
-            ActionResult.Success -> readBack.verify(action)
-            is ActionResult.Failed -> written
+        when (val written = writer.write(action)) { // M5-08a R1 STUB: BadRequest is not decided by reading the resource yet
+            WriteOutcome.Success -> readBack.verify(action)
+            WriteOutcome.BadRequest -> ExecutorReasons.failed(ExecutorReasons.REFUSED)
+            is WriteOutcome.Failed -> ExecutorReasons.failed(written.reason)
         }
 
     /** The policy is read first: absent is created, equal is a no-op with no request, different is a conflict and is never written over. */

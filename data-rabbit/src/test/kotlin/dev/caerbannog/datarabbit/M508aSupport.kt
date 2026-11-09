@@ -47,6 +47,8 @@ internal object M508a {
     fun executor(broker: FakeManagementBroker, streams: StreamManager = broker.streamManager(), delays: MutableList<Long> = mutableListOf(), seen: MutableList<Seen>? = null) =
         ManagementTopologyMigrationExecutor(http(engineOver(broker, seen)), requests(), streams) { delays += it }
 
+    fun failedReason(outcome: WriteOutcome): String = (outcome as? WriteOutcome.Failed)?.reason ?: error("expected Failed but got $outcome")
+
     fun failedReason(result: ActionResult): String = (result as? ActionResult.Failed)?.reason ?: error("expected Failed but got $result")
 
     /** The fixed wording the brief pins (see MigrationWriter). */
