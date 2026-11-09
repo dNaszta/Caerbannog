@@ -136,4 +136,25 @@ class MirroringTest {
         val r = report(D.classicQueue("q"), operatorPolicies = listOf(op))
         assertEquals(listOf("unsupported"), r.only("policy-pattern-unreadable", "op-bad").about)
     }
+
+    // ---- round 1 verify (gap found by mutation f1): an unsupported pattern must never be evaluated by another engine ----
+
+    @Test
+    fun `an unsupported pattern that a backtracking regex engine would match does not make the queue mirrored`() {
+        for (pattern in listOf("(?i)Q", "(?=q)q", "\\bq", "q++")) {
+            val r = report(D.classicQueue("q"), ha("pol-unsupported", pattern))
+            notMirrored(r, "q", "pol-unsupported")
+            assertEquals(listOf("unsupported"), r.only("policy-pattern-unreadable", "pol-unsupported").about, pattern)
+        }
+    }
+
+    @Test
+    fun `an unsupported pathological pattern does not hang the analysis`() {
+        val name = "a".repeat(250) + "!"
+        val r = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(10), org.junit.jupiter.api.function.ThrowingSupplier {
+            report(D.classicQueue(name), ha("pol-hang", "(.*a){40}Z\\b"))
+        })
+        notMirrored(r, name, "pol-hang")
+        assertEquals(listOf("unsupported"), r.only("policy-pattern-unreadable", "pol-hang").about)
+    }
 }
