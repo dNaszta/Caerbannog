@@ -66,6 +66,7 @@ class FakeConnectionGateway(
         override val publisher: MessagePublisher = FakeMessagePublisher(),
         override val manager: StreamManager = FakeStreamManager(),
         override val mqtt: dev.caerbannog.core.mqtt.MqttCatalog = FakeMqttCatalog(),
+        override val queueInspector: dev.caerbannog.core.topology.QueueMessageInspector = dev.caerbannog.core.topology.UnavailableQueueMessageInspector,
         override val mqttPublisher: dev.caerbannog.core.mqtt.MqttMessagePublisher = FakeMqttMessagePublisher(),
     ) : HeldConnection {
         private val closes = AtomicInteger()
@@ -102,6 +103,8 @@ class FakeConnectionGateway(
     private val publishers = ConcurrentHashMap<String, FakeMessagePublisher>()
     private val managers = ConcurrentHashMap<String, FakeStreamManager>()
     private val mqttCatalogs = ConcurrentHashMap<String, FakeMqttCatalog>()
+    private val mqttPublishers = ConcurrentHashMap<String, FakeMqttMessagePublisher>()
+    private val queueInspectors = ConcurrentHashMap<String, FakeQueueMessageInspector>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -173,6 +176,12 @@ class FakeConnectionGateway(
     /** M6-02: the MQTT catalog every connection opened for [profileName] exposes. */
     fun mqttOf(profileName: String): FakeMqttCatalog = mqttCatalogs.getOrPut(profileName) { FakeMqttCatalog() }
 
+    /** The MQTT publisher every connection opened for [profileName] holds. */
+    fun mqttPublisherOf(profileName: String): FakeMqttMessagePublisher = mqttPublishers.getOrPut(profileName) { FakeMqttMessagePublisher() }
+
+    /** The queue message inspector every connection opened for [profileName] holds. */
+    fun queueInspectorOf(profileName: String): FakeQueueMessageInspector = queueInspectors.getOrPut(profileName) { FakeQueueMessageInspector() }
+
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
@@ -223,6 +232,8 @@ class FakeConnectionGateway(
             publisher = publisherOf(name),
             manager = managerOf(name),
             mqtt = mqttOf(name),
+            mqttPublisher = mqttPublisherOf(name),
+            queueInspector = queueInspectorOf(name),
         )
         opened += held
         log += "opened:$name#${held.number}"

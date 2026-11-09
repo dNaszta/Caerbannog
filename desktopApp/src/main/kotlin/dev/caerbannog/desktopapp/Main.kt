@@ -88,7 +88,7 @@ fun main() = application {
 
 /** The stream screen (one stream open from the list) with its own one-second clock, which runs only while it is in the composition. */
 @Composable
-private fun StreamWindowContent(composition: AppComposition, control: ConnectionControlState, stream: String) {
+internal fun StreamWindowContent(composition: AppComposition, control: ConnectionControlState, stream: String) {
     val clients by composition.streamClients.state.collectAsState()
     val initialOffset by composition.navigation.initialOffset.collectAsState()
     val scope = rememberCoroutineScope()
@@ -301,7 +301,7 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
 
 /** The Topology screen with its own one-second clock; the clock runs only while this is in the composition (screen shown). */
 @Composable
-private fun TopologyWindowContent(composition: AppComposition, control: ConnectionControlState) {
+internal fun TopologyWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val topology by composition.topology.state.collectAsState()
     val connections by composition.viewModel.state.collectAsState()
     val currentConn = connections.currentConnection
