@@ -63,4 +63,4 @@ All four sub-tasks accepted; `docs/spec.md` "Running migrations for real" matche
 
 ## Status
 - Step 1 (architect, brief, split and scenarios): DONE 2026-11-09. Round 0. Branch `m5-08-real-migration-execution` (worktree `.claude/worktrees/m5-08`, base ff286db). Owner decisions recorded (A, ask for the folder, MCP read-only). Sub-briefs written: `M5-08a`, `M5-08b`, `M5-08c`, `M5-09`. Changed: this brief, the four sub-briefs, `tests/bdd/features/10_topology_migrations.feature` (the `@m5-08` block rewritten with sub-tags, the `@needs-decision` scenario replaced by exact ones, folder scenarios added), `tests/bdd/features/18_migrate_access_from_3x.feature` (MCP scenario), `tests/bdd/README.md` (tag row), `docs/spec.md` (new subsection "Running migrations for real", MCP table, discrepancy resolved), `docs/tasks/M5-04-topology-migrations.md` (MCP line superseded), `docs/tasks/README.md`.
-- Next: `M5-08a` step 2 (tests first).
+- Progress: `M5-08a` DONE 2026-11-10 (accepted with follow-ups, branch `m5-08a-migration-executor` built and verified, not merged, waiting for the owner's word). Next: `M5-08b`.

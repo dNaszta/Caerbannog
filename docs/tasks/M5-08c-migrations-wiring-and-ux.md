@@ -33,6 +33,7 @@ UI is state in, events out; no file or network code in `ui`; the screen reads `M
 None here.
 
 ## Open points
+From `M5-08a` (final review, 2026-11-10): (1) the screen must show the failed action as "Action k of n failed: <reason>" using `ActionFailed.index` and `total` (the view model's current text "Action 'x' failed on version 'v': reason" is replaced here); (2) a connection whose `migrationExecutor` is null shows the fixed reason from `migrationUnavailableReason` ("This broker runs RabbitMQ 3.x: it is a migration source only" or "The broker version could not be read, so migrations are not offered") and Apply stays disabled; (3) the executor comes from `StreamSource.migrationExecutor` (guarded: it refuses once the connection is no longer current); (4) a binding delete that cannot be sent (a `.` or `..` routing key) fails with "this action cannot be sent to the broker": the screen shows it as any failed action; (5) `MigrationRunner` calls need the connection's virtual host (required).
 1. `java.desktop` in the packaged runtime: verified once on the DMG here (unverified until then).
 2. Windows and Linux chooser look and feel: best effort, not measured.
 
