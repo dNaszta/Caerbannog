@@ -31,5 +31,8 @@ P2, P3 and P10 are decided (2026-11-09). The review state and any log or `toStri
 ## Spike findings (M8-00, 2026-11-09)
 Measured: a 4.x definitions import is NOT atomic (vhosts, users, permissions exist before a rejected policy) and silently skips transient and master-locator queues with 204, so the runner never feeds a generated file to the import endpoint; it applies action by action through the management API and reads each result back (exists, type and arguments equal) and a failed read-back stops the apply without recording the version. Review rule (P15, decided 2026-11-09): accepting a classic to quorum conversion requires the explicit tick "Ordering by priority may change"; for queues with `x-max-priority` the default proposal is keep classic (not replicated on 4.x), convert to quorum is the alternative; not a hard block. Optional generator choice from S-K: set the vhost `default_queue_type` to quorum instead of rewriting each queue.
 
+## Spike S-N finding
+S-N: the conversion proposal for a classic queue is a 4.x queue declaration on the NEW broker, which never reads the old index, so the version 1 blocker does not block the migration; the review shows it as informational for the conversion and as the reason to prefer the blue-green path. A v1 finding offers, besides the conversion, a "note: fix the source first if you upgrade it in place" with the three fixes. The generated migration never sets `x-queue-version`.
+
 ## Definition of done
 Tests first and passing, existing migration suites unedited and green, spec updated.

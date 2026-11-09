@@ -197,11 +197,51 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the report names redelivery, the delivery limit and exclusive consumers as "unverified" differences
 
   @fake-broker
-  Scenario: The report warns that an in-place upgrade can lose classic queue messages
-    Given a definitions file with a classic queue "orders"
+  Scenario: A classic queue with the old index is a message-loss blocker
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the classic queue "orders" reports storage version 1
+    When I analyse "legacy-eu"
+    Then there is a blocker with severity "message loss" for "orders"
+    And it says RabbitMQ 4.3 and later cannot read this queue index and an in-place upgrade would silently empty the queue
+    And it offers three fixes: set the policy "queue-version" to 2 and restart the node, upgrade through 4.0 to 4.2 first, or migrate to a new 4.x broker and move the messages with a Shovel
+    And it recommends the new broker with the Shovel as the safest way
+
+  @fake-broker
+  Scenario: A classic queue with the new index is not flagged
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the classic queue "events" reports storage version 2
+    When I analyse "legacy-eu"
+    Then there is no message-loss finding for "events"
+
+  @fake-broker @needs-decision
+  Scenario: The message-loss findings come first in the report
+    Given a live report with a mirroring policy finding and a message-loss blocker
+    When I open the report
+    Then the message-loss blocker is the first item
+    And the report never offers an in-place upgrade as a safe option
+
+  @fake-broker
+  Scenario: A definitions file cannot tell the index version, so every classic queue is warned about
+    Given a definitions file with the classic queues "orders" and "events" where "events" has "x-queue-version" 2
     When I analyse the file
-    Then the report warns that upgrading a broker in place was observed to lose classic queue messages
-    And it recommends migrating the topology to a new 4.x broker and moving the messages with a Shovel
+    Then there is a message-loss warning for "orders"
+    And there is no message-loss warning for "events"
+    And the warning says the file does not carry the index version
+
+  @fake-broker
+  Scenario: The live scan retries a storage version that is not there yet
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the broker reports no storage version for "orders" until the second read
+    When I analyse "legacy-eu"
+    Then the storage version of "orders" is read after a retry
+    And a queue whose version never appears is treated as version 1 and reported as unknown
+
+  @fake-broker
+  Scenario: The report says the loss cannot be detected after an upgrade
+    Given a message-loss blocker in the report
+    When I open its details
+    Then it says the management API does not show the loss after the upgrade
+    And it says only the broker log shows it
 
   @fake-broker
   Scenario: Client-visible changes are listed as checks, not as definition findings

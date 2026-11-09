@@ -129,7 +129,7 @@ One line per task. Status: `in progress`, `done`, `blocked`. Keep in sync with e
 | M8-10-mcp-report-and-shovel-status | MCP: caerbannog_analyze_3x_definitions and caerbannog_list_shovels (read-only) | M8 | briefed (architect, 2026-11-09); depends on M8-03, M8-08 |
 | M8-11-gate-3x-to-4x | `@gate-M8` RealBrokerM8GateTest: 3.13 to 4.x, one shovelled message | M8 | briefed (architect, 2026-11-09); depends on M8-06, M8-08, M8-09, M8-10, M8-12 |
 | M8-12-access-migration-actions | Vhost, user (hash pass-through), permission and topic-permission actions: secrets, administrator and Full control guardrails, conflicts, owner-only file (owner decision P2, 2026-11-09) | M8 | briefed (architect, 2026-11-09); depends on M8-00, M8-04 |
-| M8-13-follow-up-spikes | Follow-up spikes: S-N in-place upgrade classic message loss (first, running separately), S-O exclusive/redelivery/global QoS (test-only `com.rabbitmq:amqp-client` approved 2026-11-09, listed in `THIRD_PARTY_NOTICES.md`), S-Q amqps Shovel, S-P guest loopback, S-R cluster export, S-T, S-S | M8 | briefed (architect, 2026-11-09); depends on M8-00 (done) |
+| M8-13-follow-up-spikes | Follow-up spikes: S-N in-place upgrade classic message loss (DONE 2026-11-09: v1 classic index unreadable on 4.3+; follow-ups listed in the brief), S-O exclusive/redelivery/global QoS (test-only `com.rabbitmq:amqp-client` approved 2026-11-09, listed in `THIRD_PARTY_NOTICES.md`), S-Q amqps Shovel, S-P guest loopback, S-R cluster export, S-T, S-S | M8 | briefed (architect, 2026-11-09); depends on M8-00 (done) |
 
 ## Later milestones (planned)
 
