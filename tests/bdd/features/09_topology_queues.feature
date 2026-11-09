@@ -4,8 +4,9 @@ Feature: Topology and quorum queues
   I want to see and, where allowed, change the queues, exchanges and bindings of a broker
   So that I can understand how messages are routed without opening the Management UI
 
-  The app shows topology and statistics only. It never reads, gets or purges the messages
-  of a queue, because reading would remove messages and change the data flow.
+  The app shows topology and statistics. It never consumes, acknowledges, deletes or purges the messages
+  of a queue, because that would remove messages and change the data flow. The one way to see them (M7-08)
+  is the requeue peek: every message is returned to the queue and shown as not acknowledged.
 
   Milestones: the scenarios tagged @M2 are the read-only topology screen (task M2-08): the queues,
   exchanges and bindings of the connection's virtual host, with statistics. The scenarios tagged @M5
@@ -328,3 +329,52 @@ Feature: Topology and quorum queues
   Scenario: Inspecting a queue that does not exist is refused
     When I inspect the queue "no-such-queue"
     Then the app says the queue was not found and shows no messages
+
+  # The same peek against fakes of the broker: the real core view model, and a fake inspector that mirrors the contract of the real one.
+  @M7 @fake-broker @safety
+  Scenario: Inspect shows queue messages as not acknowledged and requeued
+    Given a quorum queue "orders"
+    And "orders" holds 3 messages
+    When I inspect the queue "orders"
+    Then I see 3 inspected messages, each marked "Not acknowledged (requeued)"
+    And the screen says the messages were returned to the queue
+
+  @M7 @fake-broker @safety
+  Scenario: Every inspection is a requeue peek and leaves the queue as it was
+    Given a quorum queue "orders"
+    And "orders" holds 3 messages
+    When I inspect the queue "orders"
+    And I inspect the queue "orders"
+    Then every inspector request used the requeue mode
+    And the queue "orders" still holds 3 messages
+
+  @M7 @fake-broker
+  Scenario: The number of messages asked for is clamped to 1 through 50
+    Given a quorum queue "orders"
+    And "orders" holds 3 messages
+    When I inspect the queue "orders" asking for 999 messages
+    Then the broker was asked for 50 messages
+    When I inspect the queue "orders" asking for 0 messages
+    Then the broker was asked for 1 messages
+
+  @M7 @fake-broker @negative
+  Scenario: A user without read access to the queue is refused
+    Given a quorum queue "secret"
+    And the user has no read access to the queue "secret"
+    When I inspect the queue "secret"
+    Then the screen shows the inspection error "does not have read access"
+    And I see no inspected messages
+
+  @M7 @fake-broker @negative
+  Scenario: Inspecting a queue that does not exist says so
+    When I inspect the queue "ghost"
+    Then the screen shows the inspection error "not found"
+    And I see no inspected messages
+
+  @M7 @fake-broker @negative @safety
+  Scenario: Every request the app made was a read of topology or statistics, or a requeue peek
+    Given a quorum queue "orders"
+    And "orders" holds 2 messages
+    When I open the topology screen on every tab and select the queue "orders"
+    And I inspect the queue "orders"
+    Then every request the app made to the broker was a read of topology or statistics, or a requeue peek

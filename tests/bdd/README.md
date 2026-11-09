@@ -38,6 +38,7 @@ tests/bdd/
 | `@smoke` | Smallest set that proves the feature works; run on every commit |
 | `@fake-broker` | Runs against in-memory fakes of the stream and management clients; no broker needed |
 | `@broker` | Needs a real RabbitMQ 4.x broker with TLS and plain listeners (Testcontainers, needs Docker) |
+| `@headers` | MQTT headers (MQTT 5 user properties) of the Publish MQTT dialog, M7-10; runs with `@fake-broker`. The `@M7 @fake-broker` queue-inspection scenarios in `09` run in the topology suite (filter `(@M2 or @M7) and @fake-broker`) against `FakeQueueMessageInspector`; their live twins are `@M7 @broker @gate-M7` (`RealBrokerM7GateTest`) |
 | `@negative` | Checks a refusal, an error or a safety rule |
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |

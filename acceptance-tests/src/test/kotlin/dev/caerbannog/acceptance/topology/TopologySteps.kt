@@ -8,6 +8,7 @@ import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
+import dev.caerbannog.core.connections.fakes.FakeQueueMessageInspector
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog.Companion.binding
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog.Companion.classic
@@ -17,6 +18,9 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingsViewMode
+import dev.caerbannog.core.topology.QueueInspectionConstants
+import dev.caerbannog.core.topology.QueueInspectionState
+import dev.caerbannog.core.topology.QueueMessageInspectionViewModel
 import dev.caerbannog.core.topology.QueueRowView
 import dev.caerbannog.core.topology.QueueTypeFilter
 import dev.caerbannog.core.topology.TopologyBannerKind
@@ -78,6 +82,8 @@ class TopologySteps {
     private var callsAtHide = -1
     private val visible = mutableListOf<String>()
     private val declared = mutableListOf<String>()
+    private val inspector = FakeQueueMessageInspector()
+    private var inspection: QueueMessageInspectionViewModel? = null
 
     @Before
     fun reset() {
@@ -96,6 +102,7 @@ class TopologySteps {
         expectedRows = emptyList()
         visible.clear()
         declared.clear()
+        inspection = null
         vm = newViewModel()
     }
 
@@ -714,5 +721,82 @@ class TopologySteps {
     fun explainsReadOnly() {
         val banner = state.banners.firstOrNull { it.kind == TopologyBannerKind.ReadOnlyLevel }
         assertTrue(banner?.headline.orEmpty().contains("set to read-only"), "banners: ${state.banners}")
+    }
+
+    // --- M7-08: the requeue peek (the real QueueMessageInspectionViewModel against a fake inspector) ---
+
+    @Given("{string} holds {int} messages")
+    fun queueHoldsMessages(queue: String, count: Int) {
+        inspector.addQueue(queue, count)
+    }
+
+    @Given("the user has no read access to the queue {string}")
+    fun noReadAccess(queue: String) {
+        inspector.denyRead(queue)
+    }
+
+    @When("I inspect the queue {string}")
+    fun inspectQueue(queue: String) = inspectQueue(queue, QueueInspectionConstants.DEFAULT_INSPECT_COUNT)
+
+    @When("I inspect the queue {string} asking for {int} messages")
+    fun inspectQueue(queue: String, count: Int) {
+        // The screen sets the count through the view model, so its own clamp is exercised before the fake clamps again.
+        val inspecting = QueueMessageInspectionViewModel(inspector = inspector, vhost = "/", queue = queue, scope = test.backgroundScope)
+        inspecting.setCount(count)
+        settle()
+        inspecting.inspectMessages()
+        settle()
+        inspection = inspecting
+    }
+
+    private fun inspectionState(): QueueInspectionState = checkNotNull(inspection) { "no inspection was started" }.state.value
+
+    @Then("I see {int} inspected messages, each marked {string}")
+    fun seeInspected(count: Int, badge: String) {
+        val loaded = inspectionState() as? QueueInspectionState.Loaded ?: error("expected loaded messages, got ${inspectionState()}")
+        assertEquals(count, loaded.messages.size)
+        assertEquals(badge, loaded.statusBadgeText)
+        assertTrue(loaded.messages.all { !it.acknowledged && it.acknowledgementStatusText == badge }, "messages: ${loaded.messages}")
+    }
+
+    @Then("the screen says the messages were returned to the queue")
+    fun saysRequeued() {
+        val loaded = inspectionState() as QueueInspectionState.Loaded
+        assertEquals(QueueInspectionConstants.REQUEUE_MODE_NOTICE, loaded.notice)
+    }
+
+    @Then("every inspector request used the requeue mode")
+    fun everyRequestRequeue() {
+        assertTrue(inspector.requests.isNotEmpty(), "the scenario made no inspector request")
+        assertTrue(inspector.requests.all { it.ackMode == QueueInspectionConstants.ACK_REQUEUE_TRUE }, "requests: ${inspector.requests}")
+    }
+
+    @Then("the queue {string} still holds {int} messages")
+    fun queueStillHolds(queue: String, count: Int) {
+        assertEquals(count, inspector.holds(queue))
+    }
+
+    @Then("the broker was asked for {int} messages")
+    fun brokerAskedFor(count: Int) {
+        assertEquals(count, inspector.requests.last().count, "requests: ${inspector.requests}")
+    }
+
+    @Then("the screen shows the inspection error {string}")
+    fun inspectionError(fragment: String) {
+        val error = inspectionState() as? QueueInspectionState.Error ?: error("expected an error, got ${inspectionState()}")
+        assertTrue(error.reason.contains(fragment, ignoreCase = true), "reason: ${error.reason}")
+    }
+
+    @Then("I see no inspected messages")
+    fun noInspectedMessages() {
+        assertFalse(inspectionState() is QueueInspectionState.Loaded, "state: ${inspectionState()}")
+    }
+
+    @Then("every request the app made to the broker was a read of topology or statistics, or a requeue peek")
+    fun everyRequestWasReadOrPeek() {
+        val made = topology.calls.toSet()
+        assertTrue(made.isNotEmpty() && inspector.requests.isNotEmpty(), "the scenario must have read topology ($made) and peeked (${inspector.requests})")
+        assertTrue(READ_ONLY_CALLS.containsAll(made), "calls outside the read-only set: ${made - READ_ONLY_CALLS}")
+        assertTrue(inspector.requests.all { it.ackMode == QueueInspectionConstants.ACK_REQUEUE_TRUE }, "peeks: ${inspector.requests}")
     }
 }

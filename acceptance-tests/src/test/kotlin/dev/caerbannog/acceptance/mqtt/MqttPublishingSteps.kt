@@ -1,13 +1,19 @@
 package dev.caerbannog.acceptance.mqtt
 
 import dev.caerbannog.core.connections.fakes.FakeMqttMessagePublisher
+import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttQos
 import dev.caerbannog.core.mqtt.PublishMqttRequest
+import dev.caerbannog.core.mqtt.PublishMqttState
+import dev.caerbannog.core.mqtt.PublishMqttViewModel
 import dev.caerbannog.core.publish.PublishOutcome
+import io.cucumber.datatable.DataTable
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -57,6 +63,59 @@ class MqttPublishingSteps {
             retain = retainWord.toBoolean(),
         )
         lastOutcome = fakePublisher.publish(request)
+    }
+
+    // --- M7-10: the dialog's headers and default payload (the real view model, a fake publisher) ---
+
+    private var dialog: PublishMqttViewModel? = null
+
+    private fun dialog(): PublishMqttViewModel = checkNotNull(dialog) { "the dialog is not open" }
+
+    @Given("I open the MQTT publish dialog for {string}")
+    fun iOpenTheMqttPublishDialog(topic: String) {
+        // Unconfined: the fake publisher never suspends, so publish() has finished when the call returns.
+        dialog = PublishMqttViewModel(fakePublisher, connectionName, CoroutineScope(Dispatchers.Unconfined), initialTopic = topic)
+    }
+
+    @Given("I add these MQTT headers")
+    fun iAddTheseMqttHeaders(table: DataTable) {
+        for ((index, row) in table.asLists().withIndex()) {
+            dialog().addHeader()
+            // Cucumber reads an empty table cell as null.
+            dialog().setHeader(index, row[0].orEmpty(), row[1].orEmpty())
+        }
+    }
+
+    @When("I publish the dialog message")
+    fun iPublishTheDialogMessage() {
+        dialog().publish()
+    }
+
+    @When("I change the dialog payload to {string}")
+    fun iChangeTheDialogPayload(payload: String) {
+        dialog().setPayload(payload)
+    }
+
+    @Then("the dialog payload is the sample message")
+    fun theDialogPayloadIsTheSampleMessage() {
+        assertEquals(PublishMqttState.DEFAULT_PAYLOAD, dialog().state.value.payload)
+        assertTrue(dialog().state.value.payload.isNotBlank())
+    }
+
+    @Then("the MQTT broker receives the message on {string} with these headers")
+    fun theMqttBrokerReceivesWithTheseHeaders(topic: String, table: DataTable) {
+        val sent = fakePublisher.findPublished(topic).single()
+        assertEquals(table.asLists().map { MqttHeader(it[0], it[1]) }, sent.headers)
+    }
+
+    @Then("the MQTT broker receives the message on {string} without headers")
+    fun theMqttBrokerReceivesWithoutHeaders(topic: String) {
+        assertEquals(emptyList<MqttHeader>(), fakePublisher.findPublished(topic).single().headers)
+    }
+
+    @Then("the MQTT broker receives the message on {string} with payload {string}")
+    fun theMqttBrokerReceivesWithPayload(topic: String, payload: String) {
+        assertEquals(payload, fakePublisher.findPublished(topic).single().payload.decodeToString())
     }
 
     @Then("the MQTT broker receives the message on {string} with QoS {int}")
