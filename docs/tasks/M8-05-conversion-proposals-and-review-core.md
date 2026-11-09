@@ -26,6 +26,8 @@ Review states in `M8-06`.
 No tool: the point is a human decision per item (spec MCP evaluation). A generated migration is an ordinary file, usable by the migration tools.
 
 ## Open points
+Report size (M8-03 review, 2026-11-09): a definitions file with 60,000 classic queues gives about 240,000 findings (about 4 per classic queue). Keep review decisions in maps keyed by `Finding.id` (unique inside a report, duplicates get `#2`, `#3`), never one object per finding with its own state flows, and never build the whole report as one JSON string for the review.
+
 P2, P3 and P10 are decided (2026-11-09). P17 (per-vhost export, owner 2026-11-09): the generator takes a `DefinitionsDocument` only (an `UnassignedDefinitions` draft from `M8-01` does not compile). For a document with `origin = SingleVirtualHost(name)` the access migration is not generated and the result says why ("This file is an export of one virtual host and holds no users, virtual hosts or permissions; the virtual host \"<name>\" must already exist on the 4.x broker"); the topology migration uses the assigned name as its virtual host. A scenario for this is added with `M8-05`. The review state and any log or `toString` never include a hash.
 
 ## Spike findings (M8-00, 2026-11-09)

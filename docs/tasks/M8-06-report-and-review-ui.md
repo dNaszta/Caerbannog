@@ -27,6 +27,8 @@ No mockup exists. The architect produces `docs/ux/Migrate3x.dc.html` (source pic
 None (UI). The report is exposed by `M8-10`.
 
 ## Open points
+Report size (M8-03 review, 2026-11-09): up to about 240,000 findings for 60,000 queues. The list must be virtualised (lazy list) and grouped by rule or severity with counts; never compose all findings at once. The text rendering escapes control characters; the UI must also render names as plain text (no markup, no control characters).
+
 P17 (owner 2026-11-09): when `DefinitionsParser.parse` returns `NeedsVirtualHost` (a per-vhost export), the screen asks for the virtual host name (prefilled with nothing, no default `/`), calls `assignVirtualHost`, shows `InvalidName` as an inline error, and analyses nothing until it gets `Assigned`; it may trim the typed text before calling (the core function does not). The report says that the access migration is empty and why. UI states and a Compose test belong here.
 Mockup. Where the entry lives (recommendation: a button on the Migrations screen and on a 3.x connection's pill).
 
