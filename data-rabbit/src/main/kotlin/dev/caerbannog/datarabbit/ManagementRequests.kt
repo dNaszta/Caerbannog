@@ -54,6 +54,9 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M5-08a: the URL of [path] (which starts with `/api`) on this connection's base; the migration executor checks the path first. */
     fun absolute(path: String): String = "$base$path"
 
+    /** M5-08a: the broker's overview, read once per connection for its version (`rabbitmq_version`). */
+    fun overview(): String = "$base/api/overview"
+
     fun whoami(): String = "$base/api/whoami"
 
     /**

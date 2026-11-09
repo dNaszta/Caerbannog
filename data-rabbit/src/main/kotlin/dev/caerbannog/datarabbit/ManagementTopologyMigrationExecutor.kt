@@ -25,10 +25,12 @@ class ManagementTopologyMigrationExecutor internal constructor(
     private val writer = MigrationWriter(http, requests)
     private val reader = ResourceReader(http, requests)
     private val readBack = ReadBack(reader, readBackDelay)
+    private val bindingDelete = BindingDelete(reader, writer, readBack)
 
     override suspend fun execute(action: MigrationAction): ActionResult = try {
         when (action) {
             is MigrationAction.DeclarePolicy, is MigrationAction.DeclareOperatorPolicy -> declarePolicy(action)
+            is MigrationAction.DeleteBinding -> bindingDelete.delete(action)
             is MigrationAction.DeclareStream -> streamOutcome(streams.createStream(action.vhost, action.name), action)
             is MigrationAction.DeleteStream -> streamOutcome(streams.deleteStream(action.vhost, action.name), action)
             else -> writeAndVerify(action)
@@ -39,11 +41,22 @@ class ManagementTopologyMigrationExecutor internal constructor(
     }
 
     private suspend fun writeAndVerify(action: MigrationAction): ActionResult =
-        when (val written = writer.write(action)) { // M5-08a R1 STUB: BadRequest is not decided by reading the resource yet
+        when (val written = writer.write(action)) {
             WriteOutcome.Success -> readBack.verify(action)
-            WriteOutcome.BadRequest -> ExecutorReasons.failed(ExecutorReasons.REFUSED)
+            WriteOutcome.BadRequest -> explainBadRequest(action)
             is WriteOutcome.Failed -> ExecutorReasons.failed(written.reason)
         }
+
+    /**
+     * A 400 on a queue or exchange declare is decided by FACTS, never by the broker's text: when the resource exists, the broker's equivalence
+     * check over all declared arguments refused it, so it exists with other settings (a conflict). When it does not exist, or cannot be read,
+     * something else is wrong (an unknown type, an invalid argument): a refusal. Nothing is deleted or recreated either way.
+     */
+    private suspend fun explainBadRequest(action: MigrationAction): ActionResult {
+        val reply = reader.read(action)
+        return if (reply is ManagementReply.Response && reply.status == OK) ExecutorReasons.conflict(action)
+        else ExecutorReasons.failed(ExecutorReasons.REFUSED)
+    }
 
     /** The policy is read first: absent is created, equal is a no-op with no request, different is a conflict and is never written over. */
     private suspend fun declarePolicy(action: MigrationAction): ActionResult {

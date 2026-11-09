@@ -12,6 +12,8 @@ internal object ExecutorReasons {
     const val NOT_ALLOWED = "the user is not allowed to do this"
     const val NO_ANSWER = "the broker did not answer"
     const val REFUSED = "the broker refused the request"
+    const val BINDING_NOT_IDENTIFIED = "the binding could not be identified"
+    const val OTHER_BINDING_REMOVED = "a different binding was removed"
     const val NOT_A_REQUEST = "this action cannot be sent to the broker"
 
     fun failed(reason: String): ActionResult.Failed = ActionResult.Failed(reason)

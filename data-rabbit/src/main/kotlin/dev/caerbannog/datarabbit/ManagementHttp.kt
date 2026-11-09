@@ -106,6 +106,10 @@ internal class ManagementHttp(
             ManagementReply.Unreachable
         } catch (e: IllegalArgumentException) {
             ManagementReply.Unreachable
+        } catch (e: RuntimeException) {
+            // The transport boundary: its contract is that every failure becomes a reply value and no exception text is kept (it could carry
+            // a URL or a secret), so a broad catch is justified here and only here. An Error is never caught.
+            ManagementReply.Unreachable
         }
     }
 

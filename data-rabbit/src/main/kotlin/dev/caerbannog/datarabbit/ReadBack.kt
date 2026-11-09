@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.migrations.ActionResult
 import dev.caerbannog.core.migrations.MigrationAction
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Verifies an action after it was sent, by reading the resource back with an allowed GET. A declare must be there as declared; a delete
@@ -22,13 +23,38 @@ internal class ReadBack(
     }
 
     /** @throws PathNotAllowedException when the resource has no allowed path; nothing is sent then. */
-    suspend fun verify(action: MigrationAction): ActionResult {
-        val first = probe(action)
+    suspend fun verify(action: MigrationAction): ActionResult = settle { probe(action) }
+
+    /**
+     * After a binding DELETE: reads the WHOLE list. The [target] must be gone and every one of [siblings] still there; a sibling that vanished is
+     * final (the run stops, nothing is recreated).
+     */
+    suspend fun verifyBindingRemoved(action: MigrationAction.DeleteBinding, target: JsonObject, siblings: List<JsonObject>): ActionResult =
+        settle { probeBindingList(action, target, siblings) }
+
+    /** Looks once; when the answer may still change, once more after the named delay. */
+    private suspend fun settle(look: suspend () -> Probe): ActionResult {
+        val first = look()
         if (first is Probe.Final) return first.result
         delayMillis(RETRY_DELAY_MILLIS)
-        return when (val second = probe(action)) {
+        return when (val second = look()) {
             is Probe.Final -> second.result
             is Probe.Pending -> second.failure
+        }
+    }
+
+    private suspend fun probeBindingList(action: MigrationAction.DeleteBinding, target: JsonObject, siblings: List<JsonObject>): Probe {
+        val reply = reader.read(action)
+        if (reply !is ManagementReply.Response) return Probe.Final(ExecutorReasons.forReply(reply))
+        val remaining = when (reply.status) {
+            OK -> BindingList.entries(reply.body) ?: return Probe.Final(ExecutorReasons.failed(ExecutorReasons.BINDING_NOT_IDENTIFIED))
+            NOT_FOUND -> emptyList()
+            else -> return Probe.Final(ExecutorReasons.forReply(reply))
+        }
+        return when {
+            target in remaining -> Probe.Pending(ExecutorReasons.stillThereAfterDelete(action))
+            !remaining.containsAll(siblings) -> Probe.Final(ExecutorReasons.failed(ExecutorReasons.OTHER_BINDING_REMOVED))
+            else -> Probe.Final(ActionResult.Success)
         }
     }
 
@@ -44,7 +70,7 @@ internal class ReadBack(
 
     private fun found(action: MigrationAction, body: String): Probe = when (action) {
         is MigrationAction.DeleteBinding ->
-            if (DeclaredResourceMatcher.hasRoutingKey(body, action.routingKey)) Probe.Pending(ExecutorReasons.stillThereAfterDelete(action))
+            if (BindingList.entries(body)?.let { BindingList.plain(it, action.routingKey).isNotEmpty() } == true) Probe.Pending(ExecutorReasons.stillThereAfterDelete(action))
             else Probe.Final(ActionResult.Success)
         is MigrationAction.DeleteQueue, is MigrationAction.DeleteExchange, is MigrationAction.DeleteStream, is MigrationAction.DeletePolicy ->
             Probe.Pending(ExecutorReasons.stillThereAfterDelete(action))

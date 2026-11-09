@@ -35,12 +35,6 @@ internal object DeclaredResourceMatcher {
         }
     }
 
-    /** True when the list of bindings between a source and a destination holds one with this routing key (a delete is verified by its absence). */
-    fun hasRoutingKey(body: String, routingKey: String): Boolean {
-        val root = (parseUntrustedJson(body, MAX_BODY_DEPTH) as? UntrustedJson.Parsed)?.element as? JsonArray ?: return false
-        return root.any { it is JsonObject && it.text("routing_key") == routingKey }
-    }
-
     private fun queueMatches(action: MigrationAction.DeclareQueue, root: JsonObject): Boolean =
         root.text("type") == action.type &&
             root.flag("durable") == action.durable &&
