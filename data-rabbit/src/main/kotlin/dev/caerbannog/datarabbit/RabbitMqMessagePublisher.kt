@@ -2,6 +2,8 @@ package dev.caerbannog.datarabbit
 
 import com.rabbitmq.stream.Environment
 import com.rabbitmq.stream.Producer
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.publish.MessagePublisher
 import dev.caerbannog.core.publish.PublishMessageRequest
 import dev.caerbannog.core.publish.PublishOutcome
@@ -19,6 +21,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+
+/** The publish reply is one small object; far below the reader's failure point near 10,000. */
+private const val MAX_REPLY_DEPTH = 64
 
 /**
  * Real RabbitMQ message publisher executing test message sends:
@@ -141,7 +146,8 @@ class RabbitMqMessagePublisher internal constructor(
                 when (reply.status) {
                     200 -> {
                         try {
-                            val parsed = Json.parseToJsonElement(reply.body).jsonObject
+                            val parsed = (parseUntrustedJson(reply.body, MAX_REPLY_DEPTH) as? UntrustedJson.Parsed)?.element?.jsonObject
+                                ?: return PublishOutcome.Success("Message published")
                             val routed = parsed["routed"]?.jsonPrimitive?.content?.toBoolean() ?: true
                             val targetDesc = when (request.target.kind) {
                                 PublishTargetKind.EXCHANGE -> "exchange '${request.target.name}'"

@@ -1,20 +1,17 @@
-package dev.caerbannog.core.migrate3x
-
-/** Brackets nested deeper than this cannot be part of a definitions file (the deepest valid value sits about 37 levels down). */
-internal const val MAX_TEXT_DEPTH: Int = 64
+package dev.caerbannog.core.json
 
 /**
  * Finds text that nests brackets too deep to hand to the JSON tree reader, which recurses and overflows the stack
  * on thousands of levels (measured with kotlinx-serialization 1.7.3). Iterative on purpose: it is the guard in
  * front of the recursion, so it must not recurse itself.
  */
-internal object JsonNestingScan {
+public object JsonNestingScan {
 
     /** [section] is the top-level key that holds the deep value, or null when there is none (not a definitions-shaped text). */
-    data class TooDeep(val section: String?)
+    public data class TooDeep(val section: String?)
 
-    /** Null when the nesting stays within [MAX_TEXT_DEPTH]. Quotes and escapes are honoured so brackets inside strings do not count. */
-    fun findTooDeep(text: String): TooDeep? {
+    /** Null when the nesting stays within [maxDepth]. Quotes and escapes are honoured so brackets inside strings do not count. */
+    public fun findTooDeep(text: String, maxDepth: Int): TooDeep? {
         var depth = 0
         var topLevelKey: String? = null
         var rootIsObject = false
@@ -29,7 +26,7 @@ internal object JsonNestingScan {
                 '[', '{' -> {
                     if (depth == 0) rootIsObject = text[i] == '{'
                     depth++
-                    if (depth > MAX_TEXT_DEPTH) return TooDeep(if (rootIsObject) topLevelKey else null)
+                    if (depth > maxDepth) return TooDeep(if (rootIsObject) topLevelKey else null)
                 }
                 ']', '}' -> if (depth > 0) depth--
             }

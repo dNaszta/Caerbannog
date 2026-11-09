@@ -6,14 +6,14 @@ import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.UnreadableCause
 import dev.caerbannog.core.connections.decidePermissions
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import io.ktor.client.request.basicAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLParserException
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -23,6 +23,9 @@ import java.net.URISyntaxException
 import java.net.http.HttpTimeoutException
 import java.net.SocketTimeoutException
 import javax.net.ssl.SSLException
+
+/** The permissions reply is one small object; far below the reader's failure point near 10,000. */
+private const val MAX_BODY_DEPTH = 64
 
 /**
  * Reads the connection user's permissions with `GET /api/permissions/{vhost}/{user}` over HTTPS, or plain HTTP when the profile has TLS off.
@@ -85,13 +88,8 @@ class ManagementApiPermissionChecker(
     private fun encode(segment: String): String = URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")
 
     private fun parse(body: String): PermissionCheckResult {
-        val obj: JsonObject = try {
-            Json.parseToJsonElement(body).jsonObject
-        } catch (e: SerializationException) {
-            return unreadable(UnreadableCause.BAD_RESPONSE, "malformed JSON")
-        } catch (e: IllegalArgumentException) {
-            return unreadable(UnreadableCause.BAD_RESPONSE, "malformed JSON")
-        }
+        val obj: JsonObject = ((parseUntrustedJson(body, MAX_BODY_DEPTH) as? UntrustedJson.Parsed)?.element as? JsonObject)
+            ?: return unreadable(UnreadableCause.BAD_RESPONSE, "malformed JSON")
         fun field(name: String): String? = (obj[name] as? JsonPrimitive)?.takeIf { it.isString }?.content
         val configure = field("configure")
         val write = field("write")

@@ -1,5 +1,7 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.CatalogResult
@@ -35,20 +37,27 @@ import kotlinx.serialization.json.longOrNull
  */
 internal object ManagementJson {
 
+    /** Broker bodies echo user-chosen structure (queue arguments, policy definitions): real data nests below about 20, the reader fails near 10,000. */
+    private const val MAX_BODY_DEPTH = 128
+
     // Thrown inside the parsers only, turned into Unexpected at the public boundary.
     private class Malformed : RuntimeException()
 
     private fun malformed(): Nothing = throw Malformed()
 
-    private inline fun <T> guarded(body: String, parse: (JsonElement) -> CatalogResult<T>): CatalogResult<T> = try {
-        parse(Json.parseToJsonElement(body))
-    } catch (e: Malformed) {
-        CatalogResult.Unexpected
-    } catch (e: SerializationException) {
-        CatalogResult.Unexpected
-    } catch (e: IllegalArgumentException) {
-        CatalogResult.Unexpected
-    }
+    private inline fun <T> guarded(body: String, parse: (JsonElement) -> CatalogResult<T>): CatalogResult<T> =
+        when (val parsed = parseUntrustedJson(body, MAX_BODY_DEPTH)) {
+            is UntrustedJson.Parsed -> try {
+                parse(parsed.element)
+            } catch (e: Malformed) {
+                CatalogResult.Unexpected
+            } catch (e: SerializationException) {
+                CatalogResult.Unexpected
+            } catch (e: IllegalArgumentException) {
+                CatalogResult.Unexpected
+            }
+            UntrustedJson.TooDeep, UntrustedJson.NotJson -> CatalogResult.Unexpected
+        }
 
     fun parseStreamPage(body: String): CatalogResult<StreamPage> = guarded(body) { root ->
         val obj = root.asObject()
@@ -363,7 +372,8 @@ internal object ManagementJson {
         val subscriptionsByClient = mutableMapOf<String, MutableList<MqttSubscription>>()
         if (!bindingsBody.isNullOrBlank()) {
             try {
-                val bindingsRoot = Json.parseToJsonElement(bindingsBody)
+                // Too deep or not JSON: no subscription data, the connections are still listed.
+                val bindingsRoot = (parseUntrustedJson(bindingsBody, MAX_BODY_DEPTH) as? UntrustedJson.Parsed)?.element
                 val bindingObjects = (bindingsRoot as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
                 for (b in bindingObjects) {
                     if (vhost != null && b.string("vhost") != null && b.string("vhost") != vhost) continue

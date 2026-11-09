@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrations
 
-import kotlinx.serialization.SerializationException
+import dev.caerbannog.core.json.UntrustedJson
+import dev.caerbannog.core.json.parseUntrustedJson
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -21,6 +22,9 @@ sealed interface MigrationValidationResult {
 }
 
 object MigrationParser {
+
+    /** A migration file has a known shallow schema (a few levels); far below the reader's failure point near 10,000. */
+    private const val MAX_FILE_DEPTH = 64
 
     private val prettyJson = Json {
         prettyPrint = true
@@ -47,12 +51,10 @@ object MigrationParser {
         rawJson: String,
         existingVersions: Set<String> = emptySet(),
     ): MigrationValidationResult {
-        val rootElement: JsonElement = try {
-            lenientJson.parseToJsonElement(rawJson)
-        } catch (_: SerializationException) {
-            return MigrationValidationResult.Invalid("the file is not valid JSON")
-        } catch (_: IllegalArgumentException) {
-            return MigrationValidationResult.Invalid("the file is not valid JSON")
+        val rootElement: JsonElement = when (val parsed = parseUntrustedJson(rawJson, MAX_FILE_DEPTH, lenientJson)) {
+            is UntrustedJson.Parsed -> parsed.element
+            UntrustedJson.TooDeep -> return MigrationValidationResult.Invalid("the file is nested too deep")
+            UntrustedJson.NotJson -> return MigrationValidationResult.Invalid("the file is not valid JSON")
         }
 
         val root = rootElement as? JsonObject
