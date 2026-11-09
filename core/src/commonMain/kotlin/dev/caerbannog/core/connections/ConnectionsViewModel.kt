@@ -1,5 +1,7 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.migrations.HistoryKeyResult
+import dev.caerbannog.core.migrations.ProfileHistoryKeys
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,8 @@ class ConnectionsViewModel(
     private val caCertificateValidator: CaCertificateValidator,
     private val session: ConnectionSession? = null,
     private val active: ActiveConnection? = null,
+    /** Keeps the applied-migrations history under the profile's name: a successful rename moves it, a confirmed delete removes it. */
+    private val historyKeys: ProfileHistoryKeys? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 
@@ -125,7 +129,7 @@ class ConnectionsViewModel(
                 if (it is SaveConnectionResult.Saved) storePasswordIfPresent(originalName, input.password)
             }
         } else {
-            renameTo(originalName, updated, input.password)
+            renameWithHistory(originalName, updated, input.password)
         }
 
         // A rename makes a running validation for the old name stale, like a panel switch does.
@@ -190,6 +194,21 @@ class ConnectionsViewModel(
         val validation = caCertificateValidator.validate(requested)
         _state.update { it.copy(lastCaCertificateValidationResult = validation) }
         return if (validation is CaCertificateValidationResult.Valid) requested else current
+    }
+
+    // The history moves FIRST, after the name check: a name that is taken must not replace that profile's history, and a history that
+    // cannot be moved leaves the profile as it is (a renamed profile with a stranded history would run applied migrations again).
+    private fun renameWithHistory(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
+        if (repository.list().any { it.name == updated.name }) return SaveConnectionResult.NameAlreadyExists(updated.name)
+        val moved = historyKeys?.rename(originalName, updated.name) ?: HistoryKeyResult.Done
+        if (moved is HistoryKeyResult.Failed) return historyNotUpdated()
+        _state.update { it.copy(errorMessage = null) }
+        return renameTo(originalName, updated, newPassword)
+    }
+
+    private fun historyNotUpdated(): SaveConnectionResult.HistoryNotUpdated {
+        _state.update { it.copy(errorMessage = HISTORY_NOT_UPDATED) }
+        return SaveConnectionResult.HistoryNotUpdated(HISTORY_NOT_UPDATED)
     }
 
     private fun renameTo(originalName: String, updated: ConnectionProfile, newPassword: String?): SaveConnectionResult {
@@ -275,6 +294,10 @@ class ConnectionsViewModel(
 
     fun confirmDelete() {
         val name = _state.value.pendingDeleteName ?: return
+        if (historyKeys?.delete(name) is HistoryKeyResult.Failed) {
+            _state.update { it.copy(profiles = repository.list(), errorMessage = HISTORY_NOT_UPDATED, pendingDeleteName = null) }
+            return
+        }
         if (_state.value.selectedProfileName == name) panelEpoch++
         repository.delete(name)
         secretStore.delete(name)
@@ -283,6 +306,7 @@ class ConnectionsViewModel(
         _state.update {
             it.copy(
                 profiles = repository.list(),
+                errorMessage = null,
                 pendingDeleteName = null,
                 selectedProfileName = it.selectedProfileName.takeUnless { selected -> selected == name },
             )
@@ -332,4 +356,8 @@ class ConnectionsViewModel(
     private fun profileNamed(name: String): ConnectionProfile =
         repository.list().firstOrNull { it.name == name }
             ?: error("No saved connection named '$name'")
+
+    private companion object {
+        const val HISTORY_NOT_UPDATED = "The migration history of this connection could not be updated, so the connection was left as it is"
+    }
 }

@@ -20,6 +20,8 @@ data class ConnectionsState(
     val permissionChecks: Map<String, PermissionCheckStatus> = emptyMap(),
     /** The session's current connection (not the edit-panel selection), mirrored from [ConnectionSession.current]. */
     val currentConnection: CurrentConnection? = null,
+    /** A fixed message about the last rename or delete that was refused, or null. */
+    val errorMessage: String? = null,
 ) {
     val selectedProfile: ConnectionProfile?
         get() = profiles.firstOrNull { it.name == selectedProfileName }

@@ -27,6 +27,7 @@ Dry run rows: "Declare user svc (administrator), password hash hidden". Warning 
 No tool returns a hash; there is no MCP apply tool (owner decision 2026-11-09, `M5-09`): access actions are only applied in the app, and the read-only dry-run tool shows `Declare user <name>` without a hash.
 
 ## Open points
+From `M5-08b` (review, 2026-11-10): `AtomicFileWriter.write(..., ownerOnly)` exists; a migration file that holds a password hash is written with `ownerOnly = true` (decision P13), every other migration file with the default permissions of the user's folder.
 Depends on `M5-08-real-migration-execution` for its APPLY half (2026-11-09): the desktop app has no real executor today (see `M8-04`). The model, generation and fake-based scenarios of this task do not wait for it; the live apply, read-back and the `@broker` scenarios do.
 
 P10 (V1 exemption and separate file), P11 (`guest`), P12 (unsupported algorithm), P13 (owner-only file) are decided (2026-11-09); S-M answers the algorithm, `guest`, read-back and body shapes.

@@ -24,4 +24,6 @@ interface ConnectionProfileRepository {
 sealed interface SaveConnectionResult {
     data class Saved(val profile: ConnectionProfile) : SaveConnectionResult
     data class NameAlreadyExists(val name: String) : SaveConnectionResult
+    /** The migration history could not be updated first, so the profile was left as it is; [message] is fixed text. */
+    data class HistoryNotUpdated(val message: String) : SaveConnectionResult
 }

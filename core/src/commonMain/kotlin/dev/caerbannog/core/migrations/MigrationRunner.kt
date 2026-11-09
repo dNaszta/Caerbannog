@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import kotlinx.coroutines.CancellationException
 
 /**
  * Result of executing a single migration action on the broker.
@@ -23,6 +24,15 @@ interface TopologyMigrationExecutor {
 interface MigrationHistoryRepository {
     suspend fun getAppliedMigrations(profileName: String): Map<String, String>
     suspend fun recordApplied(profileName: String, version: String, checksum: String)
+
+    /** Typed answer: [HistoryResult.Unreadable] when the history file exists but cannot be read; the default never fails. */
+    suspend fun load(profileName: String): HistoryResult = HistoryResult.Loaded(getAppliedMigrations(profileName))
+
+    /** The name [moveAside] would give the unreadable file now (with its collision suffix). */
+    fun asideFileName(): String = throw UnsupportedOperationException("this history has no file to move aside")
+
+    /** Renames the unreadable history file to [asideFileName], never deleting or overwriting. */
+    suspend fun moveAside(): HistoryMoveResult = HistoryMoveResult.Failed("this history has no file to move aside")
 }
 
 /**
@@ -195,11 +205,29 @@ class MigrationRunner(
                 }
             }
 
-            // Record as applied upon completing all actions in the migration
-            historyRepository.recordApplied(profileName, migration.version, migration.checksum)
+            // Record as applied upon completing all actions in the migration; if that fails, nothing later may run.
+            if (!recorded(profileName, migration)) {
+                return MigrationApplyResult.NotRecorded(migration.version, NOT_RECORDED)
+            }
             appliedVersions += migration.version
         }
 
         return MigrationApplyResult.Success(appliedVersions)
+    }
+
+    /** False when the history refused or could not write the record; the broker change was made and every action is safe to run again. */
+    private suspend fun recorded(profileName: String, migration: MigrationFile): Boolean =
+        try {
+            historyRepository.recordApplied(profileName, migration.version, migration.checksum)
+            true
+        } catch (failure: CancellationException) {
+            // A cancellation is an IllegalStateException on the JVM; it must keep cancelling.
+            throw failure
+        } catch (failure: Exception) {
+            if (failure is IllegalStateException || failure.isIoFailure()) false else throw failure
+        }
+
+    private companion object {
+        const val NOT_RECORDED = "The migration was applied but could not be recorded; running it again is safe"
     }
 }
