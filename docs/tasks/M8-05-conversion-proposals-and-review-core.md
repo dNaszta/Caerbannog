@@ -1,6 +1,6 @@
 # Conversion proposals, review state and migration generation
 
-Milestone: M8    Depends on: M8-03, M8-04, M8-12    Size: L
+Milestone: M8    Depends on: M8-03, M8-04, M8-12 (apply half also M5-08)    Size: L
 
 ## Goal
 A `ConversionReview` takes a report, lets each finding be accepted, changed or skipped, and generates one ordinary topology migration per source virtual host (P3) and one access migration (vhosts, users, permissions; P10) once everything is decided.

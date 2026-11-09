@@ -1,6 +1,6 @@
 # M8 gate: migrate a 3.13 topology to 4.x and move a message
 
-Milestone: M8    Depends on: M8-06, M8-08, M8-09, M8-10, M8-12    Size: M
+Milestone: M8    Depends on: M8-06, M8-08, M8-09, M8-10, M8-12, M5-08    Size: M
 
 ## Goal
 `RealBrokerM8GateTest` (`@gate-M8`, tag `broker-3x`) proves the whole flow on real brokers.
@@ -26,6 +26,8 @@ None.
 None (the report tool is covered by `M8-10`).
 
 ## Open points
+Depends on `M5-08-real-migration-execution` (2026-11-09): the gate applies a generated migration to a real 4.x broker, which needs the real executor with read-back and persistence.
+
 Packaging impact of any new dependency (none expected).
 
 ## Spike findings (M8-00, 2026-11-09)

@@ -351,6 +351,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the conversion is not blocked: after I tick it I can accept the proposal
 
   @fake-broker
+  # Owned by M5-08 (the real executor reads back after each action); M8-05 only generates the file.
   Scenario: Applying a generated migration reads back every declared queue
     Given a generated migration that declares the quorum queues "orders" and "jobs"
     And the broker silently does not create "jobs"
