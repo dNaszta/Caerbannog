@@ -327,8 +327,10 @@ class FolderMigrationFileRepositoryTest {
         assertIs<FolderListing.Listed>(l)
         assertTrue(l.readOnly)
         assertEquals(listOf("0001"), l.files.map { it.version })
-        assertIs<MigrationValidationResult.Invalid>(repo().importFile(raw("0002")))
-        assertIs<MigrationValidationResult.Invalid>(repo().updateFile("0001", raw("0001", extra = ",\"n\":1")))
+        // The reason must be the read-only one: the OS would refuse the write anyway, so "Invalid" alone cannot tell a checked folder from a failed write.
+        assertEquals(MigrationValidationResult.Invalid("The folder is read-only"), repo().importFile(raw("0002")))
+        assertEquals(MigrationValidationResult.Invalid("The folder is read-only"), repo().updateFile("0001", raw("0001", extra = ",\"n\":1")))
+        assertTrue(runCatching { repo().exportTopology("0003", "d", listOf(MigrationAction.DeclareQueue(name = "q"))) }.exceptionOrNull() is MigrationWriteException)
 
         dir.setWritable(true)
         assertEquals(raw("0001"), fileText("0001.json"))
