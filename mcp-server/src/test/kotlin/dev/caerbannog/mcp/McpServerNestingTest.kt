@@ -55,7 +55,8 @@ class McpServerNestingTest {
         assertNotNull(error, "expected an error object in $response")
         assertEquals(-32700, error!!["code"]?.jsonPrimitive?.int)
         assertEquals("Parse error", error["message"]?.jsonPrimitive?.content)
-        assertTrue(obj["id"] == null || obj["id"] == JsonNull, "the id of an unparsable request is null or absent: $response")
+        assertTrue(obj.containsKey("id"), "JSON-RPC 2.0: the key id must be present: $response")
+        assertEquals(JsonNull, obj["id"], "the id of an unparsable request is JSON null: $response")
         assertFalse(response.contains("[[["), "nothing of the request is echoed")
         assertFalse(response.contains("\"a\":{"), "nothing of the request is echoed")
     }

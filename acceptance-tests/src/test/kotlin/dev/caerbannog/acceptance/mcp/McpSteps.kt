@@ -325,6 +325,8 @@ class McpSteps {
         assertNotNull(error, "expected an error object in $lastRawResponse")
         assertEquals(expectedCode, error["code"]?.jsonPrimitive?.intOrNull)
         assertEquals("Parse error", error["message"]?.jsonPrimitive?.content)
+        assertTrue(lastResponseJson!!.containsKey("id"), "JSON-RPC 2.0: the key id must be present in $lastRawResponse")
+        assertEquals(kotlinx.serialization.json.JsonNull, lastResponseJson!!["id"], "the id must be JSON null in $lastRawResponse")
     }
 
     @Then("the error message does not contain any part of the request")
