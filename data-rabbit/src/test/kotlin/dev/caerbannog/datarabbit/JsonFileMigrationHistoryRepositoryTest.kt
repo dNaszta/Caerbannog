@@ -219,7 +219,7 @@ class JsonFileMigrationHistoryRepositoryTest {
     }
 
     @Test
-    fun `the old getAppliedMigrations is a wrapper of load and does not throw on an unreadable file`() = runBlocking {
+    fun `the old getAppliedMigrations is a wrapper of load and does not throw on an unreadable file`() = runBlocking<Unit> {
         put("{ broken")
         val r = runCatching { repo().getAppliedMigrations("uat-eu") }
         assertTrue(r.isSuccess)
@@ -249,7 +249,7 @@ class JsonFileMigrationHistoryRepositoryTest {
     // ---- moveAside ----
 
     @Test
-    fun `moveAside renames the file with the clock's timestamp, keeps every byte and then the history is empty`() = runBlocking {
+    fun `moveAside renames the file with the clock's timestamp, keeps every byte and then the history is empty`() = runBlocking<Unit> {
         val original = "{ broken \u00e9 SENTINEL\r\n".toByteArray(Charsets.UTF_8)
         Files.createDirectories(file.parent)
         Files.write(file, original)

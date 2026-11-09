@@ -135,7 +135,7 @@ class FolderMigrationFileRepositoryTest {
     }
 
     @Test
-    fun `an invalid import writes nothing`() = runBlocking {
+    fun `an invalid import writes nothing`() = runBlocking<Unit> {
         made()
         val before = tree()
 
@@ -146,7 +146,7 @@ class FolderMigrationFileRepositoryTest {
     }
 
     @Test
-    fun `updateFile replaces the stored text exactly, and an invalid edit keeps the old file`() = runBlocking {
+    fun `updateFile replaces the stored text exactly, and an invalid edit keeps the old file`() = runBlocking<Unit> {
         made()
         repo().importFile(raw("0001"))
         val edited = raw("0001", extra = ",\n  \"note\": \"edited\"")
@@ -183,7 +183,7 @@ class FolderMigrationFileRepositoryTest {
     }
 
     @Test
-    fun `nextVersion skips a name taken by an invalid file so an export never overwrites it`() = runBlocking {
+    fun `nextVersion skips a name taken by an invalid file so an export never overwrites it`() = runBlocking<Unit> {
         made()
         write("0001.json", raw("0001")); write("0007.json", "{ not json")
 
@@ -193,7 +193,7 @@ class FolderMigrationFileRepositoryTest {
     // ---- invalid files ----
 
     @Test
-    fun `an invalid file is listed as invalid with a reason, is not a migration and stays unchanged`() = runBlocking {
+    fun `an invalid file is listed as invalid with a reason, is not a migration and stays unchanged`() = runBlocking<Unit> {
         made()
         write("0001.json", raw("0001"))
         write("0007.json", "{ not json SENTINEL")
@@ -405,7 +405,7 @@ class FolderMigrationFileRepositoryTest {
     }
 
     @Test
-    fun `a leftover temp file from an earlier crash does not block or change anything`() = runBlocking {
+    fun `a leftover temp file from an earlier crash does not block or change anything`() = runBlocking<Unit> {
         made()
         write("0001.json", raw("0001"))
         write("0001.json.tmp", "{ half")
