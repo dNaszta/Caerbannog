@@ -187,7 +187,6 @@ fun PublishMqttDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 140.dp, max = 300.dp)
-                            .verticalScroll(rememberScrollState())
                             .testTag("publishMqttPayloadInput"),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                         maxLines = 15,

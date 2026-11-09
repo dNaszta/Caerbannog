@@ -495,7 +495,6 @@ private fun TabList(tabs: List<StreamTab>, selected: Int, onSelect: (Int) -> Uni
                             .heightIn(min = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                     Box(Modifier.height(3.dp).width(32.dp).background(if (on) MaterialTheme.colorScheme.primary else Color.Transparent))
                 }

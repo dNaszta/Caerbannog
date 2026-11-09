@@ -44,7 +44,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +54,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -66,6 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
+import dev.caerbannog.core.browser.BodyPreview
+import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.core.browser.PayloadFormatter
 import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.browser.StreamLogTape
@@ -75,8 +74,6 @@ import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
-import kotlinx.coroutines.launch
-import java.awt.datatransfer.StringSelection
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -664,15 +661,12 @@ private fun MessagesTable(
                             }
                         }
                         Spacer(Modifier.width(16.dp))
-                        val clipboard = LocalClipboard.current
-                        val bodyText = remember(msg.payload) { fullBodyForTooltip(msg.payload) }
-                        val scope = rememberCoroutineScope()
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
                             tooltip = {
                                 PlainTooltip {
                                     Text(
-                                        text = bodyText,
+                                        text = remember(msg.payload) { BodyPreview.tooltip(msg.payload) },
                                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                         modifier = Modifier.testTag("bodyTooltip:${msg.offset}"),
                                     )
@@ -681,21 +675,12 @@ private fun MessagesTable(
                             state = rememberTooltipState(),
                         ) {
                             Text(
-                                text = previewBody(msg.payload),
+                                text = BodyPreview.cell(msg.payload),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                                 maxLines = 1,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("messageCell:${msg.offset}:body")
-                                    .clickable {
-                                        scope.launch {
-                                            try {
-                                                clipboard.setClipEntry(ClipEntry(StringSelection(bodyText)))
-                                            } catch (_: Exception) {
-                                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(bodyText), null)
-                                            }
-                                        }
-                                    },
+                                    .testTag("messageCell:${msg.offset}:body"),
                             )
                         }
                     }
@@ -716,8 +701,7 @@ private fun MessageDetailsSheet(
     var requestedKind by remember(message.offset) { mutableStateOf<PayloadViewKind?>(null) }
     var showAll by remember(message.offset) { mutableStateOf(false) }
 
-    val clipboard = LocalClipboard.current
-    val coroutineScope = rememberCoroutineScope()
+    val copyToClipboard = rememberCopyToClipboard()
 
     val inspection = remember(message, requestedKind, showAll) {
         formatter.inspect(message, requestedKind = requestedKind, showAll = showAll)
@@ -730,14 +714,12 @@ private fun MessageDetailsSheet(
         modifier = modifier.fillMaxHeight().testTag("messageDetailsSheet"),
     ) {
         val verticalScrollState = rememberScrollState()
-        val horizontalScrollState = rememberScrollState()
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(16.dp)
-                    .verticalScroll(verticalScrollState)
-                    .horizontalScroll(horizontalScrollState),
+                    .verticalScroll(verticalScrollState),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
             // Header: title and close button
@@ -860,13 +842,7 @@ private fun MessageDetailsSheet(
                 Button(
                     onClick = {
                         val bodyText = formatter.copyBody(message)
-                        coroutineScope.launch {
-                            try {
-                                clipboard.setClipEntry(ClipEntry(StringSelection(bodyText)))
-                            } catch (_: Exception) {
-                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(bodyText), null)
-                            }
-                        }
+                        copyToClipboard(bodyText)
                     },
                     modifier = Modifier.testTag("copyBodyButton"),
                 ) {
@@ -878,13 +854,7 @@ private fun MessageDetailsSheet(
                 OutlinedButton(
                     onClick = {
                         val offsetText = formatter.copyOffset(message)
-                        coroutineScope.launch {
-                            try {
-                                clipboard.setClipEntry(ClipEntry(StringSelection(offsetText)))
-                            } catch (_: Exception) {
-                                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(offsetText), null)
-                            }
-                        }
+                        copyToClipboard(offsetText)
                     },
                     modifier = Modifier.testTag("copyOffsetButton"),
                 ) {
@@ -897,13 +867,7 @@ private fun MessageDetailsSheet(
                     OutlinedButton(
                         onClick = {
                             val metadataText = formatter.copyHeadersAndProperties(message)
-                            coroutineScope.launch {
-                                try {
-                                    clipboard.setClipEntry(ClipEntry(StringSelection(metadataText)))
-                                } catch (_: Exception) {
-                                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(metadataText), null)
-                                }
-                            }
+                            copyToClipboard(metadataText)
                         },
                         modifier = Modifier.testTag("copyHeadersAndPropertiesButton"),
                     ) {
@@ -949,34 +913,4 @@ private fun formatTimestamp(epochMs: Long): String = try {
         .format(TIMESTAMP_FORMATTER)
 } catch (_: Exception) {
     "$epochMs"
-}
-
-private fun previewBody(payload: ByteArray): String = try {
-    val text = payload.decodeToString()
-    if (text.any { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
-        payload.take(32).joinToString(" ") { "%02x".format(it) } + if (payload.size > 32) " …" else ""
-    } else {
-        text.replace("\n", " ").take(120)
-    }
-} catch (_: Exception) {
-    payload.take(32).joinToString(" ") { "%02x".format(it) }
-}
-
-/**
- * Formats the full body for display in a tooltip.
- * For text content, returns the full text (truncated to a reasonable limit for display).
- * For binary content, returns the hex representation.
- */
-private fun fullBodyForTooltip(payload: ByteArray): String = try {
-    val text = payload.decodeToString()
-    if (text.any { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
-        // Binary data: show hex dump
-        payload.joinToString(" ") { "%02x".format(it) }
-    } else {
-        // Text data: show full text but limit to reasonable size for tooltip
-        text.take(1000) + if (payload.size > 1000) "\n\n... (truncated, full length: ${payload.size} bytes)" else ""
-    }
-} catch (_: Exception) {
-    // Cannot decode as text, show hex
-    payload.joinToString(" ") { "%02x".format(it) }
 }
