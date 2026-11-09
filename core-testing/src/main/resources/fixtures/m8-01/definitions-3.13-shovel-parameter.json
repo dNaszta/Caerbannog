@@ -1,0 +1,66 @@
+{
+ "bindings": [],
+ "exchanges": [],
+ "parameters": [
+  {
+   "component": "shovel",
+   "name": "move-orders",
+   "value": {
+    "ack-mode": "on-confirm",
+    "dest-protocol": "amqp091",
+    "dest-queue": "orders",
+    "dest-uri": "amqp://",
+    "src-delete-after": "queue-length",
+    "src-protocol": "amqp091",
+    "src-queue": "orders",
+    "src-uri": "amqp://svc:SENTINEL-PASSWORD@old-broker"
+   },
+   "vhost": "/"
+  }
+ ],
+ "permissions": [
+  {
+   "configure": ".*",
+   "read": ".*",
+   "user": "svc",
+   "vhost": "/",
+   "write": ".*"
+  }
+ ],
+ "policies": [],
+ "queues": [
+  {
+   "arguments": {},
+   "auto_delete": false,
+   "durable": true,
+   "name": "orders",
+   "vhost": "/"
+  }
+ ],
+ "rabbit_version": "3.13.7",
+ "rabbitmq_version": "3.13.7",
+ "topic_permissions": [],
+ "users": [
+  {
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "limits": {},
+   "name": "svc",
+   "password_hash": "SENTINEL-HASH-svc-XXXXXXXXXXXXXXXXXXXXXXXXXX",
+   "tags": [
+    "management",
+    "policymaker"
+   ]
+  }
+ ],
+ "vhosts": [
+  {
+   "description": "Default virtual host",
+   "metadata": {
+    "description": "Default virtual host",
+    "tags": []
+   },
+   "name": "/",
+   "tags": []
+  }
+ ]
+}
