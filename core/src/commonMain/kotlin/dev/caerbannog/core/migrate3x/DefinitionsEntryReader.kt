@@ -88,7 +88,8 @@ private fun JsonElement.toArgument(section: String, level: Int): ArgumentValue =
  */
 private fun JsonPrimitive.toScalarArgument(section: String): ArgumentValue = when {
     isString -> ArgumentValue.Text(content)
-    booleanOrNull != null -> ArgumentValue.Flag(content == "true")
+    content == "true" -> ArgumentValue.Flag(true)
+    content == "false" -> ArgumentValue.Flag(false)
     else -> content.toLongOrNull()?.let { ArgumentValue.Whole(it) }
         ?: ArgumentValue.Decimal(content.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw MalformedSectionException(section))
 }

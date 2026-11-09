@@ -37,8 +37,6 @@ sealed interface DefinitionsParseResult {
 /** Reads the text of a RabbitMQ 3.x or 4.x definitions export into a [DefinitionsDocument]. Pure; never throws for bad input. */
 object DefinitionsParser {
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     private val KNOWN_SECTIONS = setOf(
         "queues", "exchanges", "bindings", "policies", "parameters", "users", "vhosts",
         "permissions", "topic_permissions", "rabbit_version", "rabbitmq_version",
@@ -47,7 +45,7 @@ object DefinitionsParser {
     fun parse(text: String): DefinitionsParseResult {
         JsonNestingScan.findTooDeep(text)?.let { return rejectTooDeep(it) }
         val root = try {
-            json.parseToJsonElement(text)
+            Json.parseToJsonElement(text)
         } catch (_: SerializationException) {
             return reject(DefinitionsRejection.NotJson)
         } catch (_: IllegalArgumentException) {
