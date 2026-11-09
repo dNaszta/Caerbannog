@@ -37,6 +37,14 @@ class DefinitionsParserNonJsonLiteralTest {
         assertFalse(rejected.toString().contains("SENTINEL-WORD"), "the rejection must not quote the input")
     }
 
+    @org.junit.jupiter.api.Test
+    fun `a capitalised True in an argument never becomes false`() {
+        val result = DefinitionsParser.parse("{\"queues\":[{\"name\":\"a\"," + queue + ",\"arguments\":{\"x\":True}}]}")
+        val value = (result as? DefinitionsParseResult.Parsed)?.document?.queues?.single()?.arguments?.get("x")
+        // Either rejected (preferred: not valid JSON) or Flag(true); Flag(false) silently inverts the value.
+        org.junit.jupiter.api.Assertions.assertTrue(result is DefinitionsParseResult.Rejected || value == ArgumentValue.Flag(true), "True became $value")
+    }
+
     private companion object {
         const val LITERAL_QUEUE = """"vhost":"/","durable":true,"auto_delete":false"""
     }
