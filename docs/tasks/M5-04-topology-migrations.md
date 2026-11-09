@@ -37,7 +37,7 @@ Implement topology migrations execution, history tracking, dry-run, export/impor
 - `desktopApp`:
   - Wire `MigrationsScreen` and activate navigation destination.
 - `mcp-server`:
-  - Expose `caerbannog_list_migrations`, `caerbannog_dry_run_migration`, `caerbannog_apply_migrations`.
+  - (Superseded 2026-11-09, owner decision) Not built here. The three tools once listed (`caerbannog_list_migrations`, `caerbannog_dry_run_migration`, `caerbannog_apply_migrations`) are replaced by two READ-ONLY tools, `caerbannog_list_migrations` and `caerbannog_dry_run_migration`, built in `M5-09`; there is no apply tool: applying stays a human action in the app.
 - `acceptance-tests`:
   - BDD runner and steps for `10_topology_migrations.feature`.
 

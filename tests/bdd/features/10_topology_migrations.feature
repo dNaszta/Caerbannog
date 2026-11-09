@@ -152,40 +152,80 @@ Feature: Topology migrations
     Then the broker reports "x-delivery-limit" 5 as a number on the queue
     And the exchange, the binding, the policy with its apply-to and priority and the operator policy exist as declared
 
-  # ---- M5-08: real execution, persistence and conflicts (the fake-broker scenarios use the real runner with fake HTTP) ----
+  # ---- M5-08: real execution, rerun safety, persistence and the migrations folder ----
+  # Sub-tags: @m5-08a executor, conflicts, rerun (core + data-rabbit, in-memory repositories, fake HTTP);
+  # @m5-08b persistence and the migrations folder (real files in temp folders, fake chooser);
+  # @m5-08c desktop wiring and the Migrations screen states. Owner decisions 2026-11-09: a failing action stops the
+  # migration and it is not recorded; a rerun is safe by design; the user chooses the migrations folder.
 
-  @m5-08 @fake-broker
-  Scenario: Applied migrations and files survive a restart
-    Given the migration "0001" was imported and applied to "uat-eu"
-    When the app is restarted
-    Then "0001" is listed and shown as applied for "uat-eu"
-    And its file on disk holds exactly the imported text
+  @m5-08 @m5-08a @fake-broker @negative
+  Scenario: A failing action stops the migration
+    Given a pending migration "0003" with three actions whose second action is refused by the broker
+    When I apply "0003"
+    Then the first action was applied and the third action was never sent
+    And the message names the second action and a fixed reason, not the broker's text
+    And "0003" is not recorded as applied
 
-  @m5-08 @fake-broker @negative
+  @m5-08 @m5-08a @fake-broker
+  Scenario: A rerun after a failure finishes the migration
+    Given a pending migration "0003" with three actions whose second action was refused by the broker in the first run
+    And the broker no longer refuses it
+    When I apply "0003" again
+    Then the first action changes nothing on the broker
+    And the second and third actions are applied
+    And "0003" is recorded as applied
+
+  @m5-08 @m5-08a @fake-broker
+  Scenario: A rerun after a success changes nothing
+    Given a migration that declares a queue, an exchange, a binding and a policy was applied
+    When its actions run again
+    Then the broker topology is unchanged
+    And no policy request changed anything and no request deleted anything
+
+  @m5-08 @m5-08a @fake-broker @negative
+  Scenario: A rerun when the broker changed in between is a conflict
+    Given a pending migration "0003" that declares the quorum queues "orders" and "jobs"
+    And the first run failed at "jobs"
+    And someone declared "orders" with other arguments in the meantime
+    When I apply "0003" again
+    Then the apply stops at "orders" and says it exists with different settings
+    And "orders" on the broker is unchanged
+    And "0003" is not recorded as applied
+
+  @m5-08 @m5-08a @fake-broker @negative
   Scenario: A queue that exists with other arguments is a conflict
     Given the broker has the quorum queue "orders" with "x-delivery-limit" 3
     And a pending migration declares the quorum queue "orders" with "x-delivery-limit" 5
     When I apply the pending migrations
     Then the apply stops and says "orders" exists with different settings
     And "orders" on the broker is unchanged
+    And no request deleted or recreated anything
     And the migration is not recorded as applied
 
-  @m5-08 @fake-broker @negative
+  @m5-08 @m5-08a @fake-broker @negative
   Scenario: A policy that exists with other settings is a conflict, never overwritten
     Given the broker has the policy "limits" on "^orders" with "max-length" 500
     And a pending migration declares the policy "limits" on "^orders" with "max-length" 1000
     When I apply the pending migrations
     Then the apply stops and says "limits" exists with different settings
     And the policy "limits" on the broker still has "max-length" 500
+    And no policy was written
 
-  @m5-08 @fake-broker
+  @m5-08 @m5-08a @fake-broker
   Scenario: A policy that exists with the same settings is a no-op
     Given the broker has the policy "limits" on "^orders" with "max-length" 500
     And a pending migration declares the policy "limits" on "^orders" with "max-length" 500
     When I apply the pending migrations
     Then the migration is recorded as applied and no policy request changed anything
 
-  @m5-08 @fake-broker @negative
+  @m5-08 @m5-08a @fake-broker
+  Scenario: Deleting something that is already gone is a no-op
+    Given a pending migration that deletes the queue "old" and the connection has the level "Full control"
+    And the broker has no queue "old"
+    When I apply the pending migrations
+    Then the migration is recorded as applied
+
+  @m5-08 @m5-08a @fake-broker @negative
   Scenario: Applying reads back every declared queue
     Given a pending migration that declares the quorum queues "orders" and "jobs"
     And the broker silently does not create "jobs"
@@ -193,20 +233,82 @@ Feature: Topology migrations
     Then the apply stops and says "jobs" was not found after it was declared
     And the migration is not recorded as applied
 
-  @m5-08 @fake-broker @negative
+  @m5-08 @m5-08a @fake-broker @negative
   Scenario: A migration for another virtual host is blocked
     Given a pending migration whose actions belong to the virtual host "/orders"
     And the connection "uat-eu" is for the virtual host "/"
     When I open the migrations screen
     Then the dry run says the actions belong to another virtual host and "Apply pending" is disabled
 
-  @m5-08 @fake-broker @negative
-  Scenario: The topology control level of the connection is honoured
-    Given the connection "uat-eu" has the topology control level "Read-only" although the broker would allow changes
-    When I open the migrations screen
-    Then "Apply pending" is disabled and the reason says the level is Read-only
+  @m5-08 @m5-08a @fake-broker @negative
+  Scenario: A migration that declares and deletes the same thing is refused
+    Given a migration file that declares the queue "orders" and also deletes the queue "orders"
+    When I import it
+    Then the import is refused and the message says the file declares and deletes "orders" and must be split into two migrations
 
-  @m5-08 @fake-broker @negative
+  @m5-08 @m5-08a @fake-broker @negative
+  Scenario: An export that cannot read the broker writes no file
+    Given the broker refuses to list the queues of "/" for this user
+    When I export the current topology
+    Then I am told the topology could not be read and no migration file was written
+
+  @m5-08 @m5-08a @fake-broker
+  Scenario: Exporting the topology reads every page
+    Given the broker has 150 queues in "/"
+    When I export the current topology
+    Then the new migration declares all 150 queues
+
+  @m5-08 @m5-08b @fake-broker
+  Scenario: Applied migrations and files survive a restart
+    Given the migrations folder is "/work/migrations" and the migration "0001" was imported and applied to "uat-eu"
+    When the app is restarted
+    Then "0001" is listed and shown as applied for "uat-eu"
+    And its file in the folder holds exactly the imported text
+
+  @m5-08 @m5-08b @fake-broker
+  Scenario: The first visit to the Migrations screen asks for the folder
+    Given no migrations folder has been chosen on this machine
+    When I open the migrations screen
+    Then I am asked to choose the folder where my migration files live
+    And no file is read or written and "Apply pending", "Import" and "Export" are disabled
+
+  @m5-08 @m5-08b @fake-broker
+  Scenario: The chosen folder is remembered for every connection
+    Given I chose the folder "/work/migrations" on the Migrations screen of "uat-eu"
+    When I open the migrations screen of "prod-eu" after a restart
+    Then the files of "/work/migrations" are listed
+    And I am not asked for a folder again
+
+  @m5-08 @m5-08b @fake-broker
+  Scenario: The history stays with the connection, not with the folder
+    Given "0001" is applied to "uat-eu" and I choose another folder that also holds "0001" with the same content
+    When I open the migrations screen of "uat-eu"
+    Then "0001" is shown as applied
+    And the history is kept in the app's own data, not in the chosen folder
+
+  @m5-08 @m5-08b @fake-broker @negative
+  Scenario: A folder that has disappeared is reported and nothing is created
+    Given the chosen folder "/work/migrations" no longer exists
+    When I open the migrations screen
+    Then I see the path and that the folder does not exist
+    And I can try again or choose another folder
+    And the folder was not created and "Apply pending" is disabled
+
+  @m5-08 @m5-08b @fake-broker @negative
+  Scenario: A folder that cannot be read is reported and nothing is changed
+    Given the chosen folder cannot be read
+    When I open the migrations screen
+    Then I see the path and that the folder cannot be read
+    And no file was written
+
+  @m5-08 @m5-08b @fake-broker @negative
+  Scenario: A read-only folder can be read but not written
+    Given the chosen folder can be read but not written
+    When I open the migrations screen
+    Then its migrations are listed
+    And "Import" and "Export" are disabled and the reason says the folder is read-only
+
+  @m5-08 @m5-08b @fake-broker @negative
   Scenario: An unreadable history file blocks applying and is kept
     Given the applied-migrations history file on disk is not valid JSON
     When I open the migrations screen
@@ -214,28 +316,66 @@ Feature: Topology migrations
     And "Apply pending" is disabled
     And the history file still has exactly its original bytes
 
-  @m5-08 @fake-broker @negative
-  Scenario: A migration file on disk that is not valid is listed as invalid, not deleted
+  @m5-08 @m5-08b @fake-broker
+  Scenario: Starting with an empty history keeps the old file under a new name
+    Given the applied-migrations history file on disk is not valid JSON
+    And the clock says 2026-11-09 14:30:05
+    When I choose "Start with an empty history"
+    Then I am asked "Move migration-history.json to migration-history.json.unreadable-20261109-143005 and start with an empty history? The old file is kept."
+    When I confirm
+    Then the old file exists under the new name with its original bytes and every migration is pending
+
+  @m5-08 @m5-08b @fake-broker @negative
+  Scenario: A migration file in the folder that is not valid is listed as invalid, not deleted
     Given the migrations folder holds a file "0007.json" that is not valid JSON
     When I open the migrations screen
     Then "0007.json" is listed as invalid with the reason
     And the file still exists unchanged
 
-  @m5-08 @fake-broker
-  Scenario: Exporting the topology reads every page
-    Given the broker has 150 queues in "/"
-    When I export the current topology
-    Then the new migration declares all 150 queues
+  @m5-08 @m5-08b @fake-broker @negative
+  Scenario Outline: A version that could escape the folder is refused
+    When I import a migration file whose version is <version>
+    Then the import is refused and nothing is written outside the migrations folder
 
-  @negative @needs-decision @fake-broker
-  # Open product decision: behavior when an action fails half-way through a migration.
-  # Proposed: stop, report the failing action, do not record the migration as applied.
-  Scenario: A failing action stops the migration
+    Examples:
+      | version      |
+      | "../0001"    |
+      | "a/b"        |
+      | "0001.json"  |
+      | NaN          |
+      | 1e3          |
+
+  @m5-08 @m5-08c @fake-broker @negative
+  Scenario: The topology control level of the connection is honoured
+    Given the connection "uat-eu" has the topology control level "Read-only" although the broker would allow changes
+    When I open the migrations screen
+    Then "Apply pending" is disabled and the reason says the level is Read-only
+
+  # Needs the 3.x detection of M8-02: that task builds the glue; until then the suite excludes @m8-02.
+  @m5-08 @m8-02 @fake-broker @negative
+  Scenario: A 3.x source connection cannot apply migrations
+    Given the connection "legacy-eu" is a RabbitMQ 3.x migration source
+    When I open the migrations screen
+    Then "Apply pending" is disabled and no executor exists for this connection
+
+  @m5-08 @m5-08c @fake-broker
+  Scenario: A failed apply shows which action failed and why
     Given a pending migration "0003" whose second action is refused by the broker
-    When I apply "0003"
-    Then the migration stops at the second action
-    And the message names the failing action and the broker's reason
-    And "0003" is not recorded as applied
+    When I apply "0003" on the screen
+    Then the screen shows that action 2 of 3 failed with a fixed reason and that "0003" was not recorded
+
+  @m5-08 @m5-08c @fake-broker
+  Scenario: A conflict names the resource
+    Given the broker has the quorum queue "orders" with "x-delivery-limit" 3
+    And a pending migration declares the quorum queue "orders" with "x-delivery-limit" 5
+    When I apply the pending migrations on the screen
+    Then the screen says "orders" exists with different settings and nothing was changed
+
+  @m5-08 @m5-08c @fake-broker
+  Scenario: The folder can be changed at any time
+    Given a folder is chosen
+    When I choose "Change folder" and pick another folder
+    Then the files of the new folder are listed and the history is unchanged
 
   @fake-broker
   Scenario: Editing an applied migration is flagged
@@ -244,13 +384,13 @@ Feature: Topology migrations
     Then the app warns that an applied migration was modified
     And it does not apply the changed file again
 
-  @broker @m5-08
+  @broker @m5-08 @m5-08a
   Scenario: Apply a migration to a real broker
     Given a real broker and a migration that declares the quorum queue "orders" and binds it to the exchange "events" with routing key "order.created"
     When I apply the pending migrations
     Then the broker has a quorum queue "orders" bound to "events" with routing key "order.created"
 
-  @broker @m5-08 @gate-M5
+  @broker @m5-08 @m5-08a @gate-M5
   Scenario: Exported topology can be applied to an empty broker
     Given a real broker A with queues, exchanges and bindings
     And a second empty real broker B
