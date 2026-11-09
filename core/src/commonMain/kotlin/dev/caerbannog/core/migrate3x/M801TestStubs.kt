@@ -12,6 +12,9 @@ package dev.caerbannog.core.migrate3x
 
 const val MAX_DEFINITIONS_FILE_BYTES: Long = 64L * 1024 * 1024
 
+/** Nesting limit of Items/Table in an ArgumentValue (top-level map is level 0). */
+const val MAX_ARGUMENT_DEPTH: Int = 32
+
 // ---- ArgumentValue ----
 sealed interface ArgumentValue {
     data class Text(val value: String) : ArgumentValue

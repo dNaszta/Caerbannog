@@ -50,6 +50,7 @@ class SecretValueTest {
     fun `it is not a data class and has no copy`() {
         // no kotlin-reflect in core (no build change allowed): a data class would have copy, componentN and a content toString.
         assertTrue(SecretValue::class.java.declaredMethods.none { it.name == "copy" || it.name.startsWith("component") })
+        assertTrue(SecretValue::class.java.declaredMethods.any { it.name == "toString" && it.parameterCount == 0 })
         assertTrue(SecretValue::class.java.methods.none { it.name == "copy" || it.name.startsWith("component") })
         assertFalse(CharSequence::class.java.isAssignableFrom(SecretValue::class.java))
         assertFalse(Comparable::class.java.isAssignableFrom(SecretValue::class.java))

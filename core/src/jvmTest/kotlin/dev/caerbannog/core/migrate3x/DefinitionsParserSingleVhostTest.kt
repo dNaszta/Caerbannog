@@ -103,7 +103,7 @@ class DefinitionsParserSingleVhostTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["", "   ", "a\u0000b", "\t", "\n", "a\tb", "x\u007F"])
+    @ValueSource(strings = ["", "   ", "a\u0000b", "\t", "\n", "a\tb", "x\u007F", "\u0085", "a\u0085b"])
     fun `a name that cannot be used is refused and does not echo the name`(name: String) {
         val draft = needsVhost(vhostV1)
         val result = draft.assignVirtualHost(name)
