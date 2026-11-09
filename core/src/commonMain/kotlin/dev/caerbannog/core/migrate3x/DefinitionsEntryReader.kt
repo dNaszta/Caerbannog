@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.json.ArgumentValueJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -59,37 +61,11 @@ internal class EntryReader(val section: String, private val json: JsonObject) {
     /** An object of typed values, empty when absent. */
     fun arguments(key: String): Map<String, ArgumentValue> = when (val value = present(key)) {
         null -> emptyMap()
-        is JsonObject -> value.mapValues { (_, element) -> element.toArgument(section, level = 1) }
+        is JsonObject -> value.mapValues { (_, element) -> ArgumentValueJson.parse(element) ?: malformed() }
         else -> malformed()
     }
 
     fun malformed(): Nothing = throw MalformedSectionException(section)
 
     private fun present(key: String): JsonElement? = json[key]?.takeUnless { it is JsonNull }
-}
-
-/** Converts a JSON value; [level] is the nesting level of a list or table (a container directly in an argument map is level 1). */
-private fun JsonElement.toArgument(section: String, level: Int): ArgumentValue = when (this) {
-    is JsonNull -> ArgumentValue.Nothing
-    is JsonPrimitive -> toScalarArgument(section)
-    is JsonArray -> {
-        if (level > MAX_ARGUMENT_DEPTH) throw MalformedSectionException(section)
-        ArgumentValue.Items(map { it.toArgument(section, level + 1) })
-    }
-    is JsonObject -> {
-        if (level > MAX_ARGUMENT_DEPTH) throw MalformedSectionException(section)
-        ArgumentValue.Table(mapValues { (_, element) -> element.toArgument(section, level + 1) })
-    }
-}
-
-/**
- * The tree reader also accepts bare words (`abc`, `NaN`) as non-string primitives, so a number must be checked:
- * anything that is not a finite number makes the section malformed. No non-finite [ArgumentValue.Decimal] can exist.
- */
-private fun JsonPrimitive.toScalarArgument(section: String): ArgumentValue = when {
-    isString -> ArgumentValue.Text(content)
-    content == "true" -> ArgumentValue.Flag(true)
-    content == "false" -> ArgumentValue.Flag(false)
-    else -> content.toLongOrNull()?.let { ArgumentValue.Whole(it) }
-        ?: ArgumentValue.Decimal(content.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw MalformedSectionException(section))
 }

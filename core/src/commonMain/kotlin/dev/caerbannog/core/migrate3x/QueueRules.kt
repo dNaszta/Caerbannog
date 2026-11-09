@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+
 private const val MAX_PRIORITY = "x-max-priority"
 private const val QUEUE_VERSION = "x-queue-version"
 private val maxInMemoryArguments = listOf("x-max-in-memory-length", "x-max-in-memory-bytes")

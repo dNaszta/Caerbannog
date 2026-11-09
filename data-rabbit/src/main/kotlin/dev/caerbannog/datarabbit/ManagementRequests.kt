@@ -72,10 +72,10 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M7-08: non-destructive queue message inspection endpoint (`POST /api/queues/{vhost}/{name}/get`). */
     fun getQueueMessages(vhost: String, name: String): String = "$base/api/queues/${encode(vhost)}/${encode(name)}/get"
 
-    // URLEncoder makes a space "+", which a path segment does not understand.
-    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
-
     companion object {
+        /** One URL path segment; URLEncoder makes a space "+", which a path segment does not understand. */
+        fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
+
         private const val QUEUE_COLUMNS = "name,type,messages_ready,messages_unacknowledged,consumers,leader,members,online,policy,state"
         private const val LIST_COLUMNS =
             "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"

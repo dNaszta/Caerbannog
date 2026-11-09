@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+
 /** Where a [DefinitionsDocument] came from. */
 sealed interface DefinitionsOrigin {
     /** A whole-broker export. */

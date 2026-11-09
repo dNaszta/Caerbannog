@@ -1,0 +1,71 @@
+{
+    "version": "0001",
+    "description": "Exported",
+    "up": [
+        {
+            "action": "declareQueue",
+            "name": "orders",
+            "type": "quorum"
+        },
+        {
+            "action": "declareQueue",
+            "vhost": "uat",
+            "name": "scratch",
+            "type": "classic",
+            "durable": false
+        },
+        {
+            "action": "declareStream",
+            "name": "audit"
+        },
+        {
+            "action": "declareExchange",
+            "name": "events",
+            "type": "topic"
+        },
+        {
+            "action": "declareExchange",
+            "name": "tmp.x",
+            "type": "fanout",
+            "durable": false
+        },
+        {
+            "action": "declareBinding",
+            "exchange": "events",
+            "queue": "orders",
+            "routingKey": "order.created"
+        },
+        {
+            "action": "declareBinding",
+            "exchange": "events",
+            "queue": "audit"
+        },
+        {
+            "action": "declarePolicy",
+            "name": "limits",
+            "pattern": "^orders"
+        },
+        {
+            "action": "deleteBinding",
+            "exchange": "events",
+            "queue": "old",
+            "routingKey": "x"
+        },
+        {
+            "action": "deleteQueue",
+            "name": "old"
+        },
+        {
+            "action": "deleteExchange",
+            "name": "old.x"
+        },
+        {
+            "action": "deleteStream",
+            "name": "old.stream"
+        },
+        {
+            "action": "deletePolicy",
+            "name": "old-policy"
+        }
+    ]
+}

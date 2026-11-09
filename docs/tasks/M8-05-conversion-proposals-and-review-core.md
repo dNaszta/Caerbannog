@@ -1,6 +1,6 @@
 # Conversion proposals, review state and migration generation
 
-Milestone: M8    Depends on: M8-03, M8-04, M8-12    Size: L
+Milestone: M8    Depends on: M8-03, M8-04, M8-12 (apply half also M5-08)    Size: L
 
 ## Goal
 A `ConversionReview` takes a report, lets each finding be accepted, changed or skipped, and generates one ordinary topology migration per source virtual host (P3) and one access migration (vhosts, users, permissions; P10) once everything is decided.
@@ -26,6 +26,8 @@ Review states in `M8-06`.
 No tool: the point is a human decision per item (spec MCP evaluation). A generated migration is an ordinary file, usable by the migration tools.
 
 ## Open points
+A 3.x entity named `.` or `..` cannot be written into a migration file (the parser refuses such names, M8-04 review): the generator reports it as a manual finding instead of writing it (a name of three or more dots can: measured on a real 4.x broker).
+Found in M8-04 step 1 (2026-11-09): there is NO real migration executor yet. The desktop app wires a no-op executor and in-memory file and history repositories (`desktopApp/.../Main.kt`, `MigrationsWindowContent`), `ManagementHttp` has no PUT or DELETE, and the scenarios "Applying a generated migration reads back every declared queue" and "Apply a migration to a real broker" need a real executor with read-back. The proposed task `M5-08-real-migration-execution` (see `M8-04`) must land before the apply half of this task and before the M8-11 gate; generation itself (this task) works on files and the fake executor.
 Report size (M8-03 review, 2026-11-09): a definitions file with 60,000 classic queues gives about 240,000 findings (about 4 per classic queue). Keep review decisions in maps keyed by `Finding.id` (unique inside a report, duplicates get `#2`, `#3`), never one object per finding with its own state flows, and never build the whole report as one JSON string for the review.
 
 P2, P3 and P10 are decided (2026-11-09). P17 (per-vhost export, owner 2026-11-09): the generator takes a `DefinitionsDocument` only (an `UnassignedDefinitions` draft from `M8-01` does not compile). For a document with `origin = SingleVirtualHost(name)` the access migration is not generated and the result says why ("This file is an export of one virtual host and holds no users, virtual hosts or permissions; the virtual host \"<name>\" must already exist on the 4.x broker"); the topology migration uses the assigned name as its virtual host. A scenario for this is added with `M8-05`. The review state and any log or `toString` never include a hash.

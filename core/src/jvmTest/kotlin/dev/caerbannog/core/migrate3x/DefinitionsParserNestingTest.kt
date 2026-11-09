@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.json.MAX_ARGUMENT_DEPTH
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

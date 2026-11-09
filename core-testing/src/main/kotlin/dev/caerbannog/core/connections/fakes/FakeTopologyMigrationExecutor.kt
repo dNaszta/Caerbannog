@@ -3,7 +3,6 @@ package dev.caerbannog.core.connections.fakes
 import dev.caerbannog.core.migrations.ActionResult
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
-import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueueRow
@@ -18,6 +17,14 @@ class FakeTopologyMigrationExecutor(
 ) : TopologyMigrationExecutor {
 
     val executedActions = mutableListOf<MigrationAction>()
+
+    // M8-04: what the broker would hold, keyed by (vhost, name), so tests can assert typed values. Read-only views.
+    private val queues = linkedMapOf<Pair<String, String>, MigrationAction.DeclareQueue>()
+    private val policies = linkedMapOf<Pair<String, String>, MigrationAction.DeclarePolicy>()
+    private val operatorPolicies = linkedMapOf<Pair<String, String>, MigrationAction.DeclareOperatorPolicy>()
+    val declaredQueues: Map<Pair<String, String>, MigrationAction.DeclareQueue> get() = queues
+    val declaredPolicies: Map<Pair<String, String>, MigrationAction.DeclarePolicy> get() = policies
+    val declaredOperatorPolicies: Map<Pair<String, String>, MigrationAction.DeclareOperatorPolicy> get() = operatorPolicies
     var failingActionIndex: Int? = null
     var failingActionName: String? = null
     var failureReason: String = "Action refused by broker"
@@ -33,6 +40,7 @@ class FakeTopologyMigrationExecutor(
         // Apply changes to fake catalogs idempotently
         when (action) {
             is MigrationAction.DeclareQueue -> {
+                queues[action.vhost to action.name] = action
                 topologyCatalog?.addQueue(
                     QueueRow(
                         name = action.name,
@@ -61,8 +69,8 @@ class FakeTopologyMigrationExecutor(
                         vhost = action.vhost,
                         type = action.type,
                         durable = action.durable,
-                        autoDelete = false,
-                        internal = false,
+                        autoDelete = action.autoDelete,
+                        internal = action.internal,
                     )
                 )
             }
@@ -77,7 +85,7 @@ class FakeTopologyMigrationExecutor(
                         source = action.exchange,
                         vhost = action.vhost,
                         destination = action.queue,
-                        destinationType = BindingDestinationType.QUEUE,
+                        destinationType = action.destinationType,
                         routingKey = action.routingKey,
                     )
                 )
@@ -97,10 +105,9 @@ class FakeTopologyMigrationExecutor(
                 streamCatalog?.deleteStream(action.name, action.vhost)
             }
 
-            is MigrationAction.DeclarePolicy,
-            is MigrationAction.DeletePolicy -> {
-                // Policies tracked as no-ops in fake
-            }
+            is MigrationAction.DeclarePolicy -> policies[action.vhost to action.name] = action
+            is MigrationAction.DeclareOperatorPolicy -> operatorPolicies[action.vhost to action.name] = action
+            is MigrationAction.DeletePolicy -> policies.remove(action.vhost to action.name)
         }
 
         return ActionResult.Success
@@ -108,6 +115,7 @@ class FakeTopologyMigrationExecutor(
 
     fun clear() {
         executedActions.clear()
+        queues.clear(); policies.clear(); operatorPolicies.clear()
         failingActionIndex = null
         failingActionName = null
     }

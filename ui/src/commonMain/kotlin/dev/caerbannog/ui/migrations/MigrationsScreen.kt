@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -141,6 +142,7 @@ fun MigrationsScreen(
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(12.dp)
+                        .semantics(mergeDescendants = true) {}
                         .testTag("migrations:errorBanner"),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -515,6 +517,14 @@ private fun DryRunActionRow(
                 text = actionDryRun.action.description,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            actionDryRun.action.detail?.let { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("actionDetail:$index"),
+                )
+            }
             val reason = actionDryRun.reason
             if (reason != null) {
                 Text(

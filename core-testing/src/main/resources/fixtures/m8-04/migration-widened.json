@@ -1,0 +1,16 @@
+{
+  "version": "0002",
+  "description": "Every new key of M8-04",
+  "up": [
+    { "action": "declareQueue", "name": "orders", "type": "quorum", "autoDelete": true,
+      "arguments": { "x-delivery-limit": 5, "x-message-ttl": 60000, "x-dead-letter-exchange": "dlx", "x-flag": true, "x-none": null, "x-ratio": 0.5, "x-list": [1, "a"], "x-obj": { "k": 2 } } },
+    { "action": "declareExchange", "name": "events.x", "type": "topic", "durable": false, "autoDelete": true, "internal": true,
+      "arguments": { "alternate-exchange": "ae" } },
+    { "action": "declareBinding", "exchange": "ex-e2e", "queue": "dlx", "destinationType": "exchange", "routingKey": "dead",
+      "arguments": { "x-match": "all" } },
+    { "action": "declarePolicy", "name": "limits", "pattern": "^orders", "applyTo": "quorum_queues", "priority": 7,
+      "definition": { "max-length": 1000, "overflow": "reject-publish" } },
+    { "action": "declareOperatorPolicy", "name": "op-limit", "pattern": ".*", "applyTo": "queues",
+      "definition": { "max-length": 100000 } }
+  ]
+}

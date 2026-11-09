@@ -1,5 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
+
 /** How serious a finding is. JSON: `blocker`, `warning`, `info`. */
 enum class Severity { Blocker, Warning, Info }
 

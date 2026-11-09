@@ -46,6 +46,8 @@ tests/bdd/
 | `@broker-3x` | M8 only: needs a real RabbitMQ 3.13 broker (`rabbitmq:3.13-management`) and, for the gate, a 4.x broker on the same container network. 3.x is a read-only migration source; no other feature is tested on 3.x. Run with `@broker` in the separate broker job |
 | `@m8-01` | The scenarios of task M8-01 (definitions model and parser); the suite `RunMigrate3xDefinitionsAcceptanceTest` selects `16_migrate_from_3x.feature` and filters `@m8-01 and @fake-broker`. Later M8 tasks add their own `@m8-NN` tag the same way |
 | `@m8-03` | The scenarios of task M8-03 (compatibility analyzer) in `16` and `18`; the suite `RunMigrate3xAnalyzerAcceptanceTest` selects both files and filters `@m8-03 and @fake-broker`. The steps that say "analyse the connection" run the analyzer on fake live facts; M8-02 later rebinds them to the live fetch without editing the scenarios |
+| `@m8-04` | The scenarios of task M8-04 (widened migration format) in `10` and `16`; `10` runs in the topology migrations suite, the shovel scenario of `16` in the suite `RunMigrate3xMigrationModelAcceptanceTest` (filter `@m8-04 and @fake-broker`); the `@broker` one runs as `RealBrokerM8MigrationRequestsTest` |
+| `@m5-08` | The scenarios of task M5-08 (real migration execution, persistence, conflicts) in `10`; they will run in the topology migrations suite (`@fake-broker`), but until M5-08 builds the glue `RunTopologyMigrationsAcceptanceTest` excludes them (`not @m5-08`; M5-08 removes the exclusion); the `@broker` ones as `RealBrokerM5MigrationTest` |
 | `@migrate-3x`, `@shovel`, `@access`, `@mcp` | M8 scenarios (`16`, `17`); `@shovel` marks forwarding with a broker-side dynamic Shovel; `@mcp` an MCP tool scenario |
 | `@negative` | Checks a refusal, an error or a safety rule |
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
@@ -82,7 +84,7 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 07 payload viewer and filter | Goals (viewer, filter), UX rules | M4 |
 | 08 publish test message | Goals (publish), Screens | M5 |
 | 09 topology and queues | Goals (quorum queues), Screens (Topology) | M2, M5 |
-| 10 topology migrations | Topology migrations and permission guardrails | M5 |
+| 10 topology migrations | Topology migrations and permission guardrails | M5, M8-04 (widened format), M5-08 (real execution) |
 | 11 global search | Goals (global search), Screens | M2, M3 |
 | 12 stream management | Goals (publish and manage), UX rules | M5 |
 | 13 connection lifecycle | Connection lifecycle (decisions D1, D2, D6, D7) | M2 |

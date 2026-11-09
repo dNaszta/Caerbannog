@@ -1,6 +1,6 @@
 # Access migration: vhosts, users, permissions in the migration format
 
-Milestone: M8    Depends on: M8-00 (S-M, S-A, S-B), M8-04    Size: L
+Milestone: M8    Depends on: M8-00 (S-M, S-A, S-B), M8-04 (apply half also M5-08)    Size: L
 
 ## Goal
 The migration format and runner can declare virtual hosts, users (with an exported password hash and tags), permissions and topic permissions, safely: hashes are secret pass-through values, applying needs an administrator and Full control, conflicts never overwrite.
@@ -27,6 +27,8 @@ Dry run rows: "Declare user svc (administrator), password hash hidden". Warning 
 No tool returns a hash; an apply tool (if one exists) refuses migrations with these actions (spec MCP table).
 
 ## Open points
+Depends on `M5-08-real-migration-execution` for its APPLY half (2026-11-09): the desktop app has no real executor today (see `M8-04`). The model, generation and fake-based scenarios of this task do not wait for it; the live apply, read-back and the `@broker` scenarios do.
+
 P10 (V1 exemption and separate file), P11 (`guest`), P12 (unsupported algorithm), P13 (owner-only file) are decided (2026-11-09); S-M answers the algorithm, `guest`, read-back and body shapes.
 
 ## Spike findings (M8-00, 2026-11-09)

@@ -1,5 +1,6 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrate3x.fakes.DefinitionsFixtures
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
