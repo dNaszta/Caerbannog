@@ -5,6 +5,7 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.SecretStore
+import kotlinx.coroutines.delay
 import java.io.IOException
 import java.security.GeneralSecurityException
 import kotlin.coroutines.cancellation.CancellationException
@@ -51,6 +52,7 @@ class RabbitMqConnectionGateway(
             return OpenResult.Failed(failure)
         }
         val catalog = ManagementStreamCatalog(http, requests)
+        val manager = RabbitMqStreamManager(environments)
         return OpenResult.Opened(
             RabbitMqHeldConnection(
                 catalog = catalog,
@@ -58,12 +60,14 @@ class RabbitMqConnectionGateway(
                 topology = ManagementTopologyCatalog(http, requests),
                 messages = RabbitMqStreamMessageReader(environments, catalog),
                 publisher = RabbitMqMessagePublisher(environments, http, requests),
-                manager = RabbitMqStreamManager(environments),
+                manager = manager,
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),
                 mqttPublisher = RabbitMqMqttPublisher(profile, password, transport),
                 queueInspector = ManagementQueueMessageInspector(http, requests),
+                // TODO(M8-02): a 3.x source keeps no executor; until the detection exists every connection gets one.
+                migrationExecutor = ManagementTopologyMigrationExecutor(http, requests, manager) { delay(it) },
             ),
         )
     }
