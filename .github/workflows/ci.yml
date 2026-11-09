@@ -48,8 +48,15 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      # Some gate tests (RealBrokerM5GateTest, RealBrokerMqttIntegrationTest) talk to the local dev broker on localhost,
+      # as `task dev:up` starts it; the other broker tests start their own Testcontainers broker.
+      - name: Start the dev broker
+        run: docker compose -f dev/broker/docker-compose.yml up -d --wait
       - name: Run broker tests
         run: ./gradlew :data-rabbit:brokerTest
+      - name: Stop the dev broker
+        if: always()
+        run: docker compose -f dev/broker/docker-compose.yml down -v
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
