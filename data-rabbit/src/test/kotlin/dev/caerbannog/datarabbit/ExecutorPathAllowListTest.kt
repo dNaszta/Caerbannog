@@ -79,6 +79,20 @@ class ExecutorPathAllowListTest {
     }
 
     @Test
+    fun `a key outside A-Za-z0-9 dot underscore tilde star plus dash and percent-hex is never sent, character by character`() {
+        val allowed = (('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('.', '_', '~', '*', '+', '-')).toSet()
+        for (code in 0..0x2FF) {
+            val c = code.toChar()
+            val allowedHere = c in allowed
+            val path = "/api/bindings/%2F/e/events/q/orders/k${c}k"
+            if (c == '.') continue // "k.k" is fine, a lone dot segment is tested elsewhere
+            assertEquals(allowedHere, ExecutorPathAllowList.isAllowed("DELETE", path), "character U+%04X in the properties key segment".format(code))
+        }
+        assertTrue(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/k%25k%2Bk"))
+        assertFalse(ExecutorPathAllowList.isAllowed("DELETE", "/api/bindings/%2F/e/events/q/orders/k%2"))
+    }
+
+    @Test
     fun `other API areas and wrong verbs are refused`() {
         for ((method, path) in listOf(
             "GET" to "/api/overview", "GET" to "/api/definitions", "POST" to "/api/definitions", "GET" to "/api/users", "PUT" to "/api/users/x",

@@ -143,6 +143,38 @@ class MigrationExecutorBindingDeleteTest {
     }
 
     @Test
+    fun `when another binding vanishes with the target the result is a failure, the run stops and nothing is recorded`() {
+        broker.addBinding("/", "events", "orders", routingKey = "a"); broker.addBinding("/", "events", "orders", routingKey = "b"); broker.addBinding("/", "events", "orders", routingKey = "c")
+        broker.alsoRemovesSibling = true
+        val delete = MigrationAction.DeleteBinding("events", "orders", "a")
+        val after = MigrationAction.DeclareQueue("never-sent")
+        val result = exec(delete)
+        assertEquals("a different binding was removed", M508a.failedReason(result))
+        assertEquals(listOf("GET", "DELETE", "GET"), seen.map { it.method }, "after the failure nothing else may be sent or recreated: ${wire()}")
+        assertEquals(1, present().size, "no binding was recreated: ${present()}")
+
+        // through the runner: the migration stops at the delete, the next action is never sent and the migration is not recorded
+        val b2 = FakeManagementBroker().apply { addExchange("/", "events", "direct"); addQueue("/", "orders"); addBinding("/", "events", "orders", routingKey = "a"); addBinding("/", "events", "orders", routingKey = "b"); alsoRemovesSibling = true }
+        val s2 = mutableListOf<M508a.Seen>()
+        val raw = dev.caerbannog.core.migrations.MigrationParser.exportToJson("0009", "sibling", listOf(delete, after))
+        val file = (dev.caerbannog.core.migrations.MigrationParser.parse(raw) as dev.caerbannog.core.migrations.MigrationValidationResult.Valid).migration
+        val history = dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository()
+        val applied = runBlocking { dev.caerbannog.core.migrations.MigrationRunner(history, M508a.executor(b2, seen = s2)).applyPending("p", listOf(file), true, dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL, "/") }
+        val failed = applied as dev.caerbannog.core.migrations.MigrationApplyResult.ActionFailed
+        assertEquals(1 to 2, failed.index to failed.total)
+        assertEquals("a different binding was removed", failed.reason)
+        assertTrue(runBlocking { history.getAppliedMigrations("p") }.isEmpty(), "the migration was recorded")
+        assertTrue(s2.none { it.path.contains("never-sent") }, s2.map { it.path }.toString())
+    }
+
+    @Test
+    fun `siblings untouched is the success case, already covered by the one-key-at-a-time test above`() {
+        broker.addBinding("/", "events", "orders", routingKey = "a"); broker.addBinding("/", "events", "orders", routingKey = "b")
+        assertEquals(ActionResult.Success, exec(MigrationAction.DeleteBinding("events", "orders", "a")))
+        assertTrue(broker.hasBinding("/", "events", "orders", "b"))
+    }
+
+    @Test
     fun `a delete of a binding never touches another source, destination or an exchange binding`() {
         broker.addExchange("/", "other", "direct"); broker.addQueue("/", "other-q")
         broker.addBinding("/", "events", "orders", routingKey = "k")

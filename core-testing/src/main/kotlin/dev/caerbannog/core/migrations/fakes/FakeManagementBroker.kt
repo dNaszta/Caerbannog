@@ -64,6 +64,9 @@ class FakeManagementBroker {
     var policyWrites: Int = 0
         private set
 
+    /** Fault switch: a binding DELETE also removes another binding between the same source and destination (a broker bug the read-back must notice). */
+    @Volatile var alsoRemovesSibling: Boolean = false
+
     /** When true every call fails like a refused connection (the engine throws an IOException). */
     @Volatile var unreachable: Boolean = false
 
@@ -317,7 +320,7 @@ class FakeManagementBroker {
                 // as "%25" (the properties_key as the broker lists it, escaped once more), never the properties_key verbatim.
                 val key = unquote(s[7].replace("~", ""))
                 val found = between.firstOrNull { it.routingKey == key && it.arguments.isEmpty() }
-                if (found != null) { bindings.remove(found); t("binding.delete.present") } else t("binding.delete.absent")
+                if (found != null) { bindings.remove(found); if (alsoRemovesSibling) between.firstOrNull { it != found }?.let { bindings.remove(it) }; t("binding.delete.present") } else t("binding.delete.absent")
             }
             else -> Reply(405)
         }
