@@ -38,6 +38,15 @@ Feature: Payload viewer and filter
     Then the "JSON" view tells me the body is not valid JSON
     And the "Text" view still shows the body
 
+  @negative @fake-broker
+  Scenario: A body nested ten thousand levels deep does not crash the viewer
+    Given the message at offset 1211 has content type "application/json" and a body of 10000 nested JSON arrays
+    When I select the message at offset 1211
+    Then the "JSON" view tells me the body is nested too deeply to format
+    And the "Text" view still shows the body
+    And the "Hex" view still shows the body
+    And the app is still running
+
   @fake-broker
   Scenario: Very large bodies are capped
     Given the message at offset 1300 has a body larger than the display cap

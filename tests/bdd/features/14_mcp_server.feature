@@ -83,3 +83,10 @@ Feature: Model Context Protocol (MCP) server
     When the client calls MCP tool "caerbannog_publish_mqtt" with profile "dev-local", topic "sensors/temperature" and payload "21.5" and the raw headers argument '["a"]'
     Then the tool result indicates an error "Invalid 'headers'"
     And no MQTT message was published
+
+  @negative
+  Scenario: MCP server answers a request nested ten thousand levels deep with a parse error
+    When the client sends an MCP request whose params are nested 10000 levels deep
+    Then the response is a JSON-RPC error with code -32700
+    And the error message does not contain any part of the request
+    And the server answers the next valid request

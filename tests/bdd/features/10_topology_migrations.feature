@@ -85,6 +85,7 @@ Feature: Topology migrations
       | has no version                       | the file has no version                |
       | repeats the version of another file  | that version already exists            |
       | uses an action the app does not know | which action is not supported          |
+      | is nested ten thousand levels deep   | the file is nested too deep            |
 
   @negative @needs-decision @fake-broker
   # Open product decision: behavior when an action fails half-way through a migration.
