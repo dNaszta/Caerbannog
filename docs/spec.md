@@ -231,6 +231,10 @@ A migration lists the changes to make: streams, super streams, quorum queues, ex
 }
 ```
 
+### Format additions for converted topology (M8-04)
+
+The format grows additively; a file without the new keys parses to the same actions and keeps its checksum (the checksum is computed over the raw text and never over the parsed form). New optional keys, each omitted when it has its default: `declareQueue` `autoDelete` (default false) and `arguments`; `declareExchange` `autoDelete` (false), `internal` (false) and `arguments`; `declareBinding` `destinationType` (`queue` or `exchange`, default `queue`; the destination name stays in `queue`, `destination` is accepted as a synonym) and `arguments`; `declarePolicy` `definition` (object), `applyTo` (`all` default, `queues`, `classic_queues`, `quorum_queues`, `streams`, `exchanges`; only `all` and `queues` are measured, the rest is checked by the M8-04 live test) and `priority` (default 0); a new action `declareOperatorPolicy` with the same keys as a policy (the broker accepts only limit keys there, S-E). Argument and definition values are typed JSON (text, whole number, decimal number, boolean, null, list, object, nested at most 32 levels): numbers stay numbers on the wire. `x-queue-type` is not allowed inside `arguments` (the queue type is the `type` key). No Shovel action exists and none will (a `declareShovel` action is rejected as unknown). Note: before M8-04 the parser ignored an `arguments` or `definition` key; such keys in an old hand-written file now become part of the parsed action, the checksum does not change.
+
 ### Self-constraint level
 
 Each connection profile carries its own `topologyControlLevel`, a ceiling the user sets explicitly for that connection, independent of what the broker would otherwise allow. It defaults to Read-only for every new profile, so a freshly added connection never unlocks topology changes by surprise. Three levels, each strictly containing the one before it:

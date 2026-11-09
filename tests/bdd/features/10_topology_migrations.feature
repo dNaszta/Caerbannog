@@ -86,6 +86,69 @@ Feature: Topology migrations
       | repeats the version of another file  | that version already exists            |
       | uses an action the app does not know | which action is not supported          |
       | is nested ten thousand levels deep   | the file is nested too deep            |
+      | declares a queue type inside the arguments | the queue type belongs in "type"   |
+      | has a policy with an unknown apply-to      | the policy apply-to is not supported |
+      | has a binding with an unknown destination type | the binding destination type must be queue or exchange |
+
+  # ---- M8-04: the format carries what a converted 3.x topology needs (additive; old files unchanged) ----
+
+  @m8-04 @fake-broker
+  Scenario: Queue arguments keep their type
+    Given a migration file that declares the quorum queue "orders" with the arguments "x-delivery-limit" 5, "x-message-ttl" 60000 and "x-dead-letter-exchange" "dlx"
+    When I import it
+    And I apply the pending migrations
+    Then the broker received the queue "orders" with "x-delivery-limit" as the number 5 and "x-message-ttl" as the number 60000
+    And "x-dead-letter-exchange" is the text "dlx"
+    And the dry run row for "orders" lists the three arguments
+
+  @m8-04 @fake-broker
+  Scenario: Exchange flags and arguments are declared
+    Given a migration file that declares the exchange "events.x" as a topic exchange that is not durable, internal and auto-delete, with the argument "alternate-exchange" "ae"
+    When I import it
+    And I apply the pending migrations
+    Then the broker has the exchange "events.x" with durable false, internal true and auto-delete true
+
+  @m8-04 @fake-broker
+  Scenario: A policy carries its apply-to, priority and typed definition
+    Given a migration file that declares the policy "limits" on "^orders" applying to "quorum_queues" with priority 7 and the definition "max-length" 1000 and "overflow" "reject-publish"
+    When I import it
+    And I apply the pending migrations
+    Then the broker received the policy "limits" with apply-to "quorum_queues", priority 7 and "max-length" as the number 1000
+
+  @m8-04 @fake-broker
+  Scenario: An operator policy is declared like a policy
+    Given a migration file that declares the operator policy "op-limit" on ".*" applying to "queues" with the definition "max-length" 100000
+    When I import it
+    And I apply the pending migrations
+    Then the broker received the operator policy "op-limit" with "max-length" as the number 100000
+
+  @m8-04 @fake-broker
+  Scenario: A binding can point at an exchange
+    Given a migration file that binds the exchange "ex-e2e" to the exchange "dlx" with routing key "dead"
+    When I import it
+    And I apply the pending migrations
+    Then the broker has a binding from "ex-e2e" to the exchange "dlx" with routing key "dead"
+
+  @m8-04 @fake-broker
+  Scenario: A file in the old format keeps its checksum and its meaning
+    Given the migration file "0001" in the format of the first release was applied to "uat-eu"
+    When I list the migrations
+    Then "0001" is shown as applied, not as modified
+    And its actions are the same as before
+
+  @m8-04 @fake-broker
+  Scenario: Exporting the topology keeps working and keeps exchange flags
+    Given the broker has a durable queue "orders", a non-durable exchange "events.x" and a binding between them
+    When I export the current topology
+    Then the new migration declares "orders", "events.x" with durable false, and the binding
+    And a file without any new feature does not contain the new keys
+
+  @m8-04 @broker
+  Scenario: Typed arguments reach a real 4.x broker as numbers
+    Given a real RabbitMQ 4 broker
+    When the requests of a migration that declares a quorum queue with "x-delivery-limit" 5, an exchange, an exchange-to-exchange binding, a policy and an operator policy are sent
+    Then the broker reports "x-delivery-limit" 5 as a number on the queue
+    And the exchange, the binding, the policy with its apply-to and priority and the operator policy exist as declared
 
   @negative @needs-decision @fake-broker
   # Open product decision: behavior when an action fails half-way through a migration.

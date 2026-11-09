@@ -424,7 +424,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     When I apply it again on "new-eu"
     Then the broker topology is unchanged
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-04
   Scenario: A migration file cannot contain a shovel action
     Given a migration file with the action "declareShovel"
     When I import it
