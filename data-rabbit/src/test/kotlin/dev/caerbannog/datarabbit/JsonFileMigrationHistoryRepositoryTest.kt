@@ -1,5 +1,6 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.migrations.HistoryKeyResult
 import dev.caerbannog.core.migrations.HistoryMoveResult
 import dev.caerbannog.core.migrations.HistoryResult
 import dev.caerbannog.core.migrations.NowProvider
@@ -8,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -88,6 +90,58 @@ class JsonFileMigrationHistoryRepositoryTest {
         val odd = "prod \"eu\" / ü\\x.json"
         repo().recordApplied(odd, "0001", "c")
         assertEquals(mapOf("0001" to "c"), repo().getAppliedMigrations(odd))
+    }
+
+    @Test
+    fun `the history file is owner-only, mode 600`() = runBlocking<Unit> {
+        assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "no POSIX permissions here")
+        repo().recordApplied("uat-eu", "0001", "a")
+
+        assertEquals(
+            setOf(java.nio.file.attribute.PosixFilePermission.OWNER_READ, java.nio.file.attribute.PosixFilePermission.OWNER_WRITE),
+            Files.getPosixFilePermissions(file),
+        )
+    }
+
+    // ---- rename and delete return a result (round 1, F1) ----
+
+    @Test
+    fun `rename and delete return Done when the write works, also when there is nothing to do`() = runBlocking<Unit> {
+        assertEquals(HistoryKeyResult.Done, repo().rename("a", "b"))
+        assertEquals(HistoryKeyResult.Done, repo().delete("a"))
+        repo().recordApplied("uat-eu", "0001", "a")
+        assertEquals(HistoryKeyResult.Done, repo().rename("uat-eu", "x"))
+        assertEquals(HistoryKeyResult.Done, repo().delete("x"))
+        assertEquals(emptyMap(), repo().getAppliedMigrations("x"))
+    }
+
+    @Test
+    fun `a failing write makes rename and delete return Failed with fixed text and leave the entries where they were`() = runBlocking<Unit> {
+        repo().recordApplied("uat-eu", "0001", "a")
+        val before = bytes()
+
+        val renamed = repo(crash).rename("uat-eu", "uat-eu-2")
+        val deleted = repo(crash).delete("uat-eu")
+
+        for (r in listOf(renamed, deleted)) {
+            val failed = assertIs<HistoryKeyResult.Failed>(r)
+            assertTrue(failed.reason.isNotBlank())
+            assertFalse(failed.reason.contains("simulated") || failed.reason.contains(root.toString()), "the reason is fixed text: ${failed.reason}")
+        }
+        assertTrue(before.contentEquals(bytes()))
+        assertEquals(mapOf("0001" to "a"), repo().getAppliedMigrations("uat-eu"))
+        assertEquals(setOf("migration-history.json"), names())
+    }
+
+    @Test
+    fun `an unreadable history counts as Done for rename and delete and stays untouched`() {
+        put("{ broken SENTINEL")
+        val before = bytes()
+
+        assertEquals(HistoryKeyResult.Done, repo().rename("uat-eu", "x"))
+        assertEquals(HistoryKeyResult.Done, repo().delete("uat-eu"))
+
+        assertTrue(before.contentEquals(bytes()))
     }
 
     // ---- rename ----

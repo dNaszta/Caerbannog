@@ -11,7 +11,7 @@ import java.nio.file.Path
  */
 internal object AtomicFileWriter {
     /** @throws IOException when the temp file cannot be written or moved; [target] is then exactly as it was. */
-    fun write(target: Path, bytes: ByteArray, mover: FileMover) {
+    fun write(target: Path, bytes: ByteArray, mover: FileMover, ownerOnly: Boolean = true /* M5-08b R1 STUB: ignored */) {
         val parent = target.toAbsolutePath().parent ?: throw IOException("no parent folder")
         val temp = Files.createTempFile(parent, ".caerbannog-", ".tmp")
         try {

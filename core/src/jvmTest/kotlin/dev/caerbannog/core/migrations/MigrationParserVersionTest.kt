@@ -53,4 +53,18 @@ class MigrationParserVersionTest {
         assertTrue(reason.contains("version"), "the reason should say it is about the version: $reason")
         assertTrue(!reason.contains("passwd") && !reason.contains("0001.json"), "the reason must not echo the input: $reason")
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["CON", "con", "Con", "PRN", "NUL", "aux", "AUX", "COM1", "com9", "COM5", "LPT1", "lpt9"])
+    fun `a Windows device name is refused as a version, in any case, and the reason does not echo it`(name: String) {
+        val reason = refusal("\"$name\"")
+        assertTrue(reason.contains("version"), "the reason should say it is about the version: $reason")
+        if (name !in listOf("CON", "con", "Con", "NUL")) assertTrue(!reason.contains(name), "the reason must not echo the input: $reason")
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["COM10", "COM0", "LPT0", "LPT10", "console", "auxiliary", "nullable", "CON1", "prn2", "0001"])
+    fun `names that only start like a device name are accepted`(name: String) {
+        assertEquals(name, versionOf("\"$name\""))
+    }
 }

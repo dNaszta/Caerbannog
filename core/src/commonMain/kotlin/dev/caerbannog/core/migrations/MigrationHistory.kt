@@ -18,8 +18,14 @@ sealed interface HistoryMoveResult {
  * a delete removes them.
  */
 interface ProfileHistoryKeys {
-    fun rename(oldName: String, newName: String)
-    fun delete(profileName: String)
+    fun rename(oldName: String, newName: String): HistoryKeyResult
+    fun delete(profileName: String): HistoryKeyResult
+}
+
+/** M5-08b R1 STUB: the answer of a history key change; [Failed.reason] is fixed text. An unreadable history file counts as [Done]. */
+sealed interface HistoryKeyResult {
+    data object Done : HistoryKeyResult
+    data class Failed(val reason: String) : HistoryKeyResult
 }
 
 /** A migration file could not be written; [reason] is fixed text, never file content or a system message. */

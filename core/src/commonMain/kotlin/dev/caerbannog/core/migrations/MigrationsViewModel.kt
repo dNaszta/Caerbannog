@@ -196,6 +196,7 @@ class MigrationsViewModel(
                 _state.update { it.copy(errorMessage = error) }
                 loadMigrations()
             }
+            is MigrationApplyResult.NotRecorded -> {} // M5-08b R1 STUB
             is MigrationApplyResult.Blocked -> {
                 _state.update { it.copy(errorMessage = result.reason) }
             }

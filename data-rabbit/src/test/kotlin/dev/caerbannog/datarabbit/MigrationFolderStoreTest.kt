@@ -25,6 +25,17 @@ class MigrationFolderStoreTest {
     private fun keys() = Json.parseToJsonElement(file.readText()).jsonObject
 
     @Test
+    fun `the settings file is owner-only, mode 600`() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "no POSIX permissions here")
+        store().folder = "/work/migrations"
+
+        assertEquals(
+            setOf(java.nio.file.attribute.PosixFilePermission.OWNER_READ, java.nio.file.attribute.PosixFilePermission.OWNER_WRITE),
+            java.nio.file.Files.getPosixFilePermissions(file.toPath()),
+        )
+    }
+
+    @Test
     fun `a fresh machine has no folder and reading creates no file`() {
         assertNull(store().folder)
         assertTrue(!file.exists())

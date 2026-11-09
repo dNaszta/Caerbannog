@@ -356,6 +356,25 @@ class FolderMigrationFileRepositoryTest {
     private val crash = FileMover { _, _ -> throw IOException("simulated crash between the temp file and the move") }
 
     @Test
+    fun `an imported migration file gets the default mode of the process, not owner-only, and its content and checksum are unchanged`() = runBlocking<Unit> {
+        assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "no POSIX permissions here")
+        made()
+        val control = Files.createFile(folder.resolve("control.txt"))
+        val ownerOnly = setOf(java.nio.file.attribute.PosixFilePermission.OWNER_READ, java.nio.file.attribute.PosixFilePermission.OWNER_WRITE)
+        assumeTrue(Files.getPosixFilePermissions(control) != ownerOnly, "the process umask already makes new files 600")
+        val text = raw("0001", extra = ",\n \"note\": \"\u00e4\"")
+
+        repo().importFile(text)
+        repo().exportTopology("0002", "d", listOf(MigrationAction.DeclareQueue(name = "q")))
+
+        assertEquals(Files.getPosixFilePermissions(control), Files.getPosixFilePermissions(folder.resolve("0001.json")), "import must use the default mode (a shared git folder must stay readable)")
+        assertEquals(Files.getPosixFilePermissions(control), Files.getPosixFilePermissions(folder.resolve("0002.json")), "export too")
+        assertTrue(Files.getPosixFilePermissions(folder.resolve("0001.json")).contains(java.nio.file.attribute.PosixFilePermission.GROUP_READ) || Files.getPosixFilePermissions(control).none { it == java.nio.file.attribute.PosixFilePermission.GROUP_READ })
+        assertEquals(text, fileText("0001.json"))
+        assertEquals(MigrationParser.computeChecksum(text), repo().listFiles().first { it.version == "0001" }.checksum)
+    }
+
+    @Test
     fun `a new file is written to a temp file in the same folder and moved into place`() = runBlocking {
         made()
         val mover = RecordingMover()

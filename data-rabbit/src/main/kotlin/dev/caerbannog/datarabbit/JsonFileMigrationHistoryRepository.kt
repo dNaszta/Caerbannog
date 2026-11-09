@@ -2,6 +2,7 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.json.UntrustedJson
 import dev.caerbannog.core.json.parseUntrustedJson
+import dev.caerbannog.core.migrations.HistoryKeyResult
 import dev.caerbannog.core.migrations.HistoryMoveResult
 import dev.caerbannog.core.migrations.HistoryResult
 import dev.caerbannog.core.migrations.MigrationHistoryRepository
@@ -76,18 +77,20 @@ class JsonFileMigrationHistoryRepository(
      * merged). Does nothing while the file is unreadable. A failed write leaves the entries where they were: the migrations then show as
      * pending under the new name, never as applied by mistake.
      */
-    override fun rename(oldName: String, newName: String) {
-        if (oldName == newName) return
+    override fun rename(oldName: String, newName: String): HistoryKeyResult {
+        if (oldName == newName) return HistoryKeyResult.Done
         change { profiles ->
             if (oldName !in profiles && newName !in profiles) return@change null
             val moved = profiles[oldName]
             (profiles - oldName - newName) + listOfNotNull(moved?.let { newName to it })
         }
+        return HistoryKeyResult.Done // M5-08b R1 STUB
     }
 
     /** Removes the entries of [profileName]. Does nothing while the file is unreadable or when there is nothing to remove. */
-    override fun delete(profileName: String) {
+    override fun delete(profileName: String): HistoryKeyResult {
         change { profiles -> if (profileName in profiles) profiles - profileName else null }
+        return HistoryKeyResult.Done // M5-08b R1 STUB
     }
 
     override fun asideFileName(): String = synchronized(lock) { freeAsideName() }

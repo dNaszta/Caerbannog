@@ -1,5 +1,6 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.migrations.HistoryKeyResult
 import dev.caerbannog.core.migrations.ProfileHistoryKeys
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -42,8 +43,8 @@ class ConnectionsViewModelRenameHistoryTest {
     private val renames = mutableListOf<Pair<String, String>>()
     private val deletes = mutableListOf<String>()
     private val keys = object : ProfileHistoryKeys {
-        override fun rename(oldName: String, newName: String) { renames += oldName to newName }
-        override fun delete(profileName: String) { deletes += profileName }
+        override fun rename(oldName: String, newName: String): HistoryKeyResult { renames += oldName to newName; return HistoryKeyResult.Done }
+        override fun delete(profileName: String): HistoryKeyResult { deletes += profileName; return HistoryKeyResult.Done }
     }
     private val vm = ConnectionsViewModel(repo, Secrets(), Reach(), Ca(), historyKeys = keys)
 
