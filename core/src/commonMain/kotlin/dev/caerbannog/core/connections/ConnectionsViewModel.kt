@@ -25,8 +25,8 @@ class ConnectionsViewModel(
     private val caCertificateValidator: CaCertificateValidator,
     private val session: ConnectionSession? = null,
     private val active: ActiveConnection? = null,
-    /** M5-08b STUB: accepted and not used yet (the rename must call it once, after a successful rename only). */
-    private val historyRenamer: dev.caerbannog.core.migrations.ProfileHistoryRenamer? = null,
+    /** M5-08b STUB: accepted and not used yet (a successful rename calls `rename` once, a confirmed delete calls `delete`). */
+    private val historyKeys: dev.caerbannog.core.migrations.ProfileHistoryKeys? = null,
 ) {
     private val _state = MutableStateFlow(ConnectionsState(profiles = repository.list()))
 

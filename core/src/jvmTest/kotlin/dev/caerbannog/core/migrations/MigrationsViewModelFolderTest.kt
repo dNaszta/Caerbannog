@@ -31,11 +31,16 @@ class MigrationsViewModelFolderTest {
     /** A repository that answers [listing] and counts how often it is asked; it holds no files. */
     private class ScriptedRepository(var listing: FolderListing) : MigrationFileRepository {
         var loads = 0
+        var exports = 0
+        var exportFails = false
         override suspend fun load(): FolderListing = listing.also { loads++ }
         override suspend fun listFiles(): List<MigrationFile> = (load() as? FolderListing.Listed)?.files.orEmpty()
         override suspend fun importFile(rawJson: String): MigrationValidationResult = error("the view model must not import here")
-        override suspend fun exportTopology(version: String, description: String, actions: List<MigrationAction>): MigrationFile =
-            error("not used")
+        override suspend fun exportTopology(version: String, description: String, actions: List<MigrationAction>): MigrationFile {
+            exports++
+            if (exportFails) throw MigrationWriteException("The file could not be written")
+            return MigrationFile(version, description, actions, "{}", "x")
+        }
         override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult = error("not used")
         override suspend fun nextVersion(): String = "0001"
     }
@@ -397,5 +402,22 @@ class MigrationsViewModelFolderTest {
         assertFalse(s.isApplyPendingEnabled)
         val message = assertNotNull(s.errorMessage)
         assertFalse(message.contains("SENTINEL"), "the message must not carry the failure text: $message")
+    }
+
+    @Test
+    fun `an export whose write fails returns null with a fixed message, writes no file and never throws`() = runBlocking {
+        store.folder = folder
+        val repo = repositoryAt(folder, listed("0001"))
+        repo.exportFails = true
+        val vm = vm()
+
+        val result = runCatching { vm.exportCurrentTopology() }
+
+        assertTrue(result.isSuccess, "the view model must not throw out of an export: ${result.exceptionOrNull()}")
+        assertNull(result.getOrNull())
+        assertEquals(1, repo.exports, "the export must have reached the folder repository")
+        val message = assertNotNull(vm.state.value.errorMessage)
+        assertFalse(message.contains("SENTINEL") || message.isBlank())
+        assertEquals(listOf("0001"), vm.state.value.entries.map { it.file.version }, "the list is unchanged")
     }
 }

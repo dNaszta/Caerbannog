@@ -106,6 +106,64 @@ class JsonFileMigrationHistoryRepositoryTest {
     }
 
     @Test
+    fun `renaming onto a leftover history replaces it with the renamed profile's entries`() = runBlocking {
+        val r = repo()
+        r.recordApplied("uat-eu", "0001", "a1")
+        r.recordApplied("leftover", "0001", "old")
+        r.recordApplied("leftover", "0002", "old2")
+        r.recordApplied("prod-eu", "0009", "p9")
+
+        r.rename("uat-eu", "leftover")
+
+        assertEquals(mapOf("0001" to "a1"), repo().getAppliedMigrations("leftover"), "the leftover must be replaced, not merged")
+        assertEquals(emptyMap(), repo().getAppliedMigrations("uat-eu"))
+        assertEquals(mapOf("0009" to "p9"), repo().getAppliedMigrations("prod-eu"))
+    }
+
+    @Test
+    fun `renaming a profile that has no history removes a leftover under the new name`() = runBlocking {
+        val r = repo()
+        r.recordApplied("leftover", "0001", "old")
+
+        r.rename("uat-eu", "leftover")
+
+        assertEquals(emptyMap(), repo().getAppliedMigrations("leftover"), "the new name must not inherit the old leftover")
+    }
+
+    @Test
+    fun `deleting a profile removes its entries, keeps the others and persists`() = runBlocking {
+        val r = repo()
+        r.recordApplied("uat-eu", "0001", "a1")
+        r.recordApplied("prod-eu", "0001", "b1")
+
+        r.delete("uat-eu")
+
+        assertEquals(emptyMap(), repo().getAppliedMigrations("uat-eu"))
+        assertEquals(mapOf("0001" to "b1"), repo().getAppliedMigrations("prod-eu"))
+    }
+
+    @Test
+    fun `deleting a profile with no history writes nothing`() = runBlocking {
+        repo().delete("uat-eu")
+        assertFalse(Files.exists(file))
+        repo().recordApplied("prod-eu", "0001", "b1")
+        val before = bytes()
+        repo().delete("uat-eu")
+        assertTrue(before.contentEquals(bytes()))
+    }
+
+    @Test
+    fun `deleting a profile never writes over an unreadable history`() {
+        put("{ broken SENTINEL")
+        val before = bytes()
+
+        repo().delete("uat-eu")
+
+        assertTrue(before.contentEquals(bytes()))
+        assertEquals(setOf("migration-history.json"), names())
+    }
+
+    @Test
     fun `renaming a profile without history and renaming while the file is missing change nothing`() {
         repo().rename("uat-eu", "x")
         assertFalse(Files.exists(file), "nothing to move, nothing to write")

@@ -5,6 +5,7 @@ import dev.caerbannog.core.migrations.FolderProblem
 import dev.caerbannog.core.migrations.InvalidMigrationFile
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationParser
+import dev.caerbannog.core.migrations.MigrationWriteException
 import dev.caerbannog.core.migrations.MigrationValidationResult
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
@@ -373,7 +374,7 @@ class FolderMigrationFileRepositoryTest {
 
         val result = repo(crash).importFile(raw("0002"))
 
-        assertIs<MigrationValidationResult.Invalid>(result, "a failed write is a refusal, not a crash of the screen")
+        assertEquals(MigrationValidationResult.Invalid("the file could not be written"), result, "a failed write is a refusal, not a crash of the screen")
         assertEquals(before, tree(), "after a failed write the folder must be exactly as before")
     }
 
@@ -383,9 +384,9 @@ class FolderMigrationFileRepositoryTest {
         write("0001.json", raw("0001"))
         val before = tree()
 
-        val result = runCatching { repo(crash).updateFile("0001", raw("0001", extra = ",\"n\":1")) }
+        val result = repo(crash).updateFile("0001", raw("0001", extra = ",\"n\":1"))
 
-        assertTrue(result.isFailure || result.getOrNull() is MigrationValidationResult.Invalid)
+        assertEquals(MigrationValidationResult.Invalid("the file could not be written"), result)
         assertEquals(before, tree())
         assertEquals(raw("0001"), fileText("0001.json"))
     }
@@ -397,7 +398,9 @@ class FolderMigrationFileRepositoryTest {
 
         val result = runCatching { repo(crash).exportTopology("0001", "d", listOf(MigrationAction.DeclareQueue(name = "q"))) }
 
-        assertTrue(result.isFailure, "an export that could not be written must not pretend it succeeded")
+        val failure = result.exceptionOrNull()
+        assertIs<MigrationWriteException>(failure, "an export that could not be written must throw MigrationWriteException, got $result")
+        assertFalse(failure.reason.contains("simulated") || failure.reason.contains(root.toString()), "the reason is fixed text: ${failure.reason}")
         assertEquals(before, tree())
     }
 

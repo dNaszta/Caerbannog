@@ -9,7 +9,7 @@ import dev.caerbannog.core.migrations.MigrationFileRepository
 import dev.caerbannog.core.migrations.MigrationHistoryRepository
 import dev.caerbannog.core.migrations.MigrationValidationResult
 import dev.caerbannog.core.migrations.NowProvider
-import dev.caerbannog.core.migrations.ProfileHistoryRenamer
+import dev.caerbannog.core.migrations.ProfileHistoryKeys
 import java.nio.file.Path
 import java.time.ZoneId
 
@@ -47,11 +47,12 @@ class JsonFileMigrationHistoryRepository(
     private val now: NowProvider,
     private val mover: FileMover = NioFileMover,
     private val zone: ZoneId = ZoneId.systemDefault(),
-) : MigrationHistoryRepository, ProfileHistoryRenamer {
+) : MigrationHistoryRepository, ProfileHistoryKeys {
     override suspend fun getAppliedMigrations(profileName: String): Map<String, String> = emptyMap()
     override suspend fun recordApplied(profileName: String, version: String, checksum: String) = Unit
     override suspend fun load(profileName: String): HistoryResult = HistoryResult.Loaded(emptyMap())
     override fun asideFileName(): String = throw NotImplementedError("M5-08b STUB")
     override suspend fun moveAside(): HistoryMoveResult = HistoryMoveResult.Failed("M5-08b STUB")
     override fun rename(oldName: String, newName: String) = Unit
+    override fun delete(profileName: String) = Unit
 }

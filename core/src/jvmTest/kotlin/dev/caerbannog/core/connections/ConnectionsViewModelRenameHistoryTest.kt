@@ -1,6 +1,6 @@
 package dev.caerbannog.core.connections
 
-import dev.caerbannog.core.migrations.ProfileHistoryRenamer
+import dev.caerbannog.core.migrations.ProfileHistoryKeys
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -40,7 +40,12 @@ class ConnectionsViewModelRenameHistoryTest {
 
     private val repo = Repo()
     private val renames = mutableListOf<Pair<String, String>>()
-    private val vm = ConnectionsViewModel(repo, Secrets(), Reach(), Ca(), historyRenamer = ProfileHistoryRenamer { old, new -> renames += old to new })
+    private val deletes = mutableListOf<String>()
+    private val keys = object : ProfileHistoryKeys {
+        override fun rename(oldName: String, newName: String) { renames += oldName to newName }
+        override fun delete(profileName: String) { deletes += profileName }
+    }
+    private val vm = ConnectionsViewModel(repo, Secrets(), Reach(), Ca(), historyKeys = keys)
 
     private fun input(name: String, host: String = "h") =
         ConnectionProfileInput(name = name, host = host, virtualHost = "/", username = "svc", password = null)
@@ -78,5 +83,30 @@ class ConnectionsViewModelRenameHistoryTest {
         vm.saveProfileChanges("uat-eu", input("uat-eu-3"))
 
         assertEquals(listOf("uat-eu" to "uat-eu-3"), renames)
+    }
+
+    @Test
+    fun `confirming a delete removes that profile's history entries once and no other profile's`() {
+        vm.requestDelete("uat-eu")
+        vm.confirmDelete()
+
+        assertEquals(listOf("uat-eu"), deletes)
+        assertTrue(renames.isEmpty())
+        assertEquals(listOf("prod-eu"), repo.profiles.keys.toList())
+    }
+
+    @Test
+    fun `a delete that is cancelled or never confirmed leaves the history alone`() {
+        vm.requestDelete("uat-eu")
+        vm.cancelDelete()
+        vm.confirmDelete()
+
+        assertTrue(deletes.isEmpty(), "history removed without a confirmed delete: $deletes")
+    }
+
+    @Test
+    fun `a rename makes no delete call and a delete makes no rename call`() {
+        vm.updateConnection("uat-eu", input("uat-eu-2"))
+        assertTrue(deletes.isEmpty(), "a rename must not delete history: $deletes")
     }
 }

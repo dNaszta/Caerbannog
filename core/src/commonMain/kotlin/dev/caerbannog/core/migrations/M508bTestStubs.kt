@@ -59,10 +59,17 @@ sealed interface HistoryMoveResult {
     data class Failed(val reason: String) : HistoryMoveResult
 }
 
-/** Called by the profile rename so a renamed profile keeps its applied history. */
-fun interface ProfileHistoryRenamer {
+/**
+ * Keeps the applied history in step with the profile list: a rename moves the entries (REPLACING any leftover already under the new name),
+ * a delete removes them.
+ */
+interface ProfileHistoryKeys {
     fun rename(oldName: String, newName: String)
+    fun delete(profileName: String)
 }
+
+/** A migration file could not be written; [reason] is fixed text, never file content or a system message. */
+class MigrationWriteException(val reason: String) : Exception(reason)
 
 /** The state of the folder part of the Migrations screen. */
 sealed interface MigrationFolderState {
