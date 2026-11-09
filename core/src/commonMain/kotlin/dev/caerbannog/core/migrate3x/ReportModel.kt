@@ -55,7 +55,11 @@ sealed interface Proposal {
 
 /** One incompatibility with 4.x, or one note, about one item. */
 data class Finding(
-    /** `<rule>|<vhost or ->|<kind>|<name or ->|<about joined by ,>`; unique inside a report. */
+    /**
+     * `<rule>|<vhost or ->|<kind>|<name or ->|<about joined by ,>`; unique inside a report. When a hand-edited file holds the same
+     * item twice, the second and later findings get the suffix `#2`, `#3` in report order; the order of such duplicates is total
+     * (message, then proposal), so it depends on the order in the file only when their contents differ.
+     */
     val id: String,
     val rule: String,
     val severity: Severity,

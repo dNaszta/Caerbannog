@@ -1,6 +1,9 @@
 package dev.caerbannog.core.migrate3x
 
-/** A policy or an operator policy with its pattern compiled once; [regex] is null when the pattern is not a valid regular expression. */
+/**
+ * A policy or an operator policy with its pattern compiled once. [matcher] is null exactly when the app cannot evaluate the
+ * pattern; [unevaluableReason] then says why.
+ */
 internal data class PolicyView(
     val kind: ItemKind,
     val vhost: String,
@@ -9,7 +12,8 @@ internal data class PolicyView(
     val applyTo: String,
     val priority: Int,
     val definition: Map<String, ArgumentValue>,
-    val regex: Regex?,
+    val matcher: PolicyPatternMatcher?,
+    val unevaluableReason: PatternProblem?,
 ) {
     /** The definition keys that satisfy [wanted], sorted. */
     fun keys(wanted: (String) -> Boolean): List<String> = definition.keys.filter(wanted).sorted()
@@ -34,15 +38,12 @@ internal class AnalysisContext(val document: DefinitionsDocument, val live: Live
     /** The policy that gives [queue] mirrors on a 3.x broker, or null when the queue is not mirrored. */
     fun mirroringPolicy(queue: QueueDefinition): PolicyView? = mirroring.mirroringPolicy(queue)
 
-    private fun view(kind: ItemKind, vhost: String, name: String, pattern: String, applyTo: String, priority: Int, definition: Map<String, ArgumentValue>) =
-        PolicyView(kind, vhost, name, pattern, applyTo, priority, definition, compileOrNull(pattern))
+    private fun view(kind: ItemKind, vhost: String, name: String, pattern: String, applyTo: String, priority: Int, definition: Map<String, ArgumentValue>): PolicyView {
+        val compiled = PolicyPatternMatcher.compile(pattern)
+        val matcher = (compiled as? PatternCompilation.Compiled)?.matcher
+        val reason = (compiled as? PatternCompilation.Unevaluable)?.problem
+        return PolicyView(kind, vhost, name, pattern, applyTo, priority, definition, matcher, reason)
+    }
 
     private fun String.takeWhileDigits(): String = takeWhile { it in '0'..'9' }
 }
-
-private fun compileOrNull(pattern: String): Regex? =
-    try {
-        Regex(pattern)
-    } catch (_: IllegalArgumentException) {
-        null
-    }

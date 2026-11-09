@@ -56,13 +56,15 @@ internal object PolicyRules {
         isKey = { it.startsWith("federation-") }, text = ReportTexts::notCoveredPolicyKey, proposal = { ReportTexts.federationManual },
     )
 
-    /** A pattern that does not compile is never a match; the finding tells the user the app did not match queues against it. */
+    /** A pattern the app cannot evaluate never matches; the finding says why (the reason code is in `about`). */
     val policyPatternUnreadable: Rule = object : Rule {
         override val info: RuleInfo = RuleCatalog["policy-pattern-unreadable"]
 
         override fun check(context: AnalysisContext): List<Finding> =
-            context.policies.filter { it.regex == null }.map {
-                finding(it.ref, Severity.Info, FindingClass.BehaviourChange, ReportTexts.policyPatternUnreadable, Proposal.None)
+            context.policies.mapNotNull { policy ->
+                policy.unevaluableReason?.let {
+                    finding(policy.ref, Severity.Info, FindingClass.BehaviourChange, ReportTexts.policyPatternUnreadable(it), Proposal.None, about = listOf(it.code))
+                }
             }
     }
 

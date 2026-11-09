@@ -57,9 +57,10 @@ internal object ReportTexts {
         recommended = true,
     )
 
-    val policyPatternUnreadable = RuleText(
-        "The app could not read the pattern of this policy, so it did not match queues against it.",
-        "The pattern is not a regular expression this app understands; the mirroring check for queues ignores the policy.",
+    fun policyPatternUnreadable(problem: PatternProblem) = RuleText(
+        "The app could not evaluate this pattern (${problem.inWords}), so it did not use it to decide which queues are mirrored. " +
+            "If it matches queues, check them by hand.",
+        "A policy with a pattern the app cannot evaluate is still checked for its keys.",
     )
 
     // ---- queues ----

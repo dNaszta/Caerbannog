@@ -9,7 +9,7 @@ object CompatibilityAnalyzer {
      */
     fun analyze(document: DefinitionsDocument, live: LiveSourceFacts? = null): CompatibilityReport {
         val context = AnalysisContext(document, live)
-        val findings = DefaultRules.all.flatMap { it.check(context) }.sortedWith(reportOrder)
+        val findings = uniqueIds(DefaultRules.all.flatMap { it.check(context) }.sortedWith(reportOrder))
         return CompatibilityReport(sourceOf(document, live), summarize(document, findings), findings)
     }
 
@@ -22,7 +22,18 @@ object CompatibilityAnalyzer {
         { it.name },
         { it.rule },
         { it.about.joinToString(",") },
+        { it.message },
+        { it.proposal.toString() },
     )
+
+    /** Duplicate items in a hand-edited file give equal ids; the second and later get `#2`, `#3` in report order. */
+    private fun uniqueIds(sorted: List<Finding>): List<Finding> {
+        val seen = mutableMapOf<String, Int>()
+        return sorted.map { finding ->
+            val count = seen.merge(finding.id, 1, Int::plus) ?: 1
+            if (count == 1) finding else finding.copy(id = "${finding.id}#$count")
+        }
+    }
 
     private fun sourceOf(document: DefinitionsDocument, live: LiveSourceFacts?) = ReportSource(
         name = live?.connectionName,
