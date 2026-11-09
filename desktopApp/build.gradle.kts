@@ -30,6 +30,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
 
     testImplementation(kotlin("test"))
+    // Compose wiring tests of Main.kt's window contents (WindowContentWiringTest): same test API as the ui module.
+    testImplementation(compose.desktop.uiTestJUnit4)
+    testImplementation(compose.material3)
     // M2-05c: CompositionRootStreamEventsTest drives the real stream list with the fake gateway and catalog of core-testing.
     testImplementation(project(":core-testing"))
     // M1-07: CompositionRootTest runs the suspend check with runBlocking.
