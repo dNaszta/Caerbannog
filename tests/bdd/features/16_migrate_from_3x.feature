@@ -36,7 +36,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then I am told that this user cannot export definitions
     And I am offered to import a definitions file instead
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-01
   Scenario Outline: A file that is not a definitions export is rejected
     Given a file whose content is <content>
     When I analyse the file
@@ -48,6 +48,60 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
       | not JSON at all                  | The file is not valid JSON        |
       | an empty JSON object             | The file has no definitions       |
       | a JSON array                     | The file is not a definitions file|
+
+  # M8-01 twins: the model half of the two report scenarios around here. They run in M8-01, before the
+  # analyzer (M8-03) exists, so they stop at the parsed document.
+
+  @smoke @fake-broker @m8-01
+  Scenario: Read the definitions file exported from RabbitMQ 3.13
+    Given the definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    When I read the file
+    Then the document comes from RabbitMQ version "3.13.7"
+    And the document has 2 virtual hosts, 13 queues, 4 exchanges, 3 bindings and 3 policies
+    And the document has 1 operator policy, 4 users, 4 permissions and 1 topic permission
+    And the queue "classic-prio" in "/" is a classic queue with the argument "x-max-priority" set to the number 5
+    And the queue "quorum-q" in "/" is a quorum queue
+    And the queue "classic-transient" in "/" is not durable
+    And the user "svc" has the tags "management" and "policymaker" and the algorithm "rabbit_password_hashing_sha256"
+
+  @fake-broker @m8-01
+  Scenario: A single virtual host export asks for the virtual host name
+    Given the per-virtual-host definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    When I read the file
+    Then I am asked which virtual host name to give the content of this file
+    And nothing is analysed until a name is given
+    And no report is shown
+
+  @fake-broker @m8-01
+  Scenario: Naming the virtual host assigns it to every entry
+    Given the per-virtual-host definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    And I read the file
+    When I give the virtual host name "orders"
+    Then the queue "v1-q" is in the virtual host "orders"
+    And the document has no virtual hosts, no users, no permissions and no topic permissions
+    And the document says it comes from a single virtual host export named "orders"
+
+  @negative @fake-broker @m8-01
+  Scenario Outline: A virtual host name that cannot be used is refused
+    Given the per-virtual-host definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    And I read the file
+    When I give the virtual host name <name>
+    Then the name is refused and the file stays unassigned
+
+    Examples:
+      | name              |
+      | an empty text     |
+      | only spaces       |
+      | a text with a tab |
+
+  @security @fake-broker @m8-01
+  Scenario: The model of a 3.x export holds no secret in a readable form
+    Given a definitions file with a user "svc" that has a password hash
+    And a shovel parameter whose URI contains a password
+    When I read the file
+    Then the user "svc" is listed with its tags and hashing algorithm
+    And the text form of the document, of the user and of every parameter contains neither the password hash nor the password
+    And the shovel parameter is listed by its component and name only
 
   @security @fake-broker
   Scenario: Secrets in a 3.x export never reach the report

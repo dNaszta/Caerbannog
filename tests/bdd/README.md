@@ -44,6 +44,7 @@ tests/bdd/
 | `@broker` | Needs a real RabbitMQ 4.x broker with TLS and plain listeners (Testcontainers, needs Docker) |
 | `@headers` | MQTT headers (MQTT 5 user properties) of the Publish MQTT dialog, M7-10; runs with `@fake-broker`. The `@M7 @fake-broker` queue-inspection scenarios in `09` run in the topology suite (filter `(@M2 or @M7) and @fake-broker`) against `FakeQueueMessageInspector`; their live twins are `@M7 @broker @gate-M7` (`RealBrokerM7GateTest`) |
 | `@broker-3x` | M8 only: needs a real RabbitMQ 3.13 broker (`rabbitmq:3.13-management`) and, for the gate, a 4.x broker on the same container network. 3.x is a read-only migration source; no other feature is tested on 3.x. Run with `@broker` in the separate broker job |
+| `@m8-01` | The scenarios of task M8-01 (definitions model and parser); the suite `RunMigrate3xDefinitionsAcceptanceTest` selects `16_migrate_from_3x.feature` and filters `@m8-01 and @fake-broker`. Later M8 tasks add their own `@m8-NN` tag the same way |
 | `@migrate-3x`, `@shovel`, `@access`, `@mcp` | M8 scenarios (`16`, `17`); `@shovel` marks forwarding with a broker-side dynamic Shovel; `@mcp` an MCP tool scenario |
 | `@negative` | Checks a refusal, an error or a safety rule |
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
