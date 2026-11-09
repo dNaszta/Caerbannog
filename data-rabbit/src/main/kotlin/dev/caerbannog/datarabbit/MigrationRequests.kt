@@ -36,16 +36,24 @@ internal object MigrationRequests {
     }
 
     /** A path segment; one made only of dots is written as `%2E` per dot so no `.` or `..` segment can reach the URL. */
-    private fun encode(value: String): String =
+    fun encode(value: String): String =
         if (value.isNotEmpty() && value.all { it == '.' }) "%2E".repeat(value.length) else ManagementRequests.encode(value)
 
     private fun put(collection: String, vhost: String, name: String, body: JsonObject) =
-        ManagementWrite("PUT", "/api/$collection/${encode(vhost)}/${encode(name)}", body)
+        ManagementWrite("PUT", collectionPath(collection, vhost, name), body)
 
-    private fun bindingPath(action: MigrationAction.DeclareBinding): String {
-        val kind = if (action.destinationType == BindingDestinationType.EXCHANGE) "e" else "q"
-        return "/api/bindings/${encode(action.vhost)}/e/${encode(action.exchange)}/$kind/${encode(action.queue)}"
+    /** `/api/{collection}/{vhost}/{name}` for queues, exchanges, policies and operator policies: the only shape with a name in it. */
+    fun collectionPath(collection: String, vhost: String, name: String): String =
+        "/api/$collection/${encode(vhost)}/${encode(name)}"
+
+    /** `/api/bindings/{vhost}/e/{source}/{q|e}/{destination}`: the bindings between one source and one destination. */
+    fun bindingPath(vhost: String, source: String, destinationType: BindingDestinationType, destination: String): String {
+        val kind = if (destinationType == BindingDestinationType.EXCHANGE) "e" else "q"
+        return "/api/bindings/${encode(vhost)}/e/${encode(source)}/$kind/${encode(destination)}"
     }
+
+    private fun bindingPath(action: MigrationAction.DeclareBinding): String =
+        bindingPath(action.vhost, action.exchange, action.destinationType, action.queue)
 
     private fun queueBody(action: MigrationAction.DeclareQueue): JsonObject = buildJsonObject {
         put("durable", action.durable)

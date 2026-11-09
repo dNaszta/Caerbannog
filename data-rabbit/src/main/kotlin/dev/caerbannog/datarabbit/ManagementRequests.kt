@@ -51,6 +51,12 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M2-07 (S-A): every binding of the vhost in one unpaged call (a plain array; includes the default exchange's bindings). */
     fun bindings(vhost: String): String = "$base/api/bindings/${encode(vhost)}"
 
+    /** M5-08a: the URL of [path] (which starts with `/api`) on this connection's base; the migration executor checks the path first. */
+    fun absolute(path: String): String = "$base$path"
+
+    /** M5-08a: the broker's overview, read once per connection for its version (`rabbitmq_version`). */
+    fun overview(): String = "$base/api/overview"
+
     fun whoami(): String = "$base/api/whoami"
 
     /**

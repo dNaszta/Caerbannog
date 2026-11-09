@@ -30,7 +30,7 @@ Recommended order: a, b, c, then M5-09 (M5-09 may run in parallel with c). M8-05
 | --- | --- | --- | --- | --- | --- |
 | `declareQueue` | `PUT /api/queues/{v}/{n}` | 201 | 204: no-op | 400 `PRECONDITION_FAILED`: `Failed("<name> exists with different settings")`, nothing deleted or recreated | `GET` detail: exists; type, durable and every declared argument equal (numbers as numbers) |
 | `declareExchange` | `PUT /api/exchanges/...` | 201 | 204: no-op | 400: same conflict | exists; type, flags, arguments |
-| `declareBinding` | `POST /api/bindings/.../e/{src}/q or e/{dst}` | 201 | 204: no-op | not possible: a binding is its source, destination, routing key and arguments; another key is another binding | the binding list of source to destination contains it |
+| `declareBinding` | `POST /api/bindings/.../e/{src}/q or e/{dst}` | 201 | 201 (measured on 4.x: a repeated POST answers 201, not 204): no-op | not possible: a binding is its source, destination, routing key and arguments; another key is another binding | the binding list of source to destination contains it |
 | `declarePolicy`, `declareOperatorPolicy` | `GET` first, then `PUT` | absent: `PUT` | equal (pattern, apply-to, priority, every definition key, numbers numeric): no request at all | different: conflict failure, NO `PUT` | `GET`: equal |
 | `declareStream` | `StreamManager.createStream` | `Success` | "already exists" refusal: no-op (stream settings are not in the action) | n/a | the stream is listed |
 | `delete*` (Full control only) | `DELETE` | 204 | n/a | n/a | `GET` answers 404 |
@@ -63,4 +63,4 @@ All four sub-tasks accepted; `docs/spec.md` "Running migrations for real" matche
 
 ## Status
 - Step 1 (architect, brief, split and scenarios): DONE 2026-11-09. Round 0. Branch `m5-08-real-migration-execution` (worktree `.claude/worktrees/m5-08`, base ff286db). Owner decisions recorded (A, ask for the folder, MCP read-only). Sub-briefs written: `M5-08a`, `M5-08b`, `M5-08c`, `M5-09`. Changed: this brief, the four sub-briefs, `tests/bdd/features/10_topology_migrations.feature` (the `@m5-08` block rewritten with sub-tags, the `@needs-decision` scenario replaced by exact ones, folder scenarios added), `tests/bdd/features/18_migrate_access_from_3x.feature` (MCP scenario), `tests/bdd/README.md` (tag row), `docs/spec.md` (new subsection "Running migrations for real", MCP table, discrepancy resolved), `docs/tasks/M5-04-topology-migrations.md` (MCP line superseded), `docs/tasks/README.md`.
-- Next: `M5-08a` step 2 (tests first).
+- Progress: `M5-08a` DONE 2026-11-10 (accepted with follow-ups, branch `m5-08a-migration-executor` built and verified, not merged, waiting for the owner's word). Next: `M5-08b`.

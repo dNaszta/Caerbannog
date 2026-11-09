@@ -10,6 +10,7 @@ import dev.caerbannog.core.topology.VhostRow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Test
 
@@ -44,7 +45,12 @@ class RabbitMqConnectionGatewayTopologyTest {
         }
     }
 
-    private fun PlainManagementServer.calls() = seen.filter { it.rawPath != "/api/whoami" }.map { "${it.method} ${it.rawPath}" }
+    /** The calls of the test itself: the probe (`whoami`) and the ONE version read of the connection (F3, `GET /api/overview`, never a write) are filtered out and checked. */
+    private fun PlainManagementServer.calls(): List<String> {
+        assertEquals(1, seen.count { it.rawPath == "/api/overview" && it.method == "GET" }, "exactly one GET /api/overview per connection: $seen")
+        assertTrue(seen.filter { it.rawPath == "/api/overview" || it.rawPath == "/api/whoami" }.all { it.method == "GET" })
+        return seen.filter { it.rawPath != "/api/whoami" && it.rawPath != "/api/overview" }.map { "${it.method} ${it.rawPath}" }
+    }
 
     @Test
     fun `the held connection's topology reads the vhost list with one GET`() {

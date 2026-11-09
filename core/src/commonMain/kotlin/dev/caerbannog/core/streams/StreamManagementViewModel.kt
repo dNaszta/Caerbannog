@@ -103,6 +103,10 @@ class StreamManagementViewModel(
                 _createState.update { it.copy(isCreating = false, error = outcome.message) }
                 false
             }
+            is StreamManagementResult.NotFound -> {
+                _createState.update { it.copy(isCreating = false, error = "The stream does not exist") }
+                false
+            }
         }
     }
 
@@ -141,6 +145,10 @@ class StreamManagementViewModel(
             }
             is StreamManagementResult.Failed -> {
                 _deleteState.update { it.copy(isDeleting = false, error = outcome.message) }
+                false
+            }
+            is StreamManagementResult.NotFound -> {
+                _deleteState.update { it.copy(isDeleting = false, error = "The stream does not exist") }
                 false
             }
         }

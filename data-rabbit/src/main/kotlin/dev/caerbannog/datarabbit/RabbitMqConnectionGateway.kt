@@ -51,6 +51,14 @@ class RabbitMqConnectionGateway(
             return OpenResult.Failed(failure)
         }
         val catalog = ManagementStreamCatalog(http, requests)
+        val manager = RabbitMqStreamManager(environments)
+        val access = try {
+            MigrationAccess.forBroker(http, requests, manager)
+        } catch (e: CancellationException) {
+            http.close()
+            environments.close()
+            throw e
+        }
         return OpenResult.Opened(
             RabbitMqHeldConnection(
                 catalog = catalog,
@@ -58,12 +66,14 @@ class RabbitMqConnectionGateway(
                 topology = ManagementTopologyCatalog(http, requests),
                 messages = RabbitMqStreamMessageReader(environments, catalog),
                 publisher = RabbitMqMessagePublisher(environments, http, requests),
-                manager = RabbitMqStreamManager(environments),
+                manager = manager,
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),
                 mqttPublisher = RabbitMqMqttPublisher(profile, password, transport),
                 queueInspector = ManagementQueueMessageInspector(http, requests),
+                migrationExecutor = access.executor,
+                migrationUnavailableReason = access.unavailableReason,
             ),
         )
     }

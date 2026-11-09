@@ -6,6 +6,9 @@ package dev.caerbannog.core.streams
 sealed interface StreamManagementResult {
     data object Success : StreamManagementResult
     data class Refused(val reason: String) : StreamManagementResult
+
+    /** M5-08a: the stream does not exist (a delete of what is already gone). Typed so nobody matches message text. */
+    data object NotFound : StreamManagementResult
     data class Failed(val message: String) : StreamManagementResult
 }
 

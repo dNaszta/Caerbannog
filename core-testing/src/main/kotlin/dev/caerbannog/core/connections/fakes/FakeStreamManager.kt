@@ -22,6 +22,10 @@ class FakeStreamManager(
     @Volatile
     var refuseDeleteWith: String? = null
 
+    /** M5-08a: the next deletes answer [StreamManagementResult.NotFound] (the stream is not there). */
+    @Volatile
+    var notFoundOnDelete: Boolean = false
+
     @Volatile
     var failCreateWith: String? = null
 
@@ -51,6 +55,7 @@ class FakeStreamManager(
     }
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult {
+        if (notFoundOnDelete) return StreamManagementResult.NotFound
         failDeleteWith?.let { return StreamManagementResult.Failed(it) }
         refuseDeleteWith?.let { return StreamManagementResult.Refused(it) }
 
@@ -66,5 +71,6 @@ class FakeStreamManager(
         refuseDeleteWith = null
         failCreateWith = null
         failDeleteWith = null
+        notFoundOnDelete = false
     }
 }

@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueueRow
@@ -79,11 +80,12 @@ class MigrationsViewModel(
 
             val selectedFile = selected?.file
             val dryRun = selectedFile?.let {
-                runner.dryRun(it, hasConfigurePermission, controlLevel)
+                runner.dryRun(it, hasConfigurePermission, controlLevel, vhost)
             }
 
             val hasPending = entries.any { it.status is MigrationStatus.Pending }
-            val canApplyPending = hasPending && hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY
+            val canApplyPending = hasPending && hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY &&
+                entries.filter { it.status is MigrationStatus.Pending }.all { belongsToConnection(it.file) }
             val canApplySingle = selected?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
                 hasConfigurePermission &&
@@ -117,11 +119,14 @@ class MigrationsViewModel(
         }
     }
 
+    /** A migration with an action for another virtual host can never be applied on this connection (spec V1). */
+    private fun belongsToConnection(file: MigrationFile): Boolean = file.up.all { it.vhost == vhost }
+
     fun selectVersion(version: String) {
         scope.launch {
             val entry = _state.value.entries.firstOrNull { it.file.version == version }
             val file = entry?.file
-            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel) }
+            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost) }
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
                 hasConfigurePermission &&
@@ -142,7 +147,7 @@ class MigrationsViewModel(
     suspend fun applyPending(): MigrationApplyResult {
         _state.update { it.copy(isApplying = true, errorMessage = null) }
         val files = fileRepository.listFiles()
-        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel)
+        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost)
         when (result) {
             is MigrationApplyResult.Success -> {
                 loadMigrations()
@@ -163,7 +168,7 @@ class MigrationsViewModel(
     suspend fun applySingle(version: String): MigrationApplyResult {
         val entry = _state.value.entries.firstOrNull { it.file.version == version }
             ?: return MigrationApplyResult.Blocked("Migration file not found")
-        return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel)
+        return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel, vhost)
             .also {
                 loadMigrations()
             }
@@ -180,53 +185,18 @@ class MigrationsViewModel(
         return result
     }
 
-    suspend fun exportCurrentTopology(): MigrationFile {
-        val nextVersion = fileRepository.nextVersion()
-        val actions = mutableListOf<MigrationAction>()
-
-        if (topologyCatalog != null) {
-            val queuesResult = topologyCatalog.queues(vhost, 1)
-            val queues = (queuesResult as? dev.caerbannog.core.streams.CatalogResult.Success)?.value?.rows ?: emptyList()
-            for (q in queues) {
-                if (q.type == "stream") {
-                    actions += MigrationAction.DeclareStream(name = q.name, vhost = vhost)
-                } else {
-                    actions += MigrationAction.DeclareQueue(name = q.name, type = q.type, vhost = vhost)
-                }
-            }
-
-            val exchangesResult = topologyCatalog.exchanges(vhost)
-            val exchanges = (exchangesResult as? dev.caerbannog.core.streams.CatalogResult.Success)?.value ?: emptyList()
-            for (ex in exchanges) {
-                if (ex.name.isNotEmpty() && !ex.name.startsWith("amq.")) {
-                    actions += MigrationAction.DeclareExchange(
-                        name = ex.name,
-                        type = ex.type,
-                        vhost = vhost,
-                        durable = ex.durable,
-                        autoDelete = ex.autoDelete,
-                        internal = ex.internal,
-                    )
-                }
-            }
-
-            val bindingsResult = topologyCatalog.bindings(vhost)
-            val bindings = (bindingsResult as? dev.caerbannog.core.streams.CatalogResult.Success)?.value ?: emptyList()
-            for (b in bindings) {
-                if (b.source.isNotEmpty() && b.destination.isNotEmpty()) {
-                    actions += MigrationAction.DeclareBinding(
-                        exchange = b.source,
-                        queue = b.destination,
-                        routingKey = b.routingKey,
-                        vhost = vhost,
-                        destinationType = b.destinationType,
-                    )
-                }
-            }
+    /**
+     * Writes the current topology of the connection's virtual host as a new migration and returns it. Returns null, with
+     * [MigrationsScreenState.errorMessage] set and NO file written, when any catalog call fails (never an empty or partial file). Never throws.
+     */
+    suspend fun exportCurrentTopology(): MigrationFile? {
+        val actions = readTopologyActions()
+        if (actions == null) {
+            _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ) }
+            return null
         }
-
         val exported = fileRepository.exportTopology(
-            version = nextVersion,
+            version = fileRepository.nextVersion(),
             description = "Exported broker topology",
             actions = actions,
         )
@@ -235,7 +205,65 @@ class MigrationsViewModel(
         return exported
     }
 
+    /** Every queue page, then the exchanges and the bindings; null as soon as one call fails. */
+    private suspend fun readTopologyActions(): List<MigrationAction>? {
+        val catalog = topologyCatalog ?: return emptyList()
+        val queues = allQueues(catalog) ?: return null
+        val exchanges = (catalog.exchanges(vhost) as? CatalogResult.Success)?.value ?: return null
+        val bindings = (catalog.bindings(vhost) as? CatalogResult.Success)?.value ?: return null
+        return queues.map(::queueAction) + exchanges.mapNotNull(::exchangeAction) + bindings.mapNotNull(::bindingAction)
+    }
+
+    private suspend fun allQueues(catalog: TopologyCatalog): List<QueueRow>? {
+        val rows = mutableListOf<QueueRow>()
+        var page = 1
+        do {
+            val result = (catalog.queues(vhost, page) as? CatalogResult.Success)?.value ?: return null
+            rows += result.rows
+            page++
+        } while (result.page < result.pageCount)
+        return rows
+    }
+
+    private fun queueAction(row: QueueRow): MigrationAction =
+        if (row.type == "stream") {
+            MigrationAction.DeclareStream(name = row.name, vhost = vhost)
+        } else {
+            MigrationAction.DeclareQueue(name = row.name, type = row.type, vhost = vhost)
+        }
+
+    private fun exchangeAction(row: ExchangeRow): MigrationAction? =
+        if (row.name.isEmpty() || row.name.startsWith("amq.")) {
+            null
+        } else {
+            MigrationAction.DeclareExchange(
+                name = row.name,
+                type = row.type,
+                vhost = vhost,
+                durable = row.durable,
+                autoDelete = row.autoDelete,
+                internal = row.internal,
+            )
+        }
+
+    private fun bindingAction(row: BindingRow): MigrationAction? =
+        if (row.source.isEmpty() || row.destination.isEmpty()) {
+            null
+        } else {
+            MigrationAction.DeclareBinding(
+                exchange = row.source,
+                queue = row.destination,
+                routingKey = row.routingKey,
+                vhost = vhost,
+                destinationType = row.destinationType,
+            )
+        }
+
     fun dismissError() {
         _state.update { it.copy(errorMessage = null) }
+    }
+
+    private companion object {
+        const val TOPOLOGY_NOT_READ = "The topology could not be read"
     }
 }

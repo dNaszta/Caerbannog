@@ -40,6 +40,7 @@ States are drawn in `M5-08c` (the mockup is its step 1b); this task only provide
 None here (`M5-09` reads the folder store and the history repository through these ports).
 
 ## Open points
+From `M5-08a` (final review, 2026-11-10): `MigrationRunner.dryRun` and `applyPending` take the connection's virtual host as a REQUIRED parameter and `MigrationsViewModel` passes it; `exportCurrentTopology` returns `MigrationFile?` (null on failure, `state.errorMessage` set, no file); `ActionFailed` carries `index` and `total`; `echoableName(text): Boolean` is the one echo rule for names in messages (folder paths are the user's own and are shown whole, a file name from the folder passes `echoableName` or is shown generically); the shared status table `ManagementStatusTable` in `core-testing` is the single source of the fake broker's answers.
 1. History key by profile name; rename handled in Scope 6; deleting a profile leaves its history entries (harmless, a follow-up idea: prune on delete).
 2. Windows and exotic file systems: atomic move fallback and read-only detection are best effort and UNVERIFIED.
 3. Whether `~/.caerbannog` exists on a fresh machine: the history repository creates its own parent folder, never the user's migrations folder.

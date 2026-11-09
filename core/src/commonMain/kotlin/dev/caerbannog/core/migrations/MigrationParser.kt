@@ -96,6 +96,8 @@ object MigrationParser {
             }
         }
 
+        RerunSafety.conflict(actions)?.let { return MigrationValidationResult.Invalid(it) }
+
         val checksum = computeChecksum(rawJson)
         val migrationFile = MigrationFile(
             version = version,

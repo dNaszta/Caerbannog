@@ -54,6 +54,8 @@ dependencies {
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
 
     testImplementation(kotlin("test"))
+    // M5-08a: FakeManagementBroker (a scripted, honest model of the management API) and FakeStreamManager.
+    testImplementation(project(":core-testing"))
     // RealBrokerMqttIntegrationTest subscribes with the MQTT 3.1.1 client (a v3 subscriber also receives v5 publishes).
     testImplementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
     // M2-14c: ManagementHttp classification tests throw constructed SSL exceptions from a mock engine (no server can produce a cause loop).

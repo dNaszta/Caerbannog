@@ -146,6 +146,8 @@ class ActiveConnection(
             mqtt = GuardedMqttCatalog(connection.mqtt, isCurrent),
             mqttPublisher = GuardedMqttPublisher(connection.mqttPublisher, isCurrent),
             queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
+            migrationExecutor = connection.migrationExecutor?.let { GuardedMigrationExecutor(it, isCurrent) },
+            migrationUnavailableReason = connection.migrationUnavailableReason,
             hasMqtt = hasMqtt,
         )
     }

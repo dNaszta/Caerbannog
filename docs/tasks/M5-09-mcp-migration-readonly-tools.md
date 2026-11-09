@@ -30,6 +30,7 @@ None.
 This is the MCP task: two read-only tools, schemas above; safety: no secrets, no writes, no broker calls, structured fixed errors.
 
 ## Open points
+From `M5-08a` (final review, 2026-11-10): the dry run reasons now include "The action belongs to virtual host <v>; this connection is for <c>" (the name only when `echoableName` allows it); the MCP dry-run tool uses the same `MigrationRunner.dryRun(migration, hasConfigurePermission, controlLevel, vhost)` with the profile's virtual host (required parameter) and must not echo a name that `echoableName` refuses.
 The MCP process and the app may run at the same time: both only read the history here, the app writes it atomically, so a torn read is not possible; a missing or briefly renamed file gives the structured error.
 
 ## Definition of done

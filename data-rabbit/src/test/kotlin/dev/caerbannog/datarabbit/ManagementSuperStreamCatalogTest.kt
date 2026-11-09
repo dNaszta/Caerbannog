@@ -54,7 +54,7 @@ class ManagementSuperStreamCatalogTest {
             @Suppress("UNCHECKED_CAST")
             val layouts = (result as CatalogResult.Success<List<SuperStreamLayout>>).value.associateBy { it.name }
             assertEquals(listOf("regions-us", "regions-eu", "regions-apac"), layouts.getValue("regions").partitions)
-            val calls = server.seen.filter { it.rawPath != "/api/whoami" }
+            val calls = server.seen.also { seen -> assertEquals(1, seen.count { it.rawPath == "/api/overview" && it.method == "GET" }, "exactly one GET /api/overview per connection: $seen") }.filter { it.rawPath != "/api/whoami" && it.rawPath != "/api/overview" }
             assertEquals(listOf("GET $exchangesPath", "GET $bindingsPath"), calls.map { "${it.method} ${it.rawPath}" }, "calls: $calls")
         }
     }
@@ -68,7 +68,7 @@ class ManagementSuperStreamCatalogTest {
             val result = withCatalog(server) { it.superStreams("/") }
 
             assertEquals(CatalogResult.Success(emptyList<SuperStreamLayout>()), result)
-            val calls = server.seen.filter { it.rawPath != "/api/whoami" }
+            val calls = server.seen.also { seen -> assertEquals(1, seen.count { it.rawPath == "/api/overview" && it.method == "GET" }, "exactly one GET /api/overview per connection: $seen") }.filter { it.rawPath != "/api/whoami" && it.rawPath != "/api/overview" }
             assertEquals(listOf("GET $exchangesPath"), calls.map { "${it.method} ${it.rawPath}" }, "calls: $calls")
         }
     }
