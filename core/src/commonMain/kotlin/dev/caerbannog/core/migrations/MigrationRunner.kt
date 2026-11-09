@@ -52,13 +52,13 @@ class MigrationRunner(
     private val executor: TopologyMigrationExecutor,
 ) {
     /**
-     * Dry run check: evaluates whether actions are allowed without modifying the broker.
+     * Dry run check: evaluates whether actions are allowed without modifying the broker. [vhost] is the connection's virtual host:
+     * an action for any other one is blocked (spec V1), whatever the control level.
      */
     fun dryRun(
         migration: MigrationFile,
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
-        // M5-08a STUB: accepted and ignored until the runner implements the V1 rule. The default keeps the existing callers compiling.
         vhost: String,
     ): MigrationDryRun {
         if (!hasConfigurePermission) {
@@ -86,7 +86,9 @@ class MigrationRunner(
         }
 
         val actions = migration.up.map { action ->
-            if (action.isDestructive && controlLevel != TopologyControlLevel.FULL_CONTROL) {
+            if (action.vhost != vhost) {
+                ActionDryRun(action = action, allowed = false, reason = otherVhostReason(action.vhost, vhost))
+            } else if (action.isDestructive && controlLevel != TopologyControlLevel.FULL_CONTROL) {
                 ActionDryRun(
                     action = action,
                     allowed = false,
@@ -102,9 +104,21 @@ class MigrationRunner(
             version = migration.version,
             actions = actions,
             canApply = allAllowed,
-            blockedReason = if (!allAllowed) "Some actions are blocked by control level" else null,
+            blockedReason = when {
+                allAllowed -> null
+                migration.up.any { it.vhost != vhost } -> "Some actions belong to another virtual host than this connection's"
+                else -> "Some actions are blocked by control level"
+            },
         )
     }
+
+    /** Names a virtual host only through the echo rule; the wording keeps saying "virtual host" either way. */
+    private fun otherVhostReason(actionVhost: String, connectionVhost: String): String =
+        if (echoableName(actionVhost) && echoableName(connectionVhost)) {
+            "The action belongs to virtual host $actionVhost; this connection is for $connectionVhost"
+        } else {
+            "The action belongs to another virtual host than this connection's"
+        }
 
     /**
      * Resolves the current status of each migration file for the specified profile.
@@ -136,7 +150,6 @@ class MigrationRunner(
         files: List<MigrationFile>,
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
-        // M5-08a STUB: accepted and ignored until the runner implements the V1 rule.
         vhost: String,
     ): MigrationApplyResult {
         if (!hasConfigurePermission) {
@@ -165,7 +178,7 @@ class MigrationRunner(
                 return MigrationApplyResult.Blocked(dryRunResult.blockedReason ?: "Migration is blocked")
             }
 
-            for (action in migration.up) {
+            for ((position, action) in migration.up.withIndex()) {
                 when (val outcome = executor.execute(action)) {
                     is ActionResult.Success -> {
                         // Action completed or was idempotent no-op
@@ -174,8 +187,8 @@ class MigrationRunner(
                         return MigrationApplyResult.ActionFailed(
                             version = migration.version,
                             action = action,
-                            index = 0, // M5-08a STUB
-                            total = 0, // M5-08a STUB
+                            index = position + 1,
+                            total = migration.up.size,
                             reason = outcome.reason,
                         )
                     }

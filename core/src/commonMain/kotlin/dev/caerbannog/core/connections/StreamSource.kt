@@ -3,6 +3,9 @@ package dev.caerbannog.core.connections
 import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.StreamMessageReader
+import dev.caerbannog.core.migrations.ActionResult
+import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.mqtt.MqttCatalog
 import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.mqtt.MqttMessagePublisher
@@ -61,7 +64,7 @@ class StreamSource(
     /** M7-08: the non-destructive queue message inspector of the same held connection, guarded like [publisher]. */
     val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
     /** M5-08a: the migration executor of the same held connection, guarded like [manager]; null when the connection has none. */
-    val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
+    val migrationExecutor: TopologyMigrationExecutor? = null,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
 )
@@ -131,6 +134,15 @@ internal class GuardedStreamManager(
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
         if (isCurrent()) inner.deleteStream(vhost, name) else StreamManagementResult.Failed("Connection closed")
+}
+
+/** Proxy for a migration executor: once the connection is no longer current nothing reaches the broker (same wording as the other guards). */
+internal class GuardedMigrationExecutor(
+    private val inner: TopologyMigrationExecutor,
+    private val isCurrent: () -> Boolean,
+) : TopologyMigrationExecutor {
+    override suspend fun execute(action: MigrationAction): ActionResult =
+        if (isCurrent()) inner.execute(action) else ActionResult.Failed("Connection closed")
 }
 
 internal class GuardedMqttCatalog(

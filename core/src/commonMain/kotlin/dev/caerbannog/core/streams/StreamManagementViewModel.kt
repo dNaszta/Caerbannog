@@ -147,8 +147,8 @@ class StreamManagementViewModel(
                 _deleteState.update { it.copy(isDeleting = false, error = outcome.message) }
                 false
             }
-            is StreamManagementResult.NotFound -> { // M5-08a STUB: must show the fixed text "The stream does not exist"
-                _deleteState.update { it.copy(isDeleting = false, error = "") }
+            is StreamManagementResult.NotFound -> {
+                _deleteState.update { it.copy(isDeleting = false, error = "The stream does not exist") }
                 false
             }
         }
