@@ -14,13 +14,13 @@ sealed interface ApplyOutcome {
 /** The outcome of a finished apply, or null when it succeeded or was blocked before anything was sent. */
 internal fun MigrationApplyResult.toOutcome(): ApplyOutcome? = when (this) {
     is MigrationApplyResult.ActionFailed ->
-        if (kind == FailureKind.Conflict) ApplyOutcome.Conflict(version, index, total, reason, action.resourceName())
+        if (kind == FailureKind.Conflict) ApplyOutcome.Conflict(version, index, total, reason, action.resourceName()?.takeIf(::echoableName))
         else ApplyOutcome.Failed(version, index, total, reason)
     is MigrationApplyResult.NotRecorded -> ApplyOutcome.NotRecorded(version, reason)
     is MigrationApplyResult.Success, is MigrationApplyResult.Blocked -> null
 }
 
-/** The name a conflict is about, taken from the action itself (never parsed from a broker text); null for a binding. */
+/** The name a conflict is about, taken from the action itself (never parsed from a broker text); null for a binding. The caller echoes it only when [echoableName] allows it, as the executor does. */
 private fun MigrationAction.resourceName(): String? = when (this) {
     is MigrationAction.DeclareQueue -> name
     is MigrationAction.DeleteQueue -> name

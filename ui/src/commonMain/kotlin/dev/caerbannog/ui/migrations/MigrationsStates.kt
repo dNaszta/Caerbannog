@@ -201,8 +201,7 @@ private fun HistoryBanner(
     StateBanner("migrations:historyBanner", AppIcon.History, BannerTone.Error) { color ->
         Text(MigrationsWording.HISTORY_TITLE, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = color)
         PathText(problem.path, color)
-        Text(problem.reason, style = MaterialTheme.typography.bodySmall, color = color)
-        Text("The file was not changed.", style = MaterialTheme.typography.bodySmall, color = color)
+        Text("${problem.reason}. It was not changed.", style = MaterialTheme.typography.bodySmall, color = color)
     }
     ActionButtons {
         FilledTonalButton(onClick = onRetry, modifier = Modifier.testTag("migrations:historyRetryBtn")) {
