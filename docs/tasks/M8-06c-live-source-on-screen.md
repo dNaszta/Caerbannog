@@ -14,7 +14,8 @@ In:
 2. `ui`: source picker (segmented control as in `docs/ux/Migrate3x.dc.html` "Where does the 3.x topology come from?"), locked source card (lock icon, "read only"), the `CannotExport` state with the "Choose definitions file" button, the live loading state. Tags (new, stable afterwards): `migrate3x-source-file`, `migrate3x-source-live`, `migrate3x-source-live-reason`, `migrate3x-source-locked`, `migrate3x-state-cannotExport`, `migrate3x-analyse-live`.
 3. `ui` + `desktopApp`, F4 (owner decision, option B): the left drawer shows ONE visible note `navReasonNote` under the list while the connection is a 3.x source; the tooltip and the accessible description stay on each disabled item and on the search. Remove the tags `navItemReason:<Destination>` and `searchReason`; update the tests that use them (`NavigationFeatures` Compose and desktopApp tests). One `ReasonText` instead of five.
 4. Connection popup: for a 3.x connection the entry "Migrate from 3.x" opens the screen with the live source selected (mockup `docs/ux/Main.dc.html`, chip variant); tag `connection-popup-migrate3x`.
-5. F6: fix the import order and the indentation of the `when` inside `CompositionLocalProvider` in `Main.kt` while touching it. F8: see Open points.
+5. F6: fix the import order and the indentation of the `when` inside `CompositionLocalProvider` in `Main.kt` while touching it.
+5b. F8 (DECIDED, owner, 2026-11-10, option B): the 3.x pill on a profile card shows only while that profile is Connected (as `docs/ux/Main.dc.html` says); after Disconnect the card shows no pill. Card change plus one Compose test (connected: pill; disconnected: none).
 6. Live twin of "the analysis survives switching": the held live analysis (`AnalysisHolder`) is not cleared when the 4.x connection becomes the held one; the screen then shows the report with the source card text "from legacy-eu (disconnected)" and the picker offers the live option disabled.
 Out: any HTTP or transport change (`ManagementThreeXReads` stays as it is), review and generate (M8-06b, built), access migration (M8-06d), forwarding (M8-09), any write to a 3.x broker, any new MCP tool.
 
@@ -35,7 +36,7 @@ State in, events out; decisions (which options, which reason, which state) in `c
 None (UI-only). Reason: the live read is already reachable by an agent only through the app's own screens; an MCP tool that analyses or forwards would add a write-adjacent path to a 3.x broker, and the spec forbids a Shovel tool. An analysis tool is a separate decision (M8-06b brief already records no tool).
 
 ## Open points
-- F8 (owner question, small): after Disconnect the profile card of a 3.x broker keeps the 3.x pill because the session remembers the status of the name. Option A: keep (true information, no work). Option B: show the pill only while Connected, as the mockup says (small change in the card, one test). Recommendation: B, one source of truth with the mockup; it is a wording-adjacent visible change, so the owner confirms before step 3.
+- F8: DECIDED (owner, 2026-11-10), see Scope 5b. No open owner question left.
 - Where the live source reads its pause from: `liveSourcePause` exists; pass it, never `delay` directly.
 - Follow-up idea from M8-02b (not for this task): response body size cap in `ManagementHttp`.
 
