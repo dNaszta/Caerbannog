@@ -136,7 +136,8 @@ class RealBrokerM8LiveSourceTest {
         assertEquals("legacy-eu", outcome.held.fileLabel)
         assertTrue(report.source.live, "the report is marked as a live one")
         assertEquals("legacy-eu", report.source.name)
-        assertEquals(version, report.source.sourceVersion, "the report names the version read from the broker")
+        // R4: the report shows the export's rabbit_version (like a file import); brokerVersion (overview) feeds only the pill and the facts.
+        assertTrue(report.source.sourceVersion?.startsWith("3.13") == true, "the report names the 3.13 version of the export: ${report.source.sourceVersion}")
 
         // both queues with their proposals: every durable classic queue gets "not replicated on 4.x" with something to do about it
         for (name in listOf(mirrored, priority)) {
@@ -163,20 +164,28 @@ class RealBrokerM8LiveSourceTest {
 
     // ---- @broker-3x @m8-02: storage version of classic queues ----------------------------------------------------------------------
 
+    /** Bounded poll (30 s, every 500 ms) until the broker shows `storage_version` for [name]; production code is not involved. */
+    private fun awaitStorageVersion(name: String) {
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
+        while (api.get("/api/queues/%2F/$name").json?.let { (it as? kotlinx.serialization.json.JsonObject)?.containsKey("storage_version") } != true) {
+            check(System.nanoTime() < deadline) { "queue $name never showed storage_version within 30 s" }
+            java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(500))
+        }
+    }
+
     @Test
-    fun `a real 3_13 broker reports the storage version of its classic queues, within the bound of the production retry`() {
+    fun `a real 3_13 broker reports the storage version of its classic queues`() {
         val v1 = queue("v1") // 3.13 default: index version 1
         val v2 = queue("v2", """{"x-queue-version":2}""")
-        // No waiting here: the queue was declared a moment ago, which is the worst case. The statistics (and `storage_version`) show up with the
-        // first collection of the queue, so the production retry (STORAGE_VERSION_READS reads, 1 s apart) is the polling.
+        // R3: a real source broker has run for days. The statistics show up with the first collection (5 s by default), so wait for them here,
+        // then scan: nothing may need a retry.
+        awaitStorageVersion(v1)
+        awaitStorageVersion(v2)
         val connection = adminConnection()
-        val source = liveSource(connection)
-        val fetched = assertInstanceOf(FetchResult.Fetched::class.java, runBlocking { withTimeout(120_000) { source.fetch() } }, "fetch")
-        println("M8-02b live: a queue declared just before the scan needed ${pauses.size} pause(s) of ${pauses.firstOrNull()} ms (bound: ${STORAGE_VERSION_READS - 1})")
-        assertTrue(pauses.size <= STORAGE_VERSION_READS - 1, "never more pauses than the bound allows: $pauses")
-
-        assertEquals(ClassicIndexVersion.V1, fetched.facts.classicIndexVersions[QueueRef("/", v1)], "default 3.13 queue is on index version 1 (not Unknown: the retry bound is enough)")
+        val fetched = assertInstanceOf(FetchResult.Fetched::class.java, runBlocking { withTimeout(120_000) { liveSource(connection).fetch() } }, "fetch")
+        assertEquals(ClassicIndexVersion.V1, fetched.facts.classicIndexVersions[QueueRef("/", v1)], "default 3.13 queue is on index version 1")
         assertEquals(ClassicIndexVersion.V2, fetched.facts.classicIndexVersions[QueueRef("/", v2)], "a queue declared with x-queue-version 2")
+        assertTrue(pauses.isEmpty(), "the values were already there, so no retry pause is allowed: $pauses")
 
         val report = assertInstanceOf(LiveAnalysisOutcome.Analysed::class.java, analyse(liveSource(connection)), "analysis").held.report
         val loss = report.findings.filter { it.rule == "classic-index-v1" && it.name == v1 }
@@ -185,6 +194,26 @@ class RealBrokerM8LiveSourceTest {
         assertEquals(FindingClass.MessageLoss, loss.single().findingClass)
         assertEquals(EvidenceSource.LiveQueueStats, loss.single().evidence, "the finding comes from the live storage version, not from the file shape")
         assertTrue(report.findings.none { it.rule == "classic-index-v1" && it.name == v2 }, "a version 2 queue is not a message-loss blocker")
+    }
+
+    /**
+     * The honest worst case: scan straight after declaring. A value is never Unknown while retries remain: either it is V1/V2, or it is Unknown
+     * after the whole bound (all STORAGE_VERSION_READS - 1 pauses were used). The pauses used are printed (R3: the number is reported in step 4).
+     */
+    @Test
+    fun `a scan straight after declaring never gives up before the bound`() {
+        val v1 = queue("fresh1")
+        val v2 = queue("fresh2", """{"x-queue-version":2}""")
+        val connection = adminConnection()
+        val fetched = assertInstanceOf(FetchResult.Fetched::class.java, runBlocking { withTimeout(120_000) { liveSource(connection).fetch() } }, "fetch")
+        println("M8-02b live: scan straight after declaring used ${pauses.size} pause(s) of ${STORAGE_VERSION_READS - 1} allowed")
+        for ((name, expected) in listOf(v1 to ClassicIndexVersion.V1, v2 to ClassicIndexVersion.V2)) {
+            val value = fetched.facts.classicIndexVersions[QueueRef("/", name)]
+            assertTrue(
+                value == expected || (value == ClassicIndexVersion.Unknown && pauses.size == STORAGE_VERSION_READS - 1),
+                "queue $name: $value after ${pauses.size} pause(s); Unknown is only allowed after all ${STORAGE_VERSION_READS - 1} pauses",
+            )
+        }
     }
 
     /**

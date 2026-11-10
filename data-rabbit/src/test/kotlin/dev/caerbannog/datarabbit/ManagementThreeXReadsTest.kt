@@ -198,6 +198,74 @@ class ManagementThreeXReadsTest {
         assertInstanceOf(ReadOutcome.Failed::class.java, reading(answering(200, deep)) { it.storageVersions("/") })
     }
 
+    // ---- page_count rulings R1 and R2 ----------------------------------------------------------------------------------------------
+
+    private fun pageNumber(query: String) = Regex("page=(\\d+)").find(query)!!.groupValues[1].toInt()
+
+    @Test
+    fun `a page_count above the cap fails with a fixed text after exactly one request`() {
+        val outcome = reading(answering(200, queuePage(1, MAX_QUEUE_PAGES + 1, classic("a", 1)))) { it.storageVersions("/") }
+        val failed = assertInstanceOf(ReadOutcome.Failed::class.java, outcome)
+        assertEquals("The queue list is too long to read", failed.reason)
+        assertFixedText(failed.reason)
+        assertEquals(1, seen.size, "a hostile page_count costs one GET: ${seen.map { it.query }}")
+        assertTrue("page=1" in seen.single().query)
+    }
+
+    @Test
+    fun `a page_count of exactly the cap reads every page`() {
+        val outcome = reading({ _, query -> val n = pageNumber(query); 200 to queuePage(n, MAX_QUEUE_PAGES, classic("q$n", 1)) }) { it.storageVersions("/") }
+        val map = ok(outcome)
+        assertEquals(MAX_QUEUE_PAGES, seen.size, "one request per page")
+        assertEquals((1..MAX_QUEUE_PAGES).toList(), seen.map { pageNumber(it.query) })
+        assertEquals(MAX_QUEUE_PAGES, map.size)
+        assertEquals(1, map["q$MAX_QUEUE_PAGES"])
+    }
+
+    @Test
+    fun `a later page announcing another page_count is ignored, page 1 decides`() {
+        val outcome = reading({ _, query ->
+            when (pageNumber(query)) {
+                1 -> 200 to queuePage(1, 3, classic("a", 1))
+                2 -> 200 to queuePage(2, 5000, classic("b", 2))
+                else -> 200 to queuePage(3, 1, classic("c", 1))
+            }
+        }) { it.storageVersions("/") }
+        assertEquals(mapOf<String, Int?>("a" to 1, "b" to 2, "c" to 1), ok(outcome))
+        assertEquals(listOf(1, 2, 3), seen.map { pageNumber(it.query) })
+    }
+
+    @Test
+    fun `a body without page_count is one page, and so are 0 and 1`() {
+        for (body in listOf(
+            """{"items":[${classic("a", 1)}]}""",
+            """{"items":[${classic("a", 1)}],"page_count":0}""",
+            """{"items":[${classic("a", 1)}],"page_count":1}""",
+        )) {
+            seen.clear()
+            assertEquals(mapOf<String, Int?>("a" to 1), ok(reading(answering(200, body)) { it.storageVersions("/") }), body)
+            assertEquals(1, seen.size, "exactly one request for $body, saw ${seen.map { it.query }}")
+        }
+    }
+
+    @Test
+    fun `a page_count that is not a whole non-negative number is Failed and no partial map is returned`() {
+        for (count in listOf("\"x\"", "-1", "1.5", "null", "true", "[]", "{}", "\"3\"")) {
+            seen.clear()
+            val body = """{"items":[${classic("a", 1)}],"page_count":$count}"""
+            val failed = assertInstanceOf(ReadOutcome.Failed::class.java, reading(answering(200, body)) { it.storageVersions("/") }, "page_count $count")
+            assertFixedText(failed.reason)
+        }
+    }
+
+    @Test
+    fun `a bare JSON array and an items field that is not an array are Failed`() {
+        for (body in listOf("""[${classic("a", 1)}]""", """{"items":{"a":1},"page_count":1}""", """{"page_count":1}""", """{"items":null,"page_count":1}""")) {
+            val failed = assertInstanceOf(ReadOutcome.Failed::class.java, reading(answering(200, body)) { it.storageVersions("/") }, "body $body")
+            assertFixedText(failed.reason)
+        }
+    }
+
     // ---- deprecated features -------------------------------------------------------------------------------------------------------
 
     @Test
