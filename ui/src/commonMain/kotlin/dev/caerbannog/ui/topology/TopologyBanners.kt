@@ -41,6 +41,7 @@ private fun TopologyBannerKind.look(): BannerLook = when (this) {
     TopologyBannerKind.NoConfigure, TopologyBannerKind.NotReadable ->
         BannerLook(AppIcon.Lock, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
     TopologyBannerKind.DeclaredNotConfirmed -> BannerLook(AppIcon.Info, WarnContainer, OnWarnContainer)
+    TopologyBannerKind.MigrationSource -> BannerLook(AppIcon.Lock, WarnContainer, OnWarnContainer) // M8-02a: warning tone like the pill; look is the developer's
     TopologyBannerKind.OtherVhost ->
         BannerLook(AppIcon.Dns, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
 }

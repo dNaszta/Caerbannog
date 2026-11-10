@@ -28,7 +28,9 @@ class FakeThreeXReads : ThreeXReads {
     private class Scripted(val value: Int?, val availableFromRead: Int?)
 
     private val scripts = HashMap<String, MutableMap<String, Scripted>>()
-    private val storageFailures = HashMap<String, ReadOutcome<Map<String, Int?>>>()
+    private class FailFrom(val read: Int, val outcome: ReadOutcome<Map<String, Int?>>)
+
+    private val storageFailures = HashMap<String, FailFrom>()
     private val readsPerVhost = HashMap<String, Int>()
 
     /** The queue gets [version] from the [availableFromRead]-th read of its virtual host on (1 = at once); before that it is in the map with null. */
@@ -47,9 +49,9 @@ class FakeThreeXReads : ThreeXReads {
     }
 
     /** Every storage version read of [vhost] ends with [outcome] (not Ok). */
-    fun storageReadsFail(vhost: String, outcome: ReadOutcome<Map<String, Int?>>) {
+    fun storageReadsFail(vhost: String, outcome: ReadOutcome<Map<String, Int?>>, fromRead: Int = 1) {
         require(outcome !is ReadOutcome.Ok) { "use the scripts for Ok answers" }
-        storageFailures[vhost] = outcome
+        storageFailures[vhost] = FailFrom(fromRead, outcome)
     }
 
     fun storageReads(vhost: String): Int = calls.count { it == "storage-versions:$vhost" }
@@ -69,7 +71,7 @@ class FakeThreeXReads : ThreeXReads {
     override suspend fun storageVersions(vhost: String): ReadOutcome<Map<String, Int?>> {
         log += "storage-versions:$vhost"
         val n = synchronized(readsPerVhost) { (readsPerVhost[vhost] ?: 0) + 1 }.also { synchronized(readsPerVhost) { readsPerVhost[vhost] = it } }
-        storageFailures[vhost]?.let { return it }
+        storageFailures[vhost]?.let { if (n >= it.read) return it.outcome }
         val queues = scripts[vhost].orEmpty()
         return ReadOutcome.Ok(queues.mapValues { (_, s) -> if (s.availableFromRead != null && n >= s.availableFromRead) s.value else null })
     }

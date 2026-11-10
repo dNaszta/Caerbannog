@@ -19,14 +19,12 @@ import dev.caerbannog.core.migrate3x.DefinitionsSource
 import dev.caerbannog.core.migrate3x.FetchResult
 import dev.caerbannog.core.migrate3x.Finding
 import dev.caerbannog.core.migrate3x.LiveAnalysisOutcome
-import dev.caerbannog.core.migrate3x.LiveDefinitionsSource
 import dev.caerbannog.core.migrate3x.LiveSourceTexts
 import dev.caerbannog.core.migrate3x.QueueRef
 import dev.caerbannog.core.migrate3x.ReadOutcome
 import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.core.migrate3x.STORAGE_VERSION_PAUSE_MILLIS
 import dev.caerbannog.core.migrate3x.STORAGE_VERSION_READS
-import dev.caerbannog.core.migrate3x.ThreeXReads
 import dev.caerbannog.core.migrate3x.analyseLive
 import dev.caerbannog.core.migrate3x.fakes.DefinitionsFiles
 import dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads
@@ -152,17 +150,10 @@ class Migrate3xLiveSourceSteps {
         analyse(analyse)
     }
 
-    /** What the Migrate from 3.x screen will do (M8-06c): analyse the live source of the held connection; a connection that has none is refused with the fixed text of its version. */
+    /** What the Migrate from 3.x screen will do (M8-06c): analyse the definitions source of the held connection; every connection has one. */
     private suspend fun analyse(name: String) {
         val source = active.source ?: fail("no connection is held for $name")
-        val live = source.definitionsSource ?: LiveDefinitionsSource(name, source.brokerVersion, NoReads) { pauses += it }
-        outcome = analyseLive(Recording(live))
-    }
-
-    private object NoReads : ThreeXReads {
-        override suspend fun definitions() = fail<ReadOutcome<String>>("a connection that is not a 3.x source must not be read from")
-        override suspend fun storageVersions(vhost: String) = fail<ReadOutcome<Map<String, Int?>>>("a connection that is not a 3.x source must not be read from")
-        override suspend fun deprecatedFeaturesInUse() = fail<ReadOutcome<Set<String>>>("a connection that is not a 3.x source must not be read from")
+        outcome = analyseLive(Recording(source.definitionsSource))
     }
 
     /** Keeps the facts the source fetched, so a step can see which queues the scan answered for. Changes nothing. */

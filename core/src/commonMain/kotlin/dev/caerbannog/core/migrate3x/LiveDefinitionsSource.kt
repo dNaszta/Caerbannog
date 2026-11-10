@@ -16,8 +16,8 @@ sealed interface ReadOutcome<out T> {
 
 interface DefinitionsSource {
     /**
-     * M8-02a (test developer's proposal, OPEN QUESTION to the architect): the brief's [DefinitionsSource] has no name, yet
-     * [LiveAnalysisOutcome.Unreachable] and the "<name> could not be reached" text need one when no fetch succeeded.
+     * The connection this source reads; [LiveAnalysisOutcome.Unreachable] and the "<name> could not be reached" text need it when no fetch
+     * succeeded (rulings 1).
      */
     val connectionName: String
 
@@ -36,6 +36,9 @@ object LiveSourceTexts {
     const val VERSION_UNREADABLE = "The broker version could not be read, so it cannot be analysed"
     const val NOT_THREE_X = "Only a RabbitMQ 3.x connection can be analysed live"
     const val CANNOT_EXPORT = "This user cannot export definitions: the administrator tag is needed"
+
+    /** Fixed text for a `ReadOutcome.Failed` of the definitions call; the adapter's own reason is never passed on. */
+    const val READ_FAILED = "The broker could not return its definitions"
 
     /** M8-02a (test developer's proposal, the brief says "fixed too large text"). */
     const val EXPORT_TOO_LARGE = "The definitions export of this broker is too large to analyse"
@@ -57,6 +60,31 @@ class LiveDefinitionsSource(
     private val pause: suspend (millis: Long) -> Unit,
 ) : DefinitionsSource {
     override suspend fun fetch(): FetchResult = FetchResult.Failed("M8-02a STUB")
+}
+
+/** M8-02a STUB (wrong on purpose: must refuse with NOT_THREE_X). The default of `StreamSource.definitionsSource`. */
+class UnavailableDefinitionsSource(override val connectionName: String) : DefinitionsSource {
+    override suspend fun fetch(): FetchResult = FetchResult.Failed("M8-02a STUB")
+}
+
+/** Every read fails; never called, because [LiveDefinitionsSource] refuses an unknown or 4.x version before any read. */
+object NoThreeXReads : ThreeXReads {
+    override suspend fun definitions(): ReadOutcome<String> = ReadOutcome.Failed("no source")
+    override suspend fun storageVersions(vhost: String): ReadOutcome<Map<String, Int?>> = ReadOutcome.Failed("no source")
+    override suspend fun deprecatedFeaturesInUse(): ReadOutcome<Set<String>> = ReadOutcome.Failed("no source")
+}
+
+/** M8-02a STUB: passes through without the guard (must return Unreachable without a read once [isCurrent] is false). */
+internal class GuardedDefinitionsSource(private val inner: DefinitionsSource, private val isCurrent: () -> Boolean) : DefinitionsSource {
+    override val connectionName: String get() = inner.connectionName
+    override suspend fun fetch(): FetchResult = inner.fetch()
+}
+
+/** M8-02a STUB: passes through without the guard (must return ReadOutcome.Unreachable for every method once [isCurrent] is false). */
+internal class GuardedThreeXReads(private val inner: ThreeXReads, private val isCurrent: () -> Boolean) : ThreeXReads {
+    override suspend fun definitions(): ReadOutcome<String> = inner.definitions()
+    override suspend fun storageVersions(vhost: String): ReadOutcome<Map<String, Int?>> = inner.storageVersions(vhost)
+    override suspend fun deprecatedFeaturesInUse(): ReadOutcome<Set<String>> = inner.deprecatedFeaturesInUse()
 }
 
 sealed interface LiveAnalysisOutcome {

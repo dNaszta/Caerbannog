@@ -59,6 +59,7 @@ class LiveDefinitionsSourceTest {
         assertEquals("The broker version could not be read, so it cannot be analysed", LiveSourceTexts.VERSION_UNREADABLE)
         assertEquals("Only a RabbitMQ 3.x connection can be analysed live", LiveSourceTexts.NOT_THREE_X)
         assertEquals("This user cannot export definitions: the administrator tag is needed", LiveSourceTexts.CANNOT_EXPORT)
+        assertEquals("The broker could not return its definitions", LiveSourceTexts.READ_FAILED)
         assertEquals(6, STORAGE_VERSION_READS)
         assertEquals(1_000L, STORAGE_VERSION_PAUSE_MILLIS)
     }
@@ -81,8 +82,10 @@ class LiveDefinitionsSourceTest {
 
     @Test
     fun `another failure of the definitions read gives Failed and nothing else is read`() = runTest {
-        reads.definitions = ReadOutcome.Failed("The broker answered in a form the app does not understand")
-        assertIs<FetchResult.Failed>(source().fetch())
+        reads.definitions = ReadOutcome.Failed("SENTINEL broker text: <html>500</html>")
+        val outcome = source().fetch()
+        assertEquals(FetchResult.Failed(LiveSourceTexts.READ_FAILED), outcome)
+        assertFalse("SENTINEL" in outcome.toString(), "the adapter's reason is never passed on")
         assertEquals(listOf("definitions"), reads.calls)
     }
 
@@ -222,8 +225,22 @@ class LiveDefinitionsSourceTest {
             val result = assertIs<FetchResult.Fetched>(LiveDefinitionsSource("legacy-eu", "3.13.7", r) { }.fetch(), "after $failure")
             assertEquals(ClassicIndexVersion.Unknown, result.facts.classicIndexVersions[QueueRef("/", "a")], "after $failure")
             assertEquals(ClassicIndexVersion.V2, result.facts.classicIndexVersions[QueueRef("other", "b")], "the other vhost is still read")
-            assertTrue(r.storageReads("/") in 1..STORAGE_VERSION_READS, "at most 6 reads for the failing vhost")
+            assertEquals(1, r.storageReads("/"), "a failing read ends the scan of that vhost at once, after $failure")
+            assertEquals(0, pauses.size)
         }
+    }
+
+    @Test
+    fun `a read that fails later ends the scan there, keeps what settled and leaves the rest Unknown`() = runTest {
+        reads.definitions = ReadOutcome.Ok(export("fast" to null, "slow" to null))
+        reads.storageVersionAppearsAtRead("/", "fast", 1, version = 1)
+        reads.storageVersionNeverAppears("/", "slow")
+        reads.storageReadsFail("/", ReadOutcome.Unreachable, fromRead = 3)
+        val result = fetched()
+        assertEquals(ClassicIndexVersion.V1, result.facts.classicIndexVersions[QueueRef("/", "fast")])
+        assertEquals(ClassicIndexVersion.Unknown, result.facts.classicIndexVersions[QueueRef("/", "slow")])
+        assertEquals(3, reads.storageReads("/"), "no read after the failing one")
+        assertEquals(2, pauses.size)
     }
 
     @Test

@@ -656,8 +656,7 @@ class TopologyViewModel(
             TopologyBanner(TopologyBannerKind.DeclaredNotConfirmed, text.headline, text.detail)
         }
         is PermissionCheckResult.Unreadable -> TopologyBanner(TopologyBannerKind.NotReadable, TopologyTexts.LOCKED_HEADLINE, result.reason)
-        // M8-02a STUB: a 3.x source stays locked whatever the profile says; real wording is the developer's (the screen is not offered for a source).
-        is PermissionCheckResult.MigrationSource -> TopologyBanner(TopologyBannerKind.NoConfigure, TopologyTexts.noConfigure(ctx.profile.username, home), null)
+        is PermissionCheckResult.MigrationSource -> TopologyBanner(TopologyBannerKind.MigrationSource, "M8-02a STUB", null) // M8-02a STUB
     }
 }
 

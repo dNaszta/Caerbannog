@@ -1,6 +1,7 @@
 package dev.caerbannog.core.connections
 
 import dev.caerbannog.core.migrate3x.FetchResult
+import dev.caerbannog.core.migrate3x.LiveSourceTexts
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -47,7 +48,7 @@ class MigrationSourceConnectionTest {
         h.active.connect(legacy)
         val source = assertNotNull(h.active.source)
         assertEquals("3.13.7", source.brokerVersion)
-        assertNotNull(source.definitionsSource, "a 3.x source can be analysed live")
+        assertEquals("legacy-eu", source.definitionsSource.connectionName)
         assertNull(source.migrationExecutor)
         assertEquals("This broker runs RabbitMQ 3.x: it is a migration source only", source.migrationUnavailableReason)
     }
@@ -62,7 +63,8 @@ class MigrationSourceConnectionTest {
         assertEquals(checked, h.session.permissions("uat-eu"))
         val source = assertNotNull(h.active.source)
         assertEquals("4.1.0", source.brokerVersion)
-        assertNull(source.definitionsSource)
+        assertEquals(FetchResult.Failed(LiveSourceTexts.NOT_THREE_X), source.definitionsSource.fetch())
+        assertEquals(emptyList(), h.gateway.threeXReadsOf("uat-eu").calls, "a 4.x broker is never read from")
     }
 
     @Test
@@ -75,7 +77,8 @@ class MigrationSourceConnectionTest {
         assertEquals(checked, h.session.permissions("uat-eu"), "unknown must keep today's behaviour")
         val source = assertNotNull(h.active.source)
         assertNull(source.brokerVersion)
-        assertNull(source.definitionsSource)
+        assertEquals(FetchResult.Failed(LiveSourceTexts.VERSION_UNREADABLE), source.definitionsSource.fetch())
+        assertEquals(emptyList(), h.gateway.threeXReadsOf("uat-eu").calls, "an unknown version is never read from")
         assertNull(source.migrationExecutor)
         assertEquals("The broker version could not be read, so migrations are not offered", source.migrationUnavailableReason)
     }
@@ -85,7 +88,7 @@ class MigrationSourceConnectionTest {
         val h = Harness()
         h.active.connect(h.uat)
         assertEquals(PermissionCheckResult.Checked(true, true), h.session.permissions("uat-eu"))
-        assertNull(assertNotNull(h.active.source).definitionsSource)
+        assertEquals(FetchResult.Failed(LiveSourceTexts.VERSION_UNREADABLE), assertNotNull(h.active.source).definitionsSource.fetch())
     }
 
     @Test
@@ -94,7 +97,7 @@ class MigrationSourceConnectionTest {
         h.gateway.brokerRuns("legacy-eu", "3.13.7")
         h.active.connect(legacy)
         assertEquals(1, h.gateway.overviewReads)
-        assertNotNull(h.active.source?.definitionsSource, "a 3.x connection has a definitions source").fetch()
+        h.active.source!!.definitionsSource.fetch()
         assertEquals(1, h.gateway.overviewReads, "analysing must not read the overview again")
     }
 
@@ -120,8 +123,8 @@ class MigrationSourceConnectionTest {
         h.active.connect(legacy)
         val old = assertNotNull(h.active.source)
         h.active.connect(h.uat)
-        val outcome = assertNotNull(old.definitionsSource, "a 3.x connection has a definitions source").fetch()
-        assertTrue(outcome !is FetchResult.Fetched, "a superseded source must not return data: $outcome")
+        val outcome = old.definitionsSource.fetch()
+        assertEquals(FetchResult.Unreachable, outcome, "a superseded source answers Unreachable")
         assertEquals(emptyList(), h.gateway.threeXReadsOf("legacy-eu").calls, "nothing may reach the broker after the connection is gone")
     }
 
@@ -130,7 +133,7 @@ class MigrationSourceConnectionTest {
         val h = harness()
         h.gateway.brokerRuns("legacy-eu", "3.13.7")
         h.active.connect(legacy)
-        assertNotNull(h.active.source?.definitionsSource, "a 3.x connection has a definitions source").fetch()
+        h.active.source!!.definitionsSource.fetch()
         val text = h.exposedText() + h.session.permissions("legacy-eu") + h.active.source.toString() + h.gateway.threeXReadsOf("legacy-eu").calls
         assertFalse(PASSWORD in text, "password found in observable text")
     }
