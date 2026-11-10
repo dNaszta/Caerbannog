@@ -209,6 +209,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the broker refuses the definitions export for this user because it is not an administrator
     When I analyse the live connection
     Then the screen says that this user cannot export definitions
+    And the screen says how to export the definitions
     And the button "Choose definitions file" is offered
     And no report is shown
 
@@ -220,6 +221,14 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the screen says that "legacy-eu" could not be reached
     And no report is shown
     And the screen shows no text that the broker returned
+
+  @fake-broker @m8-06c
+  Scenario: A live report says that the broker reported the index version
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    And the broker reports index version 1 for the classic queue "orders" and version 2 for the classic queue "modern"
+    When I analyse the live connection
+    Then the message-loss block lists "orders" only
+    And the message-loss block says the list comes from the broker and not from a definitions file
 
   @fake-broker @m8-06c
   Scenario: The connection popup of a 3.x broker offers Migrate from 3.x
