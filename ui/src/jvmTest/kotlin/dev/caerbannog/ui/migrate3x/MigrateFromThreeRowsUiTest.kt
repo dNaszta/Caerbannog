@@ -64,6 +64,9 @@ class MigrateFromThreeRowsUiTest {
     fun `no node, description or text of the screen holds a hash or a password`() = runDesktopComposeUiTest(1280, 800) {
         val state = MigrateScreenFiles.report(MigrateScreenFiles.withUser, open = MigrateScreenFiles::allGroups)
         show(state)
+        val g = state.view.groups.first { g -> (0 until state.view.rows(g.key).size).any { state.view.rows(g.key).at(it).name == "svc" } }
+        val i = (0 until state.view.rows(g.key).size).first { state.view.rows(g.key).at(it).name == "svc" }
+        revealRow(state.view, g.key, i)
         val everything = wholeScreenText()
         assertTrue(everything.contains("hash hidden"), "the premise: the user row is drawn")
         listOf(MigrateScreenFiles.SENTINEL_HASH, MigrateScreenFiles.SENTINEL_PASSWORD, "amqp://").forEach { assertFalse(everything.contains(it), "the screen holds $it") }

@@ -9,7 +9,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
 import dev.caerbannog.core.migrate3x.ReportView
@@ -143,7 +143,8 @@ internal fun DesktopComposeUiTest.assertTextHas(tag: String, vararg parts: Strin
 
 /** Every node of the screen, as text: texts and content descriptions, for the "no secret on the screen" checks. */
 @OptIn(ExperimentalTestApi::class)
-internal fun DesktopComposeUiTest.wholeScreenText(): String = onRoot(useUnmergedTree = true).fetchSemanticsNode().allText()
+internal fun DesktopComposeUiTest.wholeScreenText(): String =
+    onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().joinToString("\n") { it.allText() } // a tooltip is a popup: a second root
 
 // ---- single lazy column (owner decision 2026-11-10): banner, summary and chips are the first items of ONE lazy list, tagged `migrate3x-report-list` ----
 
