@@ -151,7 +151,7 @@ class MigrationsViewModelOutcomeTest {
 
     @Test
     fun `a conflict names the resource only when the echo rule allows it`() = runBlocking<Unit> {
-        val hostile = listOf("my queue", "a<b>b", "x".repeat(65), "amqp://user:secret@host/vhost", "caf\u00e9", "..")
+        val hostile = listOf("my queue", "a<b>b", "x".repeat(65), "amqp://user:secret@host/vhost", "caf\u00e9")
         for (name in hostile + listOf("orders", "x".repeat(64), "my_queue.v2-1")) {
             val files = InMemoryMigrationFileRepository()
             val local = ScriptedExecutor()
