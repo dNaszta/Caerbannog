@@ -105,6 +105,8 @@ class AppComposition(
     val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
     /** What the drawer offers: the features of the connected broker and the reason for the others (M8-02a); the window passes it to the frame. */
     val navigationFeatures: StateFlow<NavigationFeatures> = MutableStateFlow(NavigationFeatures.ALL),
+    /** M8-06c STUB: what the Migrate from 3.x screen may read live (the held 3.x connection); None until it is built in [createAppComposition]. */
+    val liveSource: dev.caerbannog.core.migrate3x.LiveSourceProvider = dev.caerbannog.core.migrate3x.LiveSourceProvider.None,
 ) {
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)

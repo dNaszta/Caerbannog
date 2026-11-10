@@ -32,6 +32,9 @@ fun permissionPill(status: PermissionCheckStatus?): PermissionPill = when (statu
     }
 }
 
+// M8-06c STUB: F8 not applied yet (the pill of a 3.x connection shows whatever the link is).
+fun cardPill(status: PermissionCheckStatus?, connected: Boolean): PermissionPill? = permissionPill(status)
+
 fun permissionBanner(profile: ConnectionProfile, status: PermissionCheckStatus?): PermissionBanner = when (status) {
     null -> PermissionBanner(PillTone.NEUTRAL, "Permission check has not run yet.", null, null)
     PermissionCheckStatus.Checking -> PermissionBanner(PillTone.NEUTRAL, "Checking permissions...", null, null)

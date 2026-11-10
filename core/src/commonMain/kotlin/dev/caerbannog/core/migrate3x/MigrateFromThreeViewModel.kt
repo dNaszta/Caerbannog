@@ -29,6 +29,15 @@ sealed interface MigrateFromThreeState {
     /** [error] is `InvalidName.reason` as returned, or null. The field always starts empty: there is no default value. */
     data class NeedsVirtualHost(val fileLabel: String, val error: String?) : MigrateFromThreeState
     data class Report(val view: ReportView, val notice: ExportNotice?, val review: ReviewState) : MigrateFromThreeState
+
+    /** M8-06c: the live read of [connectionName] runs. */
+    data class LoadingLive(val connectionName: String) : MigrateFromThreeState
+
+    /** M8-06c: the broker refused the export for this user; [text] is `LiveSourceTexts.CANNOT_EXPORT`. The screen offers the file import. */
+    data class CannotExport(val connectionName: String, val text: String) : MigrateFromThreeState
+
+    /** M8-06c: [text] is one of the fixed `LiveSourceTexts`, never a body, a URL or a credential. */
+    data class LiveFailed(val connectionName: String, val text: String) : MigrateFromThreeState
 }
 
 /**
@@ -47,6 +56,9 @@ class MigrateFromThreeViewModel(
     private val folders: MigrationFolderPorts,
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    // M8-06c STUB position: the brief says "after folders", which breaks the 8 positional callers (scope would land in this slot); tests use the name.
+    /** M8-06c: what may be read live now; the default is "nothing". Read only: it has no write method. */
+    private val liveSource: LiveSourceProvider = LiveSourceProvider.None,
 ) {
     // Declared before `mutable`: the initial state reads them.
     private var job: Job? = null
@@ -84,6 +96,17 @@ class MigrateFromThreeViewModel(
     private fun initialState(): MigrateFromThreeState =
         holder.held.value?.let { MigrateFromThreeState.Report(ReportViewBuilder.build(it), null, ReviewViewBuilder.state(it.review, null, GenerationState.Idle)) }
             ?: MigrateFromThreeState.ChooseSource
+
+    /** M8-06c STUB: the picker (selected kind and options). */
+    val picker: StateFlow<SourcePicker> = MutableStateFlow(SourcePicker(SourceKind.File, listOf(SourceOption.File)))
+
+    /** M8-06c STUB. */
+    fun chooseSource(kind: SourceKind) {
+    }
+
+    /** M8-06c STUB. */
+    fun analyseLive() {
+    }
 
     /** Opens the file dialog; a cancelled dialog changes nothing. */
     fun chooseFile() {

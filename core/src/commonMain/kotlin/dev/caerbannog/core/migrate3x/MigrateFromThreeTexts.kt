@@ -2,6 +2,21 @@ package dev.caerbannog.core.migrate3x
 
 /** The fixed words of the Migrate from 3.x screen (owner decision 5: as in `docs/ux/Migrate3x.dc.html`). Never built from file content. */
 object MigrateFromThreeTexts {
+    /** M8-06c (owner decision 2026-11-10): one line for both sources. */
+    const val INFO_LINE: String = "This screen only reads a file or the connected 3.x broker. It sends nothing that changes any broker."
+    const val LIVE_NOT_AVAILABLE: String = "Connect to a RabbitMQ 3.x broker to read it live"
+    const val SOURCE_FILE: String = "Definitions file"
+    const val LIVE_DISABLED: String = "Live connection"
+    const val READ_ONLY: String = "read only"
+    const val ANALYSE_LIVE: String = "Analyse live connection"
+    const val ANALYSE_AGAIN: String = "Analyse again"
+    const val TRY_AGAIN: String = "Try again"
+    const val LIVE_LOADING_HINT: String = "Reading the broker can take a few seconds per virtual host. Nothing on it is changed."
+
+    fun liveOption(name: String): String = "Live connection: $name"
+    fun liveDisconnected(name: String): String = "from $name (disconnected)"
+    fun liveLoading(name: String): String = "Reading and analysing $name"
+
     const val HASH_HIDDEN: String = "hash hidden"
     const val NO_PASSWORD_HASH: String = "no password hash"
     const val FILE_UNREADABLE: String = "The file could not be read"

@@ -22,7 +22,13 @@ fun interface ReportFileSaver {
 }
 
 /** What the screen holds after an analysis: the file label, the document (for the counts) and the report. */
-class HeldAnalysis(val fileLabel: String, val document: DefinitionsDocument, val report: CompatibilityReport) {
+class HeldAnalysis(
+    val fileLabel: String,
+    val document: DefinitionsDocument,
+    val report: CompatibilityReport,
+    /** M8-06c: where the analysis came from; the kind lives here because the analysis outlives the view model (D1). */
+    val kind: SourceKind = SourceKind.File,
+) {
     /** The review of this analysis (built once; the held analysis survives a new window view model, so decisions survive too). */
     val review: ConversionReview = ConversionReview.start(document, report)
 

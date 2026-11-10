@@ -30,6 +30,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
+import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
+import dev.caerbannog.core.migrate3x.SourceKind
+import dev.caerbannog.core.migrate3x.SourceOption
+import dev.caerbannog.core.migrate3x.SourcePicker
 import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -67,6 +71,10 @@ fun MigrateFromThreeScreen(
     review: ReviewEvents = ReviewEvents.None,
     /** The "Open Migrations" button of a saved result; no view model event navigates, the caller does (desktopApp: the Migrations screen). */
     onOpenMigrations: () -> Unit = {},
+    /** M8-06c: the source picker, its event and "Analyse live connection"; the defaults draw the file source only, as before. */
+    picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
+    onChooseSource: (SourceKind) -> Unit = {},
+    onAnalyseLive: () -> Unit = {},
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
@@ -82,6 +90,8 @@ fun MigrateFromThreeScreen(
             is MigrateFromThreeState.Loading -> LoadingState(state, onCancelPrompt)
             is MigrateFromThreeState.Rejected -> RejectedState(state, onChooseFile)
             is MigrateFromThreeState.NeedsVirtualHost -> VirtualHostPrompt(state, onGiveVirtualHost, onChooseFile)
+            // M8-06c STUB: the three live states are not drawn yet.
+            is MigrateFromThreeState.LoadingLive, is MigrateFromThreeState.CannotExport, is MigrateFromThreeState.LiveFailed -> Unit
             is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations)
         }
     }

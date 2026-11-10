@@ -69,6 +69,8 @@ data class ConnectionRowState(
     val note: String? = null,
     /** M2-14 the profile of this row has TLS off; the row shows [ConnectionNotes.NOT_ENCRYPTED] in every state. */
     val notEncrypted: Boolean = false,
+    /** M8-06c: true only for the current row while its link is Connected and its session status is `Done(MigrationSource)`. */
+    val offersMigration: Boolean = false,
 )
 
 /** "Stream list refresh" section. [note] is "Connect to refresh", "Not loaded yet" or "Updated N s ago". */
@@ -95,6 +97,9 @@ interface ConnectionControlEvents {
     fun refreshNow()
     /** "Manage connections" and "New connection": opens the Connections screen. */
     fun openConnections()
+
+    /** M8-06c: "Migrate from 3.x" of a connected 3.x row. Default no-op, so other implementations need no change. */
+    fun openMigrateFromThree() {}
 }
 
 /** Texts of the chip and its popup, one place (tests assert the literals). */
@@ -117,6 +122,7 @@ object ConnectionControlTexts {
     const val DISCONNECT: String = "Disconnect"
     const val RETRY: String = "Retry"
     const val OPEN_MENU: String = "Open connection menu"
+    const val MIGRATE_FROM_3X: String = "Migrate from 3.x"
 }
 
 /**
@@ -238,6 +244,8 @@ class ConnectionControlModel(
     private val onOpenConnections: () -> Unit,
     /** The screen on show (list or tab): its age and its Refresh now drive the control. Null: the stream list (M2-05 behaviour). */
     shownTarget: StateFlow<RefreshTarget>? = null,
+    /** M8-06c: where "Migrate from 3.x" of the popup leads (desktopApp: the screen with the live source selected). */
+    private val onOpenMigrateFromThree: () -> Unit = {},
 ) : ConnectionControlEvents, AutoCloseable {
     // Problem solved: the control must age and refresh whichever screen is shown, without a flag per screen (M2-06 brief item 6).
     private val target: StateFlow<RefreshTarget> = shownTarget ?: MutableStateFlow(streamList)
@@ -289,6 +297,10 @@ class ConnectionControlModel(
 
     override fun openConnections() {
         scope.launch { onOpenConnections() }
+    }
+
+    // M8-06c STUB: does not call the lambda yet.
+    override fun openMigrateFromThree() {
     }
 
     override fun close() {

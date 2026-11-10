@@ -22,6 +22,10 @@ import dev.caerbannog.core.migrate3x.DefinitionsParser
 import dev.caerbannog.core.migrate3x.ExportNotice
 import dev.caerbannog.core.migrate3x.HeldAnalysis
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
+import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
+import dev.caerbannog.core.migrate3x.SourceKind
+import dev.caerbannog.core.migrate3x.SourceOption
+import dev.caerbannog.core.migrate3x.SourcePicker
 import dev.caerbannog.core.migrate3x.ReportViewBuilder
 import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.core.migrate3x.fakes.DefinitionsFiles
@@ -101,7 +105,14 @@ internal fun SemanticsNode.allText(): String {
 }
 
 @OptIn(ExperimentalTestApi::class)
-internal fun DesktopComposeUiTest.show(state: MigrateFromThreeState, calls: MigrateCalls = MigrateCalls(), text: String = "", clipboard: RecordingClipboard = RecordingClipboard()) {
+internal fun DesktopComposeUiTest.show(
+    state: MigrateFromThreeState,
+    calls: MigrateCalls = MigrateCalls(),
+    text: String = "",
+    clipboard: RecordingClipboard = RecordingClipboard(),
+    /** M8-06c: the source picker; the default is what a screen without a 3.x connection shows. */
+    picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
+) {
     setContent {
         CompositionLocalProvider(LocalClipboard provides clipboard) {
             MigrateFromThreeScreen(
@@ -114,6 +125,9 @@ internal fun DesktopComposeUiTest.show(state: MigrateFromThreeState, calls: Migr
                 onToggleGroup = { calls.events += "group:$it" },
                 onExport = { calls.events += "export" },
                 onDismissNotice = { calls.events += "dismissNotice" },
+                picker = picker,
+                onChooseSource = { calls.events += "chooseSource:$it" },
+                onAnalyseLive = { calls.events += "analyseLive" },
             )
         }
     }

@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,18 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     fun closeStream() {
         _initialOffset.value = null
         _selectedStream.value = null
+    }
+
+    // M8-06c STUB: nothing is requested, and nothing can be.
+    /** The source the Migrate from 3.x screen is asked to select (set by the connection popup), null when nothing is pending. */
+    val requestedSource: StateFlow<SourceKind?> = MutableStateFlow<SourceKind?>(null).asStateFlow()
+
+    /** Opens Migrate from 3.x and asks it to select [source]. */
+    fun openMigrateFromThree(source: SourceKind) {
+    }
+
+    /** The screen took the request. */
+    fun sourceRequestHandled() {
     }
 
     fun open(destination: AppDestination) {

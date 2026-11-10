@@ -65,6 +65,8 @@ interface RowSource {
 /** What the screen shows for a report. [chips] ignore the filter, [lossBlock] ignores it too. */
 class ReportView(
     val fileLabel: String,
+    /** M8-06c: the source card (kind, label, lock, "Analyse again"); [fileLabel] stays and equals the label for a file. */
+    val source: SourceCardView,
     val sourceVersion: String?,
     val singleVirtualHost: String?,
     val summary: ReportSummary,

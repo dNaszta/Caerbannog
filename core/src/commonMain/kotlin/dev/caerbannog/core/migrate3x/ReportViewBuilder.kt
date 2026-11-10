@@ -17,6 +17,8 @@ object ReportViewBuilder {
         selected: Set<Severity> = Severity.entries.toSet(),
         openGroups: Set<String> = emptySet(),
         rowFormatter: (Finding) -> RowView = FindingRowFormatter::format,
+        /** M8-06c: the 3.x connection that is Connected and readable now, or null. A live analysis of another name shows "(disconnected)". */
+        liveConnectionName: String? = null,
     ): ReportView {
         val report = held.report
         val review = held.review
@@ -27,6 +29,8 @@ object ReportViewBuilder {
             listOfNotNull(skippedGroup(skipped, SKIPPED_GROUP_KEY in openGroups))
         return ReportView(
             fileLabel = held.fileLabel,
+            // M8-06c STUB: always the file card.
+            source = SourceCardView(SourceKind.File, held.fileLabel, locked = false, lockText = null, canAnalyseAgain = false),
             sourceVersion = report.source.sourceVersion,
             singleVirtualHost = report.source.singleVirtualHost,
             summary = report.summary,

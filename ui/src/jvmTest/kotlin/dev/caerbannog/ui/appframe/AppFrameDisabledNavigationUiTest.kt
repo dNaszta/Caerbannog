@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
@@ -38,7 +40,7 @@ import kotlin.test.assertEquals
 /**
  * M8-02a (owner decision 2026-11-10): while a 3.x broker is connected the drawer shows ALL items; the ones the connection does not offer are
  * DISABLED (greyed, not clickable) and say why, as text and as accessible description. Tags: `navItem:<Destination>` (existing),
- * `navItemReason:<Destination>`, `searchBox`, `searchReason`. Features come from `availableFeatures(...)` in core; the frame only reads them.
+ * `navReasonNote` (M8-06c, F4 option B: the reason is shown ONCE; the old tags `navItemReason:<Destination>` and `searchReason` are gone), `searchBox`. Features come from `availableFeatures(...)` in core; the frame only reads them.
  */
 @OptIn(ExperimentalTestApi::class)
 class AppFrameDisabledNavigationUiTest {
@@ -80,6 +82,22 @@ class AppFrameDisabledNavigationUiTest {
         }
     }
 
+    /** Hovers the node: a tooltip is a popup, so it shows up as a second root of the semantics tree whose texts hold [text]. */
+    private fun DesktopComposeUiTest.tooltipShows(tag: String, text: String): Boolean {
+        onNodeWithTag(tag).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(2000)
+        waitForIdle()
+        fun texts(n: androidx.compose.ui.semantics.SemanticsNode): String =
+            (listOf(n.config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty()) + n.children.map { texts(it) }).joinToString(" ")
+        val roots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes()
+        return roots.drop(1).any { texts(it).contains(text) }
+    }
+
+    private fun androidx.compose.ui.semantics.SemanticsNode.visibleTexts(): String {
+        val own = config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty()
+        return (listOf(own) + children.map { it.visibleTexts() }).filter { it.isNotEmpty() }.joinToString("\n")
+    }
+
     /** The reason as an accessible description: the content description or the state description of the item says it. */
     private fun SemanticsNodeInteraction.says(text: String): Boolean {
         val config = fetchSemanticsNode().config
@@ -95,16 +113,50 @@ class AppFrameDisabledNavigationUiTest {
     }
 
     @Test
-    fun `the items the connection does not offer are disabled and carry the reason as text and as description`() = runDesktopComposeUiTest(1280, 800) {
+    fun `the items the connection does not offer are disabled and carry the reason as description, the text is shown once in the note`() = runDesktopComposeUiTest(1280, 800) {
         frame(onlyMigration, reason)
         disabled.forEach {
             onNodeWithTag("navItem:${it.name}").assertIsNotEnabled()
-            onNodeWithTag("navItemReason:${it.name}", useUnmergedTree = true).assertTextEquals(reason)
             assertEquals(true, onNodeWithTag("navItem:${it.name}").says(reason), "navItem:${it.name} says the reason to a screen reader")
         }
         onNodeWithTag("searchBox").assertIsNotEnabled()
-        onNodeWithTag("searchReason", useUnmergedTree = true).assertTextEquals(reason)
         assertEquals(true, onNodeWithTag("searchBox").says(reason), "the search says the reason to a screen reader")
+        onNodeWithTag("navReasonNote", useUnmergedTree = true).assertTextEquals(reason)
+    }
+
+    // ---- M8-06c, F4 option B: ONE visible note under the list instead of one line under every disabled item and under the search ----
+
+    @Test
+    fun `the reason is shown once as the navReasonNote, and the per item and search reason tags are gone`() = runDesktopComposeUiTest(1280, 800) {
+        frame(onlyMigration, reason)
+        onAllNodesWithTag("navReasonNote", useUnmergedTree = true).assertCountEquals(1)
+        onNodeWithTag("navReasonNote", useUnmergedTree = true).assertTextEquals(reason)
+        AppDestination.entries.forEach { onAllNodesWithTag("navItemReason:${it.name}", useUnmergedTree = true).assertCountEquals(0) }
+        onAllNodesWithTag("searchReason", useUnmergedTree = true).assertCountEquals(0)
+        val visible = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().sumOf { node -> Regex(Regex.escape(reason)).findAll(node.visibleTexts()).count() }
+        assertEquals(1, visible, "the reason text is visible exactly once (descriptions and tooltips are not visible text)")
+    }
+
+    @Test
+    fun `the tooltip of a disabled item still reads the reason`() = runDesktopComposeUiTest(1280, 800) {
+        frame(onlyMigration, reason)
+        assertTrue(tooltipShows("navItem:Streams", reason), "hovering a disabled item shows the reason as a tooltip")
+    }
+
+    @Test
+    fun `no note for a connection that offers everything, also when a reason is passed, and none without a reason`() = runDesktopComposeUiTest(1280, 800) {
+        frame(ConnectionFeature.entries.toSet(), reason)
+        onAllNodesWithTag("navReasonNote", useUnmergedTree = true).assertCountEquals(0)
+        frame()
+        onAllNodesWithTag("navReasonNote", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `the note is not a drawer item, it is not focusable and does not navigate`() = runDesktopComposeUiTest(1280, 800) {
+        frame(onlyMigration, reason)
+        onNodeWithTag("navReasonNote", useUnmergedTree = true).performClick()
+        assertEquals(emptyList(), navigations)
+        onNodeWithTag("navReasonNote", useUnmergedTree = true).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
     }
 
     @Test
@@ -112,7 +164,7 @@ class AppFrameDisabledNavigationUiTest {
         frame(onlyMigration, reason)
         enabled.forEach {
             onNodeWithTag("navItem:${it.name}").assertIsEnabled()
-            onAllNodesWithTag("navItemReason:${it.name}", useUnmergedTree = true).assertCountEquals(0)
+            assertEquals(false, onNodeWithTag("navItem:${it.name}").says(reason), "an enabled item has no reason")
         }
         onNodeWithTag("navItem:Connections").performClick()
         onNodeWithTag("navItem:MigrateFromThree").performClick()
@@ -142,6 +194,7 @@ class AppFrameDisabledNavigationUiTest {
         }
         onNodeWithTag("searchBox").assertIsEnabled()
         onAllNodesWithTag("searchReason", useUnmergedTree = true).assertCountEquals(0)
+        onAllNodesWithTag("navReasonNote", useUnmergedTree = true).assertCountEquals(0)
         AppDestination.entries.forEach { onNodeWithTag("navItem:${it.name}").performClick() }
         assertEquals(AppDestination.entries.toList(), navigations)
     }
