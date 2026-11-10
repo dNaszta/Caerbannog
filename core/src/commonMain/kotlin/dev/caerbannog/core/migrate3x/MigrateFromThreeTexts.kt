@@ -35,7 +35,7 @@ object MigrateFromThreeTexts {
         "These queues use the old classic queue index (version 1), which is the 3.13 default. RabbitMQ 4.3 and later cannot read it. " +
             "The loss cannot be detected after the upgrade. A definitions file cannot tell the index version, so this list is every " +
             "classic queue without \"x-queue-version: 2\"."
-    /** M8-06c round 1 (R1) STUB: not used by the builder yet. For a live report: the broker reported the version. */
+    /** The loss detection text of a live report: the broker reported the version. */
     const val LOSS_DETECTION_LIVE: String =
         "These queues use the old classic queue index (version 1), which is the 3.13 default, or the broker did not report their index version. " +
             "RabbitMQ 4.3 and later cannot read the old index. The loss cannot be detected after the upgrade. " +

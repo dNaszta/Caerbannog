@@ -130,10 +130,10 @@ private fun ChooseSourceState(picker: SourcePicker, onChooseFile: () -> Unit, on
         } else {
             Button(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
                 ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
-                Text("Choose definitions file", Modifier.padding(start = 8.dp))
+                Text(MigrateFromThreeTexts.CHOOSE_FILE, Modifier.padding(start = 8.dp))
             }
             Text(
-                "In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json",
+                MigrateFromThreeTexts.FILE_EXPORT_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -204,7 +204,13 @@ private fun LoadingLiveState(state: MigrateFromThreeState.LoadingLive, onCancel:
 private fun CannotExportState(state: MigrateFromThreeState.CannotExport, onChooseFile: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-cannot-export"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FailureBanner(state.text)
-        Text("Nothing was analysed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            MigrateFromThreeTexts.FILE_EXPORT_HINT,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("migrate3x-state-cannot-export-hint"),
+        )
         ChooseFileButton(onChooseFile)
     }
 }
@@ -213,7 +219,7 @@ private fun CannotExportState(state: MigrateFromThreeState.CannotExport, onChoos
 private fun LiveFailedState(state: MigrateFromThreeState.LiveFailed, onAnalyseLive: () -> Unit, onChooseFile: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-live-failed"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FailureBanner(state.text)
-        Text("Nothing was analysed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-try-again")) { Text(MigrateFromThreeTexts.TRY_AGAIN) }
             ChooseFileButton(onChooseFile)
@@ -233,7 +239,7 @@ private fun FailureBanner(text: String) {
 private fun ChooseFileButton(onChooseFile: () -> Unit) {
     OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
         ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
-        Text("Choose definitions file", Modifier.padding(start = 8.dp))
+        Text(MigrateFromThreeTexts.CHOOSE_FILE, Modifier.padding(start = 8.dp))
     }
 }
 
@@ -258,7 +264,7 @@ private fun RejectedState(state: MigrateFromThreeState.Rejected, onChooseFile: (
             Text(state.text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
         }
         Text(state.fileLabel, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
-        Text("Nothing was analysed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
             ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
             Text("Choose another file", Modifier.padding(start = 8.dp))

@@ -36,7 +36,7 @@ object ReportViewBuilder {
             summaryLine = summaryLine(report.summary),
             counts = documentCounts(held.document),
             countsLine = countsLine(held.document, report.source.singleVirtualHost),
-            lossBlock = lossBlock(report.findings),
+            lossBlock = lossBlock(report.findings, held.kind),
             accessNote = MigrateFromThreeTexts.ACCESS_EMPTY.takeIf { report.source.singleVirtualHost != null },
             chips = chipOrder.map { severity ->
                 ChipView(severity, count(report.summary, severity), selected = severity in selected)
@@ -159,14 +159,14 @@ object ReportViewBuilder {
     }
 
     /** The queues at risk, names escaped like the text export. Null when no queue is at risk. Never filtered by the chips. */
-    private fun lossBlock(findings: List<Finding>): LossBlockView? {
+    private fun lossBlock(findings: List<Finding>, kind: SourceKind): LossBlockView? {
         val names = findings.filter { it.findingClass == FindingClass.MessageLoss }.map { escapeForText(it.name.orEmpty()) }
         if (names.isEmpty()) return null
         return LossBlockView(
             title = MigrateFromThreeTexts.lossTitle(names.size),
             queueCount = names.size,
             preview = names.take(LOSS_PREVIEW_COUNT),
-            detection = MigrateFromThreeTexts.LOSS_DETECTION,
+            detection = if (kind == SourceKind.Live) MigrateFromThreeTexts.LOSS_DETECTION_LIVE else MigrateFromThreeTexts.LOSS_DETECTION,
             fixes = listOf(
                 FixView(MigrateFromThreeTexts.LOSS_FIX_NEW_BROKER_TITLE, MigrateFromThreeTexts.LOSS_FIX_NEW_BROKER_TEXT, recommended = true),
                 FixView(MigrateFromThreeTexts.LOSS_FIX_POLICY_TITLE, MigrateFromThreeTexts.LOSS_FIX_POLICY_TEXT, recommended = false),

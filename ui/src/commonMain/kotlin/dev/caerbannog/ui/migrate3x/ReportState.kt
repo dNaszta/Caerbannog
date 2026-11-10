@@ -133,7 +133,7 @@ private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: (
                         Text(source.label, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     view.sourceVersion?.let { Text("RabbitMQ $it", style = MaterialTheme.typography.labelLarge, maxLines = 1) }
-                    Text(if (source.kind == SourceKind.Live) "Live" else "File", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    Text(source.kindLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     source.lockText?.let {
                         Row(Modifier.testTag("migrate3x-source-locked"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             ConnectionIcon(AppIcon.Lock, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
