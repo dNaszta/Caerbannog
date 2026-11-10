@@ -13,9 +13,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -29,6 +33,15 @@ sealed interface MigrateFromThreeState {
     /** [error] is `InvalidName.reason` as returned, or null. The field always starts empty: there is no default value. */
     data class NeedsVirtualHost(val fileLabel: String, val error: String?) : MigrateFromThreeState
     data class Report(val view: ReportView, val notice: ExportNotice?, val review: ReviewState) : MigrateFromThreeState
+
+    /** M8-06c: the live read of [connectionName] runs. */
+    data class LoadingLive(val connectionName: String) : MigrateFromThreeState
+
+    /** M8-06c: the broker refused the export for this user; [text] is `LiveSourceTexts.CANNOT_EXPORT`. The screen offers the file import. */
+    data class CannotExport(val connectionName: String, val text: String) : MigrateFromThreeState
+
+    /** M8-06c: [text] is one of the fixed `LiveSourceTexts`, never a body, a URL or a credential. */
+    data class LiveFailed(val connectionName: String, val text: String) : MigrateFromThreeState
 }
 
 /**
@@ -47,6 +60,8 @@ class MigrateFromThreeViewModel(
     private val folders: MigrationFolderPorts,
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** M8-06c: what may be read live now; the default is "nothing". Read only: it has no write method. */
+    private val liveSource: LiveSourceProvider = LiveSourceProvider.None,
 ) {
     // Declared before `mutable`: the initial state reads them.
     private var job: Job? = null
@@ -82,8 +97,68 @@ class MigrateFromThreeViewModel(
 
     // The decisions live in the held analysis, so a new window view model shows the same counts (ruling 12), with no sheet and an idle generation.
     private fun initialState(): MigrateFromThreeState =
-        holder.held.value?.let { MigrateFromThreeState.Report(ReportViewBuilder.build(it), null, ReviewViewBuilder.state(it.review, null, GenerationState.Idle)) }
+        holder.held.value?.let { MigrateFromThreeState.Report(viewOf(it), null, ReviewViewBuilder.state(it.review, null, GenerationState.Idle)) }
             ?: MigrateFromThreeState.ChooseSource
+
+    /** The kind the user chose in the picker. It falls back to File when the live connection goes, and stays File when it comes back. */
+    private val chosenKind = MutableStateFlow(SourceKind.File)
+
+    /** What the picker shows; follows the connection while the screen is open (the user may connect from the chip popup). */
+    val picker: StateFlow<SourcePicker> = combine(liveSource.current, chosenKind, ::pickerOf)
+        .stateIn(scope, SharingStarted.Eagerly, pickerOf(liveSource.current.value, chosenKind.value))
+
+    init {
+        scope.launch {
+            liveSource.current.collect { source ->
+                if (source == null) chosenKind.value = SourceKind.File
+                rebuild()
+            }
+        }
+    }
+
+    /**
+     * Selects the kind of the picker. From a refusal or a failure it also goes back to ChooseSource. Ignored while work runs, at the virtual
+     * host question and with a report on screen (the report stays); Live is ignored while no live source is offered.
+     */
+    fun chooseSource(kind: SourceKind) {
+        if (kind == SourceKind.Live && liveSource.current.value == null) return
+        when (mutable.value) {
+            MigrateFromThreeState.ChooseSource -> Unit
+            is MigrateFromThreeState.Rejected, is MigrateFromThreeState.CannotExport, is MigrateFromThreeState.LiveFailed ->
+                mutable.value = MigrateFromThreeState.ChooseSource
+            else -> return
+        }
+        chosenKind.value = kind
+    }
+
+    /** Reads and analyses the held 3.x connection, GET requests only. Ignored while a live read runs and while no live source is offered. */
+    fun analyseLive() {
+        val source = liveSource.current.value ?: return
+        if (mutable.value is MigrateFromThreeState.LoadingLive) return
+        val name = source.connectionName
+        job?.cancel()
+        pending = null
+        dropReviewLocals()
+        mutable.value = MigrateFromThreeState.LoadingLive(name)
+        job = scope.launch {
+            val outcome = analyseLive(source, analysisDispatcher)
+            ensureActive()
+            when (outcome) {
+                is LiveAnalysisOutcome.Analysed -> present(outcome.held)
+                // The texts are the fixed ones of LiveSourceTexts: the broker's own words never reach the state.
+                is LiveAnalysisOutcome.OfferFileImport -> mutable.value = MigrateFromThreeState.CannotExport(name, outcome.text)
+                is LiveAnalysisOutcome.Unreachable -> mutable.value = MigrateFromThreeState.LiveFailed(name, LiveSourceTexts.unreachable(outcome.connectionName))
+                is LiveAnalysisOutcome.Failed -> mutable.value = MigrateFromThreeState.LiveFailed(name, outcome.text)
+            }
+        }
+    }
+
+    private fun pickerOf(source: DefinitionsSource?, chosen: SourceKind): SourcePicker =
+        if (source == null) SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE)))
+        else SourcePicker(chosen, listOf(SourceOption.File, SourceOption.Live(source.connectionName)))
+
+    private fun viewOf(held: HeldAnalysis, filter: Set<Severity> = Severity.entries.toSet(), groups: Set<String> = emptySet()): ReportView =
+        ReportViewBuilder.build(held, filter, groups, liveConnectionName = liveSource.current.value?.connectionName)
 
     /** Opens the file dialog; a cancelled dialog changes nothing. */
     fun chooseFile() {
@@ -124,13 +199,17 @@ class MigrateFromThreeViewModel(
     }
 
     private suspend fun showReport(label: String, document: DefinitionsDocument) {
-        val held = withContext(analysisDispatcher) { HeldAnalysis(label, document, CompatibilityAnalyzer.analyze(document)) }
+        present(withContext(analysisDispatcher) { HeldAnalysis(label, document, CompatibilityAnalyzer.analyze(document)) })
+    }
+
+    /** The one step that shows an analysis, for a file and for a live read: holds it and starts with every severity shown. */
+    private fun present(held: HeldAnalysis) {
         pending = null
         selected = Severity.entries.toSet()
         openGroups = emptySet()
         dropReviewLocals()
         holder.hold(held)
-        mutable.value = MigrateFromThreeState.Report(ReportViewBuilder.build(held), null, ReviewViewBuilder.state(held.review, null, GenerationState.Idle))
+        mutable.value = MigrateFromThreeState.Report(viewOf(held), null, ReviewViewBuilder.state(held.review, null, GenerationState.Idle))
     }
 
     /** Answers the virtual host prompt. Trims the text, then asks the core; a refusal stays on the prompt. Ignored when no prompt is shown. */
@@ -154,9 +233,9 @@ class MigrateFromThreeViewModel(
         mutable.value = MigrateFromThreeState.ChooseSource
     }
 
-    /** Cancels a running Loading (the job, back to ChooseSource; a late result is ignored; a held report is not changed). */
+    /** Cancels a running Loading or LoadingLive (the job, back to ChooseSource; a late result is ignored; a held report is not changed). */
     fun cancelLoading() {
-        if (mutable.value !is MigrateFromThreeState.Loading) return
+        if (mutable.value !is MigrateFromThreeState.Loading && mutable.value !is MigrateFromThreeState.LoadingLive) return
         job?.cancel()
         mutable.value = MigrateFromThreeState.ChooseSource
     }
@@ -179,7 +258,7 @@ class MigrateFromThreeViewModel(
     /** The one place that rebuilds the report view and the review state, so every event ends the same way. */
     private fun rebuild() {
         val held = holder.held.value ?: return
-        val view = ReportViewBuilder.build(held, selected, openGroups)
+        val view = viewOf(held, selected, openGroups)
         val review = ReviewViewBuilder.state(held.review, edit, generation)
         mutable.update { if (it is MigrateFromThreeState.Report) it.copy(view = view, review = review) else it }
     }

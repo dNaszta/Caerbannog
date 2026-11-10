@@ -1,6 +1,7 @@
 package dev.caerbannog.desktopapp
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,7 +37,7 @@ class MigrateFromThreeParts(
  * a folder chosen here is the folder shown there and the files saved here are listed there.
  */
 fun AppComposition.createMigrateFromThreeViewModel(scope: CoroutineScope): MigrateFromThreeViewModel =
-    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, migrationFolderPorts, scope)
+    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, migrationFolderPorts, scope, liveSource = liveSource)
 
 /** The review events of the screen, one to one onto the view model. */
 internal fun MigrateFromThreeViewModel.reviewEvents(): ReviewEvents = object : ReviewEvents {
@@ -67,6 +68,15 @@ internal fun MigrateFromThreeWindowContent(composition: AppComposition, control:
     // No connection input: switching the connection does not rebuild this view model, and a rebuilt one reads the held report anyway.
     val vm = remember(composition) { composition.createMigrateFromThreeViewModel(scope) }
     val state by vm.state.collectAsState()
+    val picker by vm.picker.collectAsState()
+    // The connection popup asks for the live source; the view model ignores the request while a report is on screen.
+    val request by composition.navigation.requestedSource.collectAsState()
+    LaunchedEffect(request) {
+        request?.let {
+            vm.chooseSource(it)
+            composition.navigation.sourceRequestHandled()
+        }
+    }
     AppFrame(
         title = AppDestination.MigrateFromThree.label,
         control = control,
@@ -88,6 +98,9 @@ internal fun MigrateFromThreeWindowContent(composition: AppComposition, control:
             onReportCopied = vm::reportCopied,
             review = remember(vm) { vm.reviewEvents() },
             onOpenMigrations = { composition.navigation.open(AppDestination.Migrations) },
+            picker = picker,
+            onChooseSource = vm::chooseSource,
+            onAnalyseLive = vm::analyseLive,
         )
     }
 }

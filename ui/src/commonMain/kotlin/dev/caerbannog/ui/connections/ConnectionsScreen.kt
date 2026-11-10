@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.connections.BrokerEndpoints
 import dev.caerbannog.core.connections.BrokerPorts
 import dev.caerbannog.core.connections.CaCertificateValidationResult
+import dev.caerbannog.core.connections.ChipState
 import dev.caerbannog.core.connections.checkResultMessage
 import dev.caerbannog.core.connections.editPanelNotes
 import dev.caerbannog.core.connections.ConnectionControlEvents
@@ -114,6 +115,7 @@ fun ConnectionsScreen(
         ConnectionsContent(
             state = state,
             onSelect = viewModel::selectConnection,
+            connectedName = control?.chip?.takeIf { it.kind == ChipState.Connected }?.text,
             editPanel = { panelModifier ->
                 EditPanel(
                     state = state,

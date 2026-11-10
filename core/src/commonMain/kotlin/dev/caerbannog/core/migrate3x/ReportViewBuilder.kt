@@ -17,6 +17,8 @@ object ReportViewBuilder {
         selected: Set<Severity> = Severity.entries.toSet(),
         openGroups: Set<String> = emptySet(),
         rowFormatter: (Finding) -> RowView = FindingRowFormatter::format,
+        /** M8-06c: the 3.x connection that is Connected and readable now, or null. A live analysis of another name shows "(disconnected)". */
+        liveConnectionName: String? = null,
     ): ReportView {
         val report = held.report
         val review = held.review
@@ -27,13 +29,14 @@ object ReportViewBuilder {
             listOfNotNull(skippedGroup(skipped, SKIPPED_GROUP_KEY in openGroups))
         return ReportView(
             fileLabel = held.fileLabel,
+            source = sourceCard(held, liveConnectionName),
             sourceVersion = report.source.sourceVersion,
             singleVirtualHost = report.source.singleVirtualHost,
             summary = report.summary,
             summaryLine = summaryLine(report.summary),
             counts = documentCounts(held.document),
             countsLine = countsLine(held.document, report.source.singleVirtualHost),
-            lossBlock = lossBlock(report.findings),
+            lossBlock = lossBlock(report.findings, held.kind),
             accessNote = MigrateFromThreeTexts.ACCESS_EMPTY.takeIf { report.source.singleVirtualHost != null },
             chips = chipOrder.map { severity ->
                 ChipView(severity, count(report.summary, severity), selected = severity in selected)
@@ -42,6 +45,21 @@ object ReportViewBuilder {
         ) { key ->
             if (key == SKIPPED_GROUP_KEY) skippedRows(review, skipped, SKIPPED_GROUP_KEY in openGroups)
             else rowsOf(visible[key], key in openGroups) { decorate(rowFormatter(it), it, review) }
+        }
+    }
+
+    /** A live analysis is locked ("read only"); its label is the connection while that connection is readable now, else "from <name> (disconnected)". */
+    private fun sourceCard(held: HeldAnalysis, liveConnectionName: String?): SourceCardView = when (held.kind) {
+        SourceKind.File -> SourceCardView(SourceKind.File, held.fileLabel, locked = false, lockText = null, canAnalyseAgain = false)
+        SourceKind.Live -> {
+            val same = liveConnectionName == held.fileLabel
+            SourceCardView(
+                SourceKind.Live,
+                if (same) held.fileLabel else MigrateFromThreeTexts.liveDisconnected(held.fileLabel),
+                locked = true,
+                lockText = MigrateFromThreeTexts.READ_ONLY,
+                canAnalyseAgain = same,
+            )
         }
     }
 
@@ -141,14 +159,14 @@ object ReportViewBuilder {
     }
 
     /** The queues at risk, names escaped like the text export. Null when no queue is at risk. Never filtered by the chips. */
-    private fun lossBlock(findings: List<Finding>): LossBlockView? {
+    private fun lossBlock(findings: List<Finding>, kind: SourceKind): LossBlockView? {
         val names = findings.filter { it.findingClass == FindingClass.MessageLoss }.map { escapeForText(it.name.orEmpty()) }
         if (names.isEmpty()) return null
         return LossBlockView(
             title = MigrateFromThreeTexts.lossTitle(names.size),
             queueCount = names.size,
             preview = names.take(LOSS_PREVIEW_COUNT),
-            detection = MigrateFromThreeTexts.LOSS_DETECTION,
+            detection = if (kind == SourceKind.Live) MigrateFromThreeTexts.LOSS_DETECTION_LIVE else MigrateFromThreeTexts.LOSS_DETECTION,
             fixes = listOf(
                 FixView(MigrateFromThreeTexts.LOSS_FIX_NEW_BROKER_TITLE, MigrateFromThreeTexts.LOSS_FIX_NEW_BROKER_TEXT, recommended = true),
                 FixView(MigrateFromThreeTexts.LOSS_FIX_POLICY_TITLE, MigrateFromThreeTexts.LOSS_FIX_POLICY_TEXT, recommended = false),

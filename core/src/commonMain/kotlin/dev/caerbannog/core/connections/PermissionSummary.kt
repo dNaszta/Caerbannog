@@ -32,6 +32,16 @@ fun permissionPill(status: PermissionCheckStatus?): PermissionPill = when (statu
     }
 }
 
+internal fun PermissionCheckStatus?.isMigrationSource(): Boolean =
+    this is PermissionCheckStatus.Done && result is PermissionCheckResult.MigrationSource
+
+/**
+ * The pill of a profile card (F8): the 3.x migration-source pill shows only while that profile is Connected, because a 3.x broker
+ * is a source only while it is held. Every other status keeps its pill. The edit panel uses [permissionPill] (what the last check found).
+ */
+fun cardPill(status: PermissionCheckStatus?, connected: Boolean): PermissionPill? =
+    if (!connected && status.isMigrationSource()) null else permissionPill(status)
+
 fun permissionBanner(profile: ConnectionProfile, status: PermissionCheckStatus?): PermissionBanner = when (status) {
     null -> PermissionBanner(PillTone.NEUTRAL, "Permission check has not run yet.", null, null)
     PermissionCheckStatus.Checking -> PermissionBanner(PillTone.NEUTRAL, "Checking permissions...", null, null)

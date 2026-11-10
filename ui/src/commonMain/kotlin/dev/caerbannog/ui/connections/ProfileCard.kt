@@ -29,12 +29,13 @@ import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.PermissionPill
 import dev.caerbannog.core.connections.PillTone
-import dev.caerbannog.core.connections.permissionPill
+import dev.caerbannog.core.connections.cardPill
 
 @Composable
 internal fun SavedProfilesList(
     state: ConnectionsState,
     onSelect: (String) -> Unit,
+    connectedName: String?,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -49,6 +50,7 @@ internal fun SavedProfilesList(
                         profile = profile,
                         selected = profile.name == state.selectedProfileName,
                         status = state.permissionChecks[profile.name],
+                        connected = profile.name == connectedName,
                         onClick = { onSelect(profile.name) },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -59,7 +61,7 @@ internal fun SavedProfilesList(
 }
 
 @Composable
-private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: PermissionCheckStatus?, onClick: () -> Unit) {
+private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: PermissionCheckStatus?, connected: Boolean, onClick: () -> Unit) {
     // The whole card is the click target (as in the mockup) and keyboard focusable; the pill is a child of it.
     // Mockup .pcard: surface + 1dp outline-variant border; selected: secondary-container, no border.
     Surface(
@@ -79,7 +81,7 @@ private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: P
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                PermissionPillView(permissionPill(status), Modifier.testTag("permissionPill:${profile.name}"))
+                cardPill(status, connected)?.let { PermissionPillView(it, Modifier.testTag("permissionPill:${profile.name}")) }
             }
             Text(profile.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // No "Connected" status in this task's scope: there is no notion yet of an active broker

@@ -40,6 +40,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import dev.caerbannog.core.connections.ChipState
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.CaCertificateValidationResult
 import dev.caerbannog.core.connections.CaCertificateValidator
@@ -874,16 +875,83 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a 3x migration source shows its own pill and banner (M8-02a)`() = runDesktopComposeUiTest {
+    fun `a 3x migration source shows its own pill and banner while it is Connected (M8-02a, M8-06c F8)`() = runDesktopComposeUiTest {
         // The result a connect to a 3.x broker leaves in the session; the Check button path is used only to put it on screen.
         fakeChecker.result = PermissionCheckResult.MigrationSource("3.13.7")
-        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        setContent { ConnectionsScreen(permissionViewModel(prod), chipControl("prod-eu", ChipState.Connected), noControlEvents) }
         selectProfile(0)
 
         checkButton()
 
         assertTagged("permissionPill:prod-eu", "RabbitMQ 3.x: migration source only")
         assertTagged("permissionBanner", "svc-explorer is connected to RabbitMQ 3.13.7: migration source only.")
+    }
+
+    // ---- M8-06c, F8 (owner decision, option B): the 3.x pill of a card shows only while that profile is Connected; the edit panel keeps pill and banner ----
+
+    private val noControlEvents = object : dev.caerbannog.core.connections.ConnectionControlEvents {
+        override fun connect(name: String) = Unit
+        override fun disconnect(name: String) = Unit
+        override fun retry(name: String) = Unit
+        override fun setRefreshInterval(interval: dev.caerbannog.core.streams.RefreshInterval) = Unit
+        override fun refreshNow() = Unit
+        override fun openConnections() = Unit
+    }
+
+    private fun chipControl(name: String?, kind: ChipState): dev.caerbannog.core.connections.ConnectionControlState {
+        val icon = when (kind) {
+            ChipState.Connected -> dev.caerbannog.core.connections.ChipIcon.Link
+            ChipState.Connecting -> dev.caerbannog.core.connections.ChipIcon.Sync
+            ChipState.Failed -> dev.caerbannog.core.connections.ChipIcon.Error
+            else -> dev.caerbannog.core.connections.ChipIcon.LinkOff
+        }
+        val chip = dev.caerbannog.core.connections.ConnectionChipState(kind, icon, name ?: "No connection", null, null, null, "${name ?: "No connection"}. Open connection menu", false)
+        return dev.caerbannog.core.connections.ConnectionControlState(
+            chip, emptyList(), null,
+            dev.caerbannog.core.connections.RefreshSectionState(dev.caerbannog.core.streams.RefreshInterval.Every5, false, "Connect to refresh"),
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the 3x pill of a card is gone after Disconnect, while Connecting, while Failed and without a control, the banner stays`() {
+        listOf<dev.caerbannog.core.connections.ConnectionControlState?>(
+            chipControl("prod-eu", ChipState.Disconnected), chipControl("prod-eu", ChipState.Connecting), chipControl("prod-eu", ChipState.Failed), null,
+        ).forEach { control ->
+            runDesktopComposeUiTest {
+                fakeChecker.result = PermissionCheckResult.MigrationSource("3.13.7")
+                setContent { ConnectionsScreen(permissionViewModel(prod), control, noControlEvents.takeIf { control != null }) }
+                selectProfile(0)
+                checkButton()
+
+                onNode(hasTestTag("permissionPill:prod-eu"), useUnmergedTree = true).assertDoesNotExist()
+                onNode(hasTestTag("profileCard:prod-eu").and(hasAnyDescendant(hasText("RabbitMQ 3.x: migration source only"))), useUnmergedTree = true)
+                    .assertDoesNotExist()
+                assertTagged("permissionBanner", "svc-explorer is connected to RabbitMQ 3.13.7: migration source only.")
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the 3x pill of a card needs that profile to be the connected one, another connected profile does not show it`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.MigrationSource("3.13.7")
+        setContent { ConnectionsScreen(permissionViewModel(prod), chipControl("other-eu", ChipState.Connected), noControlEvents) }
+        selectProfile(0)
+        checkButton()
+
+        onNode(hasTestTag("permissionPill:prod-eu"), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `every other pill is unchanged whether the profile is connected or not`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true)
+        setContent { ConnectionsScreen(permissionViewModel(prod), chipControl("other-eu", ChipState.Connected), noControlEvents) }
+        selectProfile(0)
+        checkButton()
+
+        assertTagged("permissionPill:prod-eu", "Can change topology")
     }
 
     @OptIn(ExperimentalTestApi::class)

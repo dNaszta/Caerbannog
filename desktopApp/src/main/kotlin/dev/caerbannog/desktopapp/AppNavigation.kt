@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,11 +40,29 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
         _selectedStream.value = null
     }
 
+    private val _requestedSource = MutableStateFlow<SourceKind?>(null)
+
+    /** The source the Migrate from 3.x screen is asked to select (set by the connection popup), null when nothing is pending. */
+    val requestedSource: StateFlow<SourceKind?> = _requestedSource.asStateFlow()
+
+    /** Opens Migrate from 3.x and asks it to select [source]. */
+    fun openMigrateFromThree(source: SourceKind) {
+        open(AppDestination.MigrateFromThree)
+        _requestedSource.value = source
+    }
+
+    /** The screen took the request. */
+    fun sourceRequestHandled() {
+        _requestedSource.value = null
+    }
+
     fun open(destination: AppDestination) {
         if (destination !in WITH_SCREEN) return
         _initialOffset.value = null
         // Streams or any other drawer item with a screen leads to a list or screen, never back into an old stream.
         _selectedStream.value = null
+        // A request belongs to the open that made it: going anywhere else drops it.
+        if (destination != AppDestination.MigrateFromThree) _requestedSource.value = null
         _screen.value = destination
     }
 
