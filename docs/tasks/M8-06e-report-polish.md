@@ -11,6 +11,7 @@ Five small things the M8-06a review found are fixed, none changes what the owner
 3. `"Report saved to ${path}"` is a literal in the view model: move it to `MigrateFromThreeTexts` and pass the path through `escapeForText` (a path from the dialog may hold a control character).
 4. `reportText()` is synchronous (ruling 8 of M8-06a): make it `suspend` on the analysis dispatcher; the UI copies after the call and then calls `reportCopied()`; a cancelled call changes nothing.
 5. Mockup consistency: the loading spinner icon, the loss names order (the analyzer's order, alphabetical) are documented in the mockup note; no behaviour change.
+6. (Added by the M8-06b review) Every decision event (accept, skip, un-skip, replace, open or close the sheet) ends in `rebuild()`, which regroups all findings again through `ReportViewBuilder.build`: about 1 s per click at 240,000 findings. With the grouping cached (item 1) a decision event must only re-filter by the skipped set and recount; add a test that accepting one item on 240,000 findings does not run the grouping step again (counter) and that the Skipped group and pills still match. Raise the priority: with 06b merged this is felt on every click of a large file.
 Out: anything about decisions (M8-06b).
 
 ## Acceptance
