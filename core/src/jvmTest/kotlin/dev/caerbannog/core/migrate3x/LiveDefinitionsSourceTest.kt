@@ -296,4 +296,23 @@ class LiveDefinitionsSourceTest {
         reads.definitions = ReadOutcome.Ok("""{"x":"$sentinel""")
         assertFalse(sentinel in source().fetch().toString(), "a Failed reason must not hold the input")
     }
+
+    // ---- M8-02b carry-over F5: the source does not trust its caller for the version -------------------------------------------------
+
+    @Test
+    fun `an odd version text is unreadable, also when the caller did not clean it`() = runTest {
+        // "3 anything\nx" starts with a 3, so a plain major parse would call it a 3.x broker and read from it.
+        for (version in listOf("3 anything\nx", "3.13.7\nx", "3.13 beta", "3." + "1".repeat(40))) {
+            assertEquals(FetchResult.Failed(LiveSourceTexts.VERSION_UNREADABLE), source(version).fetch(), "version [$version]")
+        }
+        assertEquals(emptyList(), reads.calls, "an odd version must not be read from")
+    }
+
+    @Test
+    fun `the version of the facts is the displayable text, trimmed`() = runTest {
+        reads.definitions = ReadOutcome.Ok(export("orders" to null))
+        val facts = assertIs<FetchResult.Fetched>(source(" 3.13.7 ").fetch()).facts
+        assertEquals("3.13.7", facts.brokerVersion)
+        assertEquals("3.13.7-rc.1", assertIs<FetchResult.Fetched>(source("3.13.7-rc.1").fetch()).facts.brokerVersion)
+    }
 }

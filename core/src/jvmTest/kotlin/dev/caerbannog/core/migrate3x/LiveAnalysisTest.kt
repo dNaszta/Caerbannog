@@ -64,4 +64,31 @@ class LiveAnalysisTest {
         assertEquals(LiveAnalysisOutcome.Failed(LiveSourceTexts.NOT_THREE_X), run("4.1.0"))
         assertFalse(run("4.1.0") is LiveAnalysisOutcome.Analysed)
     }
+
+    // ---- M8-02b carry-over F7: the CPU work runs on the dispatcher the caller passes (like the file view model's analysisDispatcher) ----
+
+    private class CountingDispatcher : kotlinx.coroutines.CoroutineDispatcher() {
+        val dispatches = java.util.concurrent.atomic.AtomicInteger()
+        override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+            dispatches.incrementAndGet()
+            block.run()
+        }
+    }
+
+    @Test
+    fun `the analysis runs on the dispatcher given by the caller`() = runTest {
+        val dispatcher = CountingDispatcher()
+        val facts = LiveSourceFacts("legacy-eu", "3.13.7")
+        val outcome = analyseLive(Scripted("legacy-eu", FetchResult.Fetched(document, facts)), dispatcher)
+        assertIs<LiveAnalysisOutcome.Analysed>(outcome)
+        assertTrue(dispatcher.dispatches.get() >= 1, "the report must be built on the dispatcher passed in, but it was never used")
+    }
+
+    @Test
+    fun `a failure needs no dispatcher and the default stays usable`() = runTest {
+        val dispatcher = CountingDispatcher()
+        assertEquals(LiveAnalysisOutcome.Unreachable("x"), analyseLive(Scripted("x", FetchResult.Unreachable), dispatcher))
+        assertEquals(0, dispatcher.dispatches.get(), "no CPU work, no dispatch")
+        assertIs<LiveAnalysisOutcome.Analysed>(analyseLive(Scripted("legacy-eu", FetchResult.Fetched(document, LiveSourceFacts("legacy-eu", "3.13.7")))))
+    }
 }

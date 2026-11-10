@@ -57,6 +57,19 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M5-08a: the broker's overview, read once per connection for its version (`rabbitmq_version`). */
     fun overview(): String = "$base/api/overview"
 
+    /** M8-02b: the full definitions export of a 3.x source (a GET; administrator only). */
+    fun definitions(): String = "$base/api/definitions"
+
+    /**
+     * M8-02b: one page of the queues of the vhost with ALL fields, because `storage_version` is a statistics field. No `columns` filter
+     * on purpose (the live test records what `columns=` would do).
+     */
+    fun queuesWithStorageVersion(vhost: String, page: Int): String =
+        "$base/api/queues/${encode(vhost)}?page=$page&page_size=$QUEUE_PAGE_SIZE"
+
+    /** M8-02b: the deprecated features this 3.x broker is using. */
+    fun deprecatedFeaturesUsed(): String = "$base/api/deprecated-features/used"
+
     fun whoami(): String = "$base/api/whoami"
 
     /**
