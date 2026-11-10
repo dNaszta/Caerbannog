@@ -398,6 +398,10 @@ class MigrationsViewModel(
     }
 
     /** Clears the last apply's outcome, any progress and the banner text composed from it. */
+    /** M5-08c2 STUB: saves an edited file through the folder in use and answers the parser's verdict; the real one shows an Invalid reason in `errorMessage`. */
+    suspend fun updateFile(version: String, rawJson: String): MigrationValidationResult =
+        MigrationValidationResult.Invalid("M5-08c2 stub")
+
     fun dismissOutcome() {
         _state.update { it.copy(applyOutcome = null, applyProgress = null, errorMessage = null) }
     }

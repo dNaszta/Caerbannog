@@ -73,7 +73,7 @@ class MigrationsViewModelOutcomeTest {
     // ---- the outcome of an apply ---------------------------------------------------------------------------------------------------
 
     @Test
-    fun `a failed action gives a Failed outcome with its position and the composed banner text`() = runBlocking<Unit> {
+    fun `a failed action gives a Failed outcome with its position and no composed text`() = runBlocking<Unit> {
         add(migration("0003", "a", "b", "c"))
         executor.failures["b"] = ActionResult.Failed(refused)
         val vm = vm()
@@ -83,19 +83,14 @@ class MigrationsViewModelOutcomeTest {
         assertIs<MigrationApplyResult.ActionFailed>(result)
         val s = vm.state.value
         assertEquals(ApplyOutcome.Failed("0003", 2, 3, refused), s.applyOutcome)
-        assertEquals(
-            "Action 2 of 3 failed: $refused. Migration 0003 was not recorded. " +
-                "Running it again is safe: actions that already succeeded change nothing the second time.",
-            s.errorMessage,
-        )
-        assertFalse(s.errorMessage!!.contains("failed on version"), "the old text is replaced")
+        assertNull(s.errorMessage, "M5-08c2: the outcome is the structured field, the screen words it; it is not composed into errorMessage")
         assertEquals(listOf("a", "b"), executor.sent, "the third action is never sent")
         assertFalse(s.isApplying)
         assertEquals(listOf("0003"), s.entries.filter { it.status is MigrationStatus.Pending }.map { it.file.version }, "0003 stays pending")
     }
 
     @Test
-    fun `a failure of apply single gives the same outcome and text`() = runBlocking<Unit> {
+    fun `a failure of apply single gives the same outcome and no composed text`() = runBlocking<Unit> {
         add(migration("0003", "a", "b", "c"))
         executor.failures["b"] = ActionResult.Failed(refused)
         val vm = vm()
@@ -104,11 +99,11 @@ class MigrationsViewModelOutcomeTest {
 
         val s = vm.state.value
         assertEquals(ApplyOutcome.Failed("0003", 2, 3, refused), s.applyOutcome)
-        assertTrue(s.errorMessage!!.startsWith("Action 2 of 3 failed: $refused. Migration 0003 was not recorded."), s.errorMessage)
+        assertNull(s.errorMessage, "the outcome is not composed into errorMessage")
     }
 
     @Test
-    fun `a conflict by kind gives a Conflict outcome and the stopped text`() = runBlocking<Unit> {
+    fun `a conflict by kind gives a Conflict outcome naming the resource`() = runBlocking<Unit> {
         add(migration("0003", "orders", "jobs"))
         executor.failures["orders"] = ActionResult.Failed("orders exists with different settings", FailureKind.Conflict)
         val vm = vm()
@@ -116,12 +111,8 @@ class MigrationsViewModelOutcomeTest {
         assertIs<MigrationApplyResult.ActionFailed>(vm.applyPending())
 
         val s = vm.state.value
-        assertEquals(ApplyOutcome.Conflict("0003", 1, 2, "orders exists with different settings"), s.applyOutcome)
-        assertEquals(
-            "Action 1 of 2 stopped: orders exists with different settings. The existing resource was not changed. " +
-                "Migration 0003 was not recorded. Running it again is safe.",
-            s.errorMessage,
-        )
+        assertEquals(ApplyOutcome.Conflict("0003", 1, 2, "orders exists with different settings", resource = "orders"), s.applyOutcome, "the conflict carries the plain name of the resource for the screen")
+        assertNull(s.errorMessage, "the outcome is not composed into errorMessage")
     }
 
     @Test
@@ -144,8 +135,7 @@ class MigrationsViewModelOutcomeTest {
 
         assertEquals(FailureKind.Other, assertIs<MigrationApplyResult.ActionFailed>(result).kind)
         assertIs<ApplyOutcome.Failed>(vm.state.value.applyOutcome, "nothing may decide 'conflict' by reading the text")
-        assertTrue(vm.state.value.errorMessage!!.startsWith("Action 1 of 1 failed: "), vm.state.value.errorMessage)
-        assertFalse(vm.state.value.errorMessage!!.contains("stopped"))
+        assertNull(vm.state.value.errorMessage)
     }
 
     @Test
@@ -156,7 +146,7 @@ class MigrationsViewModelOutcomeTest {
 
         vm.applyPending()
 
-        assertEquals(ApplyOutcome.Conflict("0003", 1, 1, "limits differ"), vm.state.value.applyOutcome)
+        assertEquals(ApplyOutcome.Conflict("0003", 1, 1, "limits differ", resource = "orders"), vm.state.value.applyOutcome)
     }
 
     @Test
@@ -168,7 +158,7 @@ class MigrationsViewModelOutcomeTest {
 
         val s = vm.state.value
         assertEquals(ApplyOutcome.NotRecorded("0003", notRecorded), s.applyOutcome)
-        assertEquals(notRecorded, s.errorMessage)
+        assertNull(s.errorMessage, "the outcome is not composed into errorMessage")
         assertEquals(listOf("0003"), s.entries.filter { it.status is MigrationStatus.Pending }.map { it.file.version })
         assertFalse(s.toString().contains("SENTINEL"), "the failure text never reaches the state")
     }
@@ -181,7 +171,7 @@ class MigrationsViewModelOutcomeTest {
         assertIs<MigrationApplyResult.NotRecorded>(vm.applySingle("0003"))
 
         assertEquals(ApplyOutcome.NotRecorded("0003", notRecorded), vm.state.value.applyOutcome)
-        assertEquals(notRecorded, vm.state.value.errorMessage)
+        assertNull(vm.state.value.errorMessage, "the outcome is not composed into errorMessage")
     }
 
     @Test
@@ -244,14 +234,15 @@ class MigrationsViewModelOutcomeTest {
         val vm = vm()
         vm.applyPending()
         val entries = vm.state.value.entries
+        vm.importFile("this is not a migration") // an error text of another origin is on the screen too
         assertNotNull(vm.state.value.applyOutcome, "precondition: the apply left an outcome")
-        assertNotNull(vm.state.value.errorMessage, "precondition: the apply left the composed text")
+        assertNotNull(vm.state.value.errorMessage, "precondition: an error text is shown")
 
         vm.dismissOutcome()
 
         assertNull(vm.state.value.applyOutcome)
         assertNull(vm.state.value.applyProgress)
-        assertNull(vm.state.value.errorMessage, "the red banner must go with the outcome")
+        assertNull(vm.state.value.errorMessage, "dismissOutcome clears the outcome, the progress and the error text (c1 decision, kept)")
         assertEquals(entries, vm.state.value.entries)
     }
 
@@ -261,8 +252,9 @@ class MigrationsViewModelOutcomeTest {
         executor.failures["b"] = ActionResult.Failed(refused)
         val vm = vm()
         vm.applyPending()
+        vm.importFile("this is not a migration")
         assertNotNull(vm.state.value.applyOutcome, "precondition: the apply left an outcome")
-        assertNotNull(vm.state.value.errorMessage, "precondition: the apply left the composed text")
+        assertNotNull(vm.state.value.errorMessage, "precondition: an error text is shown")
 
         vm.dismissError()
 
@@ -428,58 +420,60 @@ class MigrationsViewModelOutcomeTest {
     @Test
     fun `no problem at all shows no banner line`() = assertNull(folderVm(listed()).state.value.bannerMessage)
 
+    // M5-08c2: the c1 interim strings are gone. The structured fields are what the screen draws; `bannerMessage` is only the Read-only level and
+    // the missing configure permission text (the screen lets the unavailable banner win over it).
+
     @Test
-    fun `the unavailable connection comes first, above every other problem`() {
+    fun `an unavailable connection is in unavailableReason, not in the banner string`() {
+        val s = folderVm(listed(), unavailable = unavailable).state.value
+
+        assertEquals(unavailable, s.unavailableReason)
+        assertNull(s.bannerMessage, "the interim 'Migrations are not offered...' string is gone")
+    }
+
+    @Test
+    fun `an unreadable history is in historyProblem, not in the banner string`() {
         history.result = HistoryResult.Unreadable("/h/migration-history.json", "The file is not valid JSON")
 
-        val s = folderVm(
-            FolderListing.Unavailable(folder, FolderProblem.MISSING), unavailable = unavailable,
-            permission = false, level = TopologyControlLevel.READ_ONLY,
-        ).state.value
+        val s = folderVm(listed()).state.value
 
-        assertEquals("Migrations are not offered on this connection: $unavailable", s.bannerMessage)
+        assertEquals(HistoryUnreadable("/h/migration-history.json", "The file is not valid JSON"), s.historyProblem)
+        assertNull(s.bannerMessage, "the interim history string is gone")
     }
 
     @Test
-    fun `the unreadable history comes second, with its path`() {
-        history.result = HistoryResult.Unreadable("/h/migration-history.json", "The file is not valid JSON")
+    fun `an unusable folder is in the folder state, not in the banner string`() {
+        for (problem in FolderProblem.entries) {
+            val s = folderVm(FolderListing.Unavailable(folder, problem)).state.value
 
-        val s = folderVm(FolderListing.Unavailable(folder, FolderProblem.MISSING), permission = false, level = TopologyControlLevel.READ_ONLY).state.value
-
-        assertEquals("The applied history cannot be read, so nothing can be applied (/h/migration-history.json)", s.bannerMessage)
+            assertEquals(MigrationFolderState.FolderUnavailable(folder, problem), s.folder)
+            assertNull(s.bannerMessage, "the interim '<reason>: <path>' string is gone for $problem")
+        }
     }
 
     @Test
-    fun `an unusable folder comes third, with its reason and path`() {
-        val s = folderVm(FolderListing.Unavailable(folder, FolderProblem.MISSING), permission = false, level = TopologyControlLevel.READ_ONLY).state.value
-
-        assertEquals("The folder does not exist: $folder", s.bannerMessage)
-        assertEquals("The path is not a folder: $folder", folderVm(FolderListing.Unavailable(folder, FolderProblem.NOT_A_FOLDER)).state.value.bannerMessage)
-        assertEquals("The folder cannot be read: $folder", folderVm(FolderListing.Unavailable(folder, FolderProblem.UNREADABLE)).state.value.bannerMessage)
+    fun `a read-only folder and no folder chosen are in the folder state, not in the banner string`() {
+        assertEquals(MigrationFolderState.FolderReadOnly(folder), folderVm(listed(readOnly = true)).state.value.folder)
+        assertNull(folderVm(listed(readOnly = true)).state.value.bannerMessage)
+        val none = folderVm(null)
+        assertEquals(MigrationFolderState.ChooseFolder, none.state.value.folder)
+        assertNull(none.state.value.bannerMessage, "the interim 'Choose a migrations folder first' string is gone")
     }
 
     @Test
-    fun `a read-only folder comes before the level and the permission`() {
-        val s = folderVm(listed(readOnly = true), permission = false, level = TopologyControlLevel.READ_ONLY).state.value
-
-        assertEquals("The folder is read-only ($folder)", s.bannerMessage)
-    }
-
-    @Test
-    fun `no folder chosen says to choose one, and a cancelled dialog changes nothing`() {
+    fun `a cancelled dialog changes nothing`() {
         val vm = folderVm(null)
-        assertEquals("Choose a migrations folder first", vm.state.value.bannerMessage)
 
         chooser.answerNext(null)
         vm.chooseFolder()
 
-        assertEquals("Choose a migrations folder first", vm.state.value.bannerMessage)
+        assertEquals(MigrationFolderState.ChooseFolder, vm.state.value.folder)
         assertTrue(vm.state.value.entries.isEmpty())
         assertNull(store.folder)
     }
 
     @Test
-    fun `the Read-only level says apply is disabled because of the level`() {
+    fun `the Read-only level keeps its banner text`() {
         val s = folderVm(listed(), permission = false, level = TopologyControlLevel.READ_ONLY).state.value
 
         assertEquals("Apply is disabled: this connection is set to Read-only", s.bannerMessage)
@@ -487,7 +481,7 @@ class MigrationsViewModelOutcomeTest {
     }
 
     @Test
-    fun `a missing configure permission keeps its existing text and comes last`() {
+    fun `a missing configure permission keeps its existing text and comes after the level`() {
         val s = folderVm(listed(), permission = false).state.value
 
         val banner = assertNotNull(s.bannerMessage)

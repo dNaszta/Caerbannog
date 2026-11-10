@@ -7,6 +7,7 @@ import dev.caerbannog.core.migrations.MigrationHistoryRepository
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationValidationResult
+import io.cucumber.java.After
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -44,11 +45,14 @@ class M508c1WiringSteps {
         assertTrue(result is MigrationValidationResult.Valid, "the scenario's own file was refused: $result")
     }
 
-    /** Everything the existing banners can say right now. */
-    private fun screenText(): String {
-        val state = s.getVm().state.value
-        return listOfNotNull(state.errorMessage, state.bannerMessage).joinToString("\n")
-    }
+    /** The REAL Migrations screen (Compose) over the scenario's real view model; made once per view model, ended with the scenario. */
+    private fun screen(): MigrationsScreenDriver = MigrationsScreens.forViewModel(s.getVm())
+
+    @After
+    fun endScreen() = MigrationsScreens.endScenario()
+
+    /** Everything the screen says in its banners right now (M5-08c2: read from the Compose screen, not from the state). */
+    private fun screenText(): String = screen().bannerText()
 
     // ---- The topology control level of the connection is honoured ------------------------------------------------------------------
 
@@ -73,21 +77,22 @@ class M508c1WiringSteps {
         assertEquals("Apply pending", button)
         val state = s.getVm().state.value
         assertEquals(1, state.entries.count { it.status is MigrationStatus.Pending }, "the premise: one migration is pending")
-        assertFalse(state.isApplyPendingEnabled, "\"Apply pending\" is enabled on a Read-only connection")
-        assertFalse(state.isApplySingleEnabled, "applying one migration is enabled on a Read-only connection")
-        assertEquals("Apply is disabled: this connection is set to Read-only", state.bannerMessage)
+        assertFalse(screen().isEnabled("migrations:applyPendingBtn"), "\"Apply pending\" is enabled on a Read-only connection")
+        assertFalse(screen().isEnabled("migrations:applySingleBtn"), "applying one migration is enabled on a Read-only connection")
+        assertEquals("Apply is disabled: this connection is set to Read-only", screen().textOf("migrations:lockedBanner"))
     }
 
     // ---- A failed apply and a conflict, on the screen --------------------------------------------------------------------------------
 
     @When("I apply {string} on the screen")
-    fun applyOnScreen(version: String) = runBlocking {
-        s.lastApplyResult = s.getVm().applySingle(version)
+    fun applyOnScreen(version: String) {
+        assertEquals(version, s.getVm().state.value.selectedVersion, "the premise: $version is the migration shown")
+        screen().click("migrations:applySingleBtn")
     }
 
     @When("I apply the pending migrations on the screen")
-    fun applyPendingOnScreen() = runBlocking {
-        s.lastApplyResult = s.getVm().applyPending()
+    fun applyPendingOnScreen() {
+        screen().click("migrations:applyPendingBtn")
     }
 
     @Then("the screen says {string}")
@@ -101,21 +106,20 @@ class M508c1WiringSteps {
         val shown = screenText()
         assertTrue(shown.contains("Migration $version was not recorded"), "the screen should say migration $version was not recorded: \"$shown\"")
         assertTrue(shown.contains("Running it again is safe"), "the screen should say a rerun is safe: \"$shown\"")
+        assertTrue(screen().isDrawn("migrations:failedBanner"), "a failed action has its own banner")
+        assertFalse(screen().isDrawn("migrations:errorBanner"), "the outcome is not drawn through the generic error banner")
         assertFalse(s.historyRepository.getAppliedMigrations(s.profileName).containsKey(version), "$version was recorded as applied")
     }
 
     @Then("it says the existing {string} was not changed and {string} was not recorded")
     fun saysExistingNotChanged(resource: String, version: String) = runBlocking {
         val shown = screenText()
-        assertTrue(shown.contains("The existing resource was not changed"), "the screen should say the existing $resource was not changed: \"$shown\"")
-        assertTrue(shown.contains("exists with different settings") && shown.contains(resource), "the reason should name $resource: \"$shown\"")
-        // The conflict scenarios share the 08a step that imports its migration as "0001"; the quoted version of the scenario text is not in the
-        // file. The strong check: NOTHING was recorded, and the text names the migration that really ran.
+        assertTrue(shown.contains("The existing \"$resource\" was not changed"), "the screen should say the existing \"$resource\" was not changed: \"$shown\"")
+        assertTrue(shown.contains("Migration $version was not recorded"), "the screen should say migration $version was not recorded: \"$shown\"")
+        assertTrue(screen().isDrawn("migrations:conflictBanner"), "a conflict has its own banner")
+        assertFalse(screen().isDrawn("migrations:failedBanner"), "a conflict is not drawn as a plain failure")
         val history = s.historyRepository.getAppliedMigrations(s.profileName)
         assertTrue(history.isEmpty(), "a migration was recorded as applied although its action stopped: $history")
-        assertFalse(history.containsKey(version))
-        val failed = s.lastApplyResult as? MigrationApplyResult.ActionFailed ?: error("expected the apply to stop at an action but it gave ${s.lastApplyResult}")
-        assertTrue(shown.contains("Migration ${failed.version} was not recorded"), "the screen should say migration ${failed.version} was not recorded: \"$shown\"")
     }
 
     // ---- An apply that could not be recorded ------------------------------------------------------------------------------------------
@@ -132,7 +136,8 @@ class M508c1WiringSteps {
         val entry = s.getVm().state.value.entries.firstOrNull { it.file.version == version }
         assertNotNull(entry, "$version is not listed")
         assertTrue(entry!!.status is MigrationStatus.Pending, "$version is listed as ${entry.status}")
-        assertFalse(s.getVm().state.value.errorMessage.orEmpty().contains("SENTINEL"), "the disk error text reached the screen")
+        assertFalse(screenText().contains("SENTINEL"), "the disk error text reached the screen")
+        assertTrue(screen().isDrawn("migrations:notRecordedBanner"), "an apply that could not be recorded has its own banner")
         // The structured outcome is the contract M5-08c2 draws from: an apply that could not be recorded names the migration and the fixed text.
         assertEquals(
             ApplyOutcome.NotRecorded(version, "The migration was applied but could not be recorded; running it again is safe"),
@@ -154,7 +159,8 @@ class M508c1WiringSteps {
     fun saysNotOffered() {
         val state = s.getVm().state.value
         val reason = checkNotNull(s.migrationUnavailableReason)
-        assertEquals("Migrations are not offered on this connection: $reason", state.bannerMessage)
+        val banner = checkNotNull(screen().textOf("migrations:unavailableBanner")) { "no unavailable banner is drawn" }
+        assertTrue(banner.contains("Migrations are not offered on this connection") && banner.contains(reason), "the banner says: \"$banner\"")
         assertEquals(reason, state.unavailableReason)
     }
 
@@ -163,11 +169,13 @@ class M508c1WiringSteps {
         assertEquals("Apply pending", button)
         val vm = s.getVm()
         val state = vm.state.value
-        assertFalse(state.isApplyPendingEnabled, "\"Apply pending\" is enabled on a connection without an executor")
-        assertFalse(state.isApplySingleEnabled, "applying one migration is enabled on a connection without an executor")
+        assertFalse(screen().isEnabled("migrations:applyPendingBtn"), "\"Apply pending\" is enabled on a connection without an executor")
+        assertFalse(screen().isEnabled("migrations:applySingleBtn"), "applying one migration is enabled on a connection without an executor")
         assertEquals(listOf("0001"), state.entries.map { it.file.version }, "the files are listed")
+        assertTrue(screen().isDrawn("migrationCard:0001"), "the file is not on the screen")
+        assertTrue(screen().isDrawn("dryRunAction:0"), "the dry run is not on the screen")
         assertNotNull(state.dryRun, "the dry run is not shown")
-        assertTrue(state.isImportEnabled && state.isExportEnabled, "Import or Export is disabled")
+        assertTrue(screen().isEnabled("migrations:importBtn") && screen().isEnabled("migrations:exportBtn"), "Import or Export is disabled on the screen")
         assertTrue(vm.importFile(sample("0099")) is MigrationValidationResult.Valid, "Import does not work")
         assertNotNull(vm.exportCurrentTopology(), "Export does not work")
         assertTrue(s.executor.executedActions.isEmpty(), "something was sent to the broker")

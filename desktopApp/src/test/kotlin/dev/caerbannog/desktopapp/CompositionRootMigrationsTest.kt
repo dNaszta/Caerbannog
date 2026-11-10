@@ -252,7 +252,7 @@ class CompositionRootMigrationsTest {
             val state = vm.state.value
 
             assertEquals(reason, state.unavailableReason)
-            assertEquals("Migrations are not offered on this connection: $reason", state.bannerMessage)
+            assertNull(state.bannerMessage, "the screen draws the unavailable banner from unavailableReason (M5-08c2)")
             assertFalse(state.isApplyPendingEnabled)
             assertFalse(state.isApplySingleEnabled)
             assertIs<MigrationApplyResult.Blocked>(vm.applyPending())
@@ -278,7 +278,7 @@ class CompositionRootMigrationsTest {
 
             assertFalse(vm.state.value.isApplyPendingEnabled)
             assertIs<MigrationApplyResult.Blocked>(vm.applyPending())
-            assertEquals("Migrations are not offered on this connection: Connect to a broker first", vm.state.value.bannerMessage)
+            assertEquals("Connect to a broker first", vm.state.value.unavailableReason)
         } finally {
             composition.close()
         }

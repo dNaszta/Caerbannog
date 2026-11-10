@@ -6,7 +6,8 @@ data class ApplyProgress(val version: String, val index: Int, val total: Int)
 /** How the last apply ended, when it did not succeed. */
 sealed interface ApplyOutcome {
     data class Failed(val version: String, val index: Int, val total: Int, val reason: String) : ApplyOutcome
-    data class Conflict(val version: String, val index: Int, val total: Int, val reason: String) : ApplyOutcome
+    // M5-08c2 STUB: [resource] (the plain name the screen shows in "The existing <name> was not changed") is never filled yet.
+    data class Conflict(val version: String, val index: Int, val total: Int, val reason: String, val resource: String? = null) : ApplyOutcome
     data class NotRecorded(val version: String, val reason: String) : ApplyOutcome
 
     /** The text of the existing red banner until the screen draws the structured outcome. */

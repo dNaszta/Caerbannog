@@ -369,6 +369,7 @@ class M508bPersistenceSteps {
     // ---- history file problems ----
 
     @Given("the applied-migrations history file on disk is not valid JSON")
+    @Given("the applied-migrations history file is not valid JSON")
     fun historyNotJson() {
         activate()
         ensureDefaultFolder()
@@ -418,6 +419,72 @@ class M508bPersistenceSteps {
         assertTrue(historyBytes.contentEquals(Files.readAllBytes(moved)), "the kept file has other bytes than the original")
         assertTrue(vm.state.value.entries.isNotEmpty() && vm.state.value.entries.all { it.status is MigrationStatus.Pending })
         assertEquals(null, vm.state.value.historyProblem)
+    }
+
+    // ---- M5-08c2: the same behaviour through the REAL Compose screen ----
+
+    private fun screen() = MigrationsScreens.forViewModel(vm)
+
+    @When("I open the migrations screen and choose {string}")
+    fun openScreenAndChoose(action: String) {
+        assertEquals("Start with an empty history", action)
+        screen().click("migrations:emptyHistoryBtn")
+    }
+
+    @Then("a dialog asks to move migration-history.json to its timestamped name and says the old file is kept")
+    fun dialogAsksToMove() {
+        val dialog = checkNotNull(screen().textOf("migrations:emptyHistoryDialog")) { "no dialog is drawn" }
+        assertTrue(dialog.contains("Move migration-history.json to migration-history.json.unreadable-"), "the dialog says: \"$dialog\"")
+        assertTrue(dialog.contains("The old file is kept."), "the dialog says: \"$dialog\"")
+    }
+
+    @Then("cancelling changes nothing and confirming makes every migration pending")
+    fun cancelThenConfirm() {
+        screen().click("migrations:emptyHistoryCancelBtn")
+        assertFalse(screen().isDrawn("migrations:emptyHistoryDialog"), "the dialog is still drawn after Cancel")
+        assertTrue(historyBytes.contentEquals(Files.readAllBytes(historyFile)), "Cancel changed the history file")
+        assertNotNull(vm.state.value.historyProblem, "Cancel made the history readable")
+        screen().click("migrations:emptyHistoryBtn")
+        screen().click("migrations:emptyHistoryConfirmBtn")
+        assertFalse(screen().isDrawn("migrations:emptyHistoryDialog"), "the dialog is still drawn after Move file and start")
+        assertTrue(vm.state.value.entries.isNotEmpty() && vm.state.value.entries.all { it.status is MigrationStatus.Pending }, "not every migration is pending: ${vm.state.value.entries}")
+        assertEquals(null, vm.state.value.historyProblem)
+        val moved = Files.list(dataDir).use { st -> st.map { it.fileName.toString() }.toList() }.single { it.startsWith("migration-history.json.unreadable-") }
+        assertTrue(historyBytes.contentEquals(Files.readAllBytes(dataDir.resolve(moved))), "the kept file has other bytes than the original")
+    }
+
+    private var appliedBefore: Map<String, String> = emptyMap()
+    private lateinit var otherFolder: Path
+
+    @Given("a folder is chosen")
+    fun aFolderIsChosenForTheScreen() = runBlocking {
+        activate()
+        val first = makeFolder("/work/migrations")
+        writeUserFile(first, "0001.json", migrationText("0001"))
+        settings.folder = first.toString()
+        assertIs<MigrationApplyResult.Success>(openScreen("uat-eu").applyPending())
+        appliedBefore = history.getAppliedMigrations("uat-eu")
+        assertEquals(setOf("0001"), appliedBefore.keys, "the premise: 0001 is applied")
+        otherFolder = makeFolder("/work/other-migrations")
+        writeUserFile(otherFolder, "0001.json", migrationText("0001"))
+        writeUserFile(otherFolder, "0002.json", migrationText("0002"))
+    }
+
+    @When("I choose {string} and pick another folder")
+    fun chooseChangeFolderOnScreen(button: String) {
+        assertEquals("Change folder", button)
+        chooser.answerNext(otherFolder.toString())
+        screen().click("migrations:changeFolderBtn")
+    }
+
+    @Then("the files of the new folder are listed and the history is unchanged")
+    fun newFolderListedHistoryUnchanged() = runBlocking {
+        assertEquals(listOf("0001", "0002"), versionsListed(), "the files of the new folder")
+        assertEquals(MigrationFolderState.Ready(otherFolder.toString()), vm.state.value.folder)
+        assertTrue(screen().isDrawn("migrationCard:0002"), "the new folder's file is not on the screen")
+        assertEquals(otherFolder.toString(), screen().textOf("migrations:folderPath"), "the folder row shows the new folder")
+        assertEquals(appliedBefore, history.getAppliedMigrations("uat-eu"), "the history changed with the folder")
+        assertIs<MigrationStatus.Applied>(vm.state.value.entries.first { it.file.version == "0001" }.status)
     }
 
     // ---- invalid files and versions ----
