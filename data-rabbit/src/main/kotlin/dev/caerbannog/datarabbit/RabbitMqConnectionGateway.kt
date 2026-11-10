@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.ConnectionFailureReason
 import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.OpenResult
+import dev.caerbannog.core.connections.isMigrationSourceOnly
 import dev.caerbannog.core.connections.SecretStore
 import java.io.IOException
 import java.security.GeneralSecurityException
@@ -67,6 +68,8 @@ class RabbitMqConnectionGateway(
                 messages = RabbitMqStreamMessageReader(environments, catalog),
                 publisher = RabbitMqMessagePublisher(environments, http, requests),
                 manager = manager,
+                brokerVersion = access.version,
+                threeXReads = access.version?.takeIf { isMigrationSourceOnly(it) }?.let { ManagementThreeXReads(http, requests) },
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),

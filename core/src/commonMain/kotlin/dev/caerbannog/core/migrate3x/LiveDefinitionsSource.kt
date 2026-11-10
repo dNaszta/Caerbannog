@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
 import dev.caerbannog.core.connections.brokerMajorVersion
+import dev.caerbannog.core.connections.displayableBrokerVersion
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,7 +70,9 @@ class LiveDefinitionsSource(
     private val pause: suspend (millis: Long) -> Unit,
 ) : DefinitionsSource {
     override suspend fun fetch(): FetchResult {
-        val major = brokerMajorVersion(brokerVersion)
+        // F5: the source applies the display rule itself, so a caller cannot hand it an odd text.
+        val version = displayableBrokerVersion(brokerVersion)
+        val major = brokerMajorVersion(version)
         if (major == null) return FetchResult.Failed(LiveSourceTexts.VERSION_UNREADABLE)
         if (major >= FIRST_NON_SOURCE_MAJOR) return FetchResult.Failed(LiveSourceTexts.NOT_THREE_X)
 
@@ -90,7 +93,7 @@ class LiveDefinitionsSource(
 
         val deprecated = (reads.deprecatedFeaturesInUse() as? ReadOutcome.Ok)?.value.orEmpty()
         val versions = scanStorageVersions(document)
-        return FetchResult.Fetched(document, LiveSourceFacts(connectionName, brokerVersion, versions, deprecated))
+        return FetchResult.Fetched(document, LiveSourceFacts(connectionName, version, versions, deprecated))
     }
 
     // The UTF-8 size is at least the character count, so the cheap check settles the common cases before encoding.
@@ -168,9 +171,8 @@ sealed interface LiveAnalysisOutcome {
  * Fetches [source] and analyses the export on the live facts. The result is not held here: `AnalysisHolder` holds it (decision D1), so it
  * survives a reconnect like a file. CPU work runs off the caller's thread, like the file import.
  */
-// M8-02b STUB: [dispatcher] is accepted but not used yet (F7); the default stays Dispatchers.Default.
 suspend fun analyseLive(source: DefinitionsSource, dispatcher: CoroutineDispatcher = Dispatchers.Default): LiveAnalysisOutcome = when (val fetched = source.fetch()) {
-    is FetchResult.Fetched -> withContext(Dispatchers.Default) {
+    is FetchResult.Fetched -> withContext(dispatcher) {
         LiveAnalysisOutcome.Analysed(
             HeldAnalysis(source.connectionName, fetched.document, CompatibilityAnalyzer.analyze(fetched.document, fetched.facts)),
         )
