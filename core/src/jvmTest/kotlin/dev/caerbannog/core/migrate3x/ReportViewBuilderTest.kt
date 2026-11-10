@@ -13,27 +13,45 @@ class ReportViewBuilderTest {
 
     private fun ReportView.openAll(): ReportView = ReportViewBuilder.build(held, openGroups = groups.map { it.key }.toSet())
 
+    private fun key(rule: String, severity: Severity) = "$rule:${severity.name.lowercase()}"
+
     @Test
-    fun `the groups cover every finding once, key is rule plus severity, and the order is loss, blocker, warning, info, rule`() {
+    fun `the groups cover every finding once, key is exactly rule colon severity, and the order is loss, blocker, warning, info, rule`() {
         val view = ReportViewBuilder.build(held)
         assertEquals(held.report.findings.size, view.groups.sumOf { it.count }, "every finding sits in exactly one group")
         assertEquals(view.groups.size, view.groups.map { it.key }.toSet().size, "group keys are unique")
+        assertTrue(view.groups.isNotEmpty(), "the mixed file has groups")
         view.groups.forEach { g ->
-            assertTrue(g.key.contains(g.severity.name, ignoreCase = true), "key ${g.key} names the severity ${g.severity}")
+            val rules = held.report.findings.filter { key(it.rule, it.severity) == g.key }.map { it.rule }
+            assertTrue(rules.isNotEmpty(), "key ${g.key} is not <rule>:<severity lowercase> of any finding")
         }
         val order = view.groups.map { Triple(g(it), it.severity.ordinal, it.key) }
         assertEquals(order.sortedWith(compareBy({ it.first }, { it.second }, { it.third })), order, "order of ${view.groups.map { it.key }}")
-        assertTrue(view.groups.size >= 3, "the mixed file has several rules, got ${view.groups.map { it.key }}")
     }
 
     private fun g(group: GroupView): Int = if (group.findingClass == FindingClass.MessageLoss) 0 else 1
 
     @Test
-    fun `a group starts closed unless it is in the open set`() {
+    fun `the message-loss group is in groups, first, closed, and its count is the summary's message loss`() {
+        val first = ReportViewBuilder.build(held).groups.firstOrNull()
+        assertNotNull(first, "no groups")
+        assertEquals(FindingClass.MessageLoss, first.findingClass, "the loss group is first")
+        assertEquals(false, first.open, "closed by default")
+        assertEquals(held.report.summary.messageLoss, first.count)
+    }
+
+    @Test
+    fun `per severity the group counts add up to the chip counts`() {
         val view = ReportViewBuilder.build(held)
-        assertTrue(view.groups.none { it.open && it.findingClass != FindingClass.MessageLoss }, "only the message-loss group may start open: ${view.groups}")
-        val key = view.groups.first { it.findingClass != FindingClass.MessageLoss }.key
-        assertTrue(ReportViewBuilder.build(held, openGroups = setOf(key)).groups.first { it.key == key }.open)
+        for (chip in view.chips) assertEquals(chip.count, view.groups.filter { it.severity == chip.severity }.sumOf { it.count }, "severity ${chip.severity}")
+    }
+
+    @Test
+    fun `every group starts closed unless it is in the open set`() {
+        val view = ReportViewBuilder.build(held)
+        assertTrue(view.groups.isNotEmpty() && view.groups.none { it.open }, "${view.groups}")
+        val k = view.groups.last().key
+        assertTrue(ReportViewBuilder.build(held, openGroups = setOf(k)).groups.first { it.key == k }.open)
     }
 
     @Test
@@ -42,8 +60,33 @@ class ReportViewBuilderTest {
             val loss = ReportViewBuilder.build(held, selected).lossBlock
             assertNotNull(loss, "filter $selected must not remove the message-loss block")
             assertTrue(loss.title.contains("silently empty"), loss.title)
-            assertEquals(held.report.summary.messageLoss, loss.queues.size, "one name per at-risk queue")
+            assertEquals(held.report.summary.messageLoss, loss.queueCount, "one name per at-risk queue")
+            assertEquals(minOf(LOSS_PREVIEW_COUNT, loss.queueCount), loss.preview.size)
+            assertEquals(loss.preview, (0 until loss.preview.size).map { loss.queueAt(it) }, "the preview is the first names of the list")
         }
+    }
+
+    @Test
+    fun `the loss block previews 10 of 60000 names, reaches every name and copies all of them one per line`() {
+        val big = ScreenFiles.held(DefinitionsFiles.classicQueues(60_000))
+        val loss = assertNotNull(ReportViewBuilder.build(big).lossBlock)
+        assertEquals(60_000, loss.queueCount)
+        assertEquals(10, LOSS_PREVIEW_COUNT)
+        assertEquals(10, loss.preview.size)
+        assertEquals("q-00001", loss.queueAt(0))
+        assertEquals(60_000, loss.copyText.lines().size)
+        assertEquals(loss.queueAt(59_999), loss.copyText.lines().last())
+        assertEquals((0 until 60_000).map { loss.queueAt(it) }, loss.copyText.lines())
+    }
+
+    @Test
+    fun `loss block names are escaped like the text export and the copy text uses the same form`() {
+        val raw = "<b>x</b>\u0007\n"
+        val h = ScreenFiles.held(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(raw), DefinitionsFiles.queue("plain"))))
+        val loss = assertNotNull(ReportViewBuilder.build(h).lossBlock)
+        val shown = (0 until loss.queueCount).map { loss.queueAt(it) }
+        assertTrue(shown.contains("<b>x</b>\\u0007\\u000A"), "$shown")
+        assertEquals(shown, loss.copyText.lines(), "no raw newline in a name: one name per line")
     }
 
     @Test
@@ -75,10 +118,11 @@ class ReportViewBuilderTest {
     }
 
     @Test
-    fun `the filter removes groups of the other severities but not the message-loss group`() {
+    fun `the filter removes groups of the other severities and the loss block stays`() {
         val view = ReportViewBuilder.build(held, setOf(Severity.Blocker))
         assertTrue(view.groups.isNotEmpty())
-        assertTrue(view.groups.filter { it.findingClass != FindingClass.MessageLoss }.all { it.severity == Severity.Blocker }, "${view.groups}")
+        assertTrue(view.groups.all { it.severity == Severity.Blocker }, "${view.groups}")
+        assertNotNull(view.lossBlock)
     }
 
     @Test

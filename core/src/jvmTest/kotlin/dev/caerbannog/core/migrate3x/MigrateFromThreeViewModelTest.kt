@@ -171,11 +171,55 @@ class MigrateFromThreeViewModelTest {
         val r = Rig(this, loader); val vm = r.vm()
         vm.open(path); runCurrent()
         assertEquals(MigrateFromThreeState.Loading("legacy.json"), vm.state.value, "the premise: a file is loading")
-        vm.cancelPrompt(); runCurrent()
+        vm.cancelLoading(); runCurrent()
         assertEquals(MigrateFromThreeState.ChooseSource, vm.state.value)
         loader.finish(path, good); advanceUntilIdle()
         assertEquals(MigrateFromThreeState.ChooseSource, vm.state.value, "the late result must not bring a report back")
         assertNull(r.holder.held.value)
+    }
+
+    @Test
+    fun `cancelPrompt outside the virtual host prompt does nothing`() = runTest {
+        val loader = SuspendingDefinitionsFileLoader()
+        val r = Rig(this, loader); val vm = r.vm()
+        vm.cancelPrompt(); runCurrent()
+        assertEquals(MigrateFromThreeState.ChooseSource, vm.state.value)
+        vm.open(path); runCurrent()
+        vm.cancelPrompt(); runCurrent()
+        assertEquals(MigrateFromThreeState.Loading("legacy.json"), vm.state.value, "Loading is not cancelled by cancelPrompt")
+        loader.finish(path, good); advanceUntilIdle()
+        vm.cancelPrompt(); advanceUntilIdle()
+        assertEquals("legacy.json", vm.report().view.fileLabel, "a shown report is not touched")
+        assertNotNull(r.holder.held.value)
+    }
+
+    @Test
+    fun `cancelLoading outside Loading does nothing`() = runTest {
+        val r = rig(); val vm = r.vm()
+        vm.open(path); advanceUntilIdle()
+        vm.cancelLoading(); advanceUntilIdle()
+        assertEquals("legacy.json", vm.report().view.fileLabel)
+        assertNotNull(r.holder.held.value)
+    }
+
+    @Test
+    fun `cancelLoading while a second file loads keeps the held report of the first`() = runTest {
+        val loader = SuspendingDefinitionsFileLoader()
+        val r = Rig(this, loader); val vm = r.vm()
+        vm.open(path); runCurrent(); loader.finish(path, good); advanceUntilIdle()
+        vm.open("/data/second.json"); runCurrent()
+        assertEquals(MigrateFromThreeState.Loading("second.json"), vm.state.value)
+        vm.cancelLoading(); runCurrent()
+        assertEquals(MigrateFromThreeState.ChooseSource, vm.state.value)
+        assertEquals("legacy.json", r.holder.held.value?.fileLabel, "the held report is not changed")
+    }
+
+    @Test
+    fun `reportCopied shows the copied notice and a later export replaces it`() = runTest {
+        val r = rig(); val vm = r.vm()
+        vm.open(path); advanceUntilIdle()
+        vm.reportCopied(); advanceUntilIdle()
+        assertEquals(ExportNotice("Report copied as text", failed = false), vm.report().notice)
     }
 
     @Test
@@ -314,7 +358,10 @@ class MigrateFromThreeViewModelTest {
         assertEquals(assertNotNull(r.holder.held.value, "a report is held").report.findings.size, view.groups.sumOf { it.count })
         assertTrue(view.groups.size < 20, "groups with counts, not one entry per finding: ${view.groups.size}")
         view.groups.filter { !it.open }.forEach { assertEquals(0, view.rows(it.key).size) }
-        assertEquals(60_000, assertNotNull(view.lossBlock, "60,000 classic queues are at risk").queues.size)
+        val loss = assertNotNull(view.lossBlock, "60,000 classic queues are at risk")
+        assertEquals(60_000, loss.queueCount)
+        assertEquals(10, loss.preview.size)
+        assertEquals(loss.queueAt(59_999), "q-60000")
         val biggest = view.groups.maxBy { it.count }
         vm.toggleGroup(biggest.key); advanceUntilIdle()
         val rows = vm.report().view.rows(biggest.key)

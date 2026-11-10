@@ -36,6 +36,9 @@ internal object Migrate3xScreenWorld {
     var holder = AnalysisHolder()
     var vm: MigrateFromThreeViewModel? = null
     var clipboard: String? = null
+    var copiedName: String? = null
+    var copiedExpected: String? = null
+    var copiedLoss: String? = null
     var connectedTo: String? = null
 
     /** The only kind of request this screen could make; there is no gateway, so it is always empty. A step asserts it. */
@@ -98,7 +101,7 @@ internal object Migrate3xScreenWorld {
         this.active = active
         path = "/data/legacy.json"; files.clear(); loader.requestedPaths.clear()
         chooser = FakeDefinitionsFileChooser(); saver = FakeReportFileSaver(); holder = AnalysisHolder()
-        vm = null; clipboard = null; connectedTo = null; brokerRequests.clear()
+        vm = null; clipboard = null; copiedName = null; copiedExpected = null; copiedLoss = null; connectedTo = null; brokerRequests.clear()
     }
 }
 

@@ -38,8 +38,14 @@ class MigrateFromThreeViewModel(
     fun open(path: String) {}
     fun giveVirtualHost(text: String) {}
 
-    /** Also cancels a running Loading (back to ChooseSource; a late result is ignored). */
+    /** Cancels the virtual host prompt (back to ChooseSource). Does nothing in any other state. */
     fun cancelPrompt() {}
+
+    /** Cancels a running Loading (the job, back to ChooseSource; a late result is ignored; a held report is not changed). */
+    fun cancelLoading() {}
+
+    /** The UI calls this after it copied [reportText] to the clipboard: the notice "Report copied as text". */
+    fun reportCopied() {}
     fun toggleSeverity(severity: Severity) {}
     fun toggleGroup(key: String) {}
     fun exportReportJson() {}

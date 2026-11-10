@@ -118,7 +118,7 @@ class MigrateFromThreeStatesUiTest {
             assertTextHas("migrate3x-chip-${chip.severity.name.lowercase()}", "${chip.count}")
         }
         view.groups.forEach { g -> assertTextHas("migrate3x-group-${g.key}", "${g.count}") }
-        assertNotDrawn("migrate3x-row-0")
+        assertTrue(nodes("migrate3x-row-${view.groups.first().key}-0").isEmpty(), "groups start closed")
     }
 
     @Test

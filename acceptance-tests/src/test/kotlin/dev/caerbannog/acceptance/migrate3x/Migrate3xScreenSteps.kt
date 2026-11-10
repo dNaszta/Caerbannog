@@ -69,6 +69,9 @@ class Migrate3xScreenSteps {
     @Given("a definitions file with 2 classic queues without \"x-queue-version\"")
     fun twoClassicQueues() = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("invoices"))))
 
+    @Given("^a definitions file with (12|60,000) classic queues without \"x-queue-version\"$")
+    fun manyClassicQueues(count: String) = setFile(DefinitionsFiles.classicQueues(count.replace(",", "").toInt()))
+
     @Given("^a file that (is not valid JSON|is a JSON array|is larger than the limit|cannot be read from the disk)$")
     fun aFileThat(problem: String) {
         w.path = "/data/definitions.json"
@@ -151,6 +154,7 @@ class Migrate3xScreenSteps {
     @When("I copy the report as text")
     fun copyAsText() {
         w.clipboard = w.viewModel().reportText()
+        w.viewModel().reportCopied(); w.settle()
     }
 
     @When("I connect to {string}, a broker running RabbitMQ 4")
@@ -208,7 +212,8 @@ class Migrate3xScreenSteps {
     @Then("it lists both queues and says the loss cannot be detected after the upgrade")
     fun lossBlockQueues() {
         val loss = assertNotNull(view().lossBlock)
-        assertEquals(setOf("orders", "invoices"), loss.queues.toSet())
+        assertEquals(2, loss.queueCount)
+        assertEquals(setOf("orders", "invoices"), loss.preview.toSet())
         assertTrue(loss.detection.contains("cannot be detected after the upgrade"), "detection text: ${loss.detection}")
     }
 
@@ -281,7 +286,7 @@ class Migrate3xScreenSteps {
 
     @Then("only blockers are listed")
     fun onlyBlockers() {
-        val groups = view().groups.filter { it.findingClass != FindingClass.MessageLoss }
+        val groups = view().groups
         assertTrue(groups.isNotEmpty() && groups.all { it.severity == Severity.Blocker }, "groups: $groups")
         assertEquals(listOf(true, false, false), view().chips.map { it.selected })
     }
@@ -289,8 +294,8 @@ class Migrate3xScreenSteps {
     @Then("the message-loss block is still first")
     fun lossStillFirst() {
         assertNotNull(view().lossBlock, "the filter removed the message-loss block")
-        val first = view().groups.firstOrNull()
-        if (first != null && view().groups.any { it.findingClass == FindingClass.MessageLoss }) assertEquals(FindingClass.MessageLoss, first.findingClass, "groups: ${view().groups}")
+        val first = view().groups.firstOrNull() ?: fail("no groups")
+        assertEquals(FindingClass.MessageLoss, first.findingClass, "the loss group is the first group: ${view().groups}")
     }
 
     @Then("each chip still shows its own count")
@@ -363,7 +368,66 @@ class Migrate3xScreenSteps {
         allRows().forEach { r ->
             listOfNotNull(r.name, r.message, r.why, r.proposal).forEach { s -> assertTrue(s.none { it.code < 0x20 || it.code == 0x7F }, "control character in a row text: $s") }
         }
-        assertTrue(assertNotNull(view().lossBlock).queues.none { name -> name.any { it.code < 0x20 } }, "control character in the loss block")
+        val loss = assertNotNull(view().lossBlock)
+        assertTrue(loss.preview.none { name -> name.any { it.code < 0x20 } }, "control character in the loss block")
+    }
+
+    // ---- loss preview and copy ---------------------------------------------------------------------------------------------------
+
+    @Then("the message-loss block names the first 10 queues and says there are 60,000")
+    fun lossPreview() {
+        val loss = assertNotNull(view().lossBlock)
+        assertEquals(60_000, loss.queueCount)
+        assertEquals(10, loss.preview.size)
+        assertEquals((0 until 10).map { loss.queueAt(it) }, loss.preview)
+    }
+
+    /** "Show all N" only changes how the screen draws the list (the Compose tests click it); the view must offer every name. */
+    @When("I choose \"Show all 60,000\"")
+    fun chooseShowAll() {
+        assertEquals(60_000, assertNotNull(view().lossBlock).queueCount)
+    }
+
+    @Then("the block offers every queue name as a lazy list")
+    fun everyNameByIndex() {
+        val loss = assertNotNull(view().lossBlock)
+        assertEquals("q-00001", loss.queueAt(0))
+        assertEquals("q-60000", loss.queueAt(59_999))
+    }
+
+    @When("I copy the name of the first row of a group")
+    fun copyFirstRow() {
+        val group = view().groups.firstOrNull { it.findingClass != FindingClass.MessageLoss } ?: view().groups.first()
+        if (!group.open) w.viewModel().toggleGroup(group.key)
+        w.settle()
+        val rows = view().rows(group.key)
+        assertTrue(rows.size > 0, "the group ${group.key} has no rows")
+        w.copiedName = rows.at(0).name
+        w.copiedExpected = rows.at(0).name
+    }
+
+    @Then("the clipboard holds that name, with control characters escaped as shown")
+    fun clipboardHoldsName() {
+        val copied = assertNotNull(w.copiedName, "nothing was copied")
+        assertEquals(w.copiedExpected, copied)
+        assertTrue(copied.none { it.code < 0x20 }, "a control character was copied: $copied")
+    }
+
+    @When("I copy the queue names of the message-loss block")
+    fun copyLossNames() {
+        w.copiedLoss = assertNotNull(view().lossBlock).copyText
+    }
+
+    @Then("the clipboard holds all 12 names, one per line")
+    fun clipboardHoldsAll() {
+        val loss = assertNotNull(view().lossBlock)
+        assertEquals((0 until 12).map { loss.queueAt(it) }, assertNotNull(w.copiedLoss, "nothing was copied").lines())
+        assertEquals(12, loss.queueCount)
+    }
+
+    @Then("the clipboard holds no password hash and no password")
+    fun clipboardClean() {
+        listOfNotNull(w.copiedName, w.copiedLoss).forEach { c -> listOf("SENTINEL-HASH", "SENTINEL-PASSWORD").forEach { assertFalse(c.contains(it)) } }
     }
 
     // ---- Then: export ----------------------------------------------------------------------------------------------------------------
@@ -383,6 +447,7 @@ class Migrate3xScreenSteps {
 
     @Then("the clipboard holds the text form of the report")
     fun clipboardHoldsText() {
+        assertEquals("Report copied as text", report().notice?.text, "the notice after a copy")
         assertEquals(CompatibilityReportText.render(held()), assertNotNull(w.clipboard, "nothing was copied"))
     }
 

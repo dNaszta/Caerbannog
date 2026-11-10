@@ -9,8 +9,25 @@ data class ChipView(val severity: Severity, val count: Int, val selected: Boolea
 /** One way out of the message-loss problem; exactly the new broker with a Shovel is [recommended] (never an in-place upgrade). */
 data class FixView(val title: String, val text: String, val recommended: Boolean)
 
-/** The block above the groups. [queues] are plain-text names (escaped like the text export). Null in a [ReportView] when no queue is at risk. */
-data class LossBlockView(val title: String, val queues: List<String>, val detection: String, val fixes: List<FixView>)
+/** How many queue names the loss block shows before "Show all N". */
+const val LOSS_PREVIEW_COUNT: Int = 10
+
+/**
+ * The block above the groups. Names are plain text (escaped like the text export). [preview] holds the first [LOSS_PREVIEW_COUNT] names,
+ * [queueAt] any name (the expanded lazy list), [copyText] ALL names one per line. M8-06a STUB: no queues.
+ */
+class LossBlockView(
+    val title: String,
+    val queueCount: Int,
+    val preview: List<String>,
+    val detection: String,
+    val fixes: List<FixView>,
+    val copyText: String,
+    private val nameAt: (Int) -> String,
+) {
+    fun queueAt(index: Int): String = nameAt(index)
+    override fun toString(): String = "LossBlockView($title, $queueCount queues)"
+}
 
 /** One group of findings: key = rule plus severity. Closed groups hold no rows ([ReportView.rows] is empty). */
 data class GroupView(val key: String, val title: String, val severity: Severity, val findingClass: FindingClass, val count: Int, val open: Boolean)
