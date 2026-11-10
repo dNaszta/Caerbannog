@@ -874,6 +874,20 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun `a 3x migration source shows its own pill and banner (M8-02a)`() = runDesktopComposeUiTest {
+        // The result a connect to a 3.x broker leaves in the session; the Check button path is used only to put it on screen.
+        fakeChecker.result = PermissionCheckResult.MigrationSource("3.13.7")
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+
+        checkButton()
+
+        assertTagged("permissionPill:prod-eu", "RabbitMQ 3.x: migration source only")
+        assertTagged("permissionBanner", "svc-explorer is connected to RabbitMQ 3.13.7: migration source only.")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun `a declared result is worded as a claim`() = runDesktopComposeUiTest {
         fakeChecker.result = PermissionCheckResult.Unreadable(UnreadableCause.NOT_AUTHORIZED)
         val declaring = prod.copy(declaredPermissions = DeclaredPermissions(configure = true, write = true))
