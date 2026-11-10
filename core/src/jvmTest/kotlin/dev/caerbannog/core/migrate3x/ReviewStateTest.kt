@@ -96,9 +96,10 @@ class ReviewStateTest {
     fun `show next undecided opens the first pending item, with its place in the list`() = runTest {
         val r = rig()
         r.accept(orders)
+        val expected = r.core.items.first { it != orders }   // items are in REPORT order, not file order (ruling 14)
         r.vm.showNextUndecided(); r.settle()
-        assertEquals(invoices, r.sheet.item)
-        assertEquals(listOf(2, 3), listOf(r.sheet.itemNumber, r.sheet.itemTotal))
+        assertEquals(expected, r.sheet.item)
+        assertEquals(listOf(r.core.items.indexOf(expected) + 1, 3), listOf(r.sheet.itemNumber, r.sheet.itemTotal))
     }
 
     @Test
@@ -416,15 +417,15 @@ class ReviewStateTest {
     fun `the Replace draft survives closing the sheet, a failed submit and reopening`() = runTest {
         val r = rig(ReviewFiles.three)
         r.open(orders); r.vm.startReplace(); r.settle()
-        r.vm.setReplaceText("[ {\"action\": \"decl"); r.settle()
+        r.vm.setReplaceText("[ MARKER-X"); r.settle()
         r.vm.closeItem(); r.settle()
         assertNull(r.review.sheet)
         r.open(orders); r.vm.startReplace(); r.settle()
-        assertEquals("[ {\"action\": \"decl", r.sheet.replace!!.text, "Esc keeps the typed text")
-        r.vm.submitReplace("[ {\"action\": \"decl"); r.settle()
-        assertEquals("[ {\"action\": \"decl", r.sheet.replace!!.text)
+        assertEquals("[ MARKER-X", r.sheet.replace!!.text, "Esc keeps the typed text")
+        r.vm.submitReplace("[ MARKER-X"); r.settle()
+        assertEquals("[ MARKER-X", r.sheet.replace!!.text)
         r.open(invoices); r.vm.startReplace(); r.settle()
-        assertFalse(r.sheet.replace!!.text.contains("decl"), "a draft is per item")
+        assertFalse(r.sheet.replace!!.text.contains("MARKER-X"), "a draft is per item")
     }
 
     @Test
@@ -497,7 +498,8 @@ class ReviewStateTest {
         val g = r.report.view.groups.last()
         assertTrue(g.open)
         assertEquals(2, r.report.view.rows(SKIPPED_GROUP_KEY).size)
-        assertEquals(listOf("orders", "invoices"), (0 until 2).map { r.report.view.rows(SKIPPED_GROUP_KEY).at(it).name })
+        val reportOrder = r.core.items.filter { it == orders || it == invoices }.map { it.name }   // report order (ruling 14)
+        assertEquals(reportOrder, (0 until 2).map { r.report.view.rows(SKIPPED_GROUP_KEY).at(it).name })
         r.vm.toggleGroup(SKIPPED_GROUP_KEY); r.settle()
         assertFalse(r.report.view.groups.last().open)
         assertTrue(r.report.view.groups.dropLast(1).all { ':' in it.key }, "rule group keys hold a colon; skipped holds none")

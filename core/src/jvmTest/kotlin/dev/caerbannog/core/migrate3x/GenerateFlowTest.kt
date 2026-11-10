@@ -144,7 +144,7 @@ class GenerateFlowTest {
 
     @Test
     fun `choose folder from the trouble panel offers the current folder, a cancel changes nothing, a pick restarts the flow`() = runTest {
-        val folders = FakeMigrationFolders(null, null, "/second")
+        val folders = FakeMigrationFolders(null, null)   // answers: the generate dialog is cancelled, then the choose-folder dialog is cancelled
         val r = ReviewRig(this, ReviewFiles.orders, folders)
         r.decideAll(); r.generate()
         assertIs<SaveProblem.NoFolderChosen>(r.trouble().problem)

@@ -311,8 +311,9 @@ class MigrateFromThreeReviewUiTest {
         assertTextHas("migrate3x-pending-count", "2 items need a decision")
         click("migrate3x-next-undecided")
         assertDrawn("migrate3x-review-sheet")
-        assertEquals(rig.q("invoices"), rig.report.review.sheet!!.item)
-        assertTextHas("migrate3x-review-sheet", "item 2 of 3")
+        val expected = rig.core.items.first { it != rig.q("orders") }   // report order (ruling 14)
+        assertEquals(expected, rig.report.review.sheet!!.item)
+        assertTextHas("migrate3x-review-sheet", "item ${rig.core.items.indexOf(expected) + 1} of 3")
     }
 
     @Test
@@ -323,7 +324,7 @@ class MigrateFromThreeReviewUiTest {
         assertTextHas("migrate3x-pending-count", "1 item needs a decision")
         clickReview(rig, ORDERS_GROUP, "jobs"); click("migrate3x-skip")
         assertTextHas("migrate3x-pending-count", "Every item is decided")
-        assertTextHas("migrate3x-pending-count", "3 of 3: 2 accepted, 1 skipped (in the Skipped group), 0 replaced.")
+        assertTextHas("migrate3x-pending-count", "3 of 3: 2 accepted, 1 skipped (in the Skipped group).")
         assertEnabled("migrate3x-generate", true)
         assertNotDrawn("migrate3x-next-undecided")
     }

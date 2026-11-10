@@ -599,10 +599,14 @@ class Migrate3xReviewSteps {
         assertEquals(MigrationStatus.Pending, entry.status)
     }
 
-    @Then("a connection on another virtual host does not list it")
-    fun otherVhostNoList() {
-        assertTrue(migrationsScreen!!.state.value.entries.isNotEmpty(), "the premise: the matching connection lists the files")
-        assertTrue(otherScreen!!.state.value.entries.none { it.file.version == "0003" }, "0003 is listed on another virtual host")
+    // Bound here, not in the M5-08 migrations glue: the screen suite loads only the migrate3x glue package.
+    @Then("on a connection to another virtual host it is listed but cannot be applied")
+    fun otherVhostListedNotApplicable() {
+        assertTrue(migrationsScreen!!.state.value.canApplyPending, "the premise: the matching connection can apply")
+        val other = otherScreen!!.state.value
+        assertTrue(other.entries.any { it.file.version == "0003" }, "0003 is not listed on another virtual host: ${other.entries.map { it.file.version }}")
+        assertFalse(other.canApplyPending, "Apply pending is enabled on another virtual host")
+        assertFalse(other.canApplySingle, "Apply is enabled for a single migration on another virtual host")
     }
 
     @Then("the result lists {string} as skipped by me and the binding as left out")

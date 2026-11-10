@@ -216,6 +216,14 @@ class ConversionReviewViewApiTest {
         assertFailsWith<IllegalArgumentException> { review.refusalOf(orders, decision) }
     }
 
+    @Test
+    fun `a review item with a right-to-left override in its name has a toString without the raw character`() {
+        val item = ReviewItem(ItemKind.Queue, "/", "a\u202Eb\u0007")
+        val text = item.toString()
+        assertFalse(text.contains('\u202E') || text.contains('\u0007'), text)
+        assertTrue(text.contains("a\\u202Eb"), text)
+    }
+
     // ---- undecide ----
 
     @Test
