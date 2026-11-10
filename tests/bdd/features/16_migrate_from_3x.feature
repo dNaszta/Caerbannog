@@ -655,9 +655,13 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
   Scenario: Skip an item and change the decision later
     Given the report proposes to declare the classic queue "orders" as a quorum queue
     When I skip "orders"
-    Then the item shows as skipped and the count of undecided items goes down
-    When I open the review of "orders" again and accept it with the tick
-    Then the item shows as accepted and is no longer skipped
+    Then "orders" is listed in the group "Skipped by you" and no longer in its rule group
+    And the count of undecided items goes down
+    When I un-skip "orders"
+    Then "orders" is undecided again, is back in its rule group and is no longer in the group "Skipped by you"
+    And the count of undecided items goes up
+    When I skip "orders" and open its review from the group "Skipped by you" and accept it with the tick
+    Then the item shows as accepted and the group "Skipped by you" is gone
 
   @fake-broker @m8-06b
   Scenario: Replace an item with my own actions
@@ -717,6 +721,15 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     When I connect to "new-eu", a 4.x broker on the virtual host "/", and open the Migrations screen
     Then "0003 · Migrated from RabbitMQ 3.x legacy.json vhost /" is listed as Pending
     And a connection on another virtual host does not list it
+
+  @fake-broker @m8-06b
+  Scenario: The group of skipped items is last, closed, not filtered by the chips and absent when nothing is skipped
+    Given the report of a file with blockers and warnings is shown and nothing is skipped
+    Then there is no group "Skipped by you"
+    When I skip one item
+    Then the group "Skipped by you" is the last group, shows 1 item and is closed
+    When I turn off every severity chip
+    Then the group "Skipped by you" is still shown
 
   @fake-broker @m8-06b
   Scenario: The result lists what was skipped and left out, and the notes

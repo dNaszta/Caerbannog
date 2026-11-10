@@ -46,7 +46,7 @@ Module boundaries: view model and formatting in `core` (pure, no `java.*`), scre
 None (UI). Reason: the report is a human reading task; the read-only MCP report tool is M8-10 and reuses `CompatibilityReportJson`.
 
 ## Open points
-1. Owner decisions 1 to 6 and 9 of the umbrella brief (entry point, grouping, closed groups, where the report is held, wording, skipped display, cut).
+1. Owner decisions 1 to 6 and 9 of the umbrella brief are DECIDED (owner, 2026-11-10): entry A, grouping A, closed groups A, held in memory A, wording as in the mockup, skipped items B (the Skipped group is built in M8-06b, but the report builder of 06a leaves room: the group list ends with an optional group), cut as proposed.
 2. The document counts in the header ("482 queues") come from the held `DefinitionsDocument`, not from `ReportSummary` (which counts items needing decisions); the builder computes them. No new core API needed.
 3. "Unverified" marker on a row comes from `Finding.verified`; the exact tooltip text is the one fixed text in `ReportTexts` if present, else one new constant.
 4. Where `FakeDefinitionsFileLoader` lives: check `core-testing` first.
