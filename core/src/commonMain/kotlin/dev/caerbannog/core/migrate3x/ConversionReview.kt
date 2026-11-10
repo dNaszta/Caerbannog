@@ -3,9 +3,6 @@ package dev.caerbannog.core.migrate3x
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
 
-// M8-05 STUB: the public API of the review, written by the test developer so the tests compile. The senior developer replaces every body.
-// The contract is in docs/tasks/M8-05-conversion-proposals-and-review-core.md and in the tests under core/src/jvmTest/.../migrate3x/.
-
 /** An item of the definitions that may need a decision. Bindings are named `source->destination:routingKey`. */
 data class ReviewItem(val kind: ItemKind, val vhost: String?, val name: String?)
 
@@ -61,18 +58,43 @@ sealed interface GenerationResult {
     ) : GenerationResult
 }
 
-/** M8-05 STUB. */
+/**
+ * The review of an analysed 3.x definitions file: one decision per item that needs one, then one ordinary topology migration per
+ * source virtual host. Single-threaded; decisions live in one map keyed by [ReviewItem], so a file with 60,000 queues is fine.
+ * It sends nothing, writes nothing and holds no secret of its own; [toString] shows counts only.
+ */
 class ConversionReview private constructor(private val document: DefinitionsDocument, private val report: CompatibilityReport) {
-    val items: List<ReviewItem> get() = emptyList() // M8-05 STUB
-    val pending: List<ReviewItem> get() = emptyList() // M8-05 STUB
+    private val findingsByItem: Map<ReviewItem, List<Finding>> = ReviewRules.findingsByItem(report)
 
-    fun decide(item: ReviewItem, decision: ItemDecision): DecisionResult = DecisionResult.Refused(DecisionRefusal.NotAReviewItem) // M8-05 STUB
+    /** The items that need a decision, in report order, each once. An item with a name that cannot be written is never one. */
+    val items: List<ReviewItem> = ReviewRules.itemsNeedingDecision(report)
 
-    fun decisionOf(item: ReviewItem): ItemDecision? = null // M8-05 STUB
+    private val itemSet: Set<ReviewItem> = items.toHashSet()
+    private val decisions: MutableMap<ReviewItem, ItemDecision> = HashMap()
 
-    fun generate(request: GenerationRequest): GenerationResult = GenerationResult.Incomplete(emptyList()) // M8-05 STUB
+    /** [items] without the decided ones, same order. */
+    val pending: List<ReviewItem> get() = items.filter { it !in decisions }
 
-    override fun toString(): String = "ConversionReview" // M8-05 STUB
+    /** Stores [decision] for [item] (replacing an earlier one), or refuses it and keeps the earlier one. */
+    fun decide(item: ReviewItem, decision: ItemDecision): DecisionResult {
+        if (item !in itemSet) return DecisionResult.Refused(DecisionRefusal.NotAReviewItem)
+        val refusal = when (decision) {
+            ItemDecision.Skip -> null
+            is ItemDecision.Replace -> if (decision.actions.any { it.isDestructive }) DecisionRefusal.ReplaceHasDelete else null
+            is ItemDecision.Accept -> ProposalChoice.refusal(findingsByItem[item].orEmpty(), decision)
+        }
+        if (refusal != null) return DecisionResult.Refused(refusal)
+        decisions[item] = decision
+        return DecisionResult.Decided
+    }
+
+    fun decisionOf(item: ReviewItem): ItemDecision? = decisions[item]
+
+    /** Nothing is produced while an item is undecided. Fails loudly (IllegalStateException) when a version would pass 9999. */
+    fun generate(request: GenerationRequest): GenerationResult =
+        MigrationGenerator.generate(document, report, findingsByItem, decisions, pending, request)
+
+    override fun toString(): String = "ConversionReview(items=${items.size}, decided=${decisions.size}, pending=${items.size - decisions.size})"
 
     companion object {
         fun start(document: DefinitionsDocument, report: CompatibilityReport): ConversionReview = ConversionReview(document, report)
