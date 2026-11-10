@@ -8,7 +8,8 @@ import kotlinx.coroutines.CancellationException
  */
 sealed interface ActionResult {
     data object Success : ActionResult
-    data class Failed(val reason: String) : ActionResult
+    // M5-08c1 STUB: the kind is carried but nothing sets Conflict yet (data-rabbit ExecutorReasons.conflict, the runner and the view model come in step 3).
+    data class Failed(val reason: String, val kind: FailureKind = FailureKind.Other) : ActionResult
 }
 
 /**
@@ -161,6 +162,8 @@ class MigrationRunner(
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
         vhost: String,
+        // M5-08c1 STUB: accepted and ignored until step 3 (called before each action is sent).
+        onAction: (ApplyStep) -> Unit = {},
     ): MigrationApplyResult {
         if (!hasConfigurePermission) {
             return MigrationApplyResult.Blocked("The user has no configure permission on this connection")

@@ -10,15 +10,16 @@ import org.junit.platform.suite.api.Suite
 /**
  * M5-04: runs topology migrations scenarios from tests/bdd/features/10_topology_migrations.feature
  * against fakes (no Docker, no network). Broker scenarios (@broker) are excluded.
- * `not @m5-08c and not @m8-02`: M5-08a's scenarios (@m5-08a, glue in M508aExecutorSteps: the REAL runner and executor over a Ktor mock engine in
+ * `not @m5-08c2 and not @m8-02`: M5-08c1's scenarios (@m5-08c1, glue in M508c1WiringSteps: the REAL view model with the real repositories or fakes behind the
+ * ports; the screen text is read from `errorMessage` and `bannerMessage`) run here. M5-08a's scenarios (@m5-08a, glue in M508aExecutorSteps: the REAL runner and executor over a Ktor mock engine in
  * front of FakeManagementBroker) and M5-08b's (@m5-08b, glue in M508bPersistenceSteps: the REAL folder and history repositories on temp folders,
- * a fake chooser and a fake clock) run here. The other sub-tags of M5-08 were written for later tasks whose glue does not exist yet (c desktop
- * wiring and screen states; @m8-02 needs the 3.x detection); each removes its exclusion when it builds the glue. The scenarios are not deleted
+ * a fake chooser and a fake clock) run here. The other sub-tags of M5-08 were written for later tasks whose glue does not exist yet (@m5-08c2 the Compose screen
+ * states; @m8-02 needs the 3.x detection); each removes its exclusion when it builds the glue. The scenarios are not deleted
  * or edited.
  */
 @Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("10_topology_migrations.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.migrations")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@fake-broker and not @broker and not @m5-08c and not @m8-02")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@fake-broker and not @broker and not @m5-08c2 and not @m8-02")
 class RunTopologyMigrationsAcceptanceTest

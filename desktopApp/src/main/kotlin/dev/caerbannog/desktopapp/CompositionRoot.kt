@@ -115,6 +115,9 @@ fun createAppComposition(
     appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
     uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
     navigation: AppNavigation = AppNavigation(),
+    // M5-08c1 STUBS (test seams, not used yet): the history file (default ~/.caerbannog/migration-history.json) and the folder dialog.
+    migrationHistoryFile: java.nio.file.Path = java.nio.file.Path.of(System.getProperty("user.home"), ".caerbannog", "migration-history.json"),
+    migrationFolderChooser: dev.caerbannog.core.migrations.MigrationFolderChooser = SwingMigrationFolderChooser(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)

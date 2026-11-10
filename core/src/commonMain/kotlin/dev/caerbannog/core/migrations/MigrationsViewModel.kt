@@ -36,7 +36,14 @@ data class MigrationsScreenState(
     val isExportEnabled: Boolean = true,
     /** The question waiting for Confirm or Cancel, or null. */
     val confirmation: String? = null,
+    // M5-08c1 STUBS: never filled yet.
+    val applyProgress: ApplyProgress? = null,
+    val applyOutcome: ApplyOutcome? = null,
+    val unavailableReason: String? = null,
 ) {
+    /** M5-08c1 STUB: always true until step 3 (false for a missing folder or no folder chosen). */
+    val canShowFolder: Boolean get() = true
+
     val selectedEntry: MigrationEntry?
         get() = entries.firstOrNull { it.file.version == selectedVersion }
 }
@@ -51,6 +58,8 @@ class MigrationsViewModel(
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
     /** When set, files come from `repositoryFor(chosen folder)` and [fileRepository] is not used. */
     private val folderPorts: MigrationFolderPorts? = null,
+    /** M5-08c1 STUB: accepted, not used yet. Non-null disables Apply pending and Apply single. */
+    private val migrationUnavailableReason: String? = null,
     private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow(
@@ -372,6 +381,9 @@ class MigrationsViewModel(
     fun cancelEmptyHistory() {
         _state.update { it.copy(confirmation = null) }
     }
+
+    /** M5-08c1 STUB: does nothing yet. */
+    fun dismissOutcome() = Unit
 
     fun dismissError() {
         _state.update { it.copy(errorMessage = null) }
