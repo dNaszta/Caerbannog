@@ -239,6 +239,10 @@ class FakeConnectionGateway(
 
     override suspend fun open(profile: ConnectionProfile): OpenResult {
         val name = profile.name
+        // What the broker's overview says is decided when the connection is asked for (before a held open answers), like the real read.
+        val offered = brokerVersions[name]
+        val version = offered?.let { dev.caerbannog.core.connections.displayableBrokerVersion(it) }
+        val oddVersion = offered != null && version == null
         log += "open:$name"
         profilesAsked += profile
         onOpen?.invoke(profile)
@@ -264,8 +268,7 @@ class FakeConnectionGateway(
         }
         logins.incrementAndGet()
         overviews.incrementAndGet()
-        val version = brokerVersions[name]
-        val threeX = version != null && brokerMajor(version) < FIRST_SUPPORTED_MAJOR
+        val threeX = version != null && dev.caerbannog.core.connections.isMigrationSourceOnly(version)
         val held = Held(
             profileName = name,
             number = numbers.incrementAndGet(),
@@ -280,8 +283,8 @@ class FakeConnectionGateway(
             mqtt = mqttOf(name),
             mqttPublisher = mqttPublisherOf(name),
             queueInspector = queueInspectorOf(name),
-            migrationExecutor = if (threeX || name in unreadable) null else migrationExecutors[name],
-            migrationUnavailableReason = if (threeX) THREE_X_REASON else migrationReasons[name],
+            migrationExecutor = if (threeX || oddVersion || name in unreadable) null else migrationExecutors[name],
+            migrationUnavailableReason = if (threeX) THREE_X_REASON else if (oddVersion) UNKNOWN_VERSION_REASON else migrationReasons[name],
             brokerVersion = version,
             threeXReads = if (threeX) threeXReadsOf(name) else null,
         )
@@ -289,8 +292,6 @@ class FakeConnectionGateway(
         log += "opened:$name#${held.number}"
         return OpenResult.Opened(held)
     }
-
-    private fun brokerMajor(version: String): Int = version.substringBefore('.').toIntOrNull() ?: Int.MAX_VALUE
 
     private companion object {
         const val FIRST_SUPPORTED_MAJOR = 4

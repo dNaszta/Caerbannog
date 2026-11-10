@@ -13,3 +13,6 @@ fun brokerMajorVersion(text: String?): Int? =
  * 4.x either: it keeps the "version could not be read" behaviour.
  */
 fun isMigrationSourceOnly(version: String?): Boolean = brokerMajorVersion(version)?.let { it < 4 } == true
+
+/** M8-02a STUB (wrong on purpose): only trims. Real rule: trimmed, at most 32 chars, matching the version pattern, else null. */
+fun displayableBrokerVersion(text: String?): String? = text?.trim() // M8-02a STUB

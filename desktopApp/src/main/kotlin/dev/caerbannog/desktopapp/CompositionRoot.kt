@@ -97,6 +97,10 @@ class AppComposition(
     /** The file loader, dialogs and the in-memory held analysis of the Migrate from 3.x screen (M8-06a). */
     val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
 ) {
+    /** M8-02a STUB (constant: everything on, no reason; no fallback to Connections yet). */
+    val navigationFeatures: kotlinx.coroutines.flow.StateFlow<NavigationFeatures> =
+        kotlinx.coroutines.flow.MutableStateFlow(NavigationFeatures(dev.caerbannog.core.connections.ConnectionFeature.entries.toSet(), null))
+
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
 
@@ -244,3 +248,6 @@ fun registerShutdownHook(
 }
 
 
+
+/** M8-02a STUB: what the window passes to `AppFrame(features, featuresDisabledReason)`. */
+data class NavigationFeatures(val features: Set<dev.caerbannog.core.connections.ConnectionFeature>, val reason: String?)

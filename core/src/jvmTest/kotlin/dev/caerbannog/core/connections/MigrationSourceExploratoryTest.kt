@@ -9,9 +9,9 @@ import dev.caerbannog.core.migrate3x.STORAGE_VERSION_READS
 import dev.caerbannog.core.migrate3x.fakes.DefinitionsFiles
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Disabled
 import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,7 +71,7 @@ class MigrationSourceExploratoryTest {
 
     @Test
     fun `unparsable versions are not a source and are refused on every path`() = runBlocking<Unit> {
-        for (version in listOf("", "x", "v3.13", " 3.13", "-3", "NaN", ".3")) {
+        for (version in listOf("", "x", "v3.13", "3.13 x", "-3", "NaN", ".3")) {
             val r = rig()
             r.gateway.brokerRuns("legacy-eu", version)
             r.active.connect(legacy)
@@ -95,32 +95,58 @@ class MigrationSourceExploratoryTest {
         }
     }
 
-    // Finding F1: the broker version text is shown in the banner headline and kept in the session as the broker wrote it.
-    @Disabled("finding F1 (minor): an unsanitised broker version text reaches the banner; enable when the rule is decided")
+    // F1 (round 1): an odd version text is "unknown" everywhere, so it never reaches a banner, a pill or a report.
     @Test
-    fun `a hostile version text does not reach the banner with control characters or unbounded length`() = runBlocking<Unit> {
-        val r = rig()
-        r.gateway.brokerRuns("legacy-eu", "3.13.7\nINJECTED LINE" + "x".repeat(5000))
-        r.active.connect(legacy)
-        val banner = permissionBanner(legacy, r.session.state.value.statuses["legacy-eu"])
-        assertFalse('\n' in banner.headline, "control character in the headline")
-        assertTrue(banner.headline.length < 200, "headline length ${banner.headline.length}")
+    fun `a multi-line or oversized version is not a source and never reaches the banner`() = runBlocking<Unit> {
+        for (version in listOf("3 anything\nsecond line", "3.13.7\nINJECTED LINE" + "x".repeat(5000), "3." + "1".repeat(31))) {
+            val r = rig()
+            r.gateway.brokerRuns("legacy-eu", version)
+            r.active.connect(legacy)
+            val status = r.session.state.value.statuses["legacy-eu"]
+            assertFalse((status as PermissionCheckStatus.Done).result is PermissionCheckResult.MigrationSource, "marked: [${version.take(20)}]")
+            val banner = permissionBanner(legacy, status)
+            assertFalse('\n' in banner.headline + banner.detail.orEmpty(), "line break in the banner")
+            assertTrue(banner.headline.length < 200)
+            assertTrue(permissionPill(status).text != "RabbitMQ 3.x: migration source only", "an ordinary pill shows")
+            assertNull(r.active.source!!.brokerVersion, "the source carries no odd version text")
+            assertEquals(FetchResult.Failed(dev.caerbannog.core.migrate3x.LiveSourceTexts.VERSION_UNREADABLE), r.active.source!!.definitionsSource.fetch())
+            assertEquals(emptyList(), r.gateway.threeXReadsOf("legacy-eu").calls)
+        }
     }
 
-    // Finding F2 (major): the link is Connected for a moment before the session says "migration source" (mark runs after the Connected write).
-    @Disabled("finding F2: enable when ActiveConnection marks before it publishes Connected")
+    // F2 (round 1): the session says "migration source" at the very first Connected value, never a moment later.
     @Test
     fun `at the moment the link becomes Connected the connection is already locked`() = runBlocking<Unit> {
         val r = rig()
         r.gateway.brokerRuns("legacy-eu", "3.13.7")
         val seenAtConnected = Collections.synchronizedList(ArrayList<PermissionCheckResult?>())
         val job = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
-            r.active.state.collect { if (it is LinkState.Connected) seenAtConnected += r.session.permissions("legacy-eu") }
+            // Unconfined: runs inside the write of the state, so it sees the session exactly as it is at the first Connected value.
+            r.active.state.collect { if (it is LinkState.Connected && seenAtConnected.isEmpty()) seenAtConnected += r.session.permissions("legacy-eu") }
         }
         r.active.connect(legacy)
         job.cancel()
-        assertTrue(seenAtConnected.isNotEmpty())
-        assertTrue(seenAtConnected.all { it is PermissionCheckResult.MigrationSource }, "a gate reading at Connected saw: $seenAtConnected")
+        assertEquals(1, seenAtConnected.size, "Connected was never observed")
+        assertTrue(seenAtConnected.single() is PermissionCheckResult.MigrationSource, "a gate reading at the first Connected saw: $seenAtConnected")
+    }
+
+    // F3 (round 1): a connect superseded while its open is still waiting never marks, even when the newer connect of the same name is a 4.x broker.
+    @Test
+    fun `a superseded connect does not mark and the newer 4x check result stays`() = runBlocking<Unit> {
+        val r = rig()
+        r.gateway.brokerRuns("legacy-eu", "3.13.7")
+        val gate = r.gateway.holdOpens("legacy-eu")
+        val first = async(start = CoroutineStart.UNDISPATCHED) { r.active.connect(legacy) }
+        r.gateway.awaitOpenStarted()
+        r.gateway.brokerRuns("legacy-eu", "4.1.0") // the broker behind the name is now a 4.x one; the first open already asked its overview
+        val second = async(start = CoroutineStart.UNDISPATCHED) { r.active.connect(legacy) }
+        r.gateway.awaitOpenStarted()
+        gate.release()
+        first.await()
+        second.await()
+        assertEquals(LinkState.Connected("legacy-eu"), r.active.state.value)
+        assertEquals(PermissionCheckResult.Checked(true, true), r.session.permissions("legacy-eu"), "the 4.x check result is the final status")
+        assertEquals("4.1.0", r.active.source!!.brokerVersion)
     }
 
     @Test

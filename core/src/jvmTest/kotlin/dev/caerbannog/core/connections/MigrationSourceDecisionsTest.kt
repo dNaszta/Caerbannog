@@ -12,9 +12,23 @@ class MigrationSourceDecisionsTest {
         val table = mapOf(
             "3.13.7" to true, "3" to true, "3.8.0-rc.1" to true, "0.9" to true,
             "4.0.0" to false, "4.1" to false, "10.1" to false, "4" to false,
+            "3 anything\nsecond line" to false, "3.13.7\nx" to false, "3.${"1".repeat(31)}" to false, " 3.13.7 " to true, "3.13.7-rc.1" to true,
             null to false, "" to false, "x" to false, "v3.13" to false, " 3.13" to false, "-3.1" to false, "99999999999.1" to false,
         )
         table.forEach { (version, expected) -> assertEquals(expected, isMigrationSourceOnly(version), "isMigrationSourceOnly($version)") }
+    }
+
+    @Test
+    fun `displayableBrokerVersion keeps a plain version and rejects every odd text`() {
+        val accepted = mapOf("3.13.7" to "3.13.7", "3.13.7-rc.1" to "3.13.7-rc.1", "4.0.0+build" to "4.0.0+build", " 3.13.7 " to "3.13.7", "3" to "3", "10.1" to "10.1", "3.13.7~beta_1" to "3.13.7~beta_1")
+        accepted.forEach { (input, expected) -> assertEquals(expected, displayableBrokerVersion(input), "displayableBrokerVersion([$input])") }
+        val rejected = listOf(
+            null, "", "   ", "x", "v3.13", ".3", "3.", "-3", "3 anything\nsecond line", "3.13.7\nx", "3.13.7\u0000", "3.13 7", "3.13.7\u202e",
+            "3." + "1".repeat(31), "<script>", "3.13.7;rm", "3.13.7 -rc",
+        )
+        rejected.forEach { assertEquals(null, displayableBrokerVersion(it), "displayableBrokerVersion([${it?.replace("\n", "\\n")}]) must be null") }
+        assertEquals("3." + "1".repeat(30), displayableBrokerVersion("3." + "1".repeat(30)), "32 characters are accepted")
+        assertEquals(null, displayableBrokerVersion("3." + "1".repeat(31)), "33 characters are not")
     }
 
     @Test

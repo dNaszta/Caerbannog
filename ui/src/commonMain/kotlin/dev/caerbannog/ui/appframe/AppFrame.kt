@@ -329,6 +329,10 @@ fun AppFrame(
     activeItem: String = title,
     /** Shown before the title (the back arrow of a detail screen). */
     leading: @Composable RowScope.() -> Unit = {},
+    /** M8-02a STUB (not read yet): the features the connection offers; an item whose feature is missing is drawn disabled. */
+    features: Set<dev.caerbannog.core.connections.ConnectionFeature> = dev.caerbannog.core.connections.ConnectionFeature.entries.toSet(),
+    /** M8-02a STUB (not read yet): the reason shown on and said by a disabled item; null when all features are on. */
+    featuresDisabledReason: String? = null,
     content: @Composable () -> Unit,
 ) {
     AppFrameLayout(title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, activeItem = activeItem, leading = leading, content = content)
