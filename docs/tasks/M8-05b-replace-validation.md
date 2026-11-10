@@ -21,3 +21,6 @@ None (internal to the review core).
 
 ## Definition of done
 Tests first and passing, no unrelated change.
+
+## Status
+- Step 2 (test developer, tests first): DONE 2026-11-10, round 0. Added to `ItemDecisionTest`: `..` queue refused as `ReplaceInvalid` with nothing stored and `pending` unchanged; a refused Replace keeps an earlier decision; an action for another vhost refused (single and mixed with a valid one); a valid Replace is still `Decided` and generates. `ConversionExploratoryTest` `..` case tightened to assert the refusal. Compile stub `DecisionRefusal.ReplaceInvalid(reason)` marked `M8-05b STUB` in `ConversionReview.kt` (no logic; `decide` unchanged). Red: `:core:jvmTest --tests '*migrate3x*'` 458 run, 4 failed by assertion (the valid-Replace test is green, as it guards existing behaviour). No BDD scenario added: no user-visible behaviour before M8-06. Acceptance module not touched or run.

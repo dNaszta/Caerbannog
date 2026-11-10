@@ -26,6 +26,9 @@ sealed interface DecisionRefusal {
     /** A `Replace` holds a delete action (any `Delete*`). */
     data object ReplaceHasDelete : DecisionRefusal
 
+    /** M8-05b STUB: a `Replace` holds an action the migration parser refuses, or one for another vhost than the item's. [reason] has no secret (typed topology only). */
+    data class ReplaceInvalid(val reason: String) : DecisionRefusal
+
     /** The item is compatible, a binding, or unknown: nothing to decide. */
     data object NotAReviewItem : DecisionRefusal
 }

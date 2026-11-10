@@ -65,12 +65,10 @@ class ConversionExploratoryTest {
     }
 
     @Test
-    fun `a user replacement with an unwritable name fails loudly or is refused, never produces a broken file`() {
+    fun `a user replacement with an unwritable name is refused where it is entered`() {
         val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
         val result = s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("..", "quorum"))))
-        if (result == DecisionResult.Decided) {
-            val outcome = runCatching { s.review.generate(REQUEST) }
-            assertTrue(outcome.isFailure || (outcome.getOrNull() as GenerationResult.Generated).migrations.all { m -> m.file.up.none { it is MigrationAction.DeclareQueue && it.name == ".." } }, "a file with a '..' queue was produced")
-        }
+        assertTrue(result is DecisionResult.Refused && result.reason is DecisionRefusal.ReplaceInvalid, "expected ReplaceInvalid but got $result")
+        assertEquals(null, s.review.decisionOf(q("orders")))
     }
 }

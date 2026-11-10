@@ -2,6 +2,8 @@ package dev.caerbannog.core.migrate3x
 
 import dev.caerbannog.core.migrations.MigrationAction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 
 /** M8-05: what `decide` accepts and refuses. The ordering tick is data enforced here (P15). */
@@ -166,5 +168,46 @@ class ItemDecisionTest {
         assertEquals(listOf(q("orders")), s.review.pending)
         val declares = ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum"), MigrationAction.DeclareExchange("e")))
         assertEquals(DecisionResult.Decided, s.review.decide(q("orders"), declares))
+    }
+
+    private fun assertReplaceInvalid(result: DecisionResult) {
+        val r = result as? DecisionResult.Refused ?: fail("expected a refusal but got $result")
+        val reason = r.reason as? DecisionRefusal.ReplaceInvalid ?: fail("expected ReplaceInvalid but got ${r.reason}")
+        assertTrue(reason.reason.isNotBlank(), "the refusal carries the parser's reason")
+    }
+
+    @Test
+    fun `a Replace with a queue named dot dot is refused as ReplaceInvalid and decides nothing`() {
+        val s = classic()
+        assertReplaceInvalid(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("..", "quorum")))))
+        assertEquals(null, s.review.decisionOf(q("orders")), "nothing stored")
+        assertEquals(listOf(q("orders")), s.review.pending)
+    }
+
+    @Test
+    fun `a refused Replace keeps an earlier decision`() {
+        val s = classic()
+        val earlier = ItemDecision.Accept(acknowledged = TICK)
+        assertEquals(DecisionResult.Decided, s.review.decide(q("orders"), earlier))
+        assertReplaceInvalid(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("..", "quorum")))))
+        assertEquals(earlier, s.review.decisionOf(q("orders")))
+    }
+
+    @Test
+    fun `a Replace whose action is for another vhost is refused as ReplaceInvalid`() {
+        val s = classic()
+        assertReplaceInvalid(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum", vhost = "other")))))
+        assertReplaceInvalid(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum"), MigrationAction.DeclareExchange("e", vhost = "other")))))
+        assertEquals(null, s.review.decisionOf(q("orders")))
+        assertEquals(listOf(q("orders")), s.review.pending)
+    }
+
+    @Test
+    fun `a valid Replace in the item's vhost is still decided and generates`() {
+        val s = classic()
+        val replace = ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum")))
+        assertEquals(DecisionResult.Decided, s.review.decide(q("orders"), replace))
+        assertEquals(replace, s.review.decisionOf(q("orders")))
+        s.generated()
     }
 }
