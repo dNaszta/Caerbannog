@@ -24,8 +24,8 @@ object MigrateFromThreeTexts {
     const val LOSS_FIX_UPGRADE_THROUGH_TITLE: String = "By hand: upgrade through 4.0, 4.1 or 4.2 first"
     const val LOSS_FIX_UPGRADE_THROUGH_TEXT: String = "Then upgrade to the later version and check the queues after each step. Not offered by this app."
 
-    /** M8-06b STUB (ruling 3): the one place that builds the text of a save problem; the composables only draw it. */
-    fun problemText(problem: SaveProblem): String = ""
+    /** M8-06b STUB (rulings 3 and 13: takes the Trouble, so the partial-save sentence can list saved and unsaved versions): the one place that builds the text of a save problem; the composables only draw it. */
+    fun problemText(trouble: GenerationState.Trouble): String = ""
 
     /** "1,204" for 1204: the thousands separator the mockup uses. */
     fun count(n: Int): String = n.toString().reversed().chunked(3).joinToString(",").reversed()
