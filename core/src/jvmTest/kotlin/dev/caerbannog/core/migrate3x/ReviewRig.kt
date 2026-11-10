@@ -115,3 +115,11 @@ internal class ReviewRig(
         return (0 until rows.size).map { rows.at(it) }
     }
 }
+
+/** A core review of a file text, for tests that need the core's own answer (not a literal). */
+internal object ConversionReviewsRef {
+    fun core(text: String): ConversionReview {
+        val document = (DefinitionsParser.parse(text) as DefinitionsParseResult.Parsed).document
+        return ConversionReview.start(document, CompatibilityAnalyzer.analyze(document))
+    }
+}

@@ -479,8 +479,12 @@ class Migrate3xReviewSteps {
         assertEquals(typed, editor.text, "what the user typed is not kept")
         when (error) {
             "the migration parser's own reason" -> assertTrue(shown.contains(assertNotNull(expectedReason, "the premise: the parser refuses it")), shown)
-            // The core names both virtual hosts when the echo rule allows it ("an action is for virtual host 'other', but the item belongs to '/'").
-            "an action is for another virtual host than the item's" -> assertTrue(shown.contains("an action is for") && shown.contains("virtual host"), shown)
+            // The core's own returned reason (it names both vhosts when the echo rule allows, else the nameless form), not a literal.
+            "the core's own reason about the other virtual host" -> {
+                val refusal = core().refusalOf(item!!, ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", vhost = "other"))))
+                val reason = assertIs<dev.caerbannog.core.migrate3x.DecisionRefusal.ReplaceInvalid>(refusal).reason
+                assertTrue(shown.contains(reason), "expected the core's reason \"$reason\" in \"$shown\"")
+            }
             else -> assertTrue(shown.contains(error), "expected \"$error\" but the sheet says \"$shown\"")
         }
     }

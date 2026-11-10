@@ -63,6 +63,8 @@ fun MigrateFromThreeScreen(
     onReportCopied: () -> Unit = {},
     /** M8-06b STUB: the review, generate and save events (see [ReviewEvents]). The stub screen draws none of it yet. */
     review: ReviewEvents = ReviewEvents.None,
+    /** M8-06b STUB (ruling 9): the "Open Migrations" button of the result (drawn only for a saved result); wired in desktopApp to AppDestination.Migrations. */
+    onOpenMigrations: () -> Unit = {},
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {

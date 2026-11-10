@@ -12,7 +12,10 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.migrate3x.Acknowledgement
+import dev.caerbannog.core.migrate3x.GenerationState
 import dev.caerbannog.core.migrate3x.ItemDecision
+import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
+import dev.caerbannog.core.migrate3x.SaveProblem
 import dev.caerbannog.core.migrate3x.SKIPPED_GROUP_KEY
 import dev.caerbannog.core.migrate3x.SaveOutcome
 import dev.caerbannog.core.migrations.FolderProblem
@@ -397,6 +400,8 @@ class MigrateFromThreeReviewUiTest {
         assertTextHas("migrate3x-result", "Nothing was sent to any broker. Apply them on a 4.x connection from the Migrations screen; each applies only on a connection whose virtual host matches.")
         assertTextHas("migrate3x-result-left-out", "temp", "skipped by you")
         assertDrawn("migrate3x-result-open-migrations")
+        click("migrate3x-result-open-migrations")
+        assertTrue("openMigrations" in rig.calls, "the button did not call onOpenMigrations: ${rig.calls}")
         assertEquals(listOf("0003"), folders.folder("/migrations").written)
     }
 
@@ -454,7 +459,7 @@ class MigrateFromThreeReviewUiTest {
         val rig = LiveRig(ReviewScreenFiles.orders, FakeMigrationFolders(null))
         showLive(rig)
         clickReview(rig, ORDERS_GROUP, "orders"); click(tickTag); click("migrate3x-accept"); click("migrate3x-generate")
-        assertTextHas("migrate3x-trouble", "No folder was chosen. Nothing was saved.")
+        assertTextHas("migrate3x-trouble", MigrateFromThreeTexts.problemText(SaveProblem.NoFolderChosen), "No folder was chosen. Nothing was saved.")
         assertDrawn("migrate3x-trouble-choose-folder")
         assertEquals(emptyList(), rig.folders.folder("/migrations").attempts)
     }
@@ -465,7 +470,7 @@ class MigrateFromThreeReviewUiTest {
         val rig = LiveRig(ReviewScreenFiles.orders, folders)
         showLive(rig)
         clickReview(rig, ORDERS_GROUP, "orders"); click(tickTag); click("migrate3x-accept"); click("migrate3x-generate")
-        assertTextHas("migrate3x-trouble", "The folder is read-only", "No file was saved.", "/migrations")
+        assertTextHas("migrate3x-trouble", MigrateFromThreeTexts.problemText((rig.report.review.generation as GenerationState.Trouble).problem), "The folder is read-only", "No file was saved.", "/migrations")
         assertTextHas("migrate3x-trouble-choose-folder", "Choose another folder")
         assertTextHas("migrate3x-trouble-export", "Export the files")
         assertNotDrawn("migrate3x-trouble-retry")
@@ -514,7 +519,7 @@ class MigrateFromThreeReviewUiTest {
         val rig = LiveRig(ReviewScreenFiles.orders, folders)
         showLive(rig)
         clickReview(rig, ORDERS_GROUP, "orders"); click(tickTag); click("migrate3x-accept"); click("migrate3x-generate")
-        assertTextHas("migrate3x-trouble", "The migrations folder has no free version number left (the highest is 9999).")
+        assertTextHas("migrate3x-trouble", MigrateFromThreeTexts.problemText(SaveProblem.NoFreeVersion), "The migrations folder has no free version number left (the highest is 9999).")
     }
 
     @Test

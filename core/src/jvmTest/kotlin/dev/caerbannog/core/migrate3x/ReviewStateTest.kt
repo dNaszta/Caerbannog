@@ -60,7 +60,7 @@ class ReviewStateTest {
         r.accept(jobs)
         assertEquals("Every item is decided", r.review.pendingLine)
         assertTrue(r.review.canGenerate)
-        assertEquals("3 of 3: 3 accepted, 0 skipped (in the Skipped group), 0 replaced.", r.review.decidedLine)
+        assertEquals("3 of 3: 3 accepted.", r.review.decidedLine)
     }
 
     @Test
@@ -85,7 +85,9 @@ class ReviewStateTest {
     fun `a count above one thousand uses the same plain number`() = runTest {
         val r = ReviewRig(this, ReviewFiles.classic(*Array(1500) { "q-$it" }))
         assertEquals(1500, r.review.itemCount)
-        assertEquals("1500 items need a decision", r.review.pendingLine.replace(",", ""), "digits as the count, with or without a thousands separator")
+        assertEquals("1,500 items need a decision", r.review.pendingLine, "numbers go through MigrateFromThreeTexts.count (thousands comma)")
+        r.vm.showNextUndecided(); r.settle()
+        assertEquals(listOf(1, 1500), listOf(r.sheet.itemNumber, r.sheet.itemTotal))
     }
 
     // ---- next undecided, a later change ----
@@ -359,7 +361,8 @@ class ReviewStateTest {
         val cases = mapOf(
             """[{"action":"deleteQueue","name":"orders"}]""" to "A replacement must not delete anything. Nothing was stored; the item is still undecided.",
             """[{"action":"declareQueue","name":".."}]""" to "The actions are refused: ",
-            """[{"action":"declareQueue","name":"orders","vhost":"other"}]""" to "The actions are refused: an action is for virtual host 'other', but the item belongs to '/'. Nothing was stored; the item is still undecided.",
+            // the core's own returned reason, not a literal (ruling 1)
+            """[{"action":"declareQueue","name":"orders","vhost":"other"}]""" to coreReason(ItemDecision.Replace(listOf(dev.caerbannog.core.migrations.MigrationAction.DeclareQueue("orders", vhost = "other")))),
             "this is not json" to "The actions are refused: the text is not valid JSON. Nothing was stored; the item is still undecided.",
             """{"action":"declareQueue"}""" to "The actions are refused: the text is not a list of actions. Nothing was stored; the item is still undecided.",
         )
@@ -375,6 +378,29 @@ class ReviewStateTest {
             assertNull(r.core.decisionOf(orders), "nothing is stored for: $text")
             assertEquals(1, r.review.pendingCount)
         }
+    }
+
+    private fun coreReason(decision: ItemDecision.Replace): String {
+        val refusal = ConversionReviewsRef.core(ReviewFiles.orders).refusalOf(orders, decision)
+        val reason = assertIs<DecisionRefusal.ReplaceInvalid>(refusal, "the core must refuse $decision").reason
+        return "The actions are refused: $reason. Nothing was stored; the item is still undecided."
+    }
+
+    @Test
+    fun `a new view model on the same holder shows the same counts, lines and Generate, with no sheet and an idle generation`() = runTest {
+        val r = rig()
+        r.accept(orders); r.skip(invoices)
+        r.open(jobs)    // an open sheet is not carried over
+        val before = r.review
+        val second = r.newVm(); r.settle()
+        val after = (second.state.value as MigrateFromThreeState.Report).review
+        assertEquals(
+            listOf(before.itemCount, before.pendingCount, before.acceptedCount, before.skippedCount, before.replacedCount, before.pendingLine, before.decidedLine, before.canGenerate),
+            listOf(after.itemCount, after.pendingCount, after.acceptedCount, after.skippedCount, after.replacedCount, after.pendingLine, after.decidedLine, after.canGenerate),
+        )
+        assertEquals("1 item needs a decision", after.pendingLine)
+        assertNull(after.sheet); assertEquals(GenerationState.Idle, after.generation)
+        assertEquals(SKIPPED_GROUP_KEY, (second.state.value as MigrateFromThreeState.Report).view.groups.last().key, "the Skipped group is built from the held review")
     }
 
     @Test

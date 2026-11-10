@@ -249,6 +249,50 @@ class GenerateFlowTest {
     }
 
     @Test
+    fun `a partial save records that files were saved, so the next generate asks first (ruling 6)`() = runTest {
+        val (r, folder) = rig(ReviewFiles.twoVhosts)
+        folder.failWrite(2)
+        r.decideAll(); r.generate()
+        assertIs<GenerationState.Trouble>(r.generation)
+        assertTrue(r.holder.saved.value, "one file was written, so files were saved from this analysis")
+        r.vm.dismissResult(); r.settle()
+        r.generate()
+        assertEquals(GenerationState.ConfirmAgain, r.generation)
+    }
+
+    @Test
+    fun `generate again from a Trouble is accepted without a question and writes new versions (ruling 7)`() = runTest {
+        val (r, folder) = rig(ReviewFiles.twoVhosts)
+        folder.failWrite(2)
+        r.decideAll(); r.generate()
+        assertTrue(r.holder.saved.value)
+        r.vm.generateAgain(); r.settle()
+        assertEquals(listOf("0002", "0003"), r.done().files.map { it.version }, "new versions above the highest, no ConfirmAgain in between")
+        assertEquals(setOf("0001", "0002", "0003"), folder.files.keys)
+    }
+
+    @Test
+    fun `generate again and cancel are no-ops outside their states (ruling 10)`() = runTest {
+        val (r, folder) = rig(ReviewFiles.orders)
+        r.decideAll()
+        r.vm.generateAgain(); r.vm.cancelGenerateAgain(); r.settle()
+        assertEquals(GenerationState.Idle, r.generation, "Idle")
+        assertEquals(emptyList(), folder.attempts)
+        val gate = CompletableDeferred<Unit>()
+        folder.beforeWrite = { gate.await() }
+        r.vm.generate(); r.settle()
+        assertEquals(GenerationState.Saving, r.generation)
+        r.vm.generateAgain(); r.vm.cancelGenerateAgain(); r.settle()
+        assertEquals(GenerationState.Saving, r.generation, "Saving")
+        gate.complete(Unit); r.settle()
+        val done = r.generation
+        assertIs<GenerationState.Done>(done)
+        r.vm.generateAgain(); r.vm.cancelGenerateAgain(); r.settle()
+        assertEquals(done, r.generation, "Done")
+        assertEquals(1, folder.attempts.size, "nothing was written by the no-ops")
+    }
+
+    @Test
     fun `retry saves only the files that were not saved, with the same versions`() = runTest {
         val (r, folder) = rig(ReviewFiles.twoVhosts)
         folder.failWrite(2)

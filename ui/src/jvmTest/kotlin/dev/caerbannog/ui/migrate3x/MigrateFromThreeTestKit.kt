@@ -72,7 +72,7 @@ internal object MigrateScreenFiles {
         open: (HeldAnalysis) -> Set<String> = { emptySet() },
     ): MigrateFromThreeState.Report {
         val held = held(text, label)
-        return MigrateFromThreeState.Report(ReportViewBuilder.build(held, selected, open(held)), notice)
+        return MigrateFromThreeState.Report(ReportViewBuilder.build(held, selected, open(held)), notice, dev.caerbannog.core.migrate3x.ReviewState.NONE)
     }
 
     /** Opens the first group whose rule is [rule] (the key starts with the rule id). */

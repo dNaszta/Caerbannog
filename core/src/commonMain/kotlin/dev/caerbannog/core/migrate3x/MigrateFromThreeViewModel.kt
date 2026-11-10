@@ -21,8 +21,7 @@ sealed interface MigrateFromThreeState {
 
     /** [error] is `InvalidName.reason` as returned, or null. The field always starts empty: there is no default value. */
     data class NeedsVirtualHost(val fileLabel: String, val error: String?) : MigrateFromThreeState
-    /** [review] has a STUB default (M8-06b): the brief makes it required, and the developer removes the default. */
-    data class Report(val view: ReportView, val notice: ExportNotice?, val review: ReviewState = ReviewState.NONE) : MigrateFromThreeState
+    data class Report(val view: ReportView, val notice: ExportNotice?, val review: ReviewState) : MigrateFromThreeState
 }
 
 /**
@@ -55,7 +54,8 @@ class MigrateFromThreeViewModel(
     private class Pending(val label: String, val draft: UnassignedDefinitions)
 
     private fun initialState(): MigrateFromThreeState =
-        holder.held.value?.let { MigrateFromThreeState.Report(ReportViewBuilder.build(it), null) } ?: MigrateFromThreeState.ChooseSource
+        // M8-06b STUB: the real initialState derives review from it.review (ruling 12): counts, lines, canGenerate, sheet = null, generation = Idle.
+        holder.held.value?.let { MigrateFromThreeState.Report(ReportViewBuilder.build(it), null, ReviewState.NONE) } ?: MigrateFromThreeState.ChooseSource
 
     /** Opens the file dialog; a cancelled dialog changes nothing. */
     fun chooseFile() {
@@ -100,7 +100,7 @@ class MigrateFromThreeViewModel(
         selected = Severity.entries.toSet()
         openGroups = emptySet()
         holder.hold(held)
-        mutable.value = MigrateFromThreeState.Report(ReportViewBuilder.build(held), null)
+        mutable.value = MigrateFromThreeState.Report(ReportViewBuilder.build(held), null, ReviewState.NONE)
     }
 
     /** Answers the virtual host prompt. Trims the text, then asks the core; a refusal stays on the prompt. Ignored when no prompt is shown. */

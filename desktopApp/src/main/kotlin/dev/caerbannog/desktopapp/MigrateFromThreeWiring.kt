@@ -57,6 +57,7 @@ internal fun MigrateFromThreeWindowContent(composition: AppComposition, control:
             onExport = vm::exportReportJson,
             onDismissNotice = vm::dismissNotice,
             onReportCopied = vm::reportCopied,
+            onOpenMigrations = { composition.navigation.open(AppDestination.Migrations) },
         )
     }
 }

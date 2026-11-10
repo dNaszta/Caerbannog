@@ -50,7 +50,7 @@ class SecretsOnScreenTest {
         assertClean("held analysis", held.toString())
         listOf(
             MigrateFromThreeState.ChooseSource, MigrateFromThreeState.Loading("x"), MigrateFromThreeState.Rejected("x", "y"),
-            MigrateFromThreeState.NeedsVirtualHost("x", null), MigrateFromThreeState.Report(ReportViewBuilder.build(held), null),
+            MigrateFromThreeState.NeedsVirtualHost("x", null), MigrateFromThreeState.Report(ReportViewBuilder.build(held), null, ReviewState.NONE),
         ).forEach { assertClean(it.toString(), it.toString()) }
     }
 

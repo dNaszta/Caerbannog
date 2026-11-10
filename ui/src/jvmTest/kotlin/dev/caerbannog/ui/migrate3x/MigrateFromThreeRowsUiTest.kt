@@ -109,7 +109,7 @@ class MigrateFromThreeRowsUiTest {
         val held = MigrateScreenFiles.held(DefinitionsFiles.classicQueues(60_000))
         val view0 = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held)
         val biggest = view0.groups.maxBy { it.count }
-        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = setOf(biggest.key)), null)
+        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = setOf(biggest.key)), null, dev.caerbannog.core.migrate3x.ReviewState.NONE)
         show(state)
         revealRow(state.view, biggest.key, 0)
         assertDrawn(rowTag(biggest.key, 0))
@@ -183,7 +183,7 @@ class MigrateFromThreeRowsUiTest {
 
     @Test
     fun `the loss block copy button copies all 12 names one per line`() = runDesktopComposeUiTest(1280, 800) {
-        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(12))), null)
+        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(12))), null, dev.caerbannog.core.migrate3x.ReviewState.NONE)
         val clipboard = RecordingClipboard()
         show(state, clipboard = clipboard)
         revealTop()
@@ -194,7 +194,7 @@ class MigrateFromThreeRowsUiTest {
 
     @Test
     fun `the loss block copy button copies all 60000 names, not only the preview`() = runDesktopComposeUiTest(1280, 800) {
-        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(60_000))), null)
+        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(60_000))), null, dev.caerbannog.core.migrate3x.ReviewState.NONE)
         val clipboard = RecordingClipboard()
         show(state, clipboard = clipboard)
         revealTop()
@@ -210,7 +210,7 @@ class MigrateFromThreeRowsUiTest {
 
     @Test
     fun `the loss block shows the first 10 of 60000 names and Show all expands them in place as a lazy list`() = runDesktopComposeUiTest(1280, 800) {
-        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(60_000))), null)
+        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(MigrateScreenFiles.held(DefinitionsFiles.classicQueues(60_000))), null, dev.caerbannog.core.migrate3x.ReviewState.NONE)
         show(state)
         revealTop()
         assertTextHas("migrate3x-loss-banner", "q-00001", "q-00010", "Show all 60,000")
@@ -228,7 +228,7 @@ class MigrateFromThreeRowsUiTest {
     @Test
     fun `banner, summary and chips are items of the same lazy list - scroll away and back`() = runDesktopComposeUiTest(1280, 600) {
         val held = MigrateScreenFiles.held(DefinitionsFiles.classicQueues(300))
-        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = MigrateScreenFiles.allGroups(held)), null)
+        val state = MigrateFromThreeState.Report(dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = MigrateScreenFiles.allGroups(held)), null, dev.caerbannog.core.migrate3x.ReviewState.NONE)
         show(state)
         revealTop()
         assertDrawn("migrate3x-loss-banner"); assertDrawn("migrate3x-chip-blocker")
@@ -255,7 +255,7 @@ class MigrateFromThreeRowsUiTest {
         val held = MigrateScreenFiles.held(MigrateScreenFiles.mixed)
         val key = rule(held, "queue-not-durable")
         val view = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = setOf(key), rowFormatter = longRowFormatter(name, message))
-        show(MigrateFromThreeState.Report(view, null))
+        show(MigrateFromThreeState.Report(view, null, dev.caerbannog.core.migrate3x.ReviewState.NONE))
         revealRow(view, key, 0)
         onNodeWithTag(rowTag(key, 0)).performMouseInput { moveTo(center) }
         mainClock.advanceTimeBy(2_000)
@@ -286,7 +286,7 @@ class MigrateFromThreeRowsUiTest {
         val held = MigrateScreenFiles.held(text)
         val key = rule(held, "queue-not-durable")
         val view = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = setOf(key))
-        show(MigrateFromThreeState.Report(view, null))
+        show(MigrateFromThreeState.Report(view, null, dev.caerbannog.core.migrate3x.ReviewState.NONE))
         revealRow(view, key, 0)
         onNodeWithTag(rowTag(key, 0)).performMouseInput { moveTo(center) }
         mainClock.advanceTimeBy(2_000)
@@ -327,7 +327,7 @@ class MigrateFromThreeRowsUiTest {
         val big = dev.caerbannog.core.migrate3x.HeldAnalysis("big.json", base.document, base.report.copy(findings = findings))
         val biggest = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(big).groups.maxBy { it.count }.key
         val view = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(big, openGroups = setOf(biggest))
-        show(MigrateFromThreeState.Report(view, null))
+        show(MigrateFromThreeState.Report(view, null, dev.caerbannog.core.migrate3x.ReviewState.NONE))
         revealRow(view, biggest, 0)
         onNodeWithTag("migrate3x-export").assertIsDisplayed()
         val drawn = (0 until 300).count { nodes(rowTag(biggest, it)).isNotEmpty() }

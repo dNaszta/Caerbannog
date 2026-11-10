@@ -27,7 +27,7 @@ class MigrateFromThreeReviewScaleUiTest {
     fun `60000 pending items - the bar counts them, a group draws a handful of rows and the first sheet opens`() = runDesktopComposeUiTest(1280, 900) {
         val rig = LiveRig(sixty)
         showLive(rig)
-        assertTrue(textOf("migrate3x-pending-count").let { it.contains("60000 items need a decision") || it.contains("60,000 items need a decision") }, textOf("migrate3x-pending-count"))
+        assertTextHas("migrate3x-pending-count", "60,000 items need a decision")
         assertEnabled("migrate3x-generate", false)
         val key = ORDERS_GROUP
         revealGroup(rig.report.view, key)
@@ -39,7 +39,7 @@ class MigrateFromThreeReviewScaleUiTest {
         assertTrue(buttons in 1..200, "drew $buttons Review buttons")
         click("migrate3x-review-$key-0")
         assertDrawn("migrate3x-review-sheet")
-        assertTextHas("migrate3x-review-sheet", "item 1 of 60")
+        assertTextHas("migrate3x-review-sheet", "item 1 of 60,000")
     }
 
     @Test

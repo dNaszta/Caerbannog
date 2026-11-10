@@ -114,6 +114,7 @@ internal fun DesktopComposeUiTest.showLive(rig: LiveRig, clipboard: RecordingCli
                 onDismissNotice = vm::dismissNotice,
                 onReportCopied = vm::reportCopied,
                 review = events,
+                onOpenMigrations = { rig.calls += "openMigrations" },
             )
         }
     }
