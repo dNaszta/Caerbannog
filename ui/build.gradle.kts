@@ -30,6 +30,8 @@ kotlin {
             implementation(project(":core"))
         }
         jvmTest.dependencies {
+            // M8-06a: definitions file text builders and fixtures for the Migrate from 3.x screen tests (test scope only; core-testing depends on core alone).
+            implementation(project(":core-testing"))
             implementation(kotlin("test"))
             implementation("org.junit.jupiter:junit-jupiter:5.11.4")
             implementation(compose.desktop.uiTestJUnit4)

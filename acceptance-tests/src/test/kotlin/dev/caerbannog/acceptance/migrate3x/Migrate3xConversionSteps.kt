@@ -219,6 +219,7 @@ class Migrate3xConversionSteps {
     fun userAndShovel(user: String) {
         val text = DefinitionsFixtures.read(DefinitionsFixtures.SHOVEL_PARAMETER)
         assertTrue(text.contains("SENTINEL-HASH-$user") && text.contains("SENTINEL-PASSWORD"), "the fixture must hold the sentinel hash of $user and the sentinel password")
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.setFile(text) // M8-06a: the screen reads the file text
         world.document = (DefinitionsParser.parse(text) as? DefinitionsParseResult.Parsed)?.document ?: fail("the fixture was not parsed")
         world.review = null
         // Accept what can be accepted and skip the rest, so that the migration can be generated from the whole file.
@@ -481,6 +482,7 @@ class Migrate3xConversionSteps {
 
     @Then("no request was sent to any broker")
     fun noRequest() {
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.assertNoRequest() // M8-06a: the same words on the screen
         // Generation takes the document and the report only; there is no broker, client or URL to call (ConversionSecretsTest guards the source).
         assertTrue(fresh().migrations.isNotEmpty(), "nothing was generated, so \"no request\" proves nothing")
         assertEquals(emptyList<String>(), world.brokerRequests)

@@ -111,6 +111,7 @@ class Migrate3xDefinitionsSteps {
             "a text with a tab" -> "\t"
             else -> if (description.startsWith("\"") && description.endsWith("\"")) description.substring(1, description.length - 1) else fail("Unknown name description: $description")
         }
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.giveVirtualHost(name) // M8-06a: the same words on the screen
         assignment = draft().assignVirtualHost(name)
     }
 
@@ -125,6 +126,7 @@ class Migrate3xDefinitionsSteps {
 
     @Then("no report is shown")
     fun noReportIsShown() {
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.assertNoReport() // M8-06a: the same words on the screen
         // M8-01: no report exists yet; "no report" means the result is not a parsed document.
         assertFalse(result is DefinitionsParseResult.Parsed, "Expected no document to come out of the file but got $result")
         assertNotNull(result)
