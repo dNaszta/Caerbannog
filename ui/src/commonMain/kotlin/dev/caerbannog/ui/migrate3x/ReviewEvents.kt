@@ -4,10 +4,9 @@ import dev.caerbannog.core.migrate3x.Acknowledgement
 import dev.caerbannog.core.migrate3x.ReviewItem
 
 /**
- * M8-06b STUB (test developer): the events of the review, generate and save part of the screen, one method per view model event of
- * `docs/tasks/M8-06b-review-generate-save.md` "View model API". The Compose tests pass an implementation that delegates to a real view
- * model. The developer may reshape this (for example single lambdas) but then updates `MigrateFromThreeTestKit.kt` (`ReviewEvents` use) with it.
- * Every method does nothing by default, so the 06a screen and its tests are not affected.
+ * The events of the review, generate and save part of the screen, one method per view model event of
+ * `docs/tasks/M8-06b-review-generate-save.md` "View model API". The caller delegates to the view model. Every method does nothing by
+ * default, so the 06a screen and its tests pass [None].
  */
 interface ReviewEvents {
     fun openItem(item: ReviewItem) = Unit

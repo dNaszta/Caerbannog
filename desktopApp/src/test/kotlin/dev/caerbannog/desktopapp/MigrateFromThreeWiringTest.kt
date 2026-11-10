@@ -4,6 +4,7 @@ import dev.caerbannog.core.migrate3x.AnalysisHolder
 import dev.caerbannog.core.migrate3x.DefinitionsFileChooser
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
 import dev.caerbannog.core.migrate3x.MigrateFromThreeViewModel
+import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.migrate3x.ReportFileSaver
 import dev.caerbannog.core.migrate3x.SaveOutcome
 import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileChooser
@@ -47,11 +48,11 @@ class MigrateFromThreeWiringTest {
         val parts = MigrateFromThreeParts(JvmDefinitionsFileLoader(), FakeDefinitionsFileChooser(), FakeReportFileSaver(), AnalysisHolder())
         val scope = CoroutineScope(Job() + Dispatchers.Default)
         try {
-            val first = MigrateFromThreeViewModel(parts.loader, parts.chooser, parts.saver, parts.holder, scope)
+            val first = MigrateFromThreeViewModel(parts.loader, parts.chooser, parts.saver, parts.holder, FakeMigrationFolders().ports, scope)
             first.open(file.path)
             val report = withTimeout(10_000) { first.awaitReport() }
             assertEquals("legacy.json", report.view.fileLabel)
-            val second = MigrateFromThreeViewModel(parts.loader, parts.chooser, parts.saver, parts.holder, scope)
+            val second = MigrateFromThreeViewModel(parts.loader, parts.chooser, parts.saver, parts.holder, FakeMigrationFolders().ports, scope)
             assertEquals("legacy.json", assertIs<MigrateFromThreeState.Report>(second.state.value).view.fileLabel)
         } finally {
             scope.coroutineContext[Job]?.cancel()

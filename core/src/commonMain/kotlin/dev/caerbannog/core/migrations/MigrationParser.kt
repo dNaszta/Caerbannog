@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 sealed interface MigrationValidationResult {
@@ -17,19 +16,31 @@ sealed interface MigrationValidationResult {
     data class Invalid(val reason: String) : MigrationValidationResult
 }
 
-/** M8-06b STUB (signatures from the brief). */
 sealed interface ActionsParseResult {
     data class Parsed(val actions: List<MigrationAction>) : ActionsParseResult
-    /** [reason] never holds input text. */
+
+    /** [reason] never holds input text; per-action reasons are the parser's own. */
     data class Invalid(val reason: String) : ActionsParseResult
 }
 
 object MigrationParser {
-    /** M8-06b STUB. */
-    fun parseActions(text: String): ActionsParseResult = ActionsParseResult.Invalid("M8-06b STUB")
+    /** [text] is a JSON array of migration actions (the `up` array). An empty list is Parsed: a replacement that writes nothing is allowed. */
+    fun parseActions(text: String): ActionsParseResult {
+        val element = when (val parsed = parseUntrustedJson(text, MAX_FILE_DEPTH, lenientJson)) {
+            is UntrustedJson.Parsed -> parsed.element
+            UntrustedJson.TooDeep -> return ActionsParseResult.Invalid("the text is nested too deep")
+            UntrustedJson.NotJson -> return ActionsParseResult.Invalid("the text is not valid JSON")
+        }
+        val array = element as? JsonArray ?: return ActionsParseResult.Invalid("the text is not a list of actions")
+        return try {
+            readActions(array)
+        } catch (refusal: FieldRefusal) {
+            ActionsParseResult.Invalid(refusal.reason)
+        }
+    }
 
-    /** M8-06b STUB. */
-    fun actionsToJson(actions: List<MigrationAction>): String = "[]"
+    /** The inverse of [parseActions] for the prefill: a pretty JSON array, same fields and the same omission of `"vhost": "/"` as [exportToJson]. */
+    fun actionsToJson(actions: List<MigrationAction>): String = prettyJson.encodeToString(JsonArray.serializer(), actionsArray(actions))
 
     /** A migration file has a known shallow schema (a few levels); far below the reader's failure point near 10,000. */
     private const val MAX_FILE_DEPTH = 64
@@ -90,25 +101,10 @@ object MigrationParser {
         val upArray = root["up"] as? JsonArray
             ?: return MigrationValidationResult.Invalid("the file has no up actions")
 
-        val actions = mutableListOf<MigrationAction>()
-        for (item in upArray) {
-            val itemObj = item as? JsonObject
-                ?: return MigrationValidationResult.Invalid("which action is not supported")
-
-            val actionName = itemObj.string("action")
-            if (actionName.isNullOrBlank()) {
-                return MigrationValidationResult.Invalid("which action is not supported")
-            }
-
-            val codec = ActionCodecs.find(actionName)
-                ?: return MigrationValidationResult.Invalid(unsupportedActionMessage(actionName))
-            when (val result = codec.read(itemObj)) {
-                is ActionReadResult.Read -> actions += result.action
-                is ActionReadResult.Refused -> return MigrationValidationResult.Invalid(result.reason)
-            }
+        val actions = when (val read = readActions(upArray)) {
+            is ActionsParseResult.Parsed -> read.actions
+            is ActionsParseResult.Invalid -> return MigrationValidationResult.Invalid(read.reason)
         }
-
-        RerunSafety.conflict(actions)?.let { return MigrationValidationResult.Invalid(it) }
 
         val checksum = computeChecksum(rawJson)
         val migrationFile = MigrationFile(
@@ -120,6 +116,23 @@ object MigrationParser {
         )
 
         return MigrationValidationResult.Valid(migrationFile)
+    }
+
+    /** The one action loop of a migration file and of a pasted action list, so their reasons cannot drift apart. */
+    internal fun readActions(array: JsonArray): ActionsParseResult {
+        val actions = mutableListOf<MigrationAction>()
+        for (item in array) {
+            val itemObj = item as? JsonObject ?: return ActionsParseResult.Invalid("which action is not supported")
+            val actionName = itemObj.string("action")
+            if (actionName.isNullOrBlank()) return ActionsParseResult.Invalid("which action is not supported")
+            val codec = ActionCodecs.find(actionName) ?: return ActionsParseResult.Invalid(unsupportedActionMessage(actionName))
+            when (val result = codec.read(itemObj)) {
+                is ActionReadResult.Read -> actions += result.action
+                is ActionReadResult.Refused -> return ActionsParseResult.Invalid(result.reason)
+            }
+        }
+        RerunSafety.conflict(actions)?.let { return ActionsParseResult.Invalid(it) }
+        return ActionsParseResult.Parsed(actions)
     }
 
     /** An untrusted action name is named only when it is short and plain; the phrase stays the same either way. */
@@ -136,18 +149,21 @@ object MigrationParser {
         val root = buildJsonObject {
             put("version", version)
             put("description", description)
-            putJsonArray("up") {
-                for (action in actions) {
-                    add(
-                        buildJsonObject {
-                            put("action", action.actionName)
-                            if (action.vhost != "/") put("vhost", action.vhost)
-                            ActionCodecs.forAction(action.actionName).write(action, this)
-                        }
-                    )
-                }
-            }
+            put("up", actionsArray(actions))
         }
         return prettyJson.encodeToString(JsonObject.serializer(), root)
+    }
+
+    /** The one writer of actions, shared by [exportToJson] and [actionsToJson]. */
+    private fun actionsArray(actions: List<MigrationAction>): JsonArray = buildJsonArray {
+        for (action in actions) {
+            add(
+                buildJsonObject {
+                    put("action", action.actionName)
+                    if (action.vhost != "/") put("vhost", action.vhost)
+                    ActionCodecs.forAction(action.actionName).write(action, this)
+                }
+            )
+        }
     }
 }

@@ -24,8 +24,107 @@ object MigrateFromThreeTexts {
     const val LOSS_FIX_UPGRADE_THROUGH_TITLE: String = "By hand: upgrade through 4.0, 4.1 or 4.2 first"
     const val LOSS_FIX_UPGRADE_THROUGH_TEXT: String = "Then upgrade to the later version and check the queues after each step. Not offered by this app."
 
-    /** M8-06b STUB (rulings 3 and 13: takes the Trouble, so the partial-save sentence can list saved and unsaved versions): the one place that builds the text of a save problem; the composables only draw it. */
-    fun problemText(trouble: GenerationState.Trouble): String = ""
+    const val SKIPPED_GROUP_TITLE: String = "Skipped by you"
+    const val UNVERIFIED: String = "unverified"
+    const val UNVERIFIED_TOOLTIP: String = "Not measured on a broker yet"
+    const val REPLACE_HAS_DELETE: String = "A replacement must not delete anything. Nothing was stored; the item is still undecided."
+    const val REPLACE_NOT_STORED: String = "The item cannot be replaced. Nothing was stored; the item is still undecided."
+    const val MANUAL_NEEDED: String =
+        "This item cannot be accepted as it is. Choose an automatic alternative, skip it, or replace it with your own actions."
+    const val CONFIRM_AGAIN: String =
+        "Migration files were already saved from this analysis. Generating again writes new files with new versions and leaves the old ones " +
+            "as they are. Generate again?"
+    const val RESULT_NOTHING_SENT: String =
+        "Nothing was sent to any broker. Apply them on a 4.x connection from the Migrations screen; each applies only on a connection " +
+            "whose virtual host matches."
+    const val NOTHING_WRITTEN: String = "No migration was written: nothing is left to write"
+    const val SKIPPED_BY_YOU: String = "skipped by you"
+    const val NAME_CANNOT_BE_WRITTEN: String = "its name cannot be written into a migration"
+    const val EXPORT_FAILED_PREFIX: String = "The migration file could not be saved"
+    const val NUMBERING_FROM_ONE: String = "The folder could not be read, so the numbering starts at 0001."
+    const val NO_FOLDER_CHOSEN: String = "No folder was chosen. Nothing was saved."
+    const val NO_FREE_VERSION: String = "The migrations folder has no free version number left (the highest is 9999)."
+
+    const val GENERATE_HINT: String = "Generate is possible when every item is decided."
+
+    /** "item 14 of 381": the place of the open item in the list of items that need a decision. */
+    fun itemPosition(number: Int, total: Int): String = "item ${count(number)} of ${count(total)}"
+
+    /** The name of an item for the sheet, escaped like every string taken from a file. Bindings are named `source->destination:routingKey`. */
+    fun itemTitle(item: ReviewItem): String = escapeForText(item.name.orEmpty())
+
+    /** The line of the decision bar. [itemCount] is every item that needs a decision, [pending] the undecided ones. */
+    fun pendingLine(itemCount: Int, pending: Int): String = when {
+        itemCount == 0 -> "No item needs a decision"
+        pending == 0 -> "Every item is decided"
+        pending == 1 -> "1 item needs a decision"
+        else -> "${count(pending)} items need a decision"
+    }
+
+    /** "381 of 381: 340 accepted, 38 skipped (in the Skipped group), 3 replaced." A part that is zero is left out. */
+    fun decidedLine(itemCount: Int, accepted: Int, skipped: Int, replaced: Int): String {
+        val parts = buildList {
+            if (accepted > 0) add("${count(accepted)} accepted")
+            if (skipped > 0) add("${count(skipped)} skipped (in the Skipped group)")
+            if (replaced > 0) add("${count(replaced)} replaced")
+        }
+        return "${count(itemCount)} of ${count(itemCount)}: ${parts.joinToString(", ")}."
+    }
+
+    /** The sentence under a Replace text the migration format or the core refused; [reason] is escaped here. */
+    fun replaceRefused(reason: String): String =
+        "The actions are refused: ${escapeForText(reason)}. Nothing was stored; the item is still undecided."
+
+    fun replaceHint(vhost: String): String =
+        "Migration actions, the \"up\" list of a migration file. An action without \"vhost\" is for \"/\". " +
+            "Only actions for virtual host ${escapeForText(vhost)} are accepted."
+
+    /** One line per reason Accept is blocked: a line per missing tick, or the manual sentence. */
+    fun acceptBlockLines(block: DecisionRefusal?): List<String> = when (block) {
+        is DecisionRefusal.TickMissing -> Acknowledgement.entries.filter { it in block.missing }.map { "Tick \"${it.text}\" to accept" }
+        is DecisionRefusal.ManualNeeded -> listOf(MANUAL_NEEDED)
+        else -> emptyList()
+    }
+
+    /** What a refusal of `decide` says under the Replace text. */
+    fun replaceRefusalText(refusal: DecisionRefusal): String = when (refusal) {
+        DecisionRefusal.ReplaceHasDelete -> REPLACE_HAS_DELETE
+        is DecisionRefusal.ReplaceInvalid -> replaceRefused(refusal.reason)
+        else -> REPLACE_NOT_STORED
+    }
+
+    fun pillText(pill: DecisionPill): String = when (pill) {
+        DecisionPill.Undecided -> "Needs decision"
+        is DecisionPill.Accepted -> if (pill.ticked) "Accepted, ordering tick set" else "Accepted"
+        is DecisionPill.Replaced -> "Replaced"
+        DecisionPill.Skipped -> "Skipped"
+    }
+
+    /** "Review" for an item that needs a decision or was skipped, "Change" once it was accepted or replaced. */
+    fun reviewButtonText(pill: DecisionPill): String = when (pill) {
+        is DecisionPill.Accepted, is DecisionPill.Replaced -> "Change"
+        DecisionPill.Undecided, DecisionPill.Skipped -> "Review"
+    }
+
+    fun savedHeadline(files: Int): String = "${plural(files, "migration")} saved"
+
+    fun exportedHeadline(files: Int): String = "${plural(files, "migration")} exported"
+
+    fun vhostHint(virtualHosts: Int): String =
+        "Each file applies only on a connection whose virtual host matches. " +
+            "A source with ${count(virtualHosts)} virtual hosts needs one 4.x profile per virtual host."
+
+    /** The one place that builds the text of a save problem; the composables only draw it. Reasons and paths are escaped here. */
+    fun problemText(trouble: GenerationState.Trouble): String = when (val problem = trouble.problem) {
+        SaveProblem.NoFolderChosen -> NO_FOLDER_CHOSEN
+        is SaveProblem.Folder -> "${problem.text}. No file was saved."
+        SaveProblem.NoFreeVersion -> NO_FREE_VERSION
+        is SaveProblem.FileRefused ->
+            "${problem.version}.json was not saved: ${escapeForText(problem.reason)}. Saved: ${versionList(trouble.saved)}. " +
+                "Not saved: ${versionList(trouble.unsaved)}. The saved files stay in the folder."
+    }
+
+    private fun versionList(files: List<SavedFile>): String = if (files.isEmpty()) "none" else files.joinToString(", ") { it.version }
 
     /** "1,204" for 1204: the thousands separator the mockup uses. */
     fun count(n: Int): String = n.toString().reversed().chunked(3).joinToString(",").reversed()

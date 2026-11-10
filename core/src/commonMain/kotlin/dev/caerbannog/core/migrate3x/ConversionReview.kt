@@ -7,7 +7,10 @@ import dev.caerbannog.core.migrations.MigrationParser
 import dev.caerbannog.core.migrations.MigrationValidationResult
 
 /** An item of the definitions that may need a decision. Bindings are named `source->destination:routingKey`. */
-data class ReviewItem(val kind: ItemKind, val vhost: String?, val name: String?)
+data class ReviewItem(val kind: ItemKind, val vhost: String?, val name: String?) {
+    /** Escaped like every file text: a row or a sheet that holds an item must not show a raw control character in its own `toString`. */
+    override fun toString(): String = "ReviewItem(kind=$kind, vhost=${vhost?.let { escapeForText(it) }}, name=${name?.let { escapeForText(it) }})"
+}
 
 sealed interface ItemDecision {
     /** [chosen] maps a finding id to the index in `[proposal] + alternatives` (0 = the default). */
@@ -83,15 +86,29 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
 
     /** Stores [decision] for [item] (replacing an earlier one), or refuses it and keeps the earlier one. */
     fun decide(item: ReviewItem, decision: ItemDecision): DecisionResult {
-        if (item !in itemSet) return DecisionResult.Refused(DecisionRefusal.NotAReviewItem)
-        val refusal = when (decision) {
+        refusalOf(item, decision)?.let { return DecisionResult.Refused(it) }
+        decisions[item] = decision
+        return DecisionResult.Decided
+    }
+
+    /**
+     * Pure check, no state change: the refusal [decide] would give, or null when it would store the decision.
+     * [decide] calls this, so the rule lives once; the sheet uses it to know whether Accept is enabled.
+     */
+    fun refusalOf(item: ReviewItem, decision: ItemDecision): DecisionRefusal? {
+        if (item !in itemSet) return DecisionRefusal.NotAReviewItem
+        return when (decision) {
             ItemDecision.Skip -> null
             is ItemDecision.Replace -> replaceRefusal(item, decision)
             is ItemDecision.Accept -> ProposalChoice.refusal(findingsByItem[item].orEmpty(), decision)
         }
-        if (refusal != null) return DecisionResult.Refused(refusal)
-        decisions[item] = decision
-        return DecisionResult.Decided
+    }
+
+    /** Removes the decision of [item] (back to undecided). True for a review item, also when it had no decision; false for anything else. */
+    fun undecide(item: ReviewItem): Boolean {
+        if (item !in itemSet) return false
+        decisions.remove(item)
+        return true
     }
 
     /** Three flat steps, in this order: a destructive action, an action for another vhost, then whatever the migration parser refuses. So `generate` never fails on user input. */
@@ -120,19 +137,16 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
 
     fun decisionOf(item: ReviewItem): ItemDecision? = decisions[item]
 
-    // ---- M8-06b STUB: the four additions of "Core additions"; real bodies are the developer's. ----
+    /** Every finding of [item] that can change its declaration (any severity, any `appliesWhen`), report order. Empty for an unknown item. */
+    fun findingsOf(item: ReviewItem): List<Finding> = findingsByItem[item].orEmpty()
 
-    /** M8-06b STUB. */
-    fun findingsOf(item: ReviewItem): List<Finding> = emptyList()
-
-    /** M8-06b STUB. */
-    fun previewActions(item: ReviewItem, accept: ItemDecision.Accept = ItemDecision.Accept()): List<MigrationAction> = emptyList()
-
-    /** M8-06b STUB. */
-    fun refusalOf(item: ReviewItem, decision: ItemDecision): DecisionRefusal? = null
-
-    /** M8-06b STUB. */
-    fun undecide(item: ReviewItem): Boolean = false
+    /**
+     * What [generate] would write for [item] if it were decided with [accept] (default: the default proposal of every finding, no tick).
+     * Pure: no state change and no refusal check (a manual-only item returns its declaration as the file holds it); never a delete.
+     * Empty when the item would not be written. Throws IllegalArgumentException for a chosen index out of range.
+     */
+    fun previewActions(item: ReviewItem, accept: ItemDecision.Accept = ItemDecision.Accept()): List<MigrationAction> =
+        MigrationGenerator.actionsFor(document, findingsByItem, item, accept)
 
     /** Nothing is produced while an item is undecided. Fails loudly (IllegalStateException) when a version would pass 9999. */
     fun generate(request: GenerationRequest): GenerationResult =

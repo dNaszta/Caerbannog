@@ -19,9 +19,12 @@ object ReportViewBuilder {
         rowFormatter: (Finding) -> RowView = FindingRowFormatter::format,
     ): ReportView {
         val report = held.report
-        val byKey = groupFindings(report.findings)
+        val review = held.review
+        val skipped = skippedItems(review)
+        val byKey = groupFindings(report.findings, skipped)
         val visible = byKey.filterValues { it.first().severity in selected }
-        val groups = visible.map { (key, findings) -> groupView(key, findings, key in openGroups) }
+        val groups = visible.map { (key, findings) -> groupView(key, findings, key in openGroups) } +
+            listOfNotNull(skippedGroup(skipped, SKIPPED_GROUP_KEY in openGroups))
         return ReportView(
             fileLabel = held.fileLabel,
             sourceVersion = report.source.sourceVersion,
@@ -36,13 +39,60 @@ object ReportViewBuilder {
                 ChipView(severity, count(report.summary, severity), selected = severity in selected)
             },
             groups = groups,
-        ) { key -> rowsOf(visible[key], key in openGroups, rowFormatter) }
+        ) { key ->
+            if (key == SKIPPED_GROUP_KEY) skippedRows(review, skipped, SKIPPED_GROUP_KEY in openGroups)
+            else rowsOf(visible[key], key in openGroups) { decorate(rowFormatter(it), it, review) }
+        }
+    }
+
+    /** The items the user skipped, in report order. One pass over the items; empty when nothing is skipped. */
+    private fun skippedItems(review: ConversionReview): List<ReviewItem> = review.items.filter { review.decisionOf(it) == ItemDecision.Skip }
+
+    /** The Skipped group is last, ignores the chips, and exists only while an item is skipped. Closed unless [open]. */
+    private fun skippedGroup(skipped: List<ReviewItem>, open: Boolean): GroupView? =
+        if (skipped.isEmpty()) null else GroupView(SKIPPED_GROUP_KEY, MigrateFromThreeTexts.SKIPPED_GROUP_TITLE, null, null, skipped.size, open)
+
+    private fun skippedRows(review: ConversionReview, skipped: List<ReviewItem>, open: Boolean): RowSource {
+        if (!open || skipped.isEmpty()) return RowSource.EMPTY
+        return object : RowSource {
+            override val size: Int = skipped.size
+            override fun at(index: Int): RowView = skippedRow(review, skipped[index])
+        }
+    }
+
+    private fun skippedRow(review: ConversionReview, item: ReviewItem): RowView {
+        val finding = review.findingsOf(item).firstOrNull(ReviewRules::needsDecision)
+        val was = finding?.let { "${it.severity.name}, ${escapeForText(it.message)}" }
+        return RowView(
+            kind = item.kind,
+            name = item.name?.let { escapeForText(it) },
+            message = "Left out of the migration." + (was?.let { " Was: $it" } ?: ""),
+            why = "",
+            proposal = "",
+            verified = finding?.verified ?: true,
+            user = null,
+            item = item,
+            decision = DecisionPill.Skipped,
+        )
+    }
+
+    /** A row of a finding that needs a decision offers its item and shows the pill; any other row stays as the formatter made it. */
+    private fun decorate(row: RowView, finding: Finding, review: ConversionReview): RowView {
+        if (!ReviewRules.isReviewFinding(finding) || !ReviewRules.needsDecision(finding)) return row
+        val item = ReviewItem(finding.kind, finding.vhost, finding.name)
+        // Skip is never refused for a review item, so a refusal here means "not an item that needs a decision" (for example a name that cannot be written).
+        if (review.refusalOf(item, ItemDecision.Skip) != null) return row
+        return row.copy(item = item, decision = ReviewViewBuilder.pillOf(review.decisionOf(item)))
     }
 
     /** One pass; the map keeps the groups in their display order, and every list keeps the report order of its findings. */
-    private fun groupFindings(findings: List<Finding>): Map<String, List<Finding>> {
+    private fun groupFindings(findings: List<Finding>, skipped: List<ReviewItem>): Map<String, List<Finding>> {
         val groups = HashMap<String, MutableList<Finding>>()
-        for (finding in findings) groups.getOrPut(keyOf(finding)) { mutableListOf() } += finding
+        val skippedSet = skipped.toHashSet()
+        for (finding in findings) {
+            if (skippedSet.isNotEmpty() && ReviewRules.isReviewFinding(finding) && ReviewItem(finding.kind, finding.vhost, finding.name) in skippedSet) continue
+            groups.getOrPut(keyOf(finding)) { mutableListOf() } += finding
+        }
         val order = compareBy<Map.Entry<String, List<Finding>>>(
             { if (it.value.first().findingClass == FindingClass.MessageLoss) 0 else 1 },
             { it.value.first().severity.ordinal },

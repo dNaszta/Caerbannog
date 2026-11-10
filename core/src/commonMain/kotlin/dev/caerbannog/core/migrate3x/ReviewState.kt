@@ -1,7 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
-// M8-06b STUB: the types of "View model API" and "Generate and save" of docs/tasks/M8-06b-review-generate-save.md, exactly as the brief
-// lists them, with no behaviour. The developer replaces the stub values and builds the real state in the view model.
+// The state of the review, generate and save part of the Migrate from 3.x screen (docs/tasks/M8-06b-review-generate-save.md). Plain data:
+// no secret, no hash, and every string that came from a file is escaped by the builders before it gets here.
 
 data class ReviewState(
     val itemCount: Int,
@@ -16,7 +16,7 @@ data class ReviewState(
     val generation: GenerationState,
 ) {
     companion object {
-        /** M8-06b STUB value: "no review built yet". */
+        /** "No review built yet"; the view model replaces it as soon as a report is held. */
         val NONE = ReviewState(0, 0, 0, 0, 0, "", null, false, null, GenerationState.Idle)
     }
 }
@@ -80,7 +80,7 @@ sealed interface SaveProblem {
 /** [path] is empty for an unsaved file. */
 data class SavedFile(val version: String, val vhost: String, val description: String, val actionCount: Int, val path: String)
 
-/** The brief says `how = Exported` and names no other value; [Saved] is the obvious one (the test pins both names). */
+/** Where the files went: into the migrations folder, or out through a save dialog. */
 enum class How { Saved, Exported }
 
 data class GenerationReport(
@@ -96,5 +96,9 @@ data class LeftOutRow(val label: String, val text: String)
 
 const val SKIPPED_GROUP_KEY: String = "skipped"
 
-/** M8-06b STUB: folder plus `<version>.json`, joined with the separator the folder string already uses. */
-fun savedPath(folder: String, version: String): String = ""
+/** Folder plus `<version>.json`, joined with the separator the folder string already uses (nothing is resolved, trimmed or escaped). */
+fun savedPath(folder: String, version: String): String {
+    val separator = if ('\\' in folder) '\\' else '/'
+    val base = if (folder.endsWith('/') || folder.endsWith('\\')) folder else folder + separator
+    return "$base$version.json"
+}

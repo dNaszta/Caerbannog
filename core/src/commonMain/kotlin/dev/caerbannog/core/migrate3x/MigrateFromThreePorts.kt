@@ -39,7 +39,7 @@ class AnalysisHolder {
 
     private val savedState = MutableStateFlow(false)
 
-    /** M8-06b: files were saved from this analysis; reset by [hold] and [clear]. */
+    /** True when migration files were saved from this analysis (also after a partial save); reset by [hold] and [clear]. */
     val saved: StateFlow<Boolean> = savedState.asStateFlow()
 
     fun hold(analysis: HeldAnalysis) {
@@ -52,8 +52,10 @@ class AnalysisHolder {
         savedState.value = false
     }
 
-    /** M8-06b STUB: does nothing yet. */
-    fun recordSaved() = Unit
+    /** Records that at least one file was saved from the held analysis, so the next generation asks first. */
+    fun recordSaved() {
+        savedState.value = true
+    }
 }
 
 /** The line under the report after an export: [failed] picks the style. [text] is fixed text plus, for a save, the chosen path. */
