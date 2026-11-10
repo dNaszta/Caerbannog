@@ -343,6 +343,23 @@ class MigrationsStatesUiTest {
     }
 
     @Test
+    fun `the failed action's row in the dry run carries the Failed pill, the others do not`(): Unit = runDesktopComposeUiTest {
+        val three = file("0003").copy(up = listOf(
+            MigrationAction.DeclareQueue("a", "quorum"), MigrationAction.DeclareQueue("b", "quorum"), MigrationAction.DeclareQueue("c", "quorum"),
+        ))
+        show(state {
+            copy(
+                entries = listOf(MigrationEntry(three, MigrationStatus.Pending)), selectedFile = three,
+                dryRun = MigrationDryRun("0003", three.up.map { ActionDryRun(it, allowed = true) }, canApply = true, blockedReason = null),
+                applyOutcome = ApplyOutcome.Failed("0003", 2, 3, "the broker refused the request"),
+            )
+        })
+
+        assertTextHas("dryRunFailed:1", "Failed")
+        assertNotDrawn("dryRunFailed:0"); assertNotDrawn("dryRunFailed:2")
+    }
+
+    @Test
     fun `a conflict is its own banner, names the resource and says what to do`(): Unit = runDesktopComposeUiTest {
         val calls = Calls()
         show(state { copy(applyOutcome = ApplyOutcome.Conflict("0003", 1, 2, "orders exists with different settings", resource = "orders")) }, calls)
