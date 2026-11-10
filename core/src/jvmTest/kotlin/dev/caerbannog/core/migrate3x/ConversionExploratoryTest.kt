@@ -91,7 +91,8 @@ class ConversionExploratoryTest {
     fun `M8-05b hostile names never make generate throw and a refusal reason holds no secret`() {
         val names = listOf("..", ".", "", " ", "a/b", "a\\b", "a\u0000b", "\u202e", "x".repeat(300), "con:", "%2e%2e", "\n", "\"quote\"", "{\"a\":1}")
         val sentinel = "S3CR3T-SENTINEL"
-        for (n in names + sentinel + "amqp://u:$sentinel@h") {
+        // the sentinel alone passes echoableName (and is then rightly named), so only a form the rule rejects must never be echoed
+        for (n in names + "amqp://u:$sentinel@h") {
             val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
             for (a in listOf<MigrationAction>(MigrationAction.DeclareQueue(n, "quorum"), MigrationAction.DeclareExchange(n), MigrationAction.DeclareQueue("orders", n), MigrationAction.DeclareQueue("orders", "quorum", vhost = n))) {
                 val result = s.review.decide(q("orders"), ItemDecision.Replace(listOf(a)))
