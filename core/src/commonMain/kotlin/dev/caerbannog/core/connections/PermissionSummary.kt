@@ -28,6 +28,7 @@ fun permissionPill(status: PermissionCheckStatus?): PermissionPill = when (statu
             if (result.topologyUnlocked) PermissionPill("Can change topology (declared)", PillTone.WARNING)
             else PermissionPill("Topology locked (declared)", PillTone.WARNING)
         is PermissionCheckResult.Unreadable -> PermissionPill("Topology locked", PillTone.LOCKED)
+        is PermissionCheckResult.MigrationSource -> PermissionPill("M8-02a STUB", PillTone.NEUTRAL) // M8-02a STUB
     }
 }
 
@@ -66,6 +67,7 @@ private fun doneBanner(profile: ConnectionProfile, result: PermissionCheckResult
         null,
     )
     is PermissionCheckResult.Unreadable -> PermissionBanner(PillTone.LOCKED, result.userMessage, null, null)
+    is PermissionCheckResult.MigrationSource -> PermissionBanner(PillTone.NEUTRAL, "M8-02a STUB", null, null) // M8-02a STUB
 }
 
 private fun claim(result: PermissionCheckResult.DeclaredByUser): String = when {
@@ -74,3 +76,9 @@ private fun claim(result: PermissionCheckResult.DeclaredByUser): String = when {
     result.publishingEnabled -> "can publish test messages"
     else -> "has no topology or publishing rights"
 }
+
+/** M8-02a STUB: what a connection offers. The real decision: a migration source offers only [ConnectionFeature.MigrateFromThreeX]. */
+enum class ConnectionFeature { Streams, Topology, TopologyEdits, Publish, Search, Migrations, MigrateFromThreeX }
+
+/** M8-02a STUB (offers everything; wrong for MigrationSource on purpose). */
+fun availableFeatures(result: PermissionCheckResult?): Set<ConnectionFeature> = ConnectionFeature.entries.toSet()

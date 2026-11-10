@@ -7,3 +7,6 @@ package dev.caerbannog.core.connections
  */
 fun brokerMajorVersion(text: String?): Int? =
     text?.substringBefore('.')?.takeWhile { it in '0'..'9' }?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+
+/** M8-02a STUB (wrong on purpose until implemented): true for a known major version below 4; unknown (null, unparsable) is NOT a source. */
+fun isMigrationSourceOnly(version: String?): Boolean = false

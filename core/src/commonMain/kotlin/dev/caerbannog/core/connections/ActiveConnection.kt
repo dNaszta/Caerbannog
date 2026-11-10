@@ -22,6 +22,8 @@ import kotlinx.coroutines.sync.Mutex
 class ActiveConnection(
     private val session: ConnectionSession,
     private val gateway: ConnectionGateway,
+    /** M8-02a: the pause between storage version reads of the live source; production waits, tests pass a recording no-op (no sleep). */
+    private val liveSourcePause: suspend (millis: Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) {
     private val lock = Mutex()
     private var generation = 0L

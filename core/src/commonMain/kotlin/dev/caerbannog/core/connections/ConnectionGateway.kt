@@ -68,4 +68,10 @@ interface HeldConnection : AutoCloseable {
 
     /** M5-08a R1: why [migrationExecutor] is null, a fixed text for the screen (3.x: "migration source only"; unknown version: "could not be read"); null when there is an executor. */
     val migrationUnavailableReason: String? get() = null
+
+    /** M8-02a: the raw `rabbitmq_version` text read once when the connection opened; null when unknown. Not a secret. */
+    val brokerVersion: String? get() = null
+
+    /** M8-02a (implied by the brief, guardedSource needs it): the GET-only reads of a 3.x source connection; null for every other connection. */
+    val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? get() = null
 }

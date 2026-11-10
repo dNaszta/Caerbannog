@@ -141,6 +141,10 @@ class ConnectionSession(
     /** Same as [open]; named separately so a save can be seen to trigger a second check. */
     suspend fun reopen(profile: ConnectionProfile): PermissionCheckResult = open(profile)
 
+    /** M8-02a STUB: no-op. Real: replaces Done(..) of [name] with Done(MigrationSource(version)) under the token rule of [open]. */
+    fun markMigrationSource(name: String, version: String) {
+    }
+
     /** Drops the stored result and invalidates a running check, e.g. for the old name after a rename or a delete. */
     fun forget(name: String) {
         change { t, s ->
