@@ -6,6 +6,7 @@ import dev.caerbannog.core.migrate3x.fakes.FakeReportFileSaver
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -35,6 +36,12 @@ class ReportTextSuspendTest {
             FakeDefinitionsFileLoader(), FakeDefinitionsFileChooser(), saver, holder, FakeMigrationFolders().ports, CoroutineScope(main), analysis,
         )
 
+        /**
+         * Starts `reportText()` outside the test scheduler: inside `runTest` the context carries the test scheduler and `withContext(analysisDispatcher)`
+         * (a dispatcher with its own scheduler) would be refused. Unconfined runs it to the first suspension at once.
+         */
+        fun callText() = CoroutineScope(Dispatchers.Unconfined).async { vm.reportText() }
+
         /** The view model's own start-up work (it follows the live source once) is done before a test looks at the state. */
         fun settle() { test.testScheduler.advanceUntilIdle(); analysis.scheduler.advanceUntilIdle() }
     }
@@ -46,7 +53,7 @@ class ReportTextSuspendTest {
     fun `the text of a large report (40000 findings) is rendered on the analysis dispatcher, not before it runs`() = runTest {
         val held = big()
         val rig = Rig(this, held)
-        val text = async { rig.vm.reportText() }
+        val text = rig.callText()
         runCurrent()
         assertFalse(text.isCompleted, "reportText returned before the analysis dispatcher ran: the text was rendered on the caller's thread")
         rig.analysis.scheduler.advanceUntilIdle()
@@ -60,7 +67,7 @@ class ReportTextSuspendTest {
         val rig = Rig(this, ScreenFiles.held())
         rig.settle()
         val before = rig.vm.state.value
-        val text = async { rig.vm.reportText() }
+        val text = rig.callText()
         runCurrent()
         text.cancel()
         rig.analysis.scheduler.advanceUntilIdle()
@@ -75,7 +82,7 @@ class ReportTextSuspendTest {
         val rig = Rig(this, ScreenFiles.held())
         rig.settle()
         val before = rig.vm.state.value
-        val text = async { rig.vm.reportText() }
+        val text = rig.callText()
         runCurrent(); rig.analysis.scheduler.advanceUntilIdle(); runCurrent()
         assertEquals(CompatibilityReportText.render(rig.holder.held.value!!.report), text.await())
         assertSame(before, rig.vm.state.value)
@@ -84,7 +91,7 @@ class ReportTextSuspendTest {
     @Test
     fun `the held analysis is read inside the block - a reset before the dispatcher runs gives an empty text`() = runTest {
         val rig = Rig(this, ScreenFiles.held())
-        val text = async { rig.vm.reportText() }
+        val text = rig.callText()
         runCurrent()
         rig.vm.reset()
         rig.analysis.scheduler.advanceUntilIdle(); runCurrent()
@@ -98,7 +105,7 @@ class ReportTextSuspendTest {
         val rig = Rig(this, ScreenFiles.held(), saver)
         rig.vm.exportReportJson()
         rig.analysis.scheduler.advanceUntilIdle(); advanceUntilIdle() // the export is now waiting in the saver
-        val text = async { rig.vm.reportText() }
+        val text = rig.callText()
         runCurrent(); rig.analysis.scheduler.advanceUntilIdle(); runCurrent()
         assertTrue(text.await().isNotEmpty(), "the copy finished while the export waits")
         gate.complete(SaveOutcome.Saved("/home/me/r.json"))
