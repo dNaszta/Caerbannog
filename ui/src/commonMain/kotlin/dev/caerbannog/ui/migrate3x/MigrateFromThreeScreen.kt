@@ -37,12 +37,14 @@ import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
 
 /**
- * The Migrate from 3.x screen, file source (M8-06a). State in, events out; the screen sends nothing to any broker and holds no decision:
- * every string that depends on the file comes ready from `core`.
+ * The Migrate from 3.x screen, file source (M8-06a, review and generate M8-06b). State in, events out; the screen sends nothing to any broker and
+ * holds no decision: every string that depends on the file comes ready from `core`.
  * Test tags: `migrate3x-choose-file`, `migrate3x-state-<name>` (`choose-source`, `loading`, `rejected`, `needs-virtual-host`, `report`),
  * `migrate3x-loss-banner`, `migrate3x-loss-copy`, `migrate3x-loss-show-all`, `migrate3x-loss-name-<i>`, `migrate3x-row-copy-<group key>-<index>`, `migrate3x-chip-<severity>` (`blocker`, `warning`, `info`), `migrate3x-group-<key>`, `migrate3x-row-<group key>-<index>`,
  * `migrate3x-vhost-field`, `migrate3x-vhost-error`, `migrate3x-export`, `migrate3x-copy-text`, plus `migrate3x-cancel`, `migrate3x-vhost-analyse`,
- * `migrate3x-notice`, `migrate3x-notice-dismiss`, `migrate3x-access-note`.
+ * `migrate3x-notice`, `migrate3x-notice-dismiss`, `migrate3x-access-note`. The tags of the bar, sheet and panels of M8-06b are named in
+ * `ReviewPanels.kt` and `ReviewSheet.kt`; a row of a decidable finding adds `migrate3x-pill-<group key>-<index>`, `migrate3x-review-<group key>-<index>` and
+ * `migrate3x-unskip-<group key>-<index>`.
  *
  * [onCancelPrompt] is the one Cancel of the screen: it cancels a running Loading and answers the virtual host prompt with "no"; the caller
  * maps it to the view model events that apply (each is a no-op in the other state).
@@ -61,6 +63,10 @@ fun MigrateFromThreeScreen(
     modifier: Modifier = Modifier,
     /** Called after the report text was put on the clipboard (the view model then shows "Report copied as text"). */
     onReportCopied: () -> Unit = {},
+    /** The review, generate and save events (see [ReviewEvents]); a screen that gets none shows the report and decides nothing. */
+    review: ReviewEvents = ReviewEvents.None,
+    /** The "Open Migrations" button of a saved result; no view model event navigates, the caller does (desktopApp: the Migrations screen). */
+    onOpenMigrations: () -> Unit = {},
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
@@ -76,7 +82,7 @@ fun MigrateFromThreeScreen(
             is MigrateFromThreeState.Loading -> LoadingState(state, onCancelPrompt)
             is MigrateFromThreeState.Rejected -> RejectedState(state, onChooseFile)
             is MigrateFromThreeState.NeedsVirtualHost -> VirtualHostPrompt(state, onGiveVirtualHost, onChooseFile)
-            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied)
+            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations)
         }
     }
 }

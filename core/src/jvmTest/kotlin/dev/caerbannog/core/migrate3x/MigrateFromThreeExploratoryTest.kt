@@ -23,7 +23,7 @@ class MigrateFromThreeExploratoryTest {
         val findings = (0 until 240_000 / one.size + 1).flatMap { n -> one.map { it.copy(id = "${it.id}#$n") } }.take(240_000)
         val holder = AnalysisHolder().also { it.hold(HeldAnalysis("big.json", base.document, base.report.copy(findings = findings))) }
         val d = StandardTestDispatcher(testScheduler)
-        val vm = MigrateFromThreeViewModel(FakeDefinitionsFileLoader(), FakeDefinitionsFileChooser(), FakeReportFileSaver(), holder, CoroutineScope(d), d)
+        val vm = MigrateFromThreeViewModel(FakeDefinitionsFileLoader(), FakeDefinitionsFileChooser(), FakeReportFileSaver(), holder, dev.caerbannog.core.migrations.fakes.FakeMigrationFolders().ports, CoroutineScope(d), d)
         advanceUntilIdle()
         val report = vm.state.value as MigrateFromThreeState.Report
         val key = report.view.groups.maxBy { it.count }.key

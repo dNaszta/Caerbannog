@@ -100,6 +100,23 @@ internal object MigrationGenerator {
         return GenerationResult.Generated(files(actions, request), skipped, notes)
     }
 
+    /**
+     * What [generate] writes for [item] when it is accepted with [accept]; the same declaration functions as the generator's own loop, so a
+     * preview cannot drift from the file. A linear lookup: meant for one item at a time (the sheet), not for a loop over the document.
+     */
+    fun actionsFor(document: DefinitionsDocument, findingsByItem: Map<ReviewItem, List<Finding>>, item: ReviewItem, accept: ItemDecision.Accept): List<MigrationAction> {
+        val name = item.name ?: return emptyList()
+        if (!ReviewRules.isWritableName(name)) return emptyList()
+        val findings = findingsByItem[item].orEmpty()
+        return when (item.kind) {
+            ItemKind.Exchange -> document.exchanges.firstOrNull { it.vhost == item.vhost && it.name == name }?.let { listOf(exchangeAction(it)) }
+            ItemKind.Queue -> document.queues.firstOrNull { it.vhost == item.vhost && it.name == name }?.let { listOf(queueAction(it, accept, findings)) }
+            ItemKind.Policy -> document.policies.firstOrNull { it.vhost == item.vhost && it.name == name }?.let { policyActions(it, accept, findings) }
+            ItemKind.OperatorPolicy -> document.operatorPolicies.firstOrNull { it.vhost == item.vhost && it.name == name }?.let { operatorPolicyActions(it, accept, findings) }
+            else -> null
+        }.orEmpty()
+    }
+
     /** Decision lookup shared by every item of one generation. */
     private class Build(private val findingsByItem: Map<ReviewItem, List<Finding>>, private val decisions: Map<ReviewItem, ItemDecision>) {
         fun outcome(item: ReviewItem, written: (ItemDecision.Accept, List<Finding>) -> List<MigrationAction>): Outcome {

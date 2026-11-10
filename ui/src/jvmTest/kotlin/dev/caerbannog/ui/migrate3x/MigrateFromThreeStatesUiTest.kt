@@ -180,7 +180,7 @@ class MigrateFromThreeStatesUiTest {
         val draft = (DefinitionsParser.parse(DefinitionsFixtures.read(DefinitionsFixtures.VHOST_V1)) as DefinitionsParseResult.NeedsVirtualHost).draft
         val document = (draft.assignVirtualHost("orders") as VirtualHostAssignment.Assigned).document
         val held = HeldAnalysis("vhost.json", document, CompatibilityAnalyzer.analyze(document))
-        show(MigrateFromThreeState.Report(ReportViewBuilder.build(held), null))
+        show(MigrateFromThreeState.Report(ReportViewBuilder.build(held), null, dev.caerbannog.core.migrate3x.ReviewState.NONE))
         assertTextHas("migrate3x-access-note", "no users, virtual hosts or permissions", "access migration is empty")
         assertTextHas("migrate3x-state-report", "orders")
     }

@@ -6,15 +6,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.migrate3x.Acknowledgement
 import dev.caerbannog.core.migrate3x.AnalysisHolder
 import dev.caerbannog.core.migrate3x.DefinitionsFileChooser
 import dev.caerbannog.core.migrate3x.DefinitionsFileLoader
 import dev.caerbannog.core.migrate3x.MigrateFromThreeViewModel
 import dev.caerbannog.core.migrate3x.ReportFileSaver
+import dev.caerbannog.core.migrate3x.ReviewItem
 import dev.caerbannog.datarabbit.JvmDefinitionsFileLoader
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrame
 import dev.caerbannog.ui.migrate3x.MigrateFromThreeScreen
+import dev.caerbannog.ui.migrate3x.ReviewEvents
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -28,9 +31,35 @@ class MigrateFromThreeParts(
     val holder: AnalysisHolder = AnalysisHolder(),
 )
 
-/** A view model over the app's held analysis; [scope] ends with the screen. */
+/**
+ * A view model over the app's held analysis; [scope] ends with the screen. [migrationFolderPorts] are the ports the Migrations screen uses, so
+ * a folder chosen here is the folder shown there and the files saved here are listed there.
+ */
 fun AppComposition.createMigrateFromThreeViewModel(scope: CoroutineScope): MigrateFromThreeViewModel =
-    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, scope)
+    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, migrationFolderPorts, scope)
+
+/** The review events of the screen, one to one onto the view model. */
+internal fun MigrateFromThreeViewModel.reviewEvents(): ReviewEvents = object : ReviewEvents {
+    override fun openItem(item: ReviewItem) = this@reviewEvents.openItem(item)
+    override fun closeItem() = this@reviewEvents.closeItem()
+    override fun chooseAlternative(findingId: String, index: Int) = this@reviewEvents.chooseAlternative(findingId, index)
+    override fun setTick(ack: Acknowledgement, on: Boolean) = this@reviewEvents.setTick(ack, on)
+    override fun accept() = this@reviewEvents.accept()
+    override fun skip() = this@reviewEvents.skip()
+    override fun unskip(item: ReviewItem) = this@reviewEvents.unskip(item)
+    override fun startReplace() = this@reviewEvents.startReplace()
+    override fun setReplaceText(text: String) = this@reviewEvents.setReplaceText(text)
+    override fun submitReplace(text: String) = this@reviewEvents.submitReplace(text)
+    override fun backToProposal() = this@reviewEvents.backToProposal()
+    override fun showNextUndecided() = this@reviewEvents.showNextUndecided()
+    override fun generate() = this@reviewEvents.generate()
+    override fun generateAgain() = this@reviewEvents.generateAgain()
+    override fun cancelGenerateAgain() = this@reviewEvents.cancelGenerateAgain()
+    override fun chooseFolder() = this@reviewEvents.chooseFolder()
+    override fun retrySave() = this@reviewEvents.retrySave()
+    override fun exportFiles() = this@reviewEvents.exportFiles()
+    override fun dismissResult() = this@reviewEvents.dismissResult()
+}
 
 @Composable
 internal fun MigrateFromThreeWindowContent(composition: AppComposition, control: ConnectionControlState) {
@@ -57,6 +86,8 @@ internal fun MigrateFromThreeWindowContent(composition: AppComposition, control:
             onExport = vm::exportReportJson,
             onDismissNotice = vm::dismissNotice,
             onReportCopied = vm::reportCopied,
+            review = remember(vm) { vm.reviewEvents() },
+            onOpenMigrations = { composition.navigation.open(AppDestination.Migrations) },
         )
     }
 }

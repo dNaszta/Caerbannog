@@ -19,6 +19,10 @@ internal object ReviewRules {
         return result
     }
 
+    /** A finding of an item the review can decide on (a name that cannot be written still counts: it is only never a review item). */
+    fun isReviewFinding(finding: Finding): Boolean =
+        finding.name != null && finding.kind in decidableKinds && finding.findingClass in conversionClasses
+
     fun needsDecision(finding: Finding): Boolean =
         finding.severity != Severity.Info && finding.appliesWhen == AppliesWhen.Always
 

@@ -8,6 +8,7 @@ import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileChooser
 import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileLoader
 import dev.caerbannog.core.migrate3x.fakes.FakeReportFileSaver
 import dev.caerbannog.core.migrate3x.fakes.DefinitionsFixtures
+import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import io.cucumber.java.Before
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -33,6 +34,9 @@ internal object Migrate3xScreenWorld {
     val loader = FakeDefinitionsFileLoader(files)
     var chooser = FakeDefinitionsFileChooser()
     var saver = FakeReportFileSaver()
+
+    /** M8-06b: the migrations folder the review saves into and the Migrations screen reads; `/migrations` is chosen unless a scenario says otherwise. */
+    var folders = FakeMigrationFolders("/migrations")
     var holder = AnalysisHolder()
     var vm: MigrateFromThreeViewModel? = null
     var clipboard: String? = null
@@ -46,7 +50,7 @@ internal object Migrate3xScreenWorld {
 
     fun newViewModel(): MigrateFromThreeViewModel {
         val dispatcher = StandardTestDispatcher(testScope.testScheduler)
-        return MigrateFromThreeViewModel(loader, chooser, saver, holder, CoroutineScope(dispatcher), dispatcher).also { vm = it }
+        return MigrateFromThreeViewModel(loader, chooser, saver, holder, folders.ports, CoroutineScope(dispatcher), dispatcher).also { vm = it }
     }
 
     fun viewModel(): MigrateFromThreeViewModel = vm ?: newViewModel()
@@ -100,7 +104,7 @@ internal object Migrate3xScreenWorld {
     fun reset(active: Boolean) {
         this.active = active
         path = "/data/legacy.json"; files.clear(); loader.requestedPaths.clear()
-        chooser = FakeDefinitionsFileChooser(); saver = FakeReportFileSaver(); holder = AnalysisHolder()
+        chooser = FakeDefinitionsFileChooser(); saver = FakeReportFileSaver(); holder = AnalysisHolder(); folders = FakeMigrationFolders("/migrations")
         vm = null; clipboard = null; copiedName = null; copiedExpected = null; copiedLoss = null; connectedTo = null; brokerRequests.clear()
     }
 }

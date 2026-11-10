@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrate3x.ChipView
+import dev.caerbannog.core.migrate3x.DecisionPill
 import dev.caerbannog.core.migrate3x.ExportNotice
 import dev.caerbannog.core.migrate3x.FixView
 import dev.caerbannog.core.migrate3x.GroupView
@@ -79,14 +81,29 @@ internal fun ReportState(
     onExport: () -> Unit,
     onDismissNotice: () -> Unit,
     onReportCopied: () -> Unit,
+    review: ReviewEvents,
+    onOpenMigrations: () -> Unit,
 ) {
     val view = state.view
     val copy = rememberCopyToClipboard()
+    // Hoisted: the list keeps its place while the sheet of an item is open in its stead.
+    val listState = rememberLazyListState()
     Column(Modifier.fillMaxSize().testTag("migrate3x-state-report"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val sheet = state.review.sheet
+        if (sheet != null) {
+            // The sheet of one item takes the place of the report: a narrow window has no room for both, and the sheet has its own Close.
+            ReviewSheet(sheet, review, Modifier.weight(1f))
+            return@Column
+        }
         ReportHeader(view, onChooseFile, onExport, onCopyText = { copy(reportText()); onReportCopied() })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
-        ReportBody(view, copy, onToggleSeverity, onToggleGroup, Modifier.weight(1f).fillMaxWidth())
+        // A state built without a review (no lines yet) shows no bar: the 06a screen.
+        if (state.review.pendingLine.isNotEmpty()) {
+            DecisionBar(state.review, review)
+            GenerationPanel(state.review, review, onOpenMigrations)
+        }
+        ReportBody(view, listState, copy, onToggleSeverity, onToggleGroup, review, Modifier.weight(1f).fillMaxWidth())
     }
 }
 
@@ -163,8 +180,15 @@ private fun AccessNote(text: String) {
  * followed by its rows when the group is open. Only the visible items are composed, so 240,000 findings stay fast.
  */
 @Composable
-private fun ReportBody(view: ReportView, copy: (String) -> Unit, onToggleSeverity: (Severity) -> Unit, onToggleGroup: (String) -> Unit, modifier: Modifier) {
-    val listState = rememberLazyListState()
+private fun ReportBody(
+    view: ReportView,
+    listState: LazyListState,
+    copy: (String) -> Unit,
+    onToggleSeverity: (Severity) -> Unit,
+    onToggleGroup: (String) -> Unit,
+    review: ReviewEvents,
+    modifier: Modifier,
+) {
     Box(modifier) {
         LazyColumn(
             state = listState,
@@ -180,7 +204,7 @@ private fun ReportBody(view: ReportView, copy: (String) -> Unit, onToggleSeverit
                     val rows = view.rows(group.key)
                     items(count = rows.size, key = { "r:${group.key}:$it" }) { index ->
                         val row = remember(rows, index) { rows.at(index) }
-                        ReportRow(row, group.key, index, copy)
+                        ReportRow(row, group.key, index, copy, review)
                     }
                 }
             }
@@ -284,14 +308,14 @@ private fun GroupHeader(group: GroupView, onToggle: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ConnectionIcon(if (group.open) AppIcon.ArrowDropDown else AppIcon.ChevronRight, IconSize)
-        SeverityBadge(group.severity)
+        group.severity?.let { SeverityBadge(it) }
         Text(group.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(MigrateFromThreeTexts.itemCount(group.count), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun SeverityBadge(severity: Severity) {
+internal fun SeverityBadge(severity: Severity) {
     val scheme = MaterialTheme.colorScheme
     val (container, content) = when (severity) {
         Severity.Blocker -> scheme.errorContainer to scheme.onErrorContainer
@@ -310,7 +334,7 @@ private fun severityLabel(severity: Severity): String = severity.name
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String) -> Unit) {
+private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String) -> Unit, review: ReviewEvents) {
     Column(Modifier.fillMaxWidth().testTag("migrate3x-row-$groupKey-$index")) {
         // The row is cut (name one line, message two); the tooltip holds the full name and message. Nothing else: no hash exists in a RowView.
         TooltipArea(
@@ -327,7 +351,8 @@ private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String)
         ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ConnectionIcon(kindIcon(row.kind), IconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            SelectionContainer(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     // Long names are cut here; the full name is what the copy button copies and what selection selects.
                     row.name?.let { Text(it, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -343,7 +368,9 @@ private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String)
                     }
                 }
             }
-            if (!row.verified) Text("Unverified", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DecisionActions(row, groupKey, index, review)
+            }
+            if (!row.verified) UnverifiedMarker()
             row.name?.let { name ->
                 IconButton(onClick = { copy(name) }, modifier = Modifier.testTag("migrate3x-row-copy-$groupKey-$index")) {
                     ConnectionIcon(AppIcon.ContentCopy, SmallIconSize, contentDescription = "Copy name")
@@ -352,6 +379,28 @@ private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String)
         }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/** The pill and the buttons of a row that needs a decision: Review (or Change once decided) and, in the Skipped group, Un-skip. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DecisionActions(row: RowView, groupKey: String, index: Int, review: ReviewEvents) {
+    val item = row.item ?: return
+    val decision = row.decision ?: return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        Text(
+            MigrateFromThreeTexts.pillText(decision),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 8.dp, vertical = 2.dp)
+                .testTag("migrate3x-pill-$groupKey-$index"),
+        )
+        TextButton(onClick = { review.openItem(item) }, modifier = Modifier.testTag("migrate3x-review-$groupKey-$index")) {
+            Text(MigrateFromThreeTexts.reviewButtonText(decision), maxLines = 1)
+        }
+        if (decision == DecisionPill.Skipped) {
+            TextButton(onClick = { review.unskip(item) }, modifier = Modifier.testTag("migrate3x-unskip-$groupKey-$index")) { Text("Un-skip", maxLines = 1) }
+        }
     }
 }
 

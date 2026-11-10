@@ -23,6 +23,9 @@ fun interface ReportFileSaver {
 
 /** What the screen holds after an analysis: the file label, the document (for the counts) and the report. */
 class HeldAnalysis(val fileLabel: String, val document: DefinitionsDocument, val report: CompatibilityReport) {
+    /** The review of this analysis (built once; the held analysis survives a new window view model, so decisions survive too). */
+    val review: ConversionReview = ConversionReview.start(document, report)
+
     override fun toString(): String = "HeldAnalysis($fileLabel, ${report.findings.size} findings)"
 }
 
@@ -34,12 +37,24 @@ class AnalysisHolder {
     private val state = MutableStateFlow<HeldAnalysis?>(null)
     val held: StateFlow<HeldAnalysis?> = state.asStateFlow()
 
+    private val savedState = MutableStateFlow(false)
+
+    /** True when migration files were saved from this analysis (also after a partial save); reset by [hold] and [clear]. */
+    val saved: StateFlow<Boolean> = savedState.asStateFlow()
+
     fun hold(analysis: HeldAnalysis) {
         state.value = analysis
+        savedState.value = false
     }
 
     fun clear() {
         state.value = null
+        savedState.value = false
+    }
+
+    /** Records that at least one file was saved from the held analysis, so the next generation asks first. */
+    fun recordSaved() {
+        savedState.value = true
     }
 }
 
