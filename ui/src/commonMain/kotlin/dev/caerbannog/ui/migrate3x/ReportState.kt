@@ -86,33 +86,51 @@ internal fun ReportState(
         ReportHeader(view, onChooseFile, onExport, onCopyText = { copy(reportText()); onReportCopied() })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
-        ReportBody(view, copy, onToggleSeverity, onToggleGroup)
+        ReportBody(view, copy, onToggleSeverity, onToggleGroup, Modifier.weight(1f).fillMaxWidth())
     }
 }
 
+/**
+ * The file on one line (cut with an ellipsis, the full name is in the tooltip) and the actions below it in a [FlowRow], so a narrow window
+ * wraps the buttons instead of squeezing them.
+ */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: () -> Unit, onCopyText: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ConnectionIcon(AppIcon.UploadFile, IconSize)
-        Column(Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(view.fileLabel, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                view.sourceVersion?.let { Text("RabbitMQ $it", style = MaterialTheme.typography.labelLarge) }
-                Text("File", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ConnectionIcon(AppIcon.UploadFile, IconSize)
+            Column(Modifier.weight(1f)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TooltipArea(
+                        tooltip = {
+                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
+                                Text(view.fileLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.inverseOnSurface, modifier = Modifier.widthIn(max = 480.dp).padding(8.dp))
+                            }
+                        },
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) {
+                        Text(view.fileLabel, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    view.sourceVersion?.let { Text("RabbitMQ $it", style = MaterialTheme.typography.labelLarge, maxLines = 1) }
+                    Text("File", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                Text(view.countsLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(view.countsLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
-            ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
-            Text("Choose another file", Modifier.padding(start = 8.dp))
-        }
-        OutlinedButton(onClick = onCopyText, modifier = Modifier.testTag("migrate3x-copy-text")) {
-            ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
-            Text("Copy as text", Modifier.padding(start = 8.dp))
-        }
-        Button(onClick = onExport, modifier = Modifier.testTag("migrate3x-export")) {
-            ConnectionIcon(AppIcon.Download, SmallIconSize)
-            Text("Export report", Modifier.padding(start = 8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
+                ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
+                Text("Choose another file", Modifier.padding(start = 8.dp), maxLines = 1)
+            }
+            OutlinedButton(onClick = onCopyText, modifier = Modifier.testTag("migrate3x-copy-text")) {
+                ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
+                Text("Copy as text", Modifier.padding(start = 8.dp), maxLines = 1)
+            }
+            Button(onClick = onExport, modifier = Modifier.testTag("migrate3x-export")) {
+                ConnectionIcon(AppIcon.Download, SmallIconSize)
+                Text("Export report", Modifier.padding(start = 8.dp), maxLines = 1)
+            }
         }
     }
 }
@@ -145,9 +163,9 @@ private fun AccessNote(text: String) {
  * followed by its rows when the group is open. Only the visible items are composed, so 240,000 findings stay fast.
  */
 @Composable
-private fun ReportBody(view: ReportView, copy: (String) -> Unit, onToggleSeverity: (Severity) -> Unit, onToggleGroup: (String) -> Unit) {
+private fun ReportBody(view: ReportView, copy: (String) -> Unit, onToggleSeverity: (Severity) -> Unit, onToggleGroup: (String) -> Unit, modifier: Modifier) {
     val listState = rememberLazyListState()
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(end = 12.dp).testTag("migrate3x-report-list"),
