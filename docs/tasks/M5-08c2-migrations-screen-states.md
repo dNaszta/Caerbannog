@@ -49,6 +49,7 @@ State in, events out; no file or network code in `ui`; the screen reads `Migrati
 None.
 
 ## Open points
+From the `M5-08c1` review (2026-11-10): (1) the Choose folder and Change folder buttons call the CURRENT view model (a view model rebuilt while the dialog was open must not stay stale); add a test; (2) the edit dialog saves through a view-model method that returns the `Invalid` reason into `errorMessage` instead of ignoring it (`MigrationFolderPorts.updateFile` in `MigrationsWiring.kt` is replaced); (3) `applyPending` and `applySingle` return `Blocked("An apply is already running")` while `isApplying` (re-entrancy guard, with a test); (4) the c1 interim banner strings and the first-visit `LaunchedEffect` in `Main.kt` are removed.
 1. Windows and Linux look: best effort. 2. If a state is changed in the mockup later, the table above is updated with it. 3. `dismissOutcome()` clears the outcome, the progress and the composed `errorMessage` (c1 decision); the c2 screen's Dismiss calls it. 4. State 11 has a third banner for "nothing connected" (`Connect to a broker first`).
 
 ## Definition of done
