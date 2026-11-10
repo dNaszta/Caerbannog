@@ -49,7 +49,7 @@ State in, events out; no file or network code in `ui`; the screen reads `Migrati
 None.
 
 ## Open points
-1. Windows and Linux look: best effort. 2. If a state is changed in the mockup later, the table above is updated with it.
+1. Windows and Linux look: best effort. 2. If a state is changed in the mockup later, the table above is updated with it. 3. `dismissOutcome()` clears the outcome, the progress and the composed `errorMessage` (c1 decision); the c2 screen's Dismiss calls it. 4. State 11 has a third banner for "nothing connected" (`Connect to a broker first`).
 
 ## Definition of done
 Tests first and passing, the screen matches the mockup, no unrelated change, mutation checks recorded, `verifyTestDiscovery` green.

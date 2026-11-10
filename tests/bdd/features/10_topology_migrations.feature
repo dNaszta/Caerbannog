@@ -374,7 +374,7 @@ Feature: Topology migrations
     And a pending migration declares the quorum queue "orders" with "x-delivery-limit" 5
     When I apply the pending migrations on the screen
     Then the screen says "Action 1 of 1 stopped: orders exists with different settings"
-    And it says the existing "orders" was not changed and "0003" was not recorded
+    And it says the existing "orders" was not changed and "0001" was not recorded
 
   @m5-08 @m5-08c2 @fake-broker
   Scenario: Applying shows its progress
