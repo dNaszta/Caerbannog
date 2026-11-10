@@ -166,6 +166,8 @@ class CompositionRootMigrationsTest {
 
     @Test
     fun `the level is the profile's, a Read-only profile gives a screen with apply disabled`() {
+        // The connection HAS an executor: an unavailable connection would come first in the banner order, and it would hide the level.
+        gateway.setMigrationExecutor("uat-eu", CountingExecutor())
         val composition = compose(input(level = TopologyControlLevel.READ_ONLY)).connected()
         try {
             composition.folderWithOneMigration()
@@ -269,6 +271,8 @@ class CompositionRootMigrationsTest {
             val inputs = composition.inputs()
             assertNull(inputs.executor)
             assertEquals("Connect to a broker first", inputs.unavailableReason)
+            assertEquals(TopologyControlLevel.READ_ONLY, inputs.controlLevel, "with no connection the level is the safe one, never Full control")
+            assertFalse(inputs.hasConfigurePermission, "with no connection there is no permission")
 
             val vm = composition.createMigrationsViewModel(inputs, scope)
 
