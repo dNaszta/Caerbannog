@@ -109,7 +109,7 @@ class ManagementThreeXReadsTest {
 
     @Test
     fun `any other status is Failed with a fixed text that holds no body, URL, header or credential`() {
-        for (status in listOf(204, 301, 400, 404, 500, 502, 503)) {
+        for (status in listOf(204, 400, 404, 500, 502, 503)) {
             val a = reading(answering(status, "$sentinel boom")) { it.definitions() }
             val b = reading(answering(status, "another $sentinel text")) { it.definitions() }
             val failed = assertInstanceOf(ReadOutcome.Failed::class.java, a, "status $status")
@@ -196,6 +196,68 @@ class ManagementThreeXReadsTest {
     fun `a queue list nested far too deep is Failed, not a crash`() {
         val deep = """{"items":[],"page_count":1,"x":""" + "[".repeat(10_000) + "]".repeat(10_000) + "}"
         assertInstanceOf(ReadOutcome.Failed::class.java, reading(answering(200, deep)) { it.storageVersions("/") })
+    }
+
+    // ---- R5: redirects (these pin Ktor 3.0.3 behaviour of the shared client on purpose) ---------------------------------------------
+
+    private class Hop(val method: String, val host: String, val scheme: String, val path: String, val authorization: String?)
+
+    private fun redirecting(hops: MutableList<Hop>, answer: (Hop) -> Triple<Int, String, String?>) = MockEngine { request ->
+        val hop = Hop(request.method.value, request.url.host, request.url.protocol.name, request.url.encodedPath, request.headers["Authorization"])
+        hops += hop
+        val (status, body, location) = answer(hop)
+        val headers = if (location != null) headersOf("Location" to listOf(location), "Content-Type" to listOf("application/json")) else headersOf("Content-Type", "application/json")
+        respond(body, HttpStatusCode.fromValue(status), headers)
+    }
+
+    private fun <T> readingFrom(baseUrl: String, engine: MockEngine, block: suspend (ManagementThreeXReads) -> T): T =
+        ManagementHttp(HttpClient(engine), "svc", "pw").use { http ->
+            runBlocking { withTimeout(10_000) { block(ManagementThreeXReads(http, if (baseUrl.startsWith("https")) ManagementRequests(baseUrl) else ManagementRequests(baseUrl, BrokerTransport.Plain))) } }
+        }
+
+    @Test
+    fun `a 301 or 302 without a Location ends as Unreachable`() {
+        for (status in listOf(301, 302)) {
+            val hops = mutableListOf<Hop>()
+            val outcome = readingFrom("http://broker.example:15672", redirecting(hops) { Triple(status, "", null) }) { it.definitions() }
+            assertEquals(ReadOutcome.Unreachable, outcome, "status $status")
+            assertTrue(hops.all { it.method == "GET" })
+        }
+    }
+
+    @Test
+    fun `a redirect from https to plain http is not followed and nothing reaches the other host`() {
+        val hops = mutableListOf<Hop>()
+        val engine = redirecting(hops) { Triple(302, "$sentinel", "http://other.example/api/definitions") }
+        val outcome = readingFrom("https://broker.example:15672", engine) { it.definitions() }
+        val failed = assertInstanceOf(ReadOutcome.Failed::class.java, outcome)
+        assertFixedText(failed.reason)
+        assertEquals(1, hops.size, "exactly one request: ${hops.map { it.scheme + "://" + it.host + it.path }}")
+        assertTrue(hops.none { it.host == "other.example" })
+    }
+
+    @Test
+    fun `a redirect to another host is followed without the Authorization header`() {
+        val hops = mutableListOf<Hop>()
+        val engine = redirecting(hops) { hop ->
+            if (hop.host == "broker.example") Triple(302, "", "https://other.example/api/definitions") else Triple(200, "{}", null)
+        }
+        assertEquals(ReadOutcome.Ok("{}"), readingFrom("https://broker.example:15672", engine) { it.definitions() })
+        assertEquals(2, hops.size)
+        assertTrue(hops.all { it.method == "GET" })
+        assertTrue(hops[0].authorization.orEmpty().startsWith("Basic "), "the first request carries the credential")
+        assertEquals(null, hops.single { it.host == "other.example" }.authorization, "the credential must never follow a redirect to another host")
+    }
+
+    @Test
+    fun `a redirect to another path of the same authority is followed`() {
+        val hops = mutableListOf<Hop>()
+        val engine = redirecting(hops) { hop ->
+            if (hop.path == "/api/definitions") Triple(302, "", "/api/definitions/moved") else Triple(200, "{\"ok\":true}", null)
+        }
+        assertEquals(ReadOutcome.Ok("{\"ok\":true}"), readingFrom("http://broker.example:15672", engine) { it.definitions() })
+        assertEquals(listOf("/api/definitions", "/api/definitions/moved"), hops.map { it.path })
+        assertTrue(hops.all { it.method == "GET" })
     }
 
     // ---- page_count rulings R1 and R2 ----------------------------------------------------------------------------------------------
