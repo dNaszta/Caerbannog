@@ -1,6 +1,8 @@
 package dev.caerbannog.ui.appframe
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +52,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +70,7 @@ import dev.caerbannog.core.connections.ConnectionChipState
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.ConnectionControlTexts
+import dev.caerbannog.core.connections.ConnectionFeature
 import dev.caerbannog.core.connections.ConnectionRowState
 import dev.caerbannog.core.connections.RefreshSectionState
 import dev.caerbannog.core.connections.RowAction
@@ -329,9 +334,16 @@ fun AppFrame(
     activeItem: String = title,
     /** Shown before the title (the back arrow of a detail screen). */
     leading: @Composable RowScope.() -> Unit = {},
+    /** The features the connection offers; an item whose feature is missing is drawn disabled. Default: what the window provides, else all. */
+    features: Set<ConnectionFeature> = LocalNavigationFeatures.current.features,
+    /** The reason shown on and said by a disabled item; null when all features are on. */
+    featuresDisabledReason: String? = LocalNavigationFeatures.current.reason,
     content: @Composable () -> Unit,
 ) {
-    AppFrameLayout(title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, activeItem = activeItem, leading = leading, content = content)
+    AppFrameLayout(
+        title, modifier, onNavigate, actions, chip = { ConnectionControl(control, events) }, activeItem = activeItem, leading = leading,
+        features = features, featuresDisabledReason = featuresDisabledReason, content = content,
+    )
 }
 
 /** The frame with the chip slot open: [chip] null draws no chip (a caller that has no connection control yet). */
@@ -344,11 +356,13 @@ internal fun AppFrameLayout(
     chip: (@Composable () -> Unit)?,
     activeItem: String = title,
     leading: @Composable RowScope.() -> Unit = {},
+    features: Set<ConnectionFeature> = LocalNavigationFeatures.current.features,
+    featuresDisabledReason: String? = LocalNavigationFeatures.current.reason,
     content: @Composable () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
-            AppDrawer(activeItem = activeItem, onNavigate = onNavigate, modifier = Modifier.width(280.dp).fillMaxHeight())
+            AppDrawer(activeItem, onNavigate, features, featuresDisabledReason, modifier = Modifier.width(280.dp).fillMaxHeight())
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 AppBar(title, leading, actions, chip)
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
@@ -382,6 +396,21 @@ enum class AppDestination(val label: String) {
     MigrateFromThree("Migrate from 3.x"),
 }
 
+/** The feature a drawer item needs; null for Connections, which is always on. */
+fun AppDestination.requiredFeature(): ConnectionFeature? = when (this) {
+    AppDestination.Connections -> null
+    AppDestination.Streams -> ConnectionFeature.Streams
+    AppDestination.Topology -> ConnectionFeature.Topology
+    AppDestination.Migrations -> ConnectionFeature.Migrations
+    AppDestination.MigrateFromThree -> ConnectionFeature.MigrateFromThreeX
+}
+
+/** What the window tells every frame below it: the features on and the reason for the others (null when all are on). */
+data class NavigationFeaturesInfo(val features: Set<ConnectionFeature>, val reason: String?)
+
+/** Lets the screens keep calling [AppFrame] unchanged; the window provides the value. No provider means every feature is on. */
+val LocalNavigationFeatures = staticCompositionLocalOf { NavigationFeaturesInfo(ConnectionFeature.entries.toSet(), null) }
+
 private val navItems: List<Pair<AppDestination, AppIcon>> = listOf(
     AppDestination.Connections to AppIcon.Power,
     AppDestination.Streams to AppIcon.Stream,
@@ -391,7 +420,13 @@ private val navItems: List<Pair<AppDestination, AppIcon>> = listOf(
 )
 
 @Composable
-private fun AppDrawer(activeItem: String, onNavigate: (AppDestination) -> Unit, modifier: Modifier = Modifier) {
+private fun AppDrawer(
+    activeItem: String,
+    onNavigate: (AppDestination) -> Unit,
+    features: Set<ConnectionFeature>,
+    reason: String?,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.testTag("appDrawer").background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -407,34 +442,83 @@ private fun AppDrawer(activeItem: String, onNavigate: (AppDestination) -> Unit, 
                 Text("behind the rabbit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        SearchBox(enabled = ConnectionFeature.Search in features, reason = reason)
+        Spacer(Modifier.padding(4.dp))
+        navItems.forEach { (destination, icon) ->
+            val on = destination.requiredFeature()?.let { it in features } ?: true
+            NavItem(destination, icon, selected = destination.name == activeItem, enabled = on, reason = reason, onClick = { onNavigate(destination) })
+        }
+    }
+}
+
+// The search is drawn, not wired; while the connection does not offer it, it is disabled and says why, like a drawer item.
+@Composable
+private fun SearchBox(enabled: Boolean, reason: String?) {
+    val shown = reason.takeIf { !enabled }
+    Column(Modifier.fillMaxWidth()) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA),
             shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(bottom = 0.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).testTag("searchBox").semantics {
+                if (!enabled) {
+                    disabled()
+                    shown?.let { contentDescription = "Search: $it" }
+                }
+            },
         ) {
             Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ConnectionIcon(AppIcon.Search, SmallIconSize)
                 Text("Search streams, queues, exchanges", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Spacer(Modifier.padding(4.dp))
-        navItems.forEach { (destination, icon) -> NavItem(destination, icon, selected = destination.name == activeItem, onClick = { onNavigate(destination) }) }
+        shown?.let { ReasonText(it, "searchReason", Modifier.padding(start = 12.dp, top = 2.dp)) }
     }
 }
 
+private const val DISABLED_ALPHA = 0.38f
+
 @Composable
-private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(28.dp),
-        // The whole item is the target: focusable, Enter and Space activate it, `selected` is spoken.
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("navItem:${destination.name}")
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
-    ) {
-        Row(Modifier.padding(start = 16.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ConnectionIcon(icon, IconSize)
-            Text(destination.label, style = MaterialTheme.typography.labelLarge)
+private fun ReasonText(text: String, tag: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.testTag(tag),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolean, enabled: Boolean, reason: String?, onClick: () -> Unit) {
+    val shown = reason.takeIf { !enabled }
+    val base = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val item: @Composable () -> Unit = {
+        Surface(
+            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+            contentColor = if (enabled) base else base.copy(alpha = DISABLED_ALPHA),
+            shape = RoundedCornerShape(28.dp),
+            // The whole item is the target: focusable, Enter and Space activate it, `selected` is spoken. A disabled item is neither
+            // clickable nor focusable, and its description says why.
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("navItem:${destination.name}")
+                .selectable(selected = selected, enabled = enabled, role = Role.Tab, onClick = onClick)
+                .semantics { shown?.let { contentDescription = "${destination.label}: $it" } },
+        ) {
+            Row(Modifier.padding(start = 16.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ConnectionIcon(icon, IconSize)
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    Text(destination.label, style = MaterialTheme.typography.labelLarge)
+                    shown?.let { ReasonText(it, "navItemReason:${destination.name}") }
+                }
+            }
         }
+    }
+    if (shown == null) item() else TooltipArea(tooltip = { ReasonTooltip(shown) }) { item() }
+}
+
+@Composable
+private fun ReasonTooltip(text: String) {
+    Surface(color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface, shape = RoundedCornerShape(4.dp), shadowElevation = 4.dp) {
+        Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
     }
 }

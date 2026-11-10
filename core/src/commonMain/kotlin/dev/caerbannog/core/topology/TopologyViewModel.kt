@@ -656,6 +656,10 @@ class TopologyViewModel(
             TopologyBanner(TopologyBannerKind.DeclaredNotConfirmed, text.headline, text.detail)
         }
         is PermissionCheckResult.Unreadable -> TopologyBanner(TopologyBannerKind.NotReadable, TopologyTexts.LOCKED_HEADLINE, result.reason)
+        is PermissionCheckResult.MigrationSource -> {
+            val text = permissionBanner(ctx.profile, PermissionCheckStatus.Done(result))
+            TopologyBanner(TopologyBannerKind.MigrationSource, text.headline, text.detail)
+        }
     }
 }
 

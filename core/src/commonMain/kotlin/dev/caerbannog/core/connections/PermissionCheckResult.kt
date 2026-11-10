@@ -31,6 +31,15 @@ sealed interface PermissionCheckResult {
         val unreadable: Unreadable,
     ) : PermissionCheckResult
 
+    /**
+     * A RabbitMQ 3.x connection: a migration source only, whatever the profile declares or the broker permits. Locked like [Unreadable], so
+     * every gate that reads the two flags is closed without being touched.
+     */
+    data class MigrationSource(val brokerVersion: String) : PermissionCheckResult {
+        override val topologyUnlocked: Boolean get() = false
+        override val publishingEnabled: Boolean get() = false
+    }
+
     /** Safest mode: topology locked, publishing disabled. [detail] holds only safe text, never secrets. */
     data class Unreadable(val cause: UnreadableCause, val detail: String? = null) : PermissionCheckResult {
         override val topologyUnlocked: Boolean get() = false

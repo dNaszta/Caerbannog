@@ -28,6 +28,7 @@ fun permissionPill(status: PermissionCheckStatus?): PermissionPill = when (statu
             if (result.topologyUnlocked) PermissionPill("Can change topology (declared)", PillTone.WARNING)
             else PermissionPill("Topology locked (declared)", PillTone.WARNING)
         is PermissionCheckResult.Unreadable -> PermissionPill("Topology locked", PillTone.LOCKED)
+        is PermissionCheckResult.MigrationSource -> PermissionPill(ConnectionNotes.MIGRATION_SOURCE_PILL, PillTone.WARNING)
     }
 }
 
@@ -66,6 +67,12 @@ private fun doneBanner(profile: ConnectionProfile, result: PermissionCheckResult
         null,
     )
     is PermissionCheckResult.Unreadable -> PermissionBanner(PillTone.LOCKED, result.userMessage, null, null)
+    is PermissionCheckResult.MigrationSource -> PermissionBanner(
+        PillTone.WARNING,
+        ConnectionNotes.migrationSourceHeadline(profile.username, result.brokerVersion),
+        ConnectionNotes.MIGRATION_SOURCE_DETAIL,
+        null,
+    )
 }
 
 private fun claim(result: PermissionCheckResult.DeclaredByUser): String = when {
@@ -74,3 +81,10 @@ private fun claim(result: PermissionCheckResult.DeclaredByUser): String = when {
     result.publishingEnabled -> "can publish test messages"
     else -> "has no topology or publishing rights"
 }
+
+/** What a connection offers, decided here so Compose only reads it. */
+enum class ConnectionFeature { Streams, Topology, TopologyEdits, Publish, Search, Migrations, MigrateFromThreeX }
+
+/** A migration source offers only the live read; every other result, and null (no connection), offers all (a file import needs none). */
+fun availableFeatures(result: PermissionCheckResult?): Set<ConnectionFeature> =
+    if (result is PermissionCheckResult.MigrationSource) setOf(ConnectionFeature.MigrateFromThreeX) else ConnectionFeature.entries.toSet()

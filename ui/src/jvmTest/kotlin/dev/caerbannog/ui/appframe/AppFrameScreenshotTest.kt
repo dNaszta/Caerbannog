@@ -71,6 +71,19 @@ class AppFrameScreenshotTest {
     }
 
     @Test
+    fun `screenshot - drawer while a 3x broker is connected (M8-02a)`() = runDesktopComposeUiTest(1280, 880) {
+        setContent {
+            AppFrame(
+                "Connections", state, events,
+                features = setOf(dev.caerbannog.core.connections.ConnectionFeature.MigrateFromThreeX),
+                featuresDisabledReason = dev.caerbannog.core.connections.ConnectionNotes.MIGRATION_SOURCE_PILL,
+            ) { Text("the screen") }
+        }
+        val file = snapshot("appframe-3x-drawer.png")
+        assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
+    }
+
+    @Test
     fun `screenshot - frame with the chip closed`() = runDesktopComposeUiTest(1280, 880) {
         setContent { AppFrame("Streams", state, events) { Text("the screen") } }
         val file = snapshot("appframe-01-chip-closed.png")

@@ -22,6 +22,7 @@ body{margin:0}
 <div class="nav-item"><span class="ms" aria-hidden="true">stream</span>Streams</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
 <div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+<div class="t-bs dim" style="padding:4px 16px">Variant while a 3.x broker is connected (M8-02, owner decision 2026-11-10): all items stay, Streams, Topology, Migrations and the search are greyed (disabled, not clickable) and carry the reason "RabbitMQ 3.x: migration source only" as tooltip and accessible description; Connections and Migrate from 3.x stay enabled.</div>
 </aside>
 <main class="main">
 <header class="appbar">
@@ -62,7 +63,13 @@ body{margin:0}
 <div class="t-bs dim">rabbit-ci.example.com</div>
 <div class="t-bs dim">Not connected</div>
 </div>
-<div class="t-bs dim" style="padding:0 4px">Pill states: Not checked (grey, before any check), Checking... (grey), Can change topology (green, read from the broker), Topology locked (red, read from the broker or could not be read), Can change topology (declared) or Topology locked (declared) (warning colour, the user's own claim, never green).</div>
+<div class="pcard">
+<div style="display:flex;align-items:center;justify-content:space-between"><span class="t-tm">legacy-eu</span><span class="pill warn"><span class="ms sm" aria-hidden="true">lock</span>RabbitMQ 3.x: migration source only</span></div>
+<div class="t-bs dim">rabbit-legacy.example.com</div>
+<div class="t-bs dim">Connected</div>
+</div>
+<div class="t-bs dim" style="padding:0 4px">Variant of the connected chip for legacy-eu (M8-02): <span class="connchip" style="display:inline-flex;vertical-align:middle"><span class="ms sm" aria-hidden="true" style="color:var(--ok,#386A20)">link</span><span class="nm">legacy-eu</span><span class="pill warn"><span class="ms sm" aria-hidden="true">lock</span>RabbitMQ 3.x: migration source only</span></span>. Its menu offers only "Migrate from 3.x" and Disconnect; Streams, Topology edits and Publish are not offered.</div>
+<div class="t-bs dim" style="padding:0 4px">Pill states: Not checked (grey, before any check), Checking... (grey), Can change topology (green, read from the broker), Topology locked (red, read from the broker or could not be read), Can change topology (declared) or Topology locked (declared) (warning colour, the user's own claim, never green). RabbitMQ 3.x: migration source only (warning colour with a lock, shown only while Connected, because the version is read when the connection opens; it replaces the permission pill, whatever the user's permissions or level).</div>
 </section>
 <section class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:20px">
 <div class="t-tl">Edit connection</div>

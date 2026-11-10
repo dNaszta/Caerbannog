@@ -59,6 +59,21 @@ class TopologyViewModelBannersTest {
     }
 
     @Test
+    fun `a 3x migration source says so, whatever the level and the rights are`() = runTest {
+        val s = TopologyHarness(this, permission = PermissionCheckResult.MigrationSource("3.13.7"), level = TopologyControlLevel.FULL_CONTROL).opened()
+        assertEquals(
+            listOf(
+                TopologyBanner(
+                    TopologyBannerKind.MigrationSource,
+                    "svc is connected to RabbitMQ 3.13.7: migration source only.",
+                    "This broker is read only for Caerbannog. Topology changes and test publishing are off; use Migrate from 3.x.",
+                ),
+            ),
+            s.state.banners,
+        )
+    }
+
+    @Test
     fun `a higher level than Read-only has no level banner`() = runTest {
         for (level in listOf(TopologyControlLevel.DECLARE_AND_EDIT, TopologyControlLevel.FULL_CONTROL)) {
             val s = TopologyHarness(this, permission = unlocked, level = level).opened()

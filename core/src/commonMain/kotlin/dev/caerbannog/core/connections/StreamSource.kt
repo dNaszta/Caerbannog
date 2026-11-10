@@ -67,6 +67,10 @@ class StreamSource(
     val migrationExecutor: TopologyMigrationExecutor? = null,
     /** M5-08a R1: the fixed reason there is no [migrationExecutor], passed on as it is. */
     val migrationUnavailableReason: String? = null,
+    /** M8-02a: the raw broker version text of the held connection; null when unknown. */
+    val brokerVersion: String? = null,
+    /** M8-02a: reads a live 3.x connection into a definitions document and facts; never null: a connection that is not a 3.x source refuses with a fixed text (rulings 2). */
+    val definitionsSource: dev.caerbannog.core.migrate3x.DefinitionsSource = dev.caerbannog.core.migrate3x.UnavailableDefinitionsSource(""),
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
 )

@@ -106,7 +106,7 @@ data class BindingRowView(
     val arguments: String,
 )
 
-enum class TopologyBannerKind { NoConfigure, DeclaredNotConfirmed, NotReadable, ReadOnlyLevel, OtherVhost }
+enum class TopologyBannerKind { NoConfigure, DeclaredNotConfirmed, NotReadable, ReadOnlyLevel, OtherVhost, MigrationSource }
 
 data class TopologyBanner(val kind: TopologyBannerKind, val headline: String, val detail: String?)
 

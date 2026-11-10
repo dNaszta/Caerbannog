@@ -71,6 +71,10 @@ class FakeConnectionGateway(
         /** M5-08a: null like a 3.x connection (and like the interface default) unless a test sets one. */
         override val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
         override val migrationUnavailableReason: String? = null,
+        /** M8-02a: the version text the broker's overview gave; null when unreadable. */
+        override val brokerVersion: String? = null,
+        /** M8-02a: the GET-only reads of a 3.x connection; null for every other connection. */
+        override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -103,6 +107,9 @@ class FakeConnectionGateway(
     private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
     private val migrationReasons = ConcurrentHashMap<String, String>()
     private val migrationExecutors = ConcurrentHashMap<String, dev.caerbannog.core.migrations.TopologyMigrationExecutor>()
+    private val brokerVersions = ConcurrentHashMap<String, String>()
+    private val threeXReadsByName = ConcurrentHashMap<String, dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads>()
+    private val overviews = AtomicInteger()
     private val offsetSources = ConcurrentHashMap<String, FakeStreamOffsets>()
     private val messageReaders = ConcurrentHashMap<String, FakeStreamMessageReader>()
     private val publishers = ConcurrentHashMap<String, FakeMessagePublisher>()
@@ -167,6 +174,31 @@ class FakeConnectionGateway(
     /** M5-08a R1: the connections opened for [profileName] have no executor and say why (like a 3.x broker or an unreadable version). */
     fun setMigrationUnavailable(profileName: String, reason: String) { migrationReasons[profileName] = reason }
 
+    /**
+     * M8-02a: the broker of [profileName] runs [version] (for example "3.13.7" or "4.1.0"). Like the real gateway, a 3.x broker gives no
+     * migration executor and the fixed "migration source only" reason; a connection to it carries the reads of [threeXReadsOf]. Version "4.x"
+     * keeps the profile's own executor setting.
+     */
+    fun brokerRuns(profileName: String, version: String) { brokerVersions[profileName] = version }
+
+    /**
+     * M8-02a: the version of [profileName] cannot be read (the overview failed or was not understood): no executor, the fixed "could not be
+     * read" reason, no version on the connection, no reads.
+     */
+    fun versionCannotBeRead(profileName: String) {
+        brokerVersions.remove(profileName)
+        migrationReasons[profileName] = UNKNOWN_VERSION_REASON
+        unreadable += profileName
+    }
+    private val unreadable = ConcurrentHashMap.newKeySet<String>()
+
+    /** The GET-only reads every 3.x connection opened for [profileName] exposes. */
+    fun threeXReadsOf(profileName: String): dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads =
+        threeXReadsByName.getOrPut(profileName) { dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads() }
+
+    /** M8-02a: how many times an open asked the broker for its overview (`GET /api/overview`). The version is read once per open, never again. */
+    val overviewReads: Int get() = overviews.get()
+
     fun catalogOf(profileName: String): FakeStreamCatalog = catalogs.getOrPut(profileName) { FakeStreamCatalog() }
 
     /** M2-08b: the topology every connection opened for [profileName] exposes; configure it before Connect. */
@@ -207,6 +239,10 @@ class FakeConnectionGateway(
 
     override suspend fun open(profile: ConnectionProfile): OpenResult {
         val name = profile.name
+        // What the broker's overview says is decided when the connection is asked for (before a held open answers), like the real read.
+        val offered = brokerVersions[name]
+        val version = offered?.let { dev.caerbannog.core.connections.displayableBrokerVersion(it) }
+        val oddVersion = offered != null && version == null
         log += "open:$name"
         profilesAsked += profile
         onOpen?.invoke(profile)
@@ -231,6 +267,8 @@ class FakeConnectionGateway(
             return OpenResult.Failed(it.reason)
         }
         logins.incrementAndGet()
+        overviews.incrementAndGet()
+        val threeX = version != null && dev.caerbannog.core.connections.isMigrationSourceOnly(version)
         val held = Held(
             profileName = name,
             number = numbers.incrementAndGet(),
@@ -245,8 +283,10 @@ class FakeConnectionGateway(
             mqtt = mqttOf(name),
             mqttPublisher = mqttPublisherOf(name),
             queueInspector = queueInspectorOf(name),
-            migrationExecutor = migrationExecutors[name],
-            migrationUnavailableReason = migrationReasons[name],
+            migrationExecutor = if (threeX || oddVersion || name in unreadable) null else migrationExecutors[name],
+            migrationUnavailableReason = if (threeX) THREE_X_REASON else if (oddVersion) UNKNOWN_VERSION_REASON else migrationReasons[name],
+            brokerVersion = version,
+            threeXReads = if (threeX) threeXReadsOf(name) else null,
         )
         opened += held
         log += "opened:$name#${held.number}"
@@ -254,6 +294,9 @@ class FakeConnectionGateway(
     }
 
     private companion object {
+        const val FIRST_SUPPORTED_MAJOR = 4
+        const val THREE_X_REASON = "This broker runs RabbitMQ 3.x: it is a migration source only"
+        const val UNKNOWN_VERSION_REASON = "The broker version could not be read, so migrations are not offered"
         const val TIMEOUT_MS = 5_000L
     }
 }

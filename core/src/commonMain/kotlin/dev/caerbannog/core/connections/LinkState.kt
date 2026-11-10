@@ -43,6 +43,14 @@ object ConnectionNotes {
 
     /** M2-14: said wherever a connection with TLS off is shown (edit panel, chip, popup row). Same text everywhere. */
     const val NOT_ENCRYPTED: String = "Not encrypted"
+
+    /** M8-02: the pill of a RabbitMQ 3.x connection (chip, card, popup row). */
+    const val MIGRATION_SOURCE_PILL: String = "RabbitMQ 3.x: migration source only"
+
+    const val MIGRATION_SOURCE_DETAIL: String =
+        "This broker is read only for Caerbannog. Topology changes and test publishing are off; use Migrate from 3.x."
+
+    fun migrationSourceHeadline(user: String, version: String): String = "$user is connected to RabbitMQ $version: migration source only."
 }
 
 /**
