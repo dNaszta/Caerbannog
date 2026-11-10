@@ -198,9 +198,10 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   @fake-broker @m8-06c
   Scenario: A live source is shown as locked and read only
-    Given I analysed "legacy-eu" and the report is shown
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    And I analysed "legacy-eu" and the report is shown
     Then the source card shows "legacy-eu" with the lock and the words "read only"
-    And no action on the screen changes anything on "legacy-eu"
+    And nothing on "legacy-eu" has changed
 
   @negative @fake-broker @m8-06c
   Scenario: A user who may not export is offered the file import as a button
@@ -211,6 +212,15 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the button "Choose definitions file" is offered
     And no report is shown
 
+  @negative @fake-broker @m8-06c
+  Scenario: A live broker that cannot be reached shows a fixed message and no report
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    And the broker stops answering during the export
+    When I analyse the live connection
+    Then the screen says that "legacy-eu" could not be reached
+    And no report is shown
+    And the screen shows no text that the broker returned
+
   @fake-broker @m8-06c
   Scenario: The connection popup of a 3.x broker offers Migrate from 3.x
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
@@ -220,10 +230,21 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   @fake-broker @m8-06c
   Scenario: The analysis survives switching to the 4.x connection
-    Given I analysed "legacy-eu" and the report is shown
-    When I connect to "new-eu", a broker running RabbitMQ 4
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    And I analysed "legacy-eu" and the report is shown
+    And a connection "new-eu" to a broker running RabbitMQ 4
+    When I connect to "new-eu"
     Then the report is still available
     And only "new-eu" is the held connection
+    And the source card says "from legacy-eu (disconnected)"
+    And the live option is shown disabled with the reason "Connect to a RabbitMQ 3.x broker to read it live"
+
+  @fake-broker @m8-06c
+  Scenario: The 3.x pill of a connection card shows only while that connection is connected
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    Then the card of "legacy-eu" shows the pill "RabbitMQ 3.x: migration source only"
+    When I disconnect "legacy-eu"
+    Then the card of "legacy-eu" shows no pill
 
   # ---- Compatibility report ----------------------------------------------------------------------
 
