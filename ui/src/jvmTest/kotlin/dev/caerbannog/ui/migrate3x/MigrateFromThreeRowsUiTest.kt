@@ -38,7 +38,7 @@ class MigrateFromThreeRowsUiTest {
         val state = MigrateScreenFiles.report(open = { MigrateScreenFiles.openRule(it, "classic-index-v1") })
         show(state)
         val rows = state.view.groups.filter { it.open }.sumOf { it.count }
-        assertTrue(rows >= 4, "the premise: four classic queues are at risk, got $rows")
+        assertTrue(rows >= 3, "the premise: three durable classic queues are at risk (temp is not durable), got $rows")
         val key = rule(held, "classic-index-v1")
         assertTextHas(rowTag(key, 0), held.report.findings.first { it.rule == "classic-index-v1" }.name!!)
     }

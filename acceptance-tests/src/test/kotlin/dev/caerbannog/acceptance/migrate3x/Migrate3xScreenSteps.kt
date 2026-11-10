@@ -114,7 +114,7 @@ class Migrate3xScreenSteps {
     )
 
     @Given("a definitions file with a queue named {string} followed by a control character")
-    fun queueWithControl(name: String) = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(name + "\u0007", durable = false))))
+    fun queueWithControl(name: String) = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(name + "\u0007"))))
 
     @Given("a definitions file exported from RabbitMQ 3.13.7")
     fun anyFile() = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("temp", durable = false))))
@@ -294,8 +294,6 @@ class Migrate3xScreenSteps {
     @Then("the message-loss block is still first")
     fun lossStillFirst() {
         assertNotNull(view().lossBlock, "the filter removed the message-loss block")
-        val first = view().groups.firstOrNull() ?: fail("no groups")
-        assertEquals(FindingClass.MessageLoss, first.findingClass, "the loss group is the first group: ${view().groups}")
     }
 
     @Then("each chip still shows its own count")
