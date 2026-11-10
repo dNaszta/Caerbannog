@@ -20,7 +20,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then I see a compatibility report for "/"
     And the report says how many items are compatible as they are and how many need a decision
 
-  @fake-broker
+  @fake-broker @m8-02
   Scenario: Analyse a live RabbitMQ 3.x connection
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the user may export definitions
@@ -28,7 +28,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the report is built from the definitions the broker returns
     And the report names the source as "legacy-eu" with version 3.13
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-02
   Scenario: A user who may not export definitions is offered the file import
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the broker refuses the definitions export for this user because it is not an administrator
@@ -113,7 +113,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- RabbitMQ 3.x is a read-only source --------------------------------------------------------
 
-  @fake-broker @negative
+  @fake-broker @negative @m8-02
   Scenario: A RabbitMQ 3.x connection is a migration source only
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     When I connect to "legacy-eu"
@@ -122,14 +122,68 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And test publishing is disabled
     And the only offered action is to migrate from 3.x
 
-  @safety @fake-broker
+  @fake-broker @negative @m8-02
+  Scenario: A RabbitMQ 3.x connection stays a migration source for a user with every permission
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 whose user has configure, write and read permission
+    And the connection "legacy-eu" is set to the level "Full control"
+    When I connect to "legacy-eu"
+    Then topology changes are locked whatever the user's level and permissions are
+    And test publishing is disabled
+
+  @fake-broker @m8-02
+  Scenario: A RabbitMQ 4 connection shows no migration source marking
+    Given a connection "new-eu" to a broker running RabbitMQ 4
+    When I connect to "new-eu"
+    Then the connection does not say "RabbitMQ 3.x: migration source only"
+    And the permission pill of "new-eu" is the one the permission check gave
+
+  @fake-broker @m8-02
+  Scenario: The broker version is read once when the connection opens
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    When I connect to "legacy-eu" and analyse "legacy-eu"
+    Then the broker was asked for its overview once
+    And the report names the source as "legacy-eu" with version 3.13
+
+  @negative @fake-broker @m8-02
+  Scenario: A broker whose version cannot be read is not analysed as a source
+    Given a connection "odd-eu" to a broker whose version cannot be read
+    When I analyse "odd-eu"
+    Then I am told the broker version could not be read
+    And no report is shown
+    And the connection "odd-eu" is not called a RabbitMQ 3.x migration source
+
+  @negative @fake-broker @m8-02
+  Scenario: A RabbitMQ 4 connection cannot be analysed as a live source
+    Given a connection "new-eu" to a broker running RabbitMQ 4
+    When I analyse "new-eu"
+    Then I am told that only a RabbitMQ 3.x connection can be analysed live
+    And no report is shown
+
+  @negative @fake-broker @m8-02
+  Scenario: A live 3.x broker that cannot be reached shows no report
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the broker stops answering during the export
+    When I analyse "legacy-eu"
+    Then I am told that "legacy-eu" could not be reached
+    And no report is shown
+
+  @safety @fake-broker @m8-02
   Scenario: Analysing a live 3.x broker sends only read requests
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     When I analyse "legacy-eu"
     Then every request sent to "legacy-eu" is a read request
     And nothing on "legacy-eu" has changed
 
-  @fake-broker
+  # Runs as the data-rabbit JUnit test LiveThreeXReadsGetOnlyTest (a recording Ktor MockEngine behind the real ManagementHttp); not a Cucumber scenario.
+  @safety @m8-02b
+  Scenario: Every request the live source reading makes to a 3.x broker is a GET, also when a read fails
+    Given a recording stand-in for the management API of a RabbitMQ 3.13 broker
+    And the stand-in refuses the deprecated feature list and the second queue page
+    When the live source is read
+    Then every recorded request has the method GET
+    And no recorded path contains "/get", "/contents" or "/purge"
+
+  @fake-broker @m8-06c
   Scenario: The analysis survives switching to the 4.x connection
     Given I analysed "legacy-eu" and the report is shown
     When I connect to "new-eu", a broker running RabbitMQ 4
@@ -286,13 +340,38 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And there is no message-loss warning for "events"
     And the warning says the file does not carry the index version
 
-  @fake-broker
+  @fake-broker @m8-02
   Scenario: The live scan retries a storage version that is not there yet
     Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
     And the broker reports no storage version for "orders" until the second read
     When I analyse "legacy-eu"
     Then the storage version of "orders" is read after a retry
     And a queue whose version never appears is treated as version 1 and reported as unknown
+
+  @fake-broker @m8-02
+  Scenario: The live scan stops retrying after a fixed number of reads
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the broker never reports a storage version for "orders"
+    When I analyse "legacy-eu"
+    Then the storage version of "orders" was read at most 6 times
+    And the storage version of "orders" is reported as unknown
+    And the report is still built
+
+  @fake-broker @m8-02
+  Scenario: Only classic queues are scanned for a storage version
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the export holds the classic queue "orders" and the quorum queue "audit"
+    When I analyse "legacy-eu"
+    Then the storage version of "orders" was asked for
+    And the storage version of "audit" was not asked for
+
+  @fake-broker @m8-02
+  Scenario: A deprecated feature list that cannot be read does not fail the analysis
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13
+    And the broker refuses the deprecated feature list
+    When I analyse "legacy-eu"
+    Then the report is built from the definitions the broker returns
+    And the report does not claim that mirroring is in use
 
   @fake-broker @m8-03
   Scenario: The report says the loss cannot be detected after an upgrade
@@ -494,7 +573,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the broker topology is unchanged
 
   # ---- M8-06a: the Migrate from 3.x screen, file source, report (view model level; the Compose tests bind the same words) ------
-  # The screen works with no broker connection at all. A live 3.x source, the 3.x pill and source locking arrive with M8-02 (M8-06c),
+  # The screen works with no broker connection at all. The live 3.x source (M8-02 reads it, M8-06c shows it), the 3.x pill and source locking arrive with M8-02 and M8-06c,
   # the access migration with M8-12 (M8-06d). Mockup: docs/ux/Migrate3x.dc.html (states 1 to 12).
 
   @smoke @fake-broker @m8-06a
@@ -818,11 +897,26 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- Real brokers --------------------------------------------------------------------------------
 
-  @broker-3x
+  @broker-3x @m8-02
   Scenario: A real RabbitMQ 3.13 export is read and analysed
     Given a real RabbitMQ 3.13 broker with a mirrored classic queue, a priority queue and a binding
     When I analyse it live
     Then the report lists the mirroring policy and both queues with their proposals
+    And the report names the version read from the broker
+    And mirroring is flagged from the broker's deprecated feature list
+
+  @broker-3x @m8-02
+  Scenario: A real RabbitMQ 3.13 broker reports the storage version of its classic queues
+    Given a real RabbitMQ 3.13 broker with a classic queue that has been running for a few seconds
+    When I analyse it live
+    Then the report lists the queue as an index version 1 message-loss blocker
+
+  @broker-3x @negative @m8-02
+  Scenario: A real RabbitMQ 3.13 user without the administrator tag is offered the file import
+    Given a real RabbitMQ 3.13 broker and a user with the monitoring tag
+    When I analyse it live
+    Then I am told that this user cannot export definitions
+    And I am offered to import a definitions file instead
 
   @gate-M8 @broker-3x
   Scenario: Migrate a 3.13 topology to 4.x and move a message

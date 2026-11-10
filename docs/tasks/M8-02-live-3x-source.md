@@ -1,40 +1,126 @@
 # Live 3.x source: version detection, read-only source role, definitions fetch
 
-Milestone: M8    Depends on: M8-00, M8-01    Size: M
+Milestone: M8    Depends on: M8-00, M8-01, M8-03, M5-08a (all merged)    Size: M, cut in two (M8-02a S/M, M8-02b S/M)    Later: M8-06c (screen), M8-07, M8-10
+
+Re-cut by the architect, team loop step 1, round 0, 2026-11-10, branch `m8-02-live-3x-source` (base fe181be). The first brief (2026-11-09) predates the merged M5-08a/b/c, M8-01/03/04/05/05b and M8-06a/b; this version is exact against that code.
 
 ## Goal
-A connection profile that points at a RabbitMQ 3.x broker is recognised on Connect as a migration source, locked to read-only, and its definitions can be fetched through the management API into the model of `M8-01`, sending only GET requests.
+A connection profile that points at a RabbitMQ 3.x broker is recognised on Connect (from the one `GET /api/overview` that `MigrationAccess.forBroker` already makes), shows "RabbitMQ 3.x: migration source only", is locked (no topology change, no test publishing, no stream feature), and its definitions, deprecated-feature list and classic queue storage versions can be read through the management API with GET requests only and analysed into the report of M8-03.
 
 ## Why
-Spec decision 1 (live source) and "3.x as a read-only source"; the app otherwise supports 4.x only.
+Spec "3.x as a read-only source" (decisions 1, P6, P7) and "Compatibility report" (live facts). The app otherwise supports 4.x only.
 
-## Scope
-In: `core` interface `DefinitionsSource` (fetch(profile): FetchResult sealed: Fetched, NotPermitted, Unreachable, Failed), `BrokerVersion` parsing, effective-permission rule "major below 4 means Read-only and no publishing" in the existing permission and session logic, connection pill text "RabbitMQ 3.x: migration source only"; `data-rabbit` implementation: `GET /api/overview` for the version, `GET /api/definitions` (or per-vhost, per `M8-00` S-A/S-L), reuse of the existing management client, TLS and permission rules (D9a, D7) unchanged; fake in `core-testing`; a test asserting every request to a 3.x source is a GET.
-Out: UI screen (`M8-06`), analysis.
+## The cut
+| Part | What | Needs Docker |
+| --- | --- | --- |
+| **M8-02a** core, fakes, acceptance | version on the held connection and `StreamSource`; `PermissionCheckResult.MigrationSource`; pill and banner texts; `DefinitionsSource`, `FetchResult`, `LiveDefinitionsSource` (orchestration and the bounded storage-version retry), `ThreeXReads` port; `LiveAnalysis` (fetch to `HeldAnalysis`); `FakeThreeXReads` in `core-testing`; glue for the `@m8-02 @fake-broker` scenarios | no |
+| **M8-02b** data-rabbit | `ManagementThreeXReads` (the real GET calls), wiring in `RabbitMqConnectionGateway`, `MigrationAccess` returns the version text, GET-only test, `RealBrokerM8LiveSourceTest` | only the three `@broker-3x` scenarios (Docker or rootless Podman, image `rabbitmq:3.13-management`); everything else runs in `:data-rabbit:test` |
+
+M8-02b depends on M8-02a. 02a first and merged (owner's word), then 02b. Both fit one to three days; one branch per part.
+
+## Facts in the merged code this brief builds on
+- `MigrationAccess.forBroker(http, requests, streams)` (data-rabbit, internal) reads `GET /api/overview` once (`majorVersion`) and keeps only the executor decision and a fixed reason. It throws the version text away. 02b changes it to keep that text, no second read.
+- `brokerMajorVersion(text: String?): Int?` (core, `BrokerVersion.kt`) already parses the major; null means unknown, never 4.
+- `HeldConnection` has `migrationExecutor` and `migrationUnavailableReason`; `ActiveConnection.guardedSource` copies them into `StreamSource`, every client behind an `isCurrent` guard.
+- `PermissionCheckResult` (Checked, DeclaredByUser, Unreadable) carries `topologyUnlocked` and `publishingEnabled`; `permissionPill(status)` and `permissionBanner` turn it into text. The result is produced by `ConnectionSession.open` BEFORE the clients open, so the version is not known then.
+- `LiveSourceFacts(connectionName, brokerVersion, classicIndexVersions: Map<QueueRef, ClassicIndexVersion>, deprecatedFeaturesInUse: Set<String>)` and `CompatibilityAnalyzer.analyze(document, live)` exist (M8-03); the `@m8-03` scenarios run them on fake facts.
+- `DefinitionsParser.parse(text)` returns `Parsed`, `NeedsVirtualHost` or `Rejected`; `HeldAnalysis(fileLabel, document, report)` and `AnalysisHolder` exist (M8-06a); `MAX_DEFINITIONS_FILE_BYTES` = 64 MiB.
+- `ManagementHttp` has `get`, `post`, `put`, `delete`; tests use a Ktor `MockEngine` behind it (see `ManagementQueueMessageInspectorTest`).
+
+## M8-02a: scope
+In:
+1. **Version on the held connection.** `HeldConnection.brokerVersion: String? get() = null` (the raw `rabbitmq_version` text; not a secret). `StreamSource.brokerVersion: String? = null`, copied by `guardedSource`. Pure helper in `BrokerVersion.kt`: `fun isMigrationSourceOnly(version: String?): Boolean = brokerMajorVersion(version)?.let { it < 4 } == true`. Unknown (null or unparsable) is NOT a source and NOT 4.x: it keeps today's behaviour (no executor, "version could not be read" reason from M5-08a) and the live read refuses it.
+2. **Forced Read-only and disabled stream features, one place.** New variant `PermissionCheckResult.MigrationSource(brokerVersion: String)` with `topologyUnlocked = false` and `publishingEnabled = false` (the same shape as `Unreadable`). Every gate that reads those two properties (Topology, create and delete stream, publish, migrations) is then locked without being touched; the compiler lists every `when` that needs the new case. `ConnectionSession` gets `fun markMigrationSource(name: String, version: String)`, which replaces the stored `Done(...)` status of `name` with `Done(MigrationSource(version))` under the same token rule as `open` (a newer check or `forget` wins). `ActiveConnection.connect` calls it after `openClients` returned `Opened` and the generation is still current, only when `isMigrationSourceOnly(connection.brokerVersion)`. The profile's own level and declaration never matter (a Full control profile with configure and write rights stays locked). The Migrations screen keeps showing `migrationUnavailableReason` (M5-08c).
+3. **Stream features.** The connected 3.x chip menu and the left navigation offer only "Migrate from 3.x" and Disconnect; Streams, Topology edits, Publish and Search are not offered (hidden or disabled with the pill's text as the reason, designer's call in the mockup). The decision is a pure `core` function `fun availableFeatures(result: PermissionCheckResult?): Set<ConnectionFeature>` (`ConnectionFeature` = enum of the current entries plus `MigrateFromThreeX`), unit tested; Compose only reads it. The UI wiring of the menu entry that opens the screen is M8-06c; 02a delivers the function and the pill.
+4. **Pill and banner.** `permissionPill` returns `PermissionPill("RabbitMQ 3.x: migration source only", PillTone.WARNING)` for `MigrationSource` (new tone not needed: WARNING is "not green, not red"). The banner (edit panel) says: headline "<user> is connected to RabbitMQ <version>: migration source only.", detail "This broker is read only for Caerbannog. Topology changes and test publishing are off; use Migrate from 3.x.". Wording lives in `core` (`ConnectionNotes` or beside `permissionPill`); the chip, the card and the popup row use the same text. When TLS is off the existing "Not encrypted" notes stay as they are (separate, D9a).
+5. **Reading interface and orchestration (core, `migrate3x`).**
+```kotlin
+/** GET-only by shape: no method here can change anything. Implemented by data-rabbit (M8-02b) and by FakeThreeXReads. */
+interface ThreeXReads {
+    suspend fun definitions(): ReadOutcome<String>                          // GET /api/definitions (text, size-checked by the caller)
+    suspend fun storageVersions(vhost: String): ReadOutcome<Map<String, Int?>> // classic queue name -> 1, 2 or null (not there yet)
+    suspend fun deprecatedFeaturesInUse(): ReadOutcome<Set<String>>         // GET /api/deprecated-features/used, names only
+}
+sealed interface ReadOutcome<out T> {
+    data class Ok<T>(val value: T) : ReadOutcome<T>
+    data object NotPermitted : ReadOutcome<Nothing>        // 401 / 403
+    data object Unreachable : ReadOutcome<Nothing>         // network, TLS, timeout
+    data class Failed(val reason: String) : ReadOutcome<Nothing> // fixed text, never body or URL
+}
+
+interface DefinitionsSource { suspend fun fetch(): FetchResult }
+
+sealed interface FetchResult {
+    data class Fetched(val document: DefinitionsDocument, val facts: LiveSourceFacts) : FetchResult
+    data class NotPermitted(val reason: String) : FetchResult  // "this user cannot export definitions" (needs the administrator tag, measured S-A)
+    data object Unreachable : FetchResult
+    data class Failed(val reason: String) : FetchResult        // fixed texts below
+}
+
+class LiveDefinitionsSource(
+    private val connectionName: String,
+    private val brokerVersion: String?,
+    private val reads: ThreeXReads,
+    private val pause: suspend (millis: Long) -> Unit,   // production passes ::delay, tests pass a recording no-op (no sleep)
+) : DefinitionsSource
+```
+   `StreamSource.definitionsSource: DefinitionsSource? = null` (set by `guardedSource` for a migration-source connection, behind the `isCurrent` guard; null for every other connection).
+   `fetch()` order: (a) version unknown gives `Failed(LiveSourceTexts.VERSION_UNREADABLE)` = "The broker version could not be read, so it cannot be analysed"; major 4 or more gives `Failed(LiveSourceTexts.NOT_THREE_X)` = "Only a RabbitMQ 3.x connection can be analysed live"; (b) `definitions()`: `NotPermitted` gives `FetchResult.NotPermitted(LiveSourceTexts.CANNOT_EXPORT)` = "This user cannot export definitions: the administrator tag is needed"; `Unreachable` gives `Unreachable`; text over `MAX_DEFINITIONS_FILE_BYTES` gives `Failed` (fixed "too large" text); (c) `DefinitionsParser.parse(text)`: `Parsed` is used, `NeedsVirtualHost` and `Rejected` give `Failed` with a fixed text (a live export always names its vhosts); (d) `deprecatedFeaturesInUse()`: any non-Ok outcome gives an empty set and never fails the fetch; (e) storage versions: for every vhost that has a classic queue in the document, `storageVersions(vhost)`; a name with a null value (or a missing name) is read again, at most `STORAGE_VERSION_READS = 6` reads in total per vhost with `pause(STORAGE_VERSION_PAUSE_MILLIS = 1_000)` between rounds (the value shows up a few seconds after the queue starts, S-N); a name still missing after the last read gets `ClassicIndexVersion.Unknown`; a failing read gives Unknown for that vhost's pending queues and never fails the fetch; quorum, stream and unknown-kind queues are never asked for; the Ok values 1 and 2 map to V1 and V2, any other number is Unknown. The facts: `LiveSourceFacts(connectionName, brokerVersion, classicIndexVersions, deprecatedFeaturesInUse)`. Constants are named, not inline.
+6. **Analysis entry (core).** `suspend fun analyseLive(source: DefinitionsSource): LiveAnalysisOutcome`, a plain function or a small `LiveAnalysis` object:
+```kotlin
+sealed interface LiveAnalysisOutcome {
+    data class Analysed(val held: HeldAnalysis) : LiveAnalysisOutcome   // fileLabel = connection name; report from CompatibilityAnalyzer.analyze(document, facts), CPU work off the caller's thread like M8-06a
+    data class OfferFileImport(val text: String) : LiveAnalysisOutcome  // CANNOT_EXPORT text; the screen shows a button for the file import
+    data class Unreachable(val connectionName: String) : LiveAnalysisOutcome // text: "<name> could not be reached"
+    data class Failed(val text: String) : LiveAnalysisOutcome
+}
+```
+   M8-06c's view model calls this; it does not hold the result, `AnalysisHolder` does (the one-held-connection rule D1 is untouched; the analysis survives a reconnect because it lives in the holder, as for a file).
+7. **`FakeThreeXReads`** in `core-testing` (scriptable: definitions text or outcome, per-vhost storage-version scripts such as "missing until the n-th read" and "never", deprecated features or refusal, a call log with the name of each read so tests can assert which reads happened and how often; no write method exists to log). `FakeConnectionGateway` gets a 3.x variant that returns a held connection with `brokerVersion` and reads; a "version cannot be read" variant.
+8. Acceptance glue: suite `RunMigrate3xLiveSourceAcceptanceTest` (filter `@m8-02 and @fake-broker`) and steps; the `Migrate3xAnalyzerSteps` Givens "a connection ... running RabbitMQ 3.13" stay as they are for `@m8-03`, the `@m8-02` steps live in their own class (no change of the `@m8-03` scenarios).
+
+Out of 02a: any HTTP, any Compose change beyond reading `permissionPill`/`availableFeatures` where the chip, card and popup already render the permission pill (the existing UI tests keep passing), the "Migrate from 3.x" menu entry and source picker (M8-06c).
+
+## M8-02b: scope
+In:
+1. **`ManagementThreeXReads(http: ManagementHttp, requests: ManagementRequests) : ThreeXReads`** in `data-rabbit`. Requests (new methods on `ManagementRequests`): `GET /api/definitions`; `GET /api/queues/{vhost}?page=N&page_size=<existing QUEUE_PAGE_SIZE>` read page by page until `page_count` for the storage versions (field `storage_version`, number 1 or 2, absent while the queue has no statistics yet or for non-classic queues; whether `columns=` may include `storage_version` is UNVERIFIED, the live test decides, the default is no `columns` filter on this call); `GET /api/deprecated-features/used` (array of objects, the name field is read; the real field name is in `fixtures/m8-00/deprecated-features-used-3.13.json`). Reply mapping: 200 Ok; 401 or 403 NotPermitted (for the definitions call, measured: 401 "Not administrator user" for management, policymaker and monitoring users, S-A); `ManagementReply.CertificateRejected`, `NoTlsAnswer`, `Unreachable` all Unreachable; any other status or an unparsable body Failed with a fixed text. Bodies go through `parseUntrustedJson` with the existing depth limit (M5-07) where parsed here; the definitions text itself is returned unparsed (core parses it with the guarded parser). No body, URL or header ever enters a `Failed` reason or a log. Only `http.get` is used: the class has no reference to `post`, `put` or `delete`.
+2. **`MigrationAccess`** keeps the overview version text: `data class MigrationAccess(executor, unavailableReason, version: String?)`; still ONE `GET /api/overview`. `RabbitMqHeldConnection` gets `brokerVersion` and `threeXReads` (only when `isMigrationSourceOnly(version)`, else null; `ActiveConnection` builds the `LiveDefinitionsSource` from them with `pause = ::delay`, the held connection name and the guard). TLS, credentials and the "choose the profile first" rule are unchanged: the reads use the same `ManagementHttp` as the connection, so a plain profile sends nothing before the user chose it and there is no fallback between TLS and plain.
+3. **GET-only test** `LiveThreeXReadsGetOnlyTest` (scenario "Every request the live source reading makes to a 3.x broker is a GET", tag `@m8-02b`, JUnit, no Docker): a recording `MockEngine` serving 3.13 fixtures; runs the whole read path (`LiveDefinitionsSource` over `ManagementThreeXReads`), once with every read succeeding and once with the deprecated-feature list refused (403) and the second queue page failing (500); asserts every recorded method is GET and no path contains `/get`, `/contents` or `/purge`. A second assertion: a connect to a 3.x broker sends exactly one request to `/api/overview` (the version is read once).
+4. **Live test** `RealBrokerM8LiveSourceTest` (tag `broker`, class-level container `rabbitmq:3.13-management` via the existing `M8SpikeSupport` helpers, no 4.x container) with the three `@broker-3x @m8-02` scenarios: real export of a mirrored classic queue, a priority queue and a binding is read and analysed (report lists the mirroring policy and both queues with their proposals, the version read, mirroring flagged from `deprecated-features/used`); a classic queue that has been running a few seconds gets its storage version 1 and a message-loss blocker (bounded polling with the production retry, no sleep in the test; the container must be left clean); a monitoring-tag user gets `NotPermitted` and `OfferFileImport`. It also asserts the retry constant is enough on a real broker and records the answer to the `columns=` question in the test's comment.
+
+Out of 02b: UI, MCP, the 4.x container, the gate (M8-11).
 
 ## Acceptance
-- BDD: `16` / "Analyse a live RabbitMQ 3.x connection", "A user who may not export definitions is offered the file import" (@needs-spike), "A RabbitMQ 3.x connection is a migration source only", "Analysing a live 3.x broker sends only read requests" (@safety), "The analysis survives switching to the 4.x connection", "A real RabbitMQ 3.13 export is read and analysed" (@broker-3x).
-- The existing 4.x scenarios in `01`, `02`, `13` stay green unedited.
+BDD, all in `tests/bdd/features/16_migrate_from_3x.feature` (tags in brackets):
+- 02a (`@m8-02 @fake-broker`, suite `RunMigrate3xLiveSourceAcceptanceTest`): "Analyse a live RabbitMQ 3.x connection"; "A user who may not export definitions is offered the file import" (measured by the spike, S-A; the scenario carries no `@needs-spike`); "A RabbitMQ 3.x connection is a migration source only"; "A RabbitMQ 3.x connection stays a migration source for a user with every permission"; "A RabbitMQ 4 connection shows no migration source marking"; "The broker version is read once when the connection opens" (fake gateway counts overview reads); "A broker whose version cannot be read is not analysed as a source"; "A RabbitMQ 4 connection cannot be analysed as a live source"; "A live 3.x broker that cannot be reached shows no report"; "Analysing a live 3.x broker sends only read requests" (fake: only calls of `ThreeXReads` happened, nothing else); "The live scan retries a storage version that is not there yet"; "The live scan stops retrying after a fixed number of reads"; "Only classic queues are scanned for a storage version"; "A deprecated feature list that cannot be read does not fail the analysis". The existing `@m8-03` scenario "A live 3.x broker that uses mirroring is flagged by its deprecated feature list" keeps running on fake facts.
+- 02b: "Every request the live source reading makes to a 3.x broker is a GET, also when a read fails" (`@m8-02b`, JUnit `LiveThreeXReadsGetOnlyTest`); `@broker-3x @m8-02`: "A real RabbitMQ 3.13 export is read and analysed", "A real RabbitMQ 3.13 broker reports the storage version of its classic queues", "A real RabbitMQ 3.13 user without the administrator tag is offered the file import" (JUnit `RealBrokerM8LiveSourceTest`).
+- Moved to M8-06c (retagged `@m8-06c`): "The analysis survives switching to the 4.x connection" (a screen and holder behaviour; the file twin is `@m8-06a` "The report of a file survives connecting to a 4.x broker").
+- The existing 4.x scenarios in `01`, `02`, `13`, `10` stay green unedited; the new `MigrationSource` case must not change any 4.x result (a unit test per existing `when`).
+- Unit tests (not scenarios): `isMigrationSourceOnly` table (null, "", "x", "3.13.7", "4.0.0", "10.1", "3"); `permissionPill`/`permissionBanner` for `MigrationSource`; `availableFeatures`; `ConnectionSession.markMigrationSource` (older check loses, forget wins); `LiveDefinitionsSource` order of failures and the retry bound using a recording `pause` (never a real delay, at most 6 reads, the pauses are exactly 5 per vhost); a secret check: a user hash in the export never appears in `FetchResult.toString()`, in a `Failed` reason, or in the analysis text (the model already redacts; the test pins the path).
 
 ## Design notes
-Version rule lives in `core` as a pure function. Keep the "one held connection" rule: the fetch result is an in-memory model owned by an M8 session object, not by `SessionState`. Missing or unparsable version: treat as unknown and say so, never assume 4.x. Do not add a profile field (decision P6, 2026-11-09) unless `M8-00` S-H shows `rabbitmq_version` is not reliable.
+- Modules: interfaces and orchestration in `core` (no Ktor, no `java.*`); HTTP in `data-rabbit`; wiring in `ActiveConnection.guardedSource`/`RabbitMqConnectionGateway`; the fake in `core-testing`. Nothing in `ui` beyond the existing pill rendering.
+- The result of a fetch is an in-memory `HeldAnalysis` in `AnalysisHolder`, not in `SessionState` and not on the held connection. No password is ever in `SessionState`, a `Failed` reason or a log: reasons are fixed texts.
+- Why `ThreeXReads` and not one big `DefinitionsSource` in data-rabbit: the retry bound, the failure order and the "never fails the fetch" rules are product behaviour and must be tested without HTTP and without a container; data-rabbit only maps replies. GET-only holds by the shape of the port and is also asserted on the real HTTP path.
+- No profile field (P6). Unknown version is never taken as 4.x or as 3.x.
+- Single-node only: the clustered export shape is unmeasured (S-R); the report already says "unverified" for it.
 
 ## UX
-Pill wording in the spec; the Connections screen mockup gets the pill variant (`docs/ux/Main.dc.html` update by the architect before step 2).
+Mockup `docs/ux/Main.dc.html` updated by the architect in this step (round 0): a connected "legacy-eu" profile card and a chip variant with the pill "RabbitMQ 3.x: migration source only" (warning colour with a lock; replaces the permission pill; shown only while Connected, because the version is read when the connection opens), and one sentence on the menu (only "Migrate from 3.x" and Disconnect). The wording of the pill is in the spec ("3.x as a read-only source") and the scenarios, so it is not a new product decision; the colour choice (warning, lock icon) is the architect's reading of the existing pill rules ("never green"; red means a locked 4.x broker). It needs a look by the owner with the other mockups, not before step 2. States: connected 3.x (pill), not connected (the card shows "Not checked" because the version is unknown before Connect), version unreadable (no 3.x claim, ordinary pill, Migrations says why), definitions not permitted and unreachable (texts shown by M8-06c).
 
 ## MCP
-None here (`M8-10`).
+None here. A read-only MCP tool that analyses a live 3.x connection belongs to M8-10 and will call `analyseLive` through the same `DefinitionsSource`; M8-02 adds no tool. No MCP tool ever creates or removes a Shovel.
+
+## Product decisions for the owner
+None. The pill wording is fixed in the spec; the technical choices (where the version lives, the retry bound of 6 reads one second apart, the colour) are the architect's and recorded above. Veto welcome on: the retry bound (about 5 s extra per vhost with a queue that has no version yet, worst case), and "unknown version is not a source and not analysable".
 
 ## Open points
-From `M5-08a` (final review, 2026-11-10): `MigrationAccess.forBroker` (data-rabbit) already reads `GET /api/overview` once at connect (5 s limit) and keeps only the executor decision and the fixed reason; this task reuses that one read and adds the version text to the held connection instead of making a second call; the connection pill "RabbitMQ 3.x: migration source only", the forced Read-only level and the disabled stream features stay here (and `M5-08c` shows `migrationUnavailableReason` on the Migrations screen). A broker whose overview cannot be read is treated as unknown (no executor): the live 3.x source reading must say "could not read the version" the same way.
-M5-08a review (2026-11-09, F3): the 3.x version check that keeps a 3.x connection from getting a migration executor is done in `M5-08a` (`brokerMajorVersion` in `core`, one `GET /api/overview` when the connection opens; unknown or 3.x means no executor and a fixed reason). This task still owns: reading the live 3.x source (definitions, `storage_version` with retry, deprecated features), the connection pill "RabbitMQ 3.x: migration source only", the forced Read-only level, disabled stream features, the held connection's version field (reuse the one overview read, do not add a second), and the analysis from a live connection. Scenario "A 3.x source connection cannot apply migrations" moved to `M5-08a`; the screen wording of that case is `M5-08c`.
-Whether `GET /api/definitions` needs the administrator tag (UNVERIFIED, S-A). Large exports (S-L).
-
-## Spike findings (M8-00, 2026-11-09)
-Measured: `GET /api/definitions` needs the administrator tag (401 "Not administrator user" for management, policymaker and monitoring users; also per vhost), so the live source needs an administrator profile and everything else falls back to the file import with the stated reason; `rabbitmq_version` is `"3.13.7"`; `whoami` and `permissions` have the same shape on 3.13, so Connect and the permission check need no change; `/api/stream/...` is 404 on 3.x (already handled); 1000 queues export in about 10 ms (84 KiB), no streaming. Also read `GET /api/deprecated-features/used` from the 3.x source when allowed (it reported `classic_queue_mirroring` for a mirroring policy) and hand it to the analyzer as an extra signal; the call is a GET and its failure never fails the fetch.
-
-## Spike S-N finding
-S-N (spike results): for every classic queue the live scan reads `storage_version` (1 or 2) from `GET /api/queues/{vhost}` (or the single-queue call) on the 3.x source; the value appears a few seconds after the queue starts, so a missing value is retried (bounded polling, no sleep) and finally reported as "unknown" (treated like version 1); quorum queues have none. The definitions export does not carry it. The values are GET-only and go into the model beside the definitions.
+- UNVERIFIED until `RealBrokerM8LiveSourceTest` runs: `columns=` with `storage_version` on the queue list; whether 6 reads one second apart is enough on a loaded broker (the test reports how many reads a fresh queue needs; unknown after the bound is reported as "unknown", already a blocker).
+- Clustered 3.x and a node under load are not measured (S-R).
+- 3.x exports above 64 MiB are refused (the same limit as a file; 1000 queues are 84 KiB, S-L).
 
 ## Definition of done
-Tests first and passing, GET-only test green, no 4.x behaviour changed, spec updated.
+Tests written first and failing for the right reason, then passing; `@m8-02` scenarios green in the fast suite; GET-only test green; `RealBrokerM8LiveSourceTest` green on Docker or Podman (02b); `RealBrokerM7GateTest` and `RealBrokerM8GateTest` untouched and not needed; no 4.x behaviour changed; spec "3.x as a read-only source" updated where it says how; no unrelated changes.
+
+## Status
+- Step 1 (architect, confirm and re-cut the brief): DONE 2026-11-10, round 0, branch `m8-02-live-3x-source`. Changed: this brief (re-cut into 02a and 02b, exact signatures), `docs/ux/Main.dc.html` (3.x card, chip variant, pill note), 7 new `@m8-02` scenarios plus 3 `@broker-3x` and 1 `@m8-02b` in `16` (existing ones tagged, "The analysis survives switching to the 4.x connection" retagged `@m8-06c`), `tests/bdd/README.md`, `docs/tasks/README.md`, spec line "3.x as a read-only source". Contradictions found: (1) the brief said `fetch(profile)` but the connection is already held (no profile, no password in the source); (2) it listed the version rule as "in the permission logic" but the permission result is produced before the version is known (hence `markMigrationSource`); (3) it put the retry in data-rabbit, where acceptance tests cannot reach it (now core, over `ThreeXReads`); (4) the scenario "analysis survives switching" is a screen behaviour (M8-06c); (5) "A user who may not export definitions" needed the offer at core level (`OfferFileImport`). No new dependency.
