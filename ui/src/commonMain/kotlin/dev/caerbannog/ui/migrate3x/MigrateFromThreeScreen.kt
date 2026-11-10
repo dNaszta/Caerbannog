@@ -66,7 +66,7 @@ import dev.caerbannog.ui.connections.SmallIconSize
 @Composable
 fun MigrateFromThreeScreen(
     state: MigrateFromThreeState,
-    reportText: () -> String,
+    reportText: suspend () -> String,
     onChooseFile: () -> Unit,
     onGiveVirtualHost: (String) -> Unit,
     onCancelPrompt: () -> Unit,

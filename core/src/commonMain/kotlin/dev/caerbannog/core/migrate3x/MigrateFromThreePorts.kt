@@ -32,6 +32,9 @@ class HeldAnalysis(
     /** The review of this analysis (built once; the held analysis survives a new window view model, so decisions survive too). */
     val review: ConversionReview = ConversionReview.start(document, report)
 
+    /** M8-06e: the report grouped once (eager, built where the analysis is built, off the UI thread); decisions are applied on top of it. */
+    internal val groupIndex: GroupIndex = GroupIndex.of(report.findings)
+
     override fun toString(): String = "HeldAnalysis($fileLabel, ${report.findings.size} findings)"
 }
 

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import io.cucumber.java.Scenario
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -54,6 +55,16 @@ internal object Migrate3xScreenWorld {
     }
 
     fun viewModel(): MigrateFromThreeViewModel = vm ?: newViewModel()
+
+    /**
+     * M8-06e item 4: `reportText()` is `suspend` and renders on the view model's dispatcher, which here is a test dispatcher that only runs when
+     * [settle] does. `runBlocking` would wait for it forever, so the call is started on the test scope and settled.
+     */
+    fun reportText(): String {
+        val text = testScope.async { viewModel().reportText() }
+        settle()
+        return text.getCompleted()
+    }
 
     fun setFile(text: String, label: String = "legacy.json") {
         path = "/data/$label"

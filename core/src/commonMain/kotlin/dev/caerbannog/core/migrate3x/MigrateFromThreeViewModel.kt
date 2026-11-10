@@ -290,7 +290,8 @@ class MigrateFromThreeViewModel(
     }
 
     /** The text export of the whole report (whatever the chips show); the UI puts it on the clipboard and then calls [reportCopied]. */
-    fun reportText(): String = holder.held.value?.let { CompatibilityReportText.render(it.report) }.orEmpty()
+    // M8-06e STUB: suspend, but still renders on the caller's thread; the real one is withContext(analysisDispatcher) { ... }.
+    suspend fun reportText(): String = holder.held.value?.let { CompatibilityReportText.render(it.report) }.orEmpty()
 
     fun dismissNotice() = setNotice(null)
 
