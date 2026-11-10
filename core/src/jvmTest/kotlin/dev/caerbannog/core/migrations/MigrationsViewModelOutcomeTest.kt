@@ -150,6 +150,26 @@ class MigrationsViewModelOutcomeTest {
     }
 
     @Test
+    fun `a conflict names the resource only when the echo rule allows it`() = runBlocking<Unit> {
+        val hostile = listOf("my queue", "a<b>b", "x".repeat(65), "amqp://user:secret@host/vhost", "caf\u00e9", "..")
+        for (name in hostile + listOf("orders", "x".repeat(64), "my_queue.v2-1")) {
+            val files = InMemoryMigrationFileRepository()
+            val local = ScriptedExecutor()
+            local.failures[name] = ActionResult.Failed("The resource exists with different settings", FailureKind.Conflict)
+            val vm = MigrationsViewModel(
+                fileRepository = files.also { runBlocking { it.importFile(migration("0003", name).rawJson) } },
+                runner = MigrationRunner(InMemoryMigrationHistoryRepository(), local), scope = scope,
+            )
+
+            vm.applyPending()
+
+            val outcome = assertIs<ApplyOutcome.Conflict>(vm.state.value.applyOutcome, "for the name \"$name\"")
+            val expected = if (name in hostile) null else name
+            assertEquals(expected, outcome.resource, "the screen may echo a name only when echoableName() says so: \"$name\"")
+        }
+    }
+
+    @Test
     fun `a history that cannot be written gives a NotRecorded outcome and the fixed text, and the migration stays pending`() = runBlocking<Unit> {
         add(migration("0003", "a", "b"))
         val vm = vm(history = FailingHistory())
@@ -455,6 +475,7 @@ class MigrationsViewModelOutcomeTest {
     fun `a read-only folder and no folder chosen are in the folder state, not in the banner string`() {
         assertEquals(MigrationFolderState.FolderReadOnly(folder), folderVm(listed(readOnly = true)).state.value.folder)
         assertNull(folderVm(listed(readOnly = true)).state.value.bannerMessage)
+        store.folder = null // the view models above chose a folder in this shared store; this one has none
         val none = folderVm(null)
         assertEquals(MigrationFolderState.ChooseFolder, none.state.value.folder)
         assertNull(none.state.value.bannerMessage, "the interim 'Choose a migrations folder first' string is gone")
