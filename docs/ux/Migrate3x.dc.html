@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Migrate from RabbitMQ 3.x</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;border-bottom:1px solid var(--outline-variant)}
+.row:last-child{border-bottom:0}
+.row .nm{font:400 14px/20px 'Roboto Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.grp{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;background:var(--sc);border-bottom:1px solid var(--outline-variant);font:500 14px/20px Roboto,system-ui,sans-serif}
+.list{border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface);overflow:hidden}
+.sev{height:24px;padding:0 8px;border-radius:8px;display:inline-flex;align-items:center;gap:4px;font:500 12px/16px Roboto,system-ui,sans-serif}
+.sev.blocker{background:var(--error-container);color:var(--on-error-container)}
+.sev.warning{background:var(--warn-container);color:var(--on-warn-container)}
+.sev.info{background:var(--primary-container);color:var(--on-primary-container)}
+.sev.loss{background:var(--error);color:var(--on-error)}
+.chk{display:flex;align-items:flex-start;gap:12px}
+.chk .box{width:18px;height:18px;border:2px solid var(--on-surface-variant);border-radius:2px;flex:none;margin:1px;display:inline-flex;align-items:center;justify-content:center}
+.chk .box.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.chk .box.err{border-color:var(--error)}
+.radio{width:20px;height:20px;border:2px solid var(--on-surface-variant);border-radius:10px;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.radio.on{border-color:var(--primary)}
+.radio.on::after{content:"";width:10px;height:10px;border-radius:5px;background:var(--primary)}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface)}
+.opt.on{border-color:var(--primary);background:var(--secondary-container)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:var(--sc-high)}
+.frame{position:relative;border-radius:12px;overflow:hidden;background:var(--sc-low);min-height:200px}
+.ta{font:400 13px/20px 'Roboto Mono',monospace;background:var(--surface);border:1px solid var(--outline);border-radius:4px;padding:12px 16px;white-space:pre;overflow:auto}
+.ta.err{border:2px solid var(--error);padding:11px 15px}
+.errtxt{color:var(--error);font:400 12px/16px Roboto,system-ui,sans-serif}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">move_up</span>Migrate from 3.x</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<h1>Migrate from RabbitMQ 3.x</h1>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Choose another file</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export report</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">content_copy</span>Copy as text</button>
+<button class="connchip none" type="button" aria-haspopup="menu" aria-label="No connection. Open connection menu"><span class="ms sm" aria-hidden="true">power_off</span><span class="nm">No connection</span><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button>
+</header>
+<div class="content">
+<div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">This screen only reads a file. It needs no connection and sends nothing to any broker.</span><span class="t-bs dim">(M8-06b adds: The fixes are written as a normal migration that you apply on a 4.x connection.)</span></div>
+
+<!-- 5. The report (main state) -->
+<section id="state-report" style="display:flex;flex-direction:column;gap:16px">
+<div class="t-ts">5. Report (main state, M8-06a)</div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="ms sm" aria-hidden="true">description</span><span class="mono">legacy-eu-definitions.json</span><span class="pill">RabbitMQ 3.13.7</span><span class="pill">File</span><span class="t-bs dim">3 virtual hosts, 482 queues, 61 exchanges, 1,204 bindings</span></div>
+
+<div class="banner err" id="loss-banner" role="alert" aria-label="Message loss warning"><span class="ms" aria-hidden="true">report</span><div style="flex:1;display:flex;flex-direction:column;gap:8px">
+<b>An in-place upgrade to RabbitMQ 4.3 or later would silently empty 37 classic queues</b>
+<div>These queues use the old classic queue index (version 1), which is the 3.13 default. RabbitMQ 4.3 and later cannot read it. The loss cannot be detected after the upgrade. A definitions file cannot tell the index version, so this list is every classic queue without "x-queue-version: 2".</div>
+<div class="mono">orders, orders-retry, invoices, billing.events, ... <span class="t-bs">(first 10 of 37)</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn text" type="button" style="height:32px;padding:0 8px">Show all 37</button><button class="btn text lead" type="button" style="height:32px;padding:0 8px"><span class="ms sm" aria-hidden="true">content_copy</span>Copy queue names</button></div>
+<div class="opt on" style="background:var(--ok-container);color:var(--on-ok-container);border-color:transparent"><span class="ms" aria-hidden="true">check_circle</span><div><b>Recommended: do not upgrade in place</b><div class="t-bs">Build a new 4.x broker, apply the migration this screen generates, then move the messages with a Shovel. A Shovel does not read the old index.</div></div></div>
+<div class="t-bs">Other ways, done by hand and not offered by this app: set the policy "queue-version: 2" and restart the node gracefully, then check that every queue shows version 2; or upgrade through 4.0, 4.1 or 4.2 first.</div>
+</div></div>
+
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+<div class="t-ts">Summary</div>
+<span class="t-bs">1,812 items, <b>1,430 compatible as they are</b> (not listed below), <b>382 need a decision</b></span>
+<span style="flex-grow:1"></span>
+<span class="chip on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true">check</span>Blocker 120</span>
+<span class="chip on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true">check</span>Warning 262</span>
+<span class="chip on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true">check</span>Info 18</span>
+</div>
+<div class="t-bs dim">Chips filter the rule groups below; each count stays its own whatever is filtered, and counts include skipped items (they describe the file). The "Skipped by you" group is always the last group, closed by default, is never filtered away by the chips and is hidden while nothing is skipped. A skipped item leaves its rule group and the "need a decision" count; it is listed only in the Skipped group. The message-loss block above is always first and never filtered away. The list is grouped by rule; a group is closed until you open it, so a report of 240,000 findings stays fast (only the visible rows are drawn).</div>
+
+<div class="list" role="list">
+<div class="grp" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="sev loss">Message loss</span>Classic queue with the old index (also listed in the block above)<span style="flex-grow:1"></span><span class="pill">37 items</span></div>
+<div class="grp" role="button" tabindex="0" aria-expanded="true"><span class="ms sm" aria-hidden="true">expand_more</span><span class="sev blocker">Blocker</span>Mirroring policy keys are rejected on 4.x<span style="flex-grow:1"></span><span class="pill">2 items</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">policy</span><span class="nm" style="flex:0 1 220px">ha-all</span><span class="t-bs" style="flex:1 1 auto;min-width:0">"ha-mode", "ha-sync-mode" are not accepted. Proposed: write the policy without them (it holds no other key, so it is not written).</span><span class="pill warn">Needs decision</span><button class="iconbtn" type="button" aria-label="Copy name ha-all" style="width:32px;height:32px"><span class="ms sm" aria-hidden="true">content_copy</span></button><button class="btn tonal" type="button" style="height:32px;padding:0 16px">Review</button></div>
+<div class="grp" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="sev warning">Warning</span>Classic to quorum: ordering by priority may change<span style="flex-grow:1"></span><span class="pill">241 items</span></div>
+<div class="grp" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="sev info">Info</span>Policy pattern the app could not evaluate<span style="flex-grow:1"></span><span class="pill">2 items</span></div>
+<div class="grp" role="button" tabindex="0" aria-expanded="true"><span class="ms sm" aria-hidden="true">expand_more</span><span class="sev info">Info</span>One group per access rule: users, virtual hosts, permissions (handled by the access migration)<span style="flex-grow:1"></span><span class="pill">9 items</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">person</span><span class="nm" style="flex:0 1 220px">svc</span><span class="t-bs" style="flex:1 1 auto;min-width:0">Tags: management, policymaker. Algorithm: rabbit_password_hashing_sha256.</span><span class="pill" title="The password hash is never shown, copied or exported"><span class="ms sm" aria-hidden="true">visibility_off</span>hash hidden</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">person</span><span class="nm" style="flex:0 1 220px">monitoring</span><span class="t-bs" style="flex:1 1 auto;min-width:0">Tags: monitoring. No algorithm: the file holds no password for this user.</span><span class="pill"><span class="ms sm" aria-hidden="true">key_off</span>no password hash</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs" style="flex:1">Not decided here: the access migration (users, virtual hosts, permissions) is a later step of this feature. These rows are for your information only.</span></div>
+<div class="grp" id="skipped-group" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="ms sm" aria-hidden="true">block</span>Skipped by you<span style="flex-grow:1"></span><span class="pill">1 item</span></div>
+</div>
+
+<div class="bar" id="decision-bar"><span class="ms" aria-hidden="true" style="color:#8A5100">pending_actions</span><div style="flex:1 1 240px"><b>381 items need a decision</b><div class="t-bs dim">1 decided (skipped, see the Skipped group), 0 accepted. Generate is possible when every item is decided.</div></div><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">skip_next</span>Show next undecided item</button><button class="btn filled lead" type="button" disabled><span class="ms sm" aria-hidden="true">auto_fix_high</span>Generate migration</button></div>
+<div class="t-bs dim">Every row has a copy button that copies its name (escaped as shown); the block has "Copy queue names" (all names, one per line, not only the first 10). The block lists the first 10 names; "Show all N" opens the whole list in place as a lazy list. Message-loss findings are also the first, closed group of the list, so the chip counts (taken from the report summary, which counts them) always add up to the groups. Row text is plain text only: names and messages from the file are never markup, control characters are shown escaped (for example \u0007). Long names are cut with an ellipsis; a message is cut after 2 lines and the proposal after 1; the full name and message are in the row's tooltip, and the name is copyable. The review sheet (M8-06b) and both exports carry the full text and the "why". The whole list lives in one vertical scroll with a scrollbar.</div>
+</section>
+
+<section id="states-m8-06" style="display:flex;flex-direction:column;gap:24px;margin-top:16px">
+<div class="t-tl">Other states</div>
+
+<section id="state-source" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">1. Empty: choose a source (M8-06a shows only the file source; the second source is drawn for context)</div>
+<div class="card" style="display:flex;flex-direction:column;gap:16px">
+<div class="t-tm">Where does the 3.x topology come from?</div>
+<div class="seg"><span class="on"><span class="ms sm" aria-hidden="true">check</span>Definitions file</span><span style="color:rgba(29,27,32,.38)"><span class="ms sm" aria-hidden="true">lock</span>3.x connection (arrives with live source support)</span></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Choose definitions file</button><span class="t-bs dim">In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json</span></div>
+<div class="t-bs dim">Nothing is read until you choose a file. The file is read on this machine only; it is never uploaded. Files over 64 MB are refused.</div>
+</div>
+<div class="t-bs dim">With the live source (M8-06c) a 3.x connection can be picked here instead; its pill reads "RabbitMQ 3.x: migration source only", the source is shown as locked (read only), and a user who may not export definitions is offered the file import.</div>
+</section>
+
+<section id="state-loading" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">2. Loading and analysing</div>
+<div class="card" style="display:flex;align-items:center;gap:16px"><span class="ms" aria-hidden="true">hourglass_top</span><div style="flex:1"><div class="t-ts">Reading and analysing <span class="mono">legacy-eu-definitions.json</span></div><div class="t-bs dim">Large files can take a few seconds.</div></div><button class="btn text" type="button">Cancel</button></div>
+</section>
+
+<section id="state-error" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">3. The file was rejected (no report)</div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div style="flex:1"><b>The file is not a definitions file</b><div class="mono">notes.json</div><div class="t-bs" style="margin-top:4px">Nothing was analysed. Other texts: "The file is not valid JSON", "The file has no definitions", "The file is larger than 64 MB", "The file could not be read". The text never shows file content.</div></div><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Choose another file</button></div>
+</section>
+
+<section id="state-vhost" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">4. A one-virtual-host export asks for the virtual host name (P17); nothing is analysed until it is given</div>
+<div class="card" style="display:flex;flex-direction:column;gap:16px">
+<div class="t-tm">Which virtual host is this file from?</div>
+<div class="t-bs dim">The file holds one virtual host and does not say which. Its queues, exchanges and policies will be written for the name you give. The file has no users, virtual hosts or permissions, so there will be no access migration, and the virtual host must already exist on the 4.x broker.</div>
+<div class="tf focus" style="max-width:360px"><span class="l">Virtual host name</span><div class="v"><span></span></div></div>
+<div class="t-bs dim">Empty on purpose: there is no default and "/" is not assumed. Leading and trailing spaces are removed.</div>
+<div style="display:flex;gap:12px"><button class="btn filled" type="button" disabled>Analyse</button><button class="btn text" type="button">Choose another file</button></div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:16px">
+<div class="t-ts">Same prompt after a name that cannot be used</div>
+<div class="tf" style="max-width:360px;--tf-bg:var(--sc-low)"><span class="l" style="color:var(--error)">Virtual host name</span><div class="v" style="border:2px solid var(--error);padding:0 15px"><span>a&#9;b</span></div></div>
+<div class="errtxt">The virtual host name cannot contain a tab (the refusal text of the core, shown as returned)</div>
+</div>
+</section>
+
+<section id="state-review-accept" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">6. Review sheet: accept, change or skip one item (M8-06b); classic to quorum with the ordering tick (P15)</div>
+<div class="frame"><div class="scrim" style="align-items:stretch;justify-content:flex-end"><div class="sheet" style="flex:0 0 440px;border-radius:16px 0 0 16px;background:var(--sc-high);overflow:auto">
+<div style="display:flex;align-items:center;gap:8px"><span class="ms" aria-hidden="true">queue</span><div style="flex:1;min-width:0"><div class="t-tm" style="overflow:hidden;text-overflow:ellipsis">orders</div><div class="t-bs dim">Queue in virtual host "/" · item 14 of 381</div></div><button class="iconbtn" type="button" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button></div>
+<div class="t-ts">What the app found</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div class="pcard"><div style="display:flex;gap:8px;align-items:center"><span class="sev warning">Warning</span><span class="t-ts">Classic queue, mirrored</span><span class="pill" title="Not measured on a broker yet">unverified</span></div><div class="t-bs">The queue is mirrored by a policy. 4.x has no mirroring; a quorum queue is the replacement.</div><div class="t-bs dim"><b>Why it matters:</b> a quorum queue orders messages differently from a classic queue that uses priorities.</div></div>
+</div>
+<div class="t-ts">What to do on 4.x</div>
+<div class="opt on"><span class="radio on" aria-hidden="true"></span><div><b>Declare it as a quorum queue</b> <span class="pill ok">default</span><div class="t-bs">Writes "declareQueue orders" with type quorum.</div></div></div>
+<div class="opt"><span class="radio" aria-hidden="true"></span><div><b>Keep it as a classic queue</b><div class="t-bs">Not mirrored on 4.x: one copy on one node.</div></div></div>
+<div class="chk"><span class="box" role="checkbox" aria-checked="false" tabindex="0"></span><div><b>Ordering by priority may change</b><div class="t-bs dim">Required for this choice. A quorum queue does not order by message priority the way a classic queue does.</div></div></div>
+<div class="banner warn"><span class="ms sm" aria-hidden="true">info</span><div class="t-bs">Also check your clients: a quorum queue ignores some classic settings. The list of client-visible checks is in the report.</div></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">block</span>Skip</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">edit</span>Replace with my own actions</button><span style="flex-grow:1"></span><button class="btn filled" type="button" disabled>Accept</button></div>
+<div class="t-bs dim">Accept is disabled until the tick is set. Skip leaves the item out of the migration; it moves to the "Skipped by you" group of the report, where it can be un-skipped or reviewed again. Nothing is deleted from the broker in any case.</div>
+</div></div></div>
+</section>
+
+<section id="state-review-manual" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">7. Review sheet: only a manual fix, and the keep-classic default for x-max-priority</div>
+<div class="frame"><div class="scrim" style="align-items:stretch;justify-content:flex-end"><div class="sheet" style="flex:0 0 440px;border-radius:16px 0 0 16px;background:var(--sc-high)">
+<div style="display:flex;align-items:center;gap:8px"><span class="ms" aria-hidden="true">queue</span><div style="flex:1"><div class="t-tm">temp</div><div class="t-bs dim">Queue in virtual host "/" · not durable</div></div><button class="iconbtn" type="button" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button></div>
+<div class="banner err"><span class="ms sm" aria-hidden="true">block</span><div class="t-bs"><b>This item cannot be accepted as it is.</b> A 4.x import skips a non-durable queue without an error, and there is no automatic fix for the default. Steps for you: decide whether the queue and its messages still matter.</div></div>
+<div class="opt"><span class="radio" aria-hidden="true"></span><div><b>Declare it durable</b><div class="t-bs">Writes a durable queue. A transient queue loses its messages when the broker restarts; check that this is what you want.</div></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">block</span>Skip</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">edit</span>Replace with my own actions</button><span style="flex-grow:1"></span><button class="btn filled" type="button" disabled>Accept</button></div>
+<div class="t-bs dim">Accept turns on once an automatic alternative is chosen. For a queue with x-max-priority the default is "keep classic" (no tick needed); "declare as quorum, without x-max-priority" is the alternative and needs the tick.</div>
+</div></div></div>
+</section>
+
+<section id="state-replace" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">8. Replace sheet: your own actions, and what the app refuses (ReplaceInvalid)</div>
+<div class="frame"><div class="scrim" style="align-items:stretch;justify-content:flex-end"><div class="sheet" style="flex:0 0 520px;border-radius:16px 0 0 16px;background:var(--sc-high)">
+<div style="display:flex;align-items:center;gap:8px"><span class="ms" aria-hidden="true">edit</span><div style="flex:1"><div class="t-tm">Replace "orders"</div><div class="t-bs dim">These migration actions are written instead of the proposal</div></div><button class="iconbtn" type="button" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button></div>
+<div class="ta err">[
+  { "action": "declareQueue", "name": "orders", "type": "quorum" },
+  { "action": "deleteQueue", "name": "legacy-orders" }
+]</div>
+<div class="errtxt" role="alert"><span class="ms sm" aria-hidden="true" style="vertical-align:middle">error</span> A replacement must not delete anything. Nothing was stored; the item is still undecided.</div>
+<div class="t-bs dim">The text is prefilled with what the app would write (an editable list of migration actions, same format as a migration file, "up" only). Other refusals shown in the same place: the migration parser's own reason (unknown action, a name like ".."), "an action is for another virtual host than the item's", "not valid JSON". What you typed is always kept.</div>
+<div style="display:flex;gap:8px"><button class="btn text" type="button">Back to the proposal</button><span style="flex-grow:1"></span><button class="btn filled" type="button">Save replacement</button></div>
+</div></div></div>
+</section>
+
+<section id="state-decided" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">9. Item rows after a decision, the Skipped group (owner decision 2026-11-10) and the bar when every item is decided</div>
+<div class="list"><div class="row"><span class="ms sm" aria-hidden="true">queue</span><span class="nm" style="flex:0 1 220px">orders</span><span class="t-bs" style="flex:1">Declared as a quorum queue</span><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Accepted, ordering tick set</span><button class="btn text" type="button" style="height:32px">Change</button></div>
+<div class="row"><span class="ms sm" aria-hidden="true">queue</span><span class="nm" style="flex:0 1 220px">prio</span><span class="t-bs" style="flex:1">Kept as a classic queue</span><span class="pill ok"><span class="ms sm" aria-hidden="true">check</span>Accepted</span><button class="btn text" type="button" style="height:32px">Change</button></div>
+<div class="row"><span class="ms sm" aria-hidden="true">queue</span><span class="nm" style="flex:0 1 220px">jobs</span><span class="t-bs" style="flex:1">Your own actions (1)</span><span class="pill ok"><span class="ms sm" aria-hidden="true">edit</span>Replaced</span><button class="btn text" type="button" style="height:32px">Change</button></div></div>
+<div class="list"><div class="grp" role="button" tabindex="0" aria-expanded="true"><span class="ms sm" aria-hidden="true">expand_more</span><span class="ms sm" aria-hidden="true">block</span>Skipped by you<span style="flex-grow:1"></span><span class="pill">38 items</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">queue</span><span class="nm" style="flex:0 1 220px">temp</span><span class="t-bs" style="flex:1">Left out of the migration. Was: Blocker, not durable.</span><button class="btn tonal lead" type="button" style="height:32px"><span class="ms sm" aria-hidden="true">undo</span>Un-skip</button><button class="btn text" type="button" style="height:32px">Review</button></div></div>
+<div class="t-bs dim">Un-skip puts the item back as undecided (it returns to its rule group and the count goes up by one); Review opens the sheet to accept or replace it directly. Generate leaves skipped items out and lists them in the result.</div>
+<div class="bar"><span class="ms" aria-hidden="true" style="color:#2E6B1F">task_alt</span><div style="flex:1 1 240px"><b>Every item is decided</b><div class="t-bs dim">381 of 381: 340 accepted, 38 skipped (in the Skipped group), 3 replaced.</div></div><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">auto_fix_high</span>Generate migration</button></div>
+</section>
+
+<section id="state-generate" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">10. Generate and save: the result</div>
+<div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div style="flex:1"><b>2 migrations saved</b><div class="t-bs" style="margin-top:4px">Nothing was sent to any broker. Apply them on a 4.x connection from the Migrations screen; each applies only on a connection whose virtual host matches.</div></div><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">account_tree</span>Open Migrations</button></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div class="pcard"><div style="display:flex;justify-content:space-between"><span class="t-tm">0003</span><span class="pill">virtual host "/"</span></div><div class="t-bs">Migrated from RabbitMQ 3.x legacy-eu-definitions.json vhost /</div><div class="t-bs dim">214 actions · saved to /Users/dana/work/migrations/0003.json</div></div>
+<div class="pcard"><div style="display:flex;justify-content:space-between"><span class="t-tm">0004</span><span class="pill">virtual host "orders"</span></div><div class="t-bs">Migrated from RabbitMQ 3.x legacy-eu-definitions.json vhost orders</div><div class="t-bs dim">96 actions · saved to /Users/dana/work/migrations/0004.json</div></div>
+</div>
+<div class="t-ts">Left out (38 skipped by you, 3 bindings, 1 name that cannot be written)</div>
+<div class="list"><div class="row"><span class="t-bs" style="flex:1"><span class="mono">temp</span>: skipped by you</span></div><div class="row"><span class="t-bs" style="flex:1">Binding <span class="mono">events -&gt; orders: order.created</span>: left out because "orders" is skipped</span></div><div class="row"><span class="t-bs" style="flex:1"><span class="mono">..</span>: its name cannot be written into a migration</span></div></div>
+<div class="t-ts">Notes</div>
+<div class="list"><div class="row"><span class="ms sm" aria-hidden="true">report</span><span class="t-bs" style="flex:1"><span class="mono">orders</span> uses the old classic queue index; a new 4.x broker with this migration and a Shovel is the recommended path</span></div><div class="row"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs" style="flex:1">Handled by the access migration (not part of this generation)</span></div></div>
+<div class="t-bs dim">Versions are the next free numbers in the folder. Files are never overwritten. A re-run of "Generate" after changing a decision makes new versions, so the old files stay as they are: the screen says so before saving when files were already saved from this report ("Generate again" confirms).</div>
+</section>
+
+<section id="state-generate-problems" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">11. Generate: no folder chosen, folder cannot be used, saving failed</div>
+<div class="banner info"><span class="ms" aria-hidden="true">folder</span><div style="flex:1"><b>Choose the folder for migration files</b><div class="t-bs" style="margin-top:4px">The same folder as the Migrations screen. The system folder dialog opens; if you cancel, nothing is saved ("No folder was chosen").</div></div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div style="flex:1"><b>The folder is read-only; no file was saved</b><div class="mono">/Users/dana/work/migrations</div></div><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">drive_file_move</span>Choose another folder</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export the files</button></div>
+<div class="t-bs dim">The folder texts are the ones of the Migrations screen (missing, not a folder, unreadable, read-only). If the second of two files cannot be saved the screen says which was saved and which was not.</div>
+</section>
+
+<section id="state-export" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">12. Export report: two buttons in the app bar ("Export report" saves JSON, "Copy as text" copies; decided by the architect 2026-11-10, replaces the menu), then the notices: saved, copied, failed</div>
+<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+<div class="popup" style="position:static;width:260px"><div class="row" style="min-height:48px"><span class="ms sm" aria-hidden="true">data_object</span>Save as JSON (caerbannog.compat-report/1)</div><div class="row" style="min-height:48px"><span class="ms sm" aria-hidden="true">content_copy</span>Copy as text</div></div>
+<div style="display:flex;flex-direction:column;gap:8px;flex:1 1 320px">
+<div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div class="t-bs" style="flex:1">Report saved to /Users/dana/Documents/compat-report.json. It holds no password, no password hash and no Shovel URI.</div></div>
+<div class="banner ok"><span class="ms" aria-hidden="true">content_copy</span><div class="t-bs" style="flex:1">Report copied as text</div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div class="t-bs" style="flex:1">The report could not be saved: the place cannot be written. The report is still shown.</div></div>
+</div></div>
+</section>
+
+<section id="state-entry" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">13. Where the screen is opened from (open decision, see the brief)</div>
+<div class="appbar" style="padding:0;border:1px dashed var(--outline-variant);border-radius:12px"><h1 style="padding-left:16px">Migrations</h1><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">move_up</span>Migrate from 3.x</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
+<div class="t-bs dim">Recommended: a button on the Migrations screen and the drawer item shown at the left of this mockup. On a connection that is RabbitMQ 3.x the connection popup also offers "Migrate from 3.x" (the pill's only action, M8-06c). If the report is held (it survives connecting to another broker), the drawer item shows a small dot.</div>
+</section>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

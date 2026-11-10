@@ -75,6 +75,7 @@ fun main() = application {
             AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
             AppDestination.Topology -> TopologyWindowContent(composition, control)
             AppDestination.Migrations -> MigrationsWindowContent(composition, control)
+            AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
             else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
         }
     }

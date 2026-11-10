@@ -65,6 +65,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Help
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material.icons.outlined.VerifiedUser
@@ -129,6 +130,7 @@ internal enum class AppIcon(val mockupName: String) {
     DriveFileMove("drive_file_move"),
     History("history"),
     RestartAlt("restart_alt"),
+    Person("person"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -183,6 +185,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.DriveFileMove -> Icons.Outlined.DriveFileMove
     AppIcon.History -> Icons.Outlined.History
     AppIcon.RestartAlt -> Icons.Outlined.RestartAlt
+    AppIcon.Person -> Icons.Outlined.Person
 }
 
 /** `.ms.sm` in the mockup. */

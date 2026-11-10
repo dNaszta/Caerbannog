@@ -32,18 +32,26 @@ object CompatibilityReportText {
 }
 
 /**
- * Makes a value safe to write into a line: a backslash becomes `\\`, a double quote `\"` (when [escapeQuotes]), and every control
- * character (below 0x20, 0x7F, 0x80 to 0x9F) and the line and paragraph separators become `\uXXXX` with four uppercase hex digits.
+ * Makes a value safe to write into a line and to draw: a backslash becomes `\\`, a double quote `\"` (when [escapeQuotes]), and every
+ * control (Cc), format (Cf, for example bidi overrides and zero-width characters), line and paragraph separator (Zl, Zp) character and
+ * every lone surrogate becomes `\uXXXX` with four uppercase hex digits. A valid surrogate pair (an emoji) passes through unchanged.
  */
 internal fun escapeForText(value: String, escapeQuotes: Boolean = false): String = buildString {
-    for (c in value) {
+    for ((i, c) in value.withIndex()) {
         when {
             c == '\\' -> append("\\\\")
             c == '"' && escapeQuotes -> append("\\\"")
-            c.isUnsafeInText() -> append("\\u").append(c.code.toString(16).uppercase().padStart(4, '0'))
+            c.isUnsafeInText(value, i) -> append("\\u").append(c.code.toString(16).uppercase().padStart(4, '0'))
             else -> append(c)
         }
     }
 }
 
-private fun Char.isUnsafeInText(): Boolean = code < 0x20 || code == 0x7F || code in 0x80..0x9F || this == '\u2028' || this == '\u2029'
+private fun Char.isUnsafeInText(text: String, index: Int): Boolean = when {
+    isHighSurrogate() -> !(index + 1 < text.length && text[index + 1].isLowSurrogate())
+    isLowSurrogate() -> !(index > 0 && text[index - 1].isHighSurrogate())
+    else -> when (category) {
+        CharCategory.CONTROL, CharCategory.FORMAT, CharCategory.LINE_SEPARATOR, CharCategory.PARAGRAPH_SEPARATOR -> true
+        else -> false
+    }
+}

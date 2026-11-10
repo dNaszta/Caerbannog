@@ -263,6 +263,7 @@ class Migrate3xAnalyzerSteps {
 
     @Given("the report for {string} is shown")
     fun theReportIsShown(connection: String) {
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.reportForFileIsShown(connection) // M8-06a: the same words on the screen
         val doc = (DefinitionsParser.parse(DefinitionsFixtures.read(DefinitionsFixtures.SHOVEL_PARAMETER)) as? DefinitionsParseResult.Parsed)?.document ?: fail("fixture not parsed")
         world.live = D.liveFacts(connectionName = connection, deprecatedFeatures = setOf("classic_queue_mirroring"))
         world.report = CompatibilityAnalyzer.analyze(doc, world.live)
@@ -292,6 +293,7 @@ class Migrate3xAnalyzerSteps {
 
     @When("I export the report")
     fun iExportTheReport() {
+        if (Migrate3xScreenWorld.active) return Migrate3xScreenWorld.exportReport() // M8-06a
         world.exportedJson = CompatibilityReportJson.encode(report())
     }
 
