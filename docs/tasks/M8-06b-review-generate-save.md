@@ -165,6 +165,20 @@ data class LeftOutRow(val label: String, val text: String)
 | "unverified" marker | label `unverified`, tooltip `Not measured on a broker yet` (the mockup's text; closes open point 3) |
 Row pills: `Needs decision`, `Accepted`, `Accepted, ordering tick set`, `Replaced`, `Skipped`. Option titles are the report's `Proposal.describe()` sentences; the mockup's second line under an option (for example "Writes declareQueue orders ...") is dropped, the mockup note is updated.
 
+## Rulings after step 2 (architect, 2026-11-10, answers to the test developer's 12 points; technical, no owner decision)
+1. Outline row 3 of the refusal scenario reads "the core's own reason about the other virtual host" (the core names both vhosts when `echoableName` allows, else the nameless form; the test asserts the core's string, not a literal).
+2. `GenerationReport.how` is `enum class How { Saved, Exported }`.
+3. The problem texts are built in `core`: `MigrateFromThreeTexts.problemText(problem: SaveProblem): String` (constants for "No folder was chosen. Nothing was saved.", "<message>. No file was saved.", the partial-save sentence, "The migrations folder has no free version number left (the highest is 9999)."). The composables draw the string. A core unit test pins each text; the ui tests keep their assertions.
+4. `decidedLine` omits zero parts: "3 of 3: 3 accepted." ; "381 of 381: 340 accepted, 38 skipped (in the Skipped group), 3 replaced." Order accepted, skipped, replaced.
+5. Numbers use `MigrateFromThreeTexts.count` (thousands comma) everywhere in the new texts: "1,500 items need a decision", sheet "item 1,500 of 60,000".
+6. `holder.recordSaved()` is called as soon as at least one file was written, also after a partial save: the next `generate()` asks first (the folder already holds files from this analysis).
+7. `generateAgain()` is accepted from `ConfirmAgain` and from `Trouble` (the panel is the question; a new generation with new versions, e.g. after a taken-version refusal). No other state.
+8. A failed `exportFiles()` shows `ExportNotice("The migration file could not be saved: <fixed reason>", failed = true)` on `Report.notice`, like `exportReportJson`.
+9. No view model event navigates. The screen takes `onOpenMigrations: () -> Unit`, wired in `desktopApp` `AppNavigation` (to `AppDestination.Migrations`); the button (`migrate3x-result-open-migrations`) is drawn only when `report.how == Saved`.
+10. `generateAgain()` and `cancelGenerateAgain()` outside their states are no-ops.
+11. Stub choices accepted: `Report.review` has no default; `folders` follows `holder` in the constructor; the `ReviewEvents` interface in `ui` may be reshaped by the developer, the test developer then updates the test kit.
+12. A new view model derives `review` from the held analysis (`holder.held.value.review`: counts, lines, `canGenerate`, skipped group) in `initialState()`, with `sheet = null` and `generation = Idle`; decisions live in `HeldAnalysis.review`, so they survive. Test: decide, build a second view model on the same holder, same counts.
+
 ## Open points decided (architect, technical, no owner decision)
 - Open point 3 (marker tooltip): decided above.
 - Open point 4 (Replace restricted to the item's vhost in the UI): NO extra UI restriction. The Replace text is migration-format JSON the user may edit freely; the core already refuses another vhost and a missing `vhost` means `/`, and the sheet says so in the hint. A UI lock on a field that does not exist would be a second rule beside the core's. A scenario row already covers the refusal.

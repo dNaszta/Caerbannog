@@ -708,7 +708,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
       | actions                                   | error                                                  |
       | an action that deletes a queue            | A replacement must not delete anything                 |
       | a queue named ".."                        | the migration parser's own reason                      |
-      | an action for another virtual host        | an action is for another virtual host than the item's  |
+      | an action for another virtual host        | the core's own reason about the other virtual host     |
       | text that is not JSON                     | the migration parser's own reason                      |
 
   @negative @fake-broker @m8-06b
