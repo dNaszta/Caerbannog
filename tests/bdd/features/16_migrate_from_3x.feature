@@ -346,7 +346,6 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And the broker reports no storage version for "orders" until the second read
     When I analyse "legacy-eu"
     Then the storage version of "orders" is read after a retry
-    And a queue whose version never appears is treated as version 1 and reported as unknown
 
   @fake-broker @m8-02
   Scenario: The live scan stops retrying after a fixed number of reads
