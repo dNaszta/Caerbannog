@@ -166,7 +166,7 @@ fun ConnectionPopup(state: ConnectionControlState, events: ConnectionControlEven
             if (emptyText != null) {
                 EmptyConnections(emptyText, events)
             } else {
-                state.rows.forEach { ConnectionRow(it, events, if (it.name == firstAction) Modifier.focusRequester(entry) else Modifier) }
+                state.rows.forEach { ConnectionRow(it, events, onDismiss, if (it.name == firstAction) Modifier.focusRequester(entry) else Modifier) }
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionLabel(ConnectionControlTexts.SECTION_REFRESH)
@@ -203,7 +203,7 @@ private fun EmptyConnections(text: String, events: ConnectionControlEvents) {
 }
 
 @Composable
-private fun ConnectionRow(row: ConnectionRowState, events: ConnectionControlEvents, actionModifier: Modifier) {
+private fun ConnectionRow(row: ConnectionRowState, events: ConnectionControlEvents, onDismiss: () -> Unit, entryModifier: Modifier) {
     val failed = row.icon == ChipIcon.Error
     Row(
         modifier = Modifier
@@ -234,8 +234,17 @@ private fun ConnectionRow(row: ConnectionRowState, events: ConnectionControlEven
             RowAction.Retry -> ConnectionControlTexts.RETRY to { events.retry(row.name) }
             RowAction.None -> null
         }
+        // Migrate from 3.x comes first in the row, so it takes the popup's entry focus; Disconnect keeps its place after it.
+        if (row.offersMigration) {
+            TextButton(
+                onClick = { events.openMigrateFromThree(); onDismiss() },
+                modifier = entryModifier.testTag("connection-popup-migrate3x"),
+            ) { Text(ConnectionControlTexts.MIGRATE_FROM_3X) }
+        }
         // The popup stays open after an action, so the new state is visible (brief, Keyboard and access).
-        action?.let { (label, run) -> TextButton(onClick = run, modifier = actionModifier.testTag("popupAction:${row.name}")) { Text(label) } }
+        action?.let { (label, run) ->
+            TextButton(onClick = run, modifier = (if (row.offersMigration) Modifier else entryModifier).testTag("popupAction:${row.name}")) { Text(label) }
+        }
     }
 }
 
@@ -444,18 +453,23 @@ private fun AppDrawer(
         }
         SearchBox(enabled = ConnectionFeature.Search in features, reason = reason)
         Spacer(Modifier.padding(4.dp))
+        var anyDisabled = ConnectionFeature.Search !in features
         navItems.forEach { (destination, icon) ->
             val on = destination.requiredFeature()?.let { it in features } ?: true
+            if (!on) anyDisabled = true
             NavItem(destination, icon, selected = destination.name == activeItem, enabled = on, reason = reason, onClick = { onNavigate(destination) })
         }
+        // F4: the reason is written once; each disabled item and the search keep it as tooltip and accessible description.
+        if (reason != null && anyDisabled) ReasonText(reason, "navReasonNote", Modifier.padding(start = 12.dp, top = 4.dp, end = 12.dp))
     }
 }
 
-// The search is drawn, not wired; while the connection does not offer it, it is disabled and says why, like a drawer item.
+// The search is drawn, not wired; while the connection does not offer it, it is disabled and says why (tooltip and description), like a drawer item.
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchBox(enabled: Boolean, reason: String?) {
     val shown = reason.takeIf { !enabled }
-    Column(Modifier.fillMaxWidth()) {
+    val box: @Composable () -> Unit = {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA),
@@ -472,8 +486,8 @@ private fun SearchBox(enabled: Boolean, reason: String?) {
                 Text("Search streams, queues, exchanges", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        shown?.let { ReasonText(it, "searchReason", Modifier.padding(start = 12.dp, top = 2.dp)) }
     }
+    if (shown == null) box() else TooltipArea(tooltip = { ReasonTooltip(shown) }, modifier = Modifier.fillMaxWidth()) { box() }
 }
 
 private const val DISABLED_ALPHA = 0.38f
@@ -508,7 +522,6 @@ private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolea
                 ConnectionIcon(icon, IconSize)
                 Column(Modifier.padding(vertical = 8.dp)) {
                     Text(destination.label, style = MaterialTheme.typography.labelLarge)
-                    shown?.let { ReasonText(it, "navItemReason:${destination.name}") }
                 }
             }
         }
@@ -517,7 +530,7 @@ private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolea
 }
 
 @Composable
-private fun ReasonTooltip(text: String) {
+internal fun ReasonTooltip(text: String) {
     Surface(color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface, shape = RoundedCornerShape(4.dp), shadowElevation = 4.dp) {
         Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
     }

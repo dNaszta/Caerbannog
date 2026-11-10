@@ -174,7 +174,7 @@ sealed interface LiveAnalysisOutcome {
 suspend fun analyseLive(source: DefinitionsSource, dispatcher: CoroutineDispatcher = Dispatchers.Default): LiveAnalysisOutcome = when (val fetched = source.fetch()) {
     is FetchResult.Fetched -> withContext(dispatcher) {
         LiveAnalysisOutcome.Analysed(
-            HeldAnalysis(source.connectionName, fetched.document, CompatibilityAnalyzer.analyze(fetched.document, fetched.facts)),
+            HeldAnalysis(source.connectionName, fetched.document, CompatibilityAnalyzer.analyze(fetched.document, fetched.facts), SourceKind.Live),
         )
     }
     is FetchResult.NotPermitted -> LiveAnalysisOutcome.OfferFileImport(fetched.reason)

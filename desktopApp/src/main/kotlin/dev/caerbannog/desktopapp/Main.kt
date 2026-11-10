@@ -1,28 +1,29 @@
 package dev.caerbannog.desktopapp
 
-import androidx.compose.runtime.CompositionLocalProvider
-import dev.caerbannog.ui.appframe.LocalNavigationFeatures
-import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import androidx.compose.runtime.rememberCoroutineScope
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageBrowserState
 import dev.caerbannog.core.browser.MessageBrowserViewModel
+import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.connections.createStreamGate
+import dev.caerbannog.core.connections.deleteStreamGate
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
 import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
@@ -30,19 +31,17 @@ import dev.caerbannog.core.publish.PublishMessageViewModel
 import dev.caerbannog.core.publish.PublishTargetKind
 import dev.caerbannog.core.publish.UnavailableMessagePublisher
 import dev.caerbannog.core.streams.CatalogResult
-import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
-import dev.caerbannog.ui.publish.PublishEvents
-import kotlinx.coroutines.flow.MutableStateFlow
-import dev.caerbannog.core.connections.createStreamGate
-import dev.caerbannog.core.connections.deleteStreamGate
-import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.streams.StreamManagementViewModel
 import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.QueueMessageInspectionViewModel
 import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 import dev.caerbannog.ui.appframe.AppDestination
+import dev.caerbannog.ui.appframe.LocalNavigationFeatures
+import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.migrations.MigrationsScreen
+import dev.caerbannog.ui.publish.PublishEvents
+import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
 import dev.caerbannog.ui.streams.StreamListEvents
 import dev.caerbannog.ui.streams.StreamScreen
 import dev.caerbannog.ui.streams.StreamsScreen
@@ -50,6 +49,7 @@ import dev.caerbannog.ui.topology.EmptyQueueInspectionEvents
 import dev.caerbannog.ui.topology.QueueInspectionEvents
 import dev.caerbannog.ui.topology.TopologyScreen
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -76,13 +76,13 @@ fun main() = application {
         val openStream by composition.navigation.selectedStream.collectAsState()
         val navigationFeatures by composition.navigationFeatures.collectAsState()
         CompositionLocalProvider(LocalNavigationFeatures provides NavigationFeaturesInfo(navigationFeatures.features, navigationFeatures.reason)) {
-        when (screen) {
-            AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
-            AppDestination.Topology -> TopologyWindowContent(composition, control)
-            AppDestination.Migrations -> MigrationsWindowContent(composition, control)
-            AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
-            else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
-        }
+            when (screen) {
+                AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
+                AppDestination.Topology -> TopologyWindowContent(composition, control)
+                AppDestination.Migrations -> MigrationsWindowContent(composition, control)
+                AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
+                else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
+            }
         }
     }
 }

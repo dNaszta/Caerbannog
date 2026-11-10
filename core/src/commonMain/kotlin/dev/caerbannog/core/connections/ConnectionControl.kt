@@ -144,7 +144,11 @@ fun connectionControlState(
     return ConnectionControlState(
         chip = chipOf(current, currentLink, notEncrypted = profiles.firstOrNull { it.name == current?.name }?.tls == false),
         rows = profiles.map {
-            rowOf(it.name, it.name == current?.name, if (it.name == current?.name) currentLink else null).copy(notEncrypted = !it.tls)
+            val isCurrent = it.name == current?.name
+            rowOf(it.name, isCurrent, if (isCurrent) currentLink else null).copy(
+                notEncrypted = !it.tls,
+                offersMigration = isCurrent && currentLink is LinkState.Connected && current?.status.isMigrationSource(),
+            )
         },
         emptyText = ConnectionControlTexts.NO_SAVED_CONNECTIONS.takeIf { profiles.isEmpty() },
         refresh = refreshOf(currentLink, refreshInterval, updatedAtMillis, nowMillis),
@@ -299,8 +303,8 @@ class ConnectionControlModel(
         scope.launch { onOpenConnections() }
     }
 
-    // M8-06c STUB: does not call the lambda yet.
     override fun openMigrateFromThree() {
+        scope.launch { onOpenMigrateFromThree() }
     }
 
     override fun close() {

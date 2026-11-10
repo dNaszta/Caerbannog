@@ -29,8 +29,7 @@ object ReportViewBuilder {
             listOfNotNull(skippedGroup(skipped, SKIPPED_GROUP_KEY in openGroups))
         return ReportView(
             fileLabel = held.fileLabel,
-            // M8-06c STUB: always the file card.
-            source = SourceCardView(SourceKind.File, held.fileLabel, locked = false, lockText = null, canAnalyseAgain = false),
+            source = sourceCard(held, liveConnectionName),
             sourceVersion = report.source.sourceVersion,
             singleVirtualHost = report.source.singleVirtualHost,
             summary = report.summary,
@@ -46,6 +45,21 @@ object ReportViewBuilder {
         ) { key ->
             if (key == SKIPPED_GROUP_KEY) skippedRows(review, skipped, SKIPPED_GROUP_KEY in openGroups)
             else rowsOf(visible[key], key in openGroups) { decorate(rowFormatter(it), it, review) }
+        }
+    }
+
+    /** A live analysis is locked ("read only"); its label is the connection while that connection is readable now, else "from <name> (disconnected)". */
+    private fun sourceCard(held: HeldAnalysis, liveConnectionName: String?): SourceCardView = when (held.kind) {
+        SourceKind.File -> SourceCardView(SourceKind.File, held.fileLabel, locked = false, lockText = null, canAnalyseAgain = false)
+        SourceKind.Live -> {
+            val same = liveConnectionName == held.fileLabel
+            SourceCardView(
+                SourceKind.Live,
+                if (same) held.fileLabel else MigrateFromThreeTexts.liveDisconnected(held.fileLabel),
+                locked = true,
+                lockText = MigrateFromThreeTexts.READ_ONLY,
+                canAnalyseAgain = same,
+            )
         }
     }
 

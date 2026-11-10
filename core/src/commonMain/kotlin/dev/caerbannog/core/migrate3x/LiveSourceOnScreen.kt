@@ -3,8 +3,6 @@ package dev.caerbannog.core.migrate3x
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-// M8-06c STUB: types as decided in docs/tasks/M8-06c-live-source-on-screen.md; the behaviour is the senior developer's.
-
 enum class SourceKind { File, Live }
 
 /** What the screen may read live right now; null = no readable 3.x connection is held. Read only: DefinitionsSource has no write method. */

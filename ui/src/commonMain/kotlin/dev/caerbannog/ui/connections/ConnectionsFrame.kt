@@ -34,16 +34,18 @@ internal fun ConnectionsContent(
     onSelect: (String) -> Unit,
     editPanel: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    /** The profile whose connection is up now, or null; the 3.x pill of a card shows only for it (F8). */
+    connectedName: String? = null,
 ) {
     BoxWithConstraints(modifier = modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
         if (maxWidth >= 340.dp + 24.dp + 480.dp) {
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                SavedProfilesList(state, onSelect, Modifier.width(340.dp))
+                SavedProfilesList(state, onSelect, connectedName, Modifier.width(340.dp))
                 editPanel(Modifier.weight(1f))
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SavedProfilesList(state, onSelect, Modifier.fillMaxWidth().heightIn(max = 220.dp))
+                SavedProfilesList(state, onSelect, connectedName, Modifier.fillMaxWidth().heightIn(max = 220.dp))
                 editPanel(Modifier.weight(1f).fillMaxWidth())
             }
         }

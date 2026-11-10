@@ -1,5 +1,8 @@
 package dev.caerbannog.ui.migrate3x
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,12 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,6 +33,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
@@ -35,6 +44,7 @@ import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.core.migrate3x.SourceOption
 import dev.caerbannog.core.migrate3x.SourcePicker
 import dev.caerbannog.core.migrate3x.Severity
+import dev.caerbannog.ui.appframe.ReasonTooltip
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -80,57 +90,150 @@ fun MigrateFromThreeScreen(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
             ConnectionIcon(AppIcon.Info, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                "This screen only reads a file. It needs no connection and sends nothing to any broker.",
+                MigrateFromThreeTexts.INFO_LINE,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         when (state) {
-            MigrateFromThreeState.ChooseSource -> ChooseSourceState(onChooseFile)
+            MigrateFromThreeState.ChooseSource -> ChooseSourceState(picker, onChooseFile, onChooseSource, onAnalyseLive)
             is MigrateFromThreeState.Loading -> LoadingState(state, onCancelPrompt)
             is MigrateFromThreeState.Rejected -> RejectedState(state, onChooseFile)
             is MigrateFromThreeState.NeedsVirtualHost -> VirtualHostPrompt(state, onGiveVirtualHost, onChooseFile)
-            // M8-06c STUB: the three live states are not drawn yet.
-            is MigrateFromThreeState.LoadingLive, is MigrateFromThreeState.CannotExport, is MigrateFromThreeState.LiveFailed -> Unit
-            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations)
+            is MigrateFromThreeState.LoadingLive -> LoadingLiveState(state, onCancelPrompt)
+            is MigrateFromThreeState.CannotExport -> CannotExportState(state, onChooseFile)
+            is MigrateFromThreeState.LiveFailed -> LiveFailedState(state, onAnalyseLive, onChooseFile)
+            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations, onAnalyseLive)
         }
     }
 }
 
 @Composable
-private fun ChooseSourceState(onChooseFile: () -> Unit) {
+private fun ChooseSourceState(picker: SourcePicker, onChooseFile: () -> Unit, onChooseSource: (SourceKind) -> Unit, onAnalyseLive: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-choose-source"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Where does the 3.x topology come from?", style = MaterialTheme.typography.titleMedium)
+        SourcePickerRow(picker, onChooseSource)
+        val live = picker.options.filterIsInstance<SourceOption.Live>().firstOrNull()
+        if (picker.selected == SourceKind.Live && live != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-analyse-live")) {
+                    ConnectionIcon(AppIcon.Link, SmallIconSize)
+                    Text(MigrateFromThreeTexts.ANALYSE_LIVE, Modifier.padding(start = 8.dp))
+                }
+                Text(
+                    MigrateFromThreeTexts.analyseLiveHint(live.connectionName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("migrate3x-analyse-live-hint"),
+                )
+            }
+        } else {
+            Button(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
+                ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
+                Text("Choose definitions file", Modifier.padding(start = 8.dp))
+            }
+            Text(
+                "In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Nothing is read until you choose a file. The file is read on this machine only; it is never uploaded. Files over 64 MB are refused.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * The segmented picker: a selectable group of radio buttons. An enabled option is focusable (Enter and Space choose it); a disabled one
+ * is not, says why as its description and tooltip, and shows the reason as text under it. The picker never offers to connect.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SourcePickerRow(picker: SourcePicker, onChooseSource: (SourceKind) -> Unit) {
+    Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        picker.options.forEach { option ->
+            val kind = if (option is SourceOption.File) SourceKind.File else SourceKind.Live
+            val enabled = option !is SourceOption.LiveDisabled
+            val selected = enabled && picker.selected == kind
+            val reason = (option as? SourceOption.LiveDisabled)?.reason
+            val tag = if (kind == SourceKind.File) "migrate3x-source-file" else "migrate3x-source-live"
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val chip: @Composable () -> Unit = {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA),
+                        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.testTag(tag)
+                            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = { onChooseSource(kind) })
+                            .semantics { reason?.let { contentDescription = "${option.label}: $it" } },
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ConnectionIcon(if (selected) AppIcon.Check else if (enabled) AppIcon.Link else AppIcon.Lock, SmallIconSize)
+                            Text(option.label, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+                if (reason == null) chip() else TooltipArea(tooltip = { ReasonTooltip(reason) }) { chip() }
+                reason?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("migrate3x-source-live-reason"))
+                }
+            }
+        }
+    }
+}
+
+private const val DISABLED_ALPHA = 0.38f
+
+@Composable
+private fun LoadingLiveState(state: MigrateFromThreeState.LoadingLive, onCancel: () -> Unit) {
+    Column(Modifier.testTag("migrate3x-state-loading-live"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CircularProgressIndicator(Modifier.size(IconSize))
+            Text(MigrateFromThreeTexts.liveLoading(state.connectionName), style = MaterialTheme.typography.titleMedium)
+        }
+        Text(MigrateFromThreeTexts.LIVE_LOADING_HINT, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("migrate3x-cancel")) { Text("Cancel") }
+    }
+}
+
+@Composable
+private fun CannotExportState(state: MigrateFromThreeState.CannotExport, onChooseFile: () -> Unit) {
+    Column(Modifier.testTag("migrate3x-state-cannot-export"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FailureBanner(state.text)
+        Text("Nothing was analysed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChooseFileButton(onChooseFile)
+    }
+}
+
+@Composable
+private fun LiveFailedState(state: MigrateFromThreeState.LiveFailed, onAnalyseLive: () -> Unit, onChooseFile: () -> Unit) {
+    Column(Modifier.testTag("migrate3x-state-live-failed"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FailureBanner(state.text)
+        Text("Nothing was analysed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = true,
-                onClick = {},
-                label = { Text("Definitions file") },
-                leadingIcon = { ConnectionIcon(AppIcon.Check, SmallIconSize) },
-            )
-            // Drawn for context only: the live source arrives with M8-06c.
-            FilterChip(
-                selected = false,
-                onClick = {},
-                enabled = false,
-                label = { Text("3.x connection (arrives with live source support)") },
-                leadingIcon = { ConnectionIcon(AppIcon.Lock, SmallIconSize) },
-            )
+            Button(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-try-again")) { Text(MigrateFromThreeTexts.TRY_AGAIN) }
+            ChooseFileButton(onChooseFile)
         }
-        Button(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
-            ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
-            Text("Choose definitions file", Modifier.padding(start = 8.dp))
-        }
-        Text(
-            "In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            "Nothing is read until you choose a file. The file is read on this machine only; it is never uploaded. Files over 64 MB are refused.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+}
+
+@Composable
+private fun FailureBanner(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ConnectionIcon(AppIcon.Error, IconSize, tint = MaterialTheme.colorScheme.error)
+        Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+@Composable
+private fun ChooseFileButton(onChooseFile: () -> Unit) {
+    OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
+        ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
+        Text("Choose definitions file", Modifier.padding(start = 8.dp))
     }
 }
 

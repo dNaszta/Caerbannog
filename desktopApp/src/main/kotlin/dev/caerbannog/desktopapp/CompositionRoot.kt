@@ -8,6 +8,7 @@ import dev.caerbannog.core.connections.ConnectionFeature
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
+import dev.caerbannog.core.connections.HeldLiveSourceProvider
 import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionCheckStatus
@@ -16,6 +17,8 @@ import dev.caerbannog.core.connections.availableFeatures
 import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
+import dev.caerbannog.core.migrate3x.LiveSourceProvider
+import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.core.migrations.MigrationFolderChooser
 import dev.caerbannog.core.migrations.MigrationFolderPorts
 import dev.caerbannog.core.migrations.MigrationFolderStore
@@ -105,8 +108,8 @@ class AppComposition(
     val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
     /** What the drawer offers: the features of the connected broker and the reason for the others (M8-02a); the window passes it to the frame. */
     val navigationFeatures: StateFlow<NavigationFeatures> = MutableStateFlow(NavigationFeatures.ALL),
-    /** M8-06c STUB: what the Migrate from 3.x screen may read live (the held 3.x connection); None until it is built in [createAppComposition]. */
-    val liveSource: dev.caerbannog.core.migrate3x.LiveSourceProvider = dev.caerbannog.core.migrate3x.LiveSourceProvider.None,
+    /** What the Migrate from 3.x screen may read live (the held 3.x connection), read only; None for a composition without one. */
+    val liveSource: LiveSourceProvider = LiveSourceProvider.None,
 ) {
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
@@ -194,6 +197,7 @@ fun createAppComposition(
     val control = ConnectionControlModel(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
+        onOpenMigrateFromThree = { navigation.openMigrateFromThree(SourceKind.Live) },
     )
     val navigationFeatures = navigationFeatures(session, active, streamListScope)
     streamListScope.launch {
@@ -202,7 +206,7 @@ fun createAppComposition(
             if (disabled) navigation.open(AppDestination.Connections)
         }
     }
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree, navigationFeatures)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope))
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.

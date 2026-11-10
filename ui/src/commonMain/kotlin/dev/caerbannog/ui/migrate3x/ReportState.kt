@@ -59,6 +59,7 @@ import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
 import dev.caerbannog.core.migrate3x.ReportView
 import dev.caerbannog.core.migrate3x.RowView
 import dev.caerbannog.core.migrate3x.Severity
+import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -83,6 +84,7 @@ internal fun ReportState(
     onReportCopied: () -> Unit,
     review: ReviewEvents,
     onOpenMigrations: () -> Unit,
+    onAnalyseLive: () -> Unit = {},
 ) {
     val view = state.view
     val copy = rememberCopyToClipboard()
@@ -95,7 +97,7 @@ internal fun ReportState(
             ReviewSheet(sheet, review, Modifier.weight(1f))
             return@Column
         }
-        ReportHeader(view, onChooseFile, onExport, onCopyText = { copy(reportText()); onReportCopied() })
+        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { copy(reportText()); onReportCopied() })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
         // A state built without a review (no lines yet) shows no bar: the 06a screen.
@@ -113,29 +115,42 @@ internal fun ReportState(
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: () -> Unit, onCopyText: () -> Unit) {
+private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: () -> Unit, onAnalyseLive: () -> Unit, onCopyText: () -> Unit) {
+    val source = view.source
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ConnectionIcon(AppIcon.UploadFile, IconSize)
+            ConnectionIcon(if (source.kind == SourceKind.Live) AppIcon.Link else AppIcon.UploadFile, IconSize)
             Column(Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TooltipArea(
                         tooltip = {
                             Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
-                                Text(view.fileLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.inverseOnSurface, modifier = Modifier.widthIn(max = 480.dp).padding(8.dp))
+                                Text(source.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.inverseOnSurface, modifier = Modifier.widthIn(max = 480.dp).padding(8.dp))
                             }
                         },
                         modifier = Modifier.weight(1f, fill = false),
                     ) {
-                        Text(view.fileLabel, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(source.label, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     view.sourceVersion?.let { Text("RabbitMQ $it", style = MaterialTheme.typography.labelLarge, maxLines = 1) }
-                    Text("File", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    Text(if (source.kind == SourceKind.Live) "Live" else "File", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    source.lockText?.let {
+                        Row(Modifier.testTag("migrate3x-source-locked"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ConnectionIcon(AppIcon.Lock, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
                 }
                 Text(view.countsLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (source.canAnalyseAgain) {
+                OutlinedButton(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-analyse-again")) {
+                    ConnectionIcon(AppIcon.Refresh, SmallIconSize)
+                    Text(MigrateFromThreeTexts.ANALYSE_AGAIN, Modifier.padding(start = 8.dp), maxLines = 1)
+                }
+            }
             OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
                 ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
                 Text("Choose another file", Modifier.padding(start = 8.dp), maxLines = 1)
