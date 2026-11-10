@@ -9,10 +9,19 @@ fun brokerMajorVersion(text: String?): Int? =
     text?.substringBefore('.')?.takeWhile { it in '0'..'9' }?.takeIf { it.isNotEmpty() }?.toIntOrNull()
 
 /**
- * True for a known major version below 4: such a connection is a migration source only. Unknown (null, unparsable) is NOT a source and not
+ * True for a known major version below 4: such a connection is a migration source only. Unknown (null, odd text) is NOT a source and not
  * 4.x either: it keeps the "version could not be read" behaviour.
  */
-fun isMigrationSourceOnly(version: String?): Boolean = brokerMajorVersion(version)?.let { it < 4 } == true
+fun isMigrationSourceOnly(version: String?): Boolean =
+    displayableBrokerVersion(version)?.let { brokerMajorVersion(it) }?.let { it < 4 } == true
 
-/** M8-02a STUB (wrong on purpose): only trims. Real rule: trimmed, at most 32 chars, matching the version pattern, else null. */
-fun displayableBrokerVersion(text: String?): String? = text?.trim() // M8-02a STUB
+private const val MAX_VERSION_LENGTH = 32
+private val VERSION_SHAPE = Regex("[0-9]+(\\.[0-9]+)*([-+~][0-9A-Za-z.+~_-]*)?")
+
+/**
+ * The version text as it may be shown (banner, pill row, report source): trimmed, at most 32 characters, digits and dots first and then an
+ * optional suffix such as `-rc.1` or `+build`. Anything else (a space inside, a line break, a long text) is null, "unknown", everywhere:
+ * the broker's text is data from the network and never reaches the screen unchecked.
+ */
+fun displayableBrokerVersion(text: String?): String? =
+    text?.trim()?.takeIf { it.length <= MAX_VERSION_LENGTH && VERSION_SHAPE.matches(it) }

@@ -1,5 +1,8 @@
 package dev.caerbannog.desktopapp
 
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.caerbannog.ui.appframe.LocalNavigationFeatures
+import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -71,12 +74,15 @@ fun main() = application {
     Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog", state = windowState) {
         val screen by composition.navigation.screen.collectAsState()
         val openStream by composition.navigation.selectedStream.collectAsState()
+        val navigationFeatures by composition.navigationFeatures.collectAsState()
+        CompositionLocalProvider(LocalNavigationFeatures provides NavigationFeaturesInfo(navigationFeatures.features, navigationFeatures.reason)) {
         when (screen) {
             AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
             AppDestination.Topology -> TopologyWindowContent(composition, control)
             AppDestination.Migrations -> MigrationsWindowContent(composition, control)
             AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
             else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
+        }
         }
     }
 }

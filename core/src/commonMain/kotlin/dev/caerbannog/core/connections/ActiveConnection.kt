@@ -119,13 +119,16 @@ class ActiveConnection(
                     (generation == mine).also {
                         if (it) {
                             held = opened.connection
+                            // Before Connected, in the same step: no reader sees a connected 3.x broker that is not locked yet.
+                            // Only the current connect gets here, so a superseded one never overwrites a newer check. Lock order is
+                            // always ActiveConnection, then session; the session's observers never call back into this class.
+                            markIfMigrationSource(name, opened.connection.brokerVersion)
                             _source.value = guardedSource(opened.connection, name, profile.virtualHost, profile.hasMqtt)
                             _state.value = LinkState.Connected(name)
                         }
                     }
                 }
                 if (!keep) opened.connection.closeQuietly()
-                else markIfMigrationSource(name, opened.connection.brokerVersion)
             }
         }
     }
@@ -143,11 +146,14 @@ class ActiveConnection(
 
     // The permission result was made before the clients opened, so the version (from the one overview read) arrives only now.
     private fun markIfMigrationSource(name: String, version: String?) {
-        if (version != null && isMigrationSourceOnly(version)) session.markMigrationSource(name, version)
+        // The cleaned text only: an odd version is unknown, so it is not marked and never shown.
+        val shown = displayableBrokerVersion(version)
+        if (shown != null && isMigrationSourceOnly(shown)) session.markMigrationSource(name, shown)
     }
 
     private fun guardedSource(connection: HeldConnection, connectionName: String, vhost: String, hasMqtt: Boolean): StreamSource {
         val isCurrent = { held === connection }
+        val shownVersion = displayableBrokerVersion(connection.brokerVersion)
         return StreamSource(
             catalog = GuardedCatalog(connection.catalog, isCurrent),
             offsets = GuardedOffsets(connection.offsets, isCurrent),
@@ -161,12 +167,12 @@ class ActiveConnection(
             queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
             migrationExecutor = connection.migrationExecutor?.let { GuardedMigrationExecutor(it, isCurrent) },
             migrationUnavailableReason = connection.migrationUnavailableReason,
-            brokerVersion = connection.brokerVersion,
+            brokerVersion = shownVersion,
             // Built for every connection: a source that is not a readable 3.x one refuses before any read (never a null to test for).
             definitionsSource = GuardedDefinitionsSource(
                 LiveDefinitionsSource(
                     connectionName,
-                    connection.brokerVersion,
+                    shownVersion,
                     connection.threeXReads?.let { GuardedThreeXReads(it, isCurrent) } ?: NoThreeXReads,
                     liveSourcePause,
                 ),

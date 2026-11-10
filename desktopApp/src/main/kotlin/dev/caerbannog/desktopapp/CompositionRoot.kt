@@ -4,11 +4,16 @@ import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.ConnectionControlModel
 import dev.caerbannog.core.connections.ConnectionGateway
+import dev.caerbannog.core.connections.ConnectionFeature
 import dev.caerbannog.core.connections.ConnectionSession
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.LinkState
+import dev.caerbannog.core.connections.PermissionCheckResult
 import dev.caerbannog.core.connections.PermissionCheckStatus
+import dev.caerbannog.core.connections.SessionState
+import dev.caerbannog.core.connections.availableFeatures
+import dev.caerbannog.core.connections.permissionPill
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.migrations.MigrationFolderChooser
@@ -33,6 +38,7 @@ import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
 import dev.caerbannog.datarabbit.X509CaCertificateValidator
 import dev.caerbannog.ui.appframe.AppDestination
+import dev.caerbannog.ui.appframe.requiredFeature
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +46,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -96,11 +103,9 @@ class AppComposition(
     private val streamListScope: CoroutineScope,
     /** The file loader, dialogs and the in-memory held analysis of the Migrate from 3.x screen (M8-06a). */
     val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
+    /** What the drawer offers: the features of the connected broker and the reason for the others (M8-02a); the window passes it to the frame. */
+    val navigationFeatures: StateFlow<NavigationFeatures> = MutableStateFlow(NavigationFeatures.ALL),
 ) {
-    /** M8-02a STUB (constant: everything on, no reason; no fallback to Connections yet). */
-    val navigationFeatures: kotlinx.coroutines.flow.StateFlow<NavigationFeatures> =
-        kotlinx.coroutines.flow.MutableStateFlow(NavigationFeatures(dev.caerbannog.core.connections.ConnectionFeature.entries.toSet(), null))
-
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
 
@@ -188,7 +193,14 @@ fun createAppComposition(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree)
+    val navigationFeatures = navigationFeatures(session, active, streamListScope)
+    streamListScope.launch {
+        // A destination the connection does not offer (a 3.x broker was just connected) is not left on screen: back to Connections.
+        combine(navigation.screen, navigationFeatures) { screen, nav -> screen.isDisabledBy(nav) }.collect { disabled ->
+            if (disabled) navigation.open(AppDestination.Connections)
+        }
+    }
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree, navigationFeatures)
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.
@@ -249,5 +261,23 @@ fun registerShutdownHook(
 
 
 
-/** M8-02a STUB: what the window passes to `AppFrame(features, featuresDisabledReason)`. */
-data class NavigationFeatures(val features: Set<dev.caerbannog.core.connections.ConnectionFeature>, val reason: String?)
+/** What the window passes to `AppFrame(features, featuresDisabledReason)`; [reason] is null when every feature is on. */
+data class NavigationFeatures(val features: Set<ConnectionFeature>, val reason: String?) {
+    companion object {
+        val ALL = NavigationFeatures(ConnectionFeature.entries.toSet(), null)
+    }
+}
+
+private fun AppDestination.isDisabledBy(nav: NavigationFeatures): Boolean = requiredFeature()?.let { it !in nav.features } ?: false
+
+// Only a connected broker limits the drawer: the result of a disconnected or not yet connected profile never does.
+private fun navigationFeatures(session: ConnectionSession, active: ActiveConnection, scope: CoroutineScope): StateFlow<NavigationFeatures> {
+    fun compute(link: LinkState, sessionState: SessionState): NavigationFeatures {
+        val result = (sessionState.statuses[(link as? LinkState.Connected)?.name] as? PermissionCheckStatus.Done)?.result
+        val features = availableFeatures(result)
+        val reason = if (result is PermissionCheckResult.MigrationSource) permissionPill(PermissionCheckStatus.Done(result)).text else null
+        return NavigationFeatures(features, reason)
+    }
+    return combine(active.state, session.state, ::compute)
+        .stateIn(scope, SharingStarted.Eagerly, compute(active.state.value, session.state.value))
+}
