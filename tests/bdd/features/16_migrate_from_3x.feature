@@ -549,6 +549,24 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And I can try another name or choose another file
 
   @fake-broker @m8-06a
+  Scenario: The message-loss block shows the first 10 queues and all of them on request
+    Given a definitions file with 60,000 classic queues without "x-queue-version"
+    When I open that file on the Migrate from 3.x screen
+    Then the message-loss block names the first 10 queues and says there are 60,000
+    When I choose "Show all 60,000"
+    Then the block offers every queue name as a lazy list
+
+  @fake-broker @m8-06a
+  Scenario: Names can be copied exactly as shown
+    Given a definitions file with 12 classic queues without "x-queue-version"
+    When I open that file on the Migrate from 3.x screen
+    And I copy the name of the first row of a group
+    Then the clipboard holds that name, with control characters escaped as shown
+    When I copy the queue names of the message-loss block
+    Then the clipboard holds all 12 names, one per line
+    And the clipboard holds no password hash and no password
+
+  @fake-broker @m8-06a
   Scenario: The report is filtered by severity and keeps the message-loss block first
     Given the report of a file with blockers, warnings and infos is shown
     When I turn off the chips "Warning" and "Info"
