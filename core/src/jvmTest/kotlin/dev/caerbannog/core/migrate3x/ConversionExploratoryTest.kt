@@ -4,6 +4,7 @@ import dev.caerbannog.core.migrations.MigrationAction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 
 /** M8-05 step 4: edge cases found while verifying (boundaries of `chosen`, duplicates, empty policies, replacement oddities). */
@@ -65,12 +66,45 @@ class ConversionExploratoryTest {
     }
 
     @Test
-    fun `a user replacement with an unwritable name fails loudly or is refused, never produces a broken file`() {
+    fun `a user replacement with an unwritable name is refused where it is entered`() {
         val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
         val result = s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("..", "quorum"))))
-        if (result == DecisionResult.Decided) {
-            val outcome = runCatching { s.review.generate(REQUEST) }
-            assertTrue(outcome.isFailure || (outcome.getOrNull() as GenerationResult.Generated).migrations.all { m -> m.file.up.none { it is MigrationAction.DeclareQueue && it.name == ".." } }, "a file with a '..' queue was produced")
+        assertTrue(result is DecisionResult.Refused && result.reason is DecisionRefusal.ReplaceInvalid, "expected ReplaceInvalid but got $result")
+        assertEquals(null, s.review.decisionOf(q("orders")))
+    }
+
+    @Test
+    fun `M8-05b a Replace for a global item with no vhost is not a review item`() {
+        val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
+        val result = s.review.decide(ReviewItem(ItemKind.Global, null, null), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("x", "quorum"))))
+        assertEquals(DecisionResult.Refused(DecisionRefusal.NotAReviewItem), result)
+    }
+
+    @Test
+    fun `M8-05b an empty Replace is decided or refused, and generation never throws after it`() {
+        val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
+        val result = s.review.decide(q("orders"), ItemDecision.Replace(emptyList()))
+        if (result == DecisionResult.Decided) s.generated() else assertTrue(result is DecisionResult.Refused && result.reason is DecisionRefusal.ReplaceInvalid, "got $result")
+    }
+
+    @Test
+    fun `M8-05b hostile names never make generate throw and a refusal reason holds no secret`() {
+        val names = listOf("..", ".", "", " ", "a/b", "a\\b", "a\u0000b", "\u202e", "x".repeat(300), "con:", "%2e%2e", "\n", "\"quote\"", "{\"a\":1}")
+        val sentinel = "S3CR3T-SENTINEL"
+        // the sentinel alone passes echoableName (and is then rightly named), so only a form the rule rejects must never be echoed
+        for (n in names + "amqp://u:$sentinel@h") {
+            val s = started(D.document(queues = listOf(D.classicQueue("orders"))))
+            for (a in listOf<MigrationAction>(MigrationAction.DeclareQueue(n, "quorum"), MigrationAction.DeclareExchange(n), MigrationAction.DeclareQueue("orders", n), MigrationAction.DeclareQueue("orders", "quorum", vhost = n))) {
+                val result = s.review.decide(q("orders"), ItemDecision.Replace(listOf(a)))
+                if (result == DecisionResult.Decided) {
+                    val out = runCatching { s.review.generate(REQUEST) }
+                    assertTrue(out.isSuccess, "generate threw after a Decided Replace of $a: ${out.exceptionOrNull()}")
+                } else {
+                    val reason = ((result as DecisionResult.Refused).reason as? DecisionRefusal.ReplaceInvalid)?.reason ?: fail("unexpected refusal ${result.reason}")
+                    assertTrue(reason.isNotBlank())
+                    assertTrue(!reason.contains(sentinel), "reason echoes input: $reason")
+                }
+            }
         }
     }
 }

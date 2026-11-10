@@ -2,6 +2,9 @@ package dev.caerbannog.core.migrate3x
 
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
+import dev.caerbannog.core.migrations.echoableName
+import dev.caerbannog.core.migrations.MigrationParser
+import dev.caerbannog.core.migrations.MigrationValidationResult
 
 /** An item of the definitions that may need a decision. Bindings are named `source->destination:routingKey`. */
 data class ReviewItem(val kind: ItemKind, val vhost: String?, val name: String?)
@@ -25,6 +28,9 @@ sealed interface DecisionRefusal {
 
     /** A `Replace` holds a delete action (any `Delete*`). */
     data object ReplaceHasDelete : DecisionRefusal
+
+    /** A `Replace` holds an action the migration parser refuses, or one for another vhost than the item's. [reason] is the parser's own wording or the vhost wording; a vhost is named in it only when `echoableName` allows, so a hostile name never appears. */
+    data class ReplaceInvalid(val reason: String) : DecisionRefusal
 
     /** The item is compatible, a binding, or unknown: nothing to decide. */
     data object NotAReviewItem : DecisionRefusal
@@ -80,12 +86,36 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
         if (item !in itemSet) return DecisionResult.Refused(DecisionRefusal.NotAReviewItem)
         val refusal = when (decision) {
             ItemDecision.Skip -> null
-            is ItemDecision.Replace -> if (decision.actions.any { it.isDestructive }) DecisionRefusal.ReplaceHasDelete else null
+            is ItemDecision.Replace -> replaceRefusal(item, decision)
             is ItemDecision.Accept -> ProposalChoice.refusal(findingsByItem[item].orEmpty(), decision)
         }
         if (refusal != null) return DecisionResult.Refused(refusal)
         decisions[item] = decision
         return DecisionResult.Decided
+    }
+
+    /** Three flat steps, in this order: a destructive action, an action for another vhost, then whatever the migration parser refuses. So `generate` never fails on user input. */
+    private fun replaceRefusal(item: ReviewItem, decision: ItemDecision.Replace): DecisionRefusal? {
+        if (decision.actions.any { it.isDestructive }) return DecisionRefusal.ReplaceHasDelete
+        val other = decision.actions.firstOrNull { it.vhost != item.vhost }
+        if (other != null) return DecisionRefusal.ReplaceInvalid(otherVhostReason(item.vhost, other.vhost))
+        return parserRefusal(decision)
+    }
+
+    /** Both vhosts are named only when the echo rule allows it; both come from a file, so either may be hostile. */
+    private fun otherVhostReason(itemVhost: String?, actionVhost: String): String =
+        if (itemVhost != null && echoableName(itemVhost) && echoableName(actionVhost)) {
+            "an action is for virtual host '$actionVhost', but the item belongs to '$itemVhost'"
+        } else {
+            "an action is for another virtual host than the item's"
+        }
+
+    private fun parserRefusal(decision: ItemDecision.Replace): DecisionRefusal? {
+        val raw = MigrationParser.exportToJson(THROWAWAY_VERSION, THROWAWAY_DESCRIPTION, decision.actions)
+        return when (val result = MigrationParser.parse(raw)) {
+            is MigrationValidationResult.Valid -> null
+            is MigrationValidationResult.Invalid -> DecisionRefusal.ReplaceInvalid(result.reason)
+        }
     }
 
     fun decisionOf(item: ReviewItem): ItemDecision? = decisions[item]
@@ -97,6 +127,9 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
     override fun toString(): String = "ConversionReview(items=${items.size}, decided=${decisions.size}, pending=${items.size - decisions.size})"
 
     companion object {
+        private const val THROWAWAY_VERSION = "0001"
+        private const val THROWAWAY_DESCRIPTION = "check"
+
         fun start(document: DefinitionsDocument, report: CompatibilityReport): ConversionReview = ConversionReview(document, report)
     }
 }
