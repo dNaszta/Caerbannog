@@ -123,6 +123,17 @@ class CompositionRootNavigationFeaturesTest {
     }
 
     @Test
+    fun `the chip of a connected 3x broker shows the migration source pill and its label`() {
+        val c = compose()
+        try {
+            connect(c, "legacy-eu")
+            val chip = c.control.state.value.chip
+            assertEquals("RabbitMQ 3.x: migration source only", chip.pill?.text)
+            assertEquals(dev.caerbannog.core.connections.PillTone.WARNING, chip.pill?.tone)
+        } finally { c.close() }
+    }
+
+    @Test
     fun `disconnecting or going back to a 4x connection turns every feature on again`() {
         val c = compose()
         try {
@@ -144,16 +155,20 @@ class CompositionRootNavigationFeaturesTest {
     }
 
     @Test
-    fun `the same fallback applies from Topology and Migrations`() {
-        for (destination in listOf(AppDestination.Topology, AppDestination.Migrations)) {
-            val c = compose()
-            try {
-                connect(c, "new-eu")
-                c.navigation.open(destination)
-                connect(c, "legacy-eu")
-                assertEquals(AppDestination.Connections, c.navigation.screen.value, "from $destination")
-            } finally { c.close() }
-        }
+    fun `the same fallback applies from Topology`() = fallbackFrom(AppDestination.Topology)
+
+    @Test
+    fun `the same fallback applies from Migrations`() = fallbackFrom(AppDestination.Migrations)
+
+    // One composition per test (own folder and secrets): profiles saved in connections.json have no password in a fresh secret store.
+    private fun fallbackFrom(destination: AppDestination) {
+        val c = compose()
+        try {
+            connect(c, "new-eu")
+            c.navigation.open(destination)
+            connect(c, "legacy-eu")
+            assertEquals(AppDestination.Connections, c.navigation.screen.value, "from $destination")
+        } finally { c.close() }
     }
 
     @Test

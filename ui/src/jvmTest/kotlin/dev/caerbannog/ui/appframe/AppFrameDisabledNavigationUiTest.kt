@@ -7,6 +7,15 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
+import kotlin.test.assertTrue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -145,5 +154,19 @@ class AppFrameDisabledNavigationUiTest {
         onNodeWithTag("navItem:Topology").assertIsNotEnabled()
         onNodeWithTag("navItem:Migrations").assertIsNotEnabled()
         onNodeWithTag("navItem:Connections").assertIsEnabled()
+    }
+
+    @Test
+    fun `a disabled item cannot take focus and Tab with Enter or Space never reaches it`() = runDesktopComposeUiTest(1280, 800) {
+        frame(onlyMigration, reason)
+        disabled.forEach { onNodeWithTag("navItem:${it.name}").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus)) }
+        enabled.forEach { onNodeWithTag("navItem:${it.name}").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus)) }
+        onNodeWithTag("navItem:Connections").performSemanticsAction(SemanticsActions.RequestFocus)
+        repeat(12) {
+            onNodeWithTag("appDrawer").performKeyInput { pressKey(Key.Tab) }
+            onNodeWithTag("appDrawer").performKeyInput { pressKey(Key.Enter) }
+            onNodeWithTag("appDrawer").performKeyInput { pressKey(Key.Spacebar) }
+        }
+        assertTrue(navigations.none { it in disabled }, "keyboard reached a disabled item: $navigations")
     }
 }

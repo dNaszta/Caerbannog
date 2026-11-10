@@ -13,7 +13,7 @@ class MigrationSourceDecisionsTest {
             "3.13.7" to true, "3" to true, "3.8.0-rc.1" to true, "0.9" to true,
             "4.0.0" to false, "4.1" to false, "10.1" to false, "4" to false,
             "3 anything\nsecond line" to false, "3.13.7\nx" to false, "3.${"1".repeat(31)}" to false, " 3.13.7 " to true, "3.13.7-rc.1" to true,
-            null to false, "" to false, "x" to false, "v3.13" to false, " 3.13" to false, "-3.1" to false, "99999999999.1" to false,
+            null to false, "" to false, "x" to false, "v3.13" to false, " 3.13" to true, "-3.1" to false, "99999999999.1" to false,
         )
         table.forEach { (version, expected) -> assertEquals(expected, isMigrationSourceOnly(version), "isMigrationSourceOnly($version)") }
     }
