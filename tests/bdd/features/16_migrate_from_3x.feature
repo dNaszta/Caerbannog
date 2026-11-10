@@ -688,6 +688,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And I opened that file on the Migrate from 3.x screen
     When I give the virtual host name only spaces
     Then the field shows the refusal of the name as an inline error
+    And the field still holds what I typed
     And no report is shown
     And I can try another name or choose another file
 
