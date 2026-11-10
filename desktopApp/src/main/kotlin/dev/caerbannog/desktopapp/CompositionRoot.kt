@@ -11,6 +11,11 @@ import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.PermissionChecker
 import dev.caerbannog.core.connections.SecretStore
+import dev.caerbannog.core.migrations.MigrationFolderChooser
+import dev.caerbannog.core.migrations.MigrationFolderPorts
+import dev.caerbannog.core.migrations.MigrationFolderStore
+import dev.caerbannog.core.migrations.MigrationHistoryRepository
+import dev.caerbannog.core.migrations.NowProvider
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshTarget
@@ -18,9 +23,11 @@ import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.topology.TopologyContext
 import dev.caerbannog.core.topology.TopologyViewModel
+import dev.caerbannog.datarabbit.FolderMigrationFileRepository
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
 import dev.caerbannog.datarabbit.JsonFileAppSettings
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
+import dev.caerbannog.datarabbit.JsonFileMigrationHistoryRepository
 import dev.caerbannog.datarabbit.ManagementApiPermissionChecker
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
@@ -39,6 +46,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
 import java.io.File
+import java.nio.file.Path
 
 /**
  * Composition root for the Connections screen: wires the real repository, reachability checker and
@@ -79,6 +87,10 @@ class AppComposition(
     val streamClientsEvents: StreamClientsEventsAdapter,
     /** The read-only Topology screen's state holder (M2-08b); its screen is drawn by `TopologyScreen` (M2-08c). */
     val topology: TopologyViewModel,
+    /** The one migration history of the app: the Migrations screen reads it and the Connections screen renames and deletes its keys (one lock). */
+    val migrationHistory: MigrationHistoryRepository,
+    /** What the Migrations screen needs around its files: the remembered folder, the chooser, the folder repositories and [migrationHistory]. */
+    val migrationFolderPorts: MigrationFolderPorts,
     private val streamListScope: CoroutineScope,
 ) {
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
@@ -115,12 +127,12 @@ fun createAppComposition(
     appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
     uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
     navigation: AppNavigation = AppNavigation(),
-    // M5-08c1 STUBS (test seams, not used yet): the history file (default ~/.caerbannog/migration-history.json) and the folder dialog.
-    migrationHistoryFile: java.nio.file.Path = java.nio.file.Path.of(System.getProperty("user.home"), ".caerbannog", "migration-history.json"),
-    migrationFolderChooser: dev.caerbannog.core.migrations.MigrationFolderChooser = SwingMigrationFolderChooser(),
+    migrationHistoryFile: Path = Path.of(System.getProperty("user.home"), ".caerbannog", "migration-history.json"),
+    migrationFolderChooser: MigrationFolderChooser = SwingMigrationFolderChooser(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
+    val migrationHistory = JsonFileMigrationHistoryRepository(migrationHistoryFile, NowProvider { System.currentTimeMillis() })
     val viewModel = ConnectionsViewModel(
         repository = JsonFileConnectionProfileRepository(profilesFile),
         secretStore = secretStore,
@@ -128,6 +140,7 @@ fun createAppComposition(
         caCertificateValidator = X509CaCertificateValidator(),
         session = session,
         active = active,
+        historyKeys = migrationHistory,
     )
     // The composition root owns the scope; it ends with the window. The view model runs on the UI dispatcher (Swing in the app),
     // so its state can be read by Compose without a thread hop; tests pass their own dispatcher.
@@ -166,7 +179,20 @@ fun createAppComposition(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, streamListScope)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope)
+}
+
+// The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.
+private fun migrationFolderPorts(settings: AppSettings, chooser: MigrationFolderChooser, history: MigrationHistoryRepository) =
+    MigrationFolderPorts(
+        store = settings as? MigrationFolderStore ?: SessionFolderStore(),
+        chooser = chooser,
+        repositoryFor = { FolderMigrationFileRepository(Path.of(it)) },
+        history = history,
+    )
+
+private class SessionFolderStore : MigrationFolderStore {
+    override var folder: String? = null
 }
 
 // The banner of the Topology screen needs the connected profile (user, level) and what the permission check found, nothing else.

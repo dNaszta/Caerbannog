@@ -236,7 +236,6 @@ sealed interface MigrationApplyResult {
         /** Number of actions of the migration. */
         val total: Int,
         val reason: String,
-        // M5-08c1 STUB: the runner does not copy the executor's kind yet.
         val kind: FailureKind = FailureKind.Other,
     ) : MigrationApplyResult
     data class Blocked(val reason: String) : MigrationApplyResult

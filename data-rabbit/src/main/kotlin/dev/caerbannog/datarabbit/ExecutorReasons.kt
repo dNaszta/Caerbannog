@@ -1,6 +1,7 @@
 package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.migrations.ActionResult
+import dev.caerbannog.core.migrations.FailureKind
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.echoableName
 
@@ -18,7 +19,8 @@ internal object ExecutorReasons {
 
     fun failed(reason: String): ActionResult.Failed = ActionResult.Failed(reason)
 
-    fun conflict(action: MigrationAction): ActionResult.Failed = failed("${subject(action)} exists with different settings")
+    fun conflict(action: MigrationAction): ActionResult.Failed =
+        ActionResult.Failed("${subject(action)} exists with different settings", FailureKind.Conflict)
 
     fun notFoundAfterDeclare(action: MigrationAction): ActionResult.Failed = failed("${subject(action)} was not found after it was declared")
 

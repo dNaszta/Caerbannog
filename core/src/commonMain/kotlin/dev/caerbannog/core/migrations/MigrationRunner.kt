@@ -8,9 +8,15 @@ import kotlinx.coroutines.CancellationException
  */
 sealed interface ActionResult {
     data object Success : ActionResult
-    // M5-08c1 STUB: the kind is carried but nothing sets Conflict yet (data-rabbit ExecutorReasons.conflict, the runner and the view model come in step 3).
+    /** [kind] is decided by the executor from facts (never from [reason]); it only changes how the failure is worded. */
     data class Failed(val reason: String, val kind: FailureKind = FailureKind.Other) : ActionResult
 }
+
+/** Why an action failed, decided by the executor from facts, never from text. */
+enum class FailureKind { Other, Conflict }
+
+/** One step of an apply: the action about to be sent (1-based [index] of [total] actions of migration [version]). */
+data class ApplyStep(val version: String, val index: Int, val total: Int)
 
 /**
  * Capability to execute individual topology actions on a broker.
@@ -162,7 +168,7 @@ class MigrationRunner(
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
         vhost: String,
-        // M5-08c1 STUB: accepted and ignored until step 3 (called before each action is sent).
+        /** Called once per action, in order, just before it is sent (never after a failure). */
         onAction: (ApplyStep) -> Unit = {},
     ): MigrationApplyResult {
         if (!hasConfigurePermission) {
@@ -192,6 +198,7 @@ class MigrationRunner(
             }
 
             for ((position, action) in migration.up.withIndex()) {
+                onAction(ApplyStep(migration.version, position + 1, migration.up.size))
                 when (val outcome = executor.execute(action)) {
                     is ActionResult.Success -> {
                         // Action completed or was idempotent no-op
@@ -203,6 +210,7 @@ class MigrationRunner(
                             index = position + 1,
                             total = migration.up.size,
                             reason = outcome.reason,
+                            kind = outcome.kind,
                         )
                     }
                 }
