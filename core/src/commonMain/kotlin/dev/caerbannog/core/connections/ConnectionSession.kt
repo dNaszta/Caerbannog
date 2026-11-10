@@ -141,8 +141,17 @@ class ConnectionSession(
     /** Same as [open]; named separately so a save can be seen to trigger a second check. */
     suspend fun reopen(profile: ConnectionProfile): PermissionCheckResult = open(profile)
 
-    /** M8-02a STUB: no-op. Real: replaces Done(..) of [name] with Done(MigrationSource(version)) under the token rule of [open]. */
+    /**
+     * Replaces the finished result of [name] with [PermissionCheckResult.MigrationSource]. The version is only known after the clients
+     * opened, which is after [open] produced its result, so this is a second step. Same token rule as [open]: only a finished check of
+     * [name] is replaced, so a newer check or [forget] wins (nothing is written then).
+     */
     fun markMigrationSource(name: String, version: String) {
+        change { t, s ->
+            if (t.byName[name] != null && s.statuses[name] is PermissionCheckStatus.Done) {
+                t to s.copy(statuses = s.statuses + (name to PermissionCheckStatus.Done(PermissionCheckResult.MigrationSource(version))))
+            } else null
+        }
     }
 
     /** Drops the stored result and invalidates a running check, e.g. for the old name after a rename or a delete. */

@@ -8,5 +8,8 @@ package dev.caerbannog.core.connections
 fun brokerMajorVersion(text: String?): Int? =
     text?.substringBefore('.')?.takeWhile { it in '0'..'9' }?.takeIf { it.isNotEmpty() }?.toIntOrNull()
 
-/** M8-02a STUB (wrong on purpose until implemented): true for a known major version below 4; unknown (null, unparsable) is NOT a source. */
-fun isMigrationSourceOnly(version: String?): Boolean = false
+/**
+ * True for a known major version below 4: such a connection is a migration source only. Unknown (null, unparsable) is NOT a source and not
+ * 4.x either: it keeps the "version could not be read" behaviour.
+ */
+fun isMigrationSourceOnly(version: String?): Boolean = brokerMajorVersion(version)?.let { it < 4 } == true

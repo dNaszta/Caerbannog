@@ -31,10 +31,13 @@ sealed interface PermissionCheckResult {
         val unreadable: Unreadable,
     ) : PermissionCheckResult
 
-    /** M8-02a STUB: a RabbitMQ 3.x connection, a migration source only; must be locked (the stub is wrong on purpose). */
+    /**
+     * A RabbitMQ 3.x connection: a migration source only, whatever the profile declares or the broker permits. Locked like [Unreadable], so
+     * every gate that reads the two flags is closed without being touched.
+     */
     data class MigrationSource(val brokerVersion: String) : PermissionCheckResult {
-        override val topologyUnlocked: Boolean get() = true
-        override val publishingEnabled: Boolean get() = true
+        override val topologyUnlocked: Boolean get() = false
+        override val publishingEnabled: Boolean get() = false
     }
 
     /** Safest mode: topology locked, publishing disabled. [detail] holds only safe text, never secrets. */

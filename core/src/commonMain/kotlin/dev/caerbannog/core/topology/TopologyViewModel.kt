@@ -656,7 +656,10 @@ class TopologyViewModel(
             TopologyBanner(TopologyBannerKind.DeclaredNotConfirmed, text.headline, text.detail)
         }
         is PermissionCheckResult.Unreadable -> TopologyBanner(TopologyBannerKind.NotReadable, TopologyTexts.LOCKED_HEADLINE, result.reason)
-        is PermissionCheckResult.MigrationSource -> TopologyBanner(TopologyBannerKind.MigrationSource, "M8-02a STUB", null) // M8-02a STUB
+        is PermissionCheckResult.MigrationSource -> {
+            val text = permissionBanner(ctx.profile, PermissionCheckStatus.Done(result))
+            TopologyBanner(TopologyBannerKind.MigrationSource, text.headline, text.detail)
+        }
     }
 }
 

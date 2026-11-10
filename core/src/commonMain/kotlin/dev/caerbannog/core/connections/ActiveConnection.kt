@@ -1,6 +1,11 @@
 package dev.caerbannog.core.connections
 
+import dev.caerbannog.core.migrate3x.GuardedDefinitionsSource
+import dev.caerbannog.core.migrate3x.GuardedThreeXReads
+import dev.caerbannog.core.migrate3x.LiveDefinitionsSource
+import dev.caerbannog.core.migrate3x.NoThreeXReads
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,8 +27,8 @@ import kotlinx.coroutines.sync.Mutex
 class ActiveConnection(
     private val session: ConnectionSession,
     private val gateway: ConnectionGateway,
-    /** M8-02a: the pause between storage version reads of the live source; production waits, tests pass a recording no-op (no sleep). */
-    private val liveSourcePause: suspend (millis: Long) -> Unit = { kotlinx.coroutines.delay(it) },
+    /** The pause between storage version reads of the live source; production waits, tests pass a recording no-op (no sleep). */
+    private val liveSourcePause: suspend (millis: Long) -> Unit = { delay(it) },
 ) {
     private val lock = Mutex()
     private var generation = 0L
@@ -114,12 +119,13 @@ class ActiveConnection(
                     (generation == mine).also {
                         if (it) {
                             held = opened.connection
-                            _source.value = guardedSource(opened.connection, profile.virtualHost, profile.hasMqtt)
+                            _source.value = guardedSource(opened.connection, name, profile.virtualHost, profile.hasMqtt)
                             _state.value = LinkState.Connected(name)
                         }
                     }
                 }
                 if (!keep) opened.connection.closeQuietly()
+                else markIfMigrationSource(name, opened.connection.brokerVersion)
             }
         }
     }
@@ -135,7 +141,12 @@ class ActiveConnection(
         OpenResult.Failed(ConnectionFailureReason.UNEXPECTED)
     }
 
-    private fun guardedSource(connection: HeldConnection, vhost: String, hasMqtt: Boolean): StreamSource {
+    // The permission result was made before the clients opened, so the version (from the one overview read) arrives only now.
+    private fun markIfMigrationSource(name: String, version: String?) {
+        if (version != null && isMigrationSourceOnly(version)) session.markMigrationSource(name, version)
+    }
+
+    private fun guardedSource(connection: HeldConnection, connectionName: String, vhost: String, hasMqtt: Boolean): StreamSource {
         val isCurrent = { held === connection }
         return StreamSource(
             catalog = GuardedCatalog(connection.catalog, isCurrent),
@@ -150,6 +161,17 @@ class ActiveConnection(
             queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
             migrationExecutor = connection.migrationExecutor?.let { GuardedMigrationExecutor(it, isCurrent) },
             migrationUnavailableReason = connection.migrationUnavailableReason,
+            brokerVersion = connection.brokerVersion,
+            // Built for every connection: a source that is not a readable 3.x one refuses before any read (never a null to test for).
+            definitionsSource = GuardedDefinitionsSource(
+                LiveDefinitionsSource(
+                    connectionName,
+                    connection.brokerVersion,
+                    connection.threeXReads?.let { GuardedThreeXReads(it, isCurrent) } ?: NoThreeXReads,
+                    liveSourcePause,
+                ),
+                isCurrent,
+            ),
             hasMqtt = hasMqtt,
         )
     }
