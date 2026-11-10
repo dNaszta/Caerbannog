@@ -2,6 +2,8 @@ package dev.caerbannog.core.migrate3x
 
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
+import dev.caerbannog.core.migrations.MigrationParser
+import dev.caerbannog.core.migrations.MigrationValidationResult
 
 /** An item of the definitions that may need a decision. Bindings are named `source->destination:routingKey`. */
 data class ReviewItem(val kind: ItemKind, val vhost: String?, val name: String?)
@@ -26,7 +28,7 @@ sealed interface DecisionRefusal {
     /** A `Replace` holds a delete action (any `Delete*`). */
     data object ReplaceHasDelete : DecisionRefusal
 
-    /** M8-05b STUB: a `Replace` holds an action the migration parser refuses, or one for another vhost than the item's. [reason] has no secret (typed topology only). */
+    /** A `Replace` holds an action the migration parser refuses, or one for another vhost than the item's. [reason] has no secret (typed topology only). */
     data class ReplaceInvalid(val reason: String) : DecisionRefusal
 
     /** The item is compatible, a binding, or unknown: nothing to decide. */
@@ -83,12 +85,30 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
         if (item !in itemSet) return DecisionResult.Refused(DecisionRefusal.NotAReviewItem)
         val refusal = when (decision) {
             ItemDecision.Skip -> null
-            is ItemDecision.Replace -> if (decision.actions.any { it.isDestructive }) DecisionRefusal.ReplaceHasDelete else null
+            is ItemDecision.Replace -> replaceRefusal(item, decision)
             is ItemDecision.Accept -> ProposalChoice.refusal(findingsByItem[item].orEmpty(), decision)
         }
         if (refusal != null) return DecisionResult.Refused(refusal)
         decisions[item] = decision
         return DecisionResult.Decided
+    }
+
+    /** Destructive actions first, then another vhost, then whatever the migration parser would refuse, so `generate` never fails on user input. */
+    private fun replaceRefusal(item: ReviewItem, decision: ItemDecision.Replace): DecisionRefusal? {
+        if (decision.actions.any { it.isDestructive }) return DecisionRefusal.ReplaceHasDelete
+        if (item.vhost != null) {
+            val other = decision.actions.firstOrNull { it.vhost != item.vhost } ?: return parserRefusal(decision)
+            return DecisionRefusal.ReplaceInvalid("an action is for virtual host '${other.vhost}', but the item belongs to '${item.vhost}'")
+        }
+        return parserRefusal(decision)
+    }
+
+    private fun parserRefusal(decision: ItemDecision.Replace): DecisionRefusal? {
+        val raw = MigrationParser.exportToJson("0001", "check", decision.actions)
+        return when (val result = MigrationParser.parse(raw)) {
+            is MigrationValidationResult.Valid -> null
+            is MigrationValidationResult.Invalid -> DecisionRefusal.ReplaceInvalid(result.reason)
+        }
     }
 
     fun decisionOf(item: ReviewItem): ItemDecision? = decisions[item]
