@@ -304,4 +304,33 @@ class MigrateFromThreeRowsUiTest {
         scrollList(state.view.leadingItems() - 1)
         onNodeWithTag("migrate3x-chip-info").assertIsDisplayed()
     }
+
+    @Test
+    fun `at 400 dp with a very long file name the buttons, the label and the list stay usable`() = runDesktopComposeUiTest(400, 700) {
+        val label = "definitions-" + "very-long-".repeat(20) + "export.json"
+        val state = MigrateScreenFiles.report(label = label)
+        show(state)
+        onNodeWithTag("migrate3x-export").assertIsDisplayed()
+        onNodeWithTag("migrate3x-copy-text").assertIsDisplayed()
+        onNodeWithTag("migrate3x-choose-file").assertIsDisplayed()
+        scrollList(state.view.leadingItems() - 1)
+        onNodeWithTag("migrate3x-chip-info").assertIsDisplayed()
+        revealGroup(state.view, state.view.groups.last().key)
+        onNodeWithTag("migrate3x-group-${state.view.groups.last().key}").assertIsDisplayed()
+    }
+
+    @Test
+    fun `at 400 dp a report of 240000 findings draws a handful of nodes`() = runDesktopComposeUiTest(400, 700) {
+        val base = MigrateScreenFiles.held(DefinitionsFiles.classicQueues(2_000))
+        val one = base.report.findings
+        val findings = (0 until 240_000 / one.size + 1).flatMap { n -> one.map { it.copy(id = "${it.id}#$n") } }.take(240_000)
+        val big = dev.caerbannog.core.migrate3x.HeldAnalysis("big.json", base.document, base.report.copy(findings = findings))
+        val biggest = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(big).groups.maxBy { it.count }.key
+        val view = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(big, openGroups = setOf(biggest))
+        show(MigrateFromThreeState.Report(view, null))
+        revealRow(view, biggest, 0)
+        onNodeWithTag("migrate3x-export").assertIsDisplayed()
+        val drawn = (0 until 300).count { nodes(rowTag(biggest, it)).isNotEmpty() }
+        assertTrue(drawn in 1..60, "a lazy list at 400 dp draws only what is visible, drew $drawn")
+    }
 }
