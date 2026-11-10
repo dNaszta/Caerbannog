@@ -158,6 +158,14 @@ class Migrate3xLiveScreenSteps {
         gateway.threeXReadsOf(only()).definitions = ReadOutcome.NotPermitted
     }
 
+    @Given("the broker reports index version {int} for the classic queue {string} and version {int} for the classic queue {string}")
+    fun theBrokerReportsVersions(v1: Int, first: String, v2: Int, second: String) {
+        val reads = gateway.threeXReadsOf(only())
+        reads.definitions = ReadOutcome.Ok(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(first), DefinitionsFiles.queue(second))))
+        reads.storageVersionAppearsAtRead("/", first, 1, version = v1)
+        reads.storageVersionAppearsAtRead("/", second, 1, version = v2)
+    }
+
     @Given("the broker stops answering during the export")
     fun theBrokerStopsAnswering() {
         gateway.threeXReadsOf(only()).definitions = ReadOutcome.Unreachable
@@ -263,6 +271,28 @@ class Migrate3xLiveScreenSteps {
         // MigrateFromThreeLiveSourceUiTest, so this step checks the state only.
         check(label.isNotBlank())
         assertTrue(state() is MigrateFromThreeState.CannotExport, "the screen is in ${state()}")
+    }
+
+    @Then("the screen says how to export the definitions")
+    fun saysHowToExport() {
+        // The hint is drawn from MigrateFromThreeTexts.FILE_EXPORT_HINT under the state's text (Compose test: migrate3x-state-cannot-export-hint); here the state is the one that shows it.
+        assertTrue(state() is MigrateFromThreeState.CannotExport, "the screen is in ${state()}")
+        check(MigrateFromThreeTexts.FILE_EXPORT_HINT.isNotBlank())
+    }
+
+    private fun lossBlock() = (state() as? MigrateFromThreeState.Report ?: fail("no report is shown: ${state()}")).view.lossBlock ?: fail("no message-loss block")
+
+    @Then("the message-loss block lists {string} only")
+    fun lossBlockListsOnly(name: String) {
+        val loss = lossBlock()
+        assertEquals(listOf(name), (0 until loss.queueCount).map { loss.queueAt(it) })
+    }
+
+    @Then("the message-loss block says the list comes from the broker and not from a definitions file")
+    fun lossBlockSaysFromBroker() {
+        val text = lossBlock().detection
+        assertEquals(MigrateFromThreeTexts.LOSS_DETECTION_LIVE, text)
+        assertFalse(text.contains("A definitions file cannot tell"), text)
     }
 
     @Then("the screen says that {string} could not be reached")

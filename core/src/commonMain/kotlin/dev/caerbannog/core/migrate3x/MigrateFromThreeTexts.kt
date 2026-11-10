@@ -18,6 +18,11 @@ object MigrateFromThreeTexts {
     fun analyseLiveHint(name: String): String = "Reads the definitions of $name with GET requests. Nothing on the broker is changed."
     fun liveLoading(name: String): String = "Reading and analysing $name"
 
+    /** M8-06c round 1 (R2, finding 4). */
+    const val FILE_EXPORT_HINT: String = "In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json"
+    const val NOTHING_ANALYSED: String = "Nothing was analysed."
+    const val CHOOSE_FILE: String = "Choose definitions file"
+
     const val HASH_HIDDEN: String = "hash hidden"
     const val NO_PASSWORD_HASH: String = "no password hash"
     const val FILE_UNREADABLE: String = "The file could not be read"
@@ -30,6 +35,11 @@ object MigrateFromThreeTexts {
         "These queues use the old classic queue index (version 1), which is the 3.13 default. RabbitMQ 4.3 and later cannot read it. " +
             "The loss cannot be detected after the upgrade. A definitions file cannot tell the index version, so this list is every " +
             "classic queue without \"x-queue-version: 2\"."
+    /** M8-06c round 1 (R1) STUB: not used by the builder yet. For a live report: the broker reported the version. */
+    const val LOSS_DETECTION_LIVE: String =
+        "These queues use the old classic queue index (version 1), which is the 3.13 default, or the broker did not report their index version. " +
+            "RabbitMQ 4.3 and later cannot read the old index. The loss cannot be detected after the upgrade. " +
+            "This list comes from the broker: queues it reports as version 2 are not listed."
     const val LOSS_FIX_NEW_BROKER_TITLE: String = "Recommended: do not upgrade in place"
     const val LOSS_FIX_NEW_BROKER_TEXT: String =
         "Build a new 4.x broker, apply the migration this screen generates, then move the messages with a Shovel. " +

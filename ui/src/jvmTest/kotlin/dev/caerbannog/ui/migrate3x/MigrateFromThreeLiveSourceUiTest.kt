@@ -250,6 +250,23 @@ class MigrateFromThreeLiveSourceUiTest {
     }
 
     @Test
+    fun `CannotExport shows how to export the definitions, LiveFailed does not`() = runDesktopComposeUiTest(1280, 800) {
+        show(MigrateFromThreeState.CannotExport("legacy-eu", LiveSourceTexts.CANNOT_EXPORT), picker = liveSelected)
+        assertEquals("In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json", textOf("migrate3x-state-cannot-export-hint"))
+        assertTextHas("migrate3x-state-cannot-export", "Nothing was analysed.")
+        show(MigrateFromThreeState.LiveFailed("legacy-eu", LiveSourceTexts.unreachable("legacy-eu")), picker = liveSelected)
+        assertNotDrawn("migrate3x-state-cannot-export-hint")
+    }
+
+    @Test
+    fun `the card pill word comes from the card`() = runDesktopComposeUiTest(1280, 880) {
+        show(liveReport(), picker = liveSelected)
+        assertTextHas("migrate3x-state-report", "Live")
+        show(MigrateScreenFiles.report(), picker = liveSelected)
+        assertTextHas("migrate3x-state-report", "File")
+    }
+
+    @Test
     fun `CannotExport - the file button is reachable and works from the keyboard`() = runDesktopComposeUiTest(1280, 800) {
         val calls = MigrateCalls()
         show(MigrateFromThreeState.CannotExport("legacy-eu", LiveSourceTexts.CANNOT_EXPORT), calls, picker = liveSelected)

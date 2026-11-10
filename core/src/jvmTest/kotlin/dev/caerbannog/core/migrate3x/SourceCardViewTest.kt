@@ -67,4 +67,21 @@ class SourceCardViewTest {
         assertEquals("Live connection: legacy-eu", SourceOption.Live("legacy-eu").label)
         assertEquals("Definitions file", SourceOption.File.label)
     }
+
+    @Test
+    fun `the card has its pill word and the screen texts are constants`() {
+        assertEquals("Live", SourceCardView(SourceKind.Live, "x", true, "read only", true).kindLabel)
+        assertEquals("File", SourceCardView(SourceKind.File, "x", false, null, false).kindLabel)
+        assertEquals("Live", ReportViewBuilder.build(live(), liveConnectionName = "legacy-eu").source.kindLabel)
+        assertEquals("File", ReportViewBuilder.build(ScreenFiles.held()).source.kindLabel)
+        assertEquals("Nothing was analysed.", MigrateFromThreeTexts.NOTHING_ANALYSED)
+        assertEquals("Choose definitions file", MigrateFromThreeTexts.CHOOSE_FILE)
+        assertEquals("In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json", MigrateFromThreeTexts.FILE_EXPORT_HINT)
+        assertEquals(
+            "These queues use the old classic queue index (version 1), which is the 3.13 default, or the broker did not report their index version. " +
+                "RabbitMQ 4.3 and later cannot read the old index. The loss cannot be detected after the upgrade. " +
+                "This list comes from the broker: queues it reports as version 2 are not listed.",
+            MigrateFromThreeTexts.LOSS_DETECTION_LIVE,
+        )
+    }
 }

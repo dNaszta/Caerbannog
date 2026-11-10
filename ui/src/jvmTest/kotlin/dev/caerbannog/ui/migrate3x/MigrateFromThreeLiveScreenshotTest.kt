@@ -21,7 +21,13 @@ import dev.caerbannog.core.connections.PermissionPill
 import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.RefreshSectionState
 import dev.caerbannog.core.connections.RowAction
-import dev.caerbannog.core.migrate3x.HeldAnalysis
+import dev.caerbannog.core.migrate3x.LiveAnalysisOutcome
+import dev.caerbannog.core.migrate3x.LiveDefinitionsSource
+import dev.caerbannog.core.migrate3x.ReadOutcome
+import dev.caerbannog.core.migrate3x.analyseLive
+import dev.caerbannog.core.migrate3x.fakes.DefinitionsFiles
+import dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads
+import kotlinx.coroutines.runBlocking
 import dev.caerbannog.core.migrate3x.LiveSourceTexts
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
 import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
@@ -61,8 +67,14 @@ class MigrateFromThreeLiveScreenshotTest {
     }
 
     private fun report(connected: String?): MigrateFromThreeState.Report {
-        val file = MigrateScreenFiles.held()
-        val held = HeldAnalysis("legacy-eu", file.document, file.report, SourceKind.Live)
+        // The real live path (round 1): analyseLive over FakeThreeXReads, so the loss block carries the live wording.
+        val reads = FakeThreeXReads().apply {
+            definitions = ReadOutcome.Ok(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("modern"), DefinitionsFiles.queue("jobs"))))
+            storageVersionAppearsAtRead("/", "orders", 1, version = 1)
+            storageVersionAppearsAtRead("/", "modern", 1, version = 2)
+            storageVersionNeverAppears("/", "jobs")
+        }
+        val held = (runBlocking { analyseLive(LiveDefinitionsSource("legacy-eu", "3.13.7", reads) { }) } as LiveAnalysisOutcome.Analysed).held
         return MigrateFromThreeState.Report(ReportViewBuilder.build(held, liveConnectionName = connected), null, ReviewState.NONE)
     }
 

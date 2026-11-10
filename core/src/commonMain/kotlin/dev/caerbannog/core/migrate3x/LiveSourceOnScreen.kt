@@ -37,4 +37,7 @@ sealed interface SourceOption {
 data class SourcePicker(val selected: SourceKind, val options: List<SourceOption>)
 
 /** The card of the source in the report header. */
-data class SourceCardView(val kind: SourceKind, val label: String, val locked: Boolean, val lockText: String?, val canAnalyseAgain: Boolean)
+data class SourceCardView(val kind: SourceKind, val label: String, val locked: Boolean, val lockText: String?, val canAnalyseAgain: Boolean) {
+    // M8-06c round 1 STUB: the pill word of the card ("Live" or "File").
+    val kindLabel: String get() = ""
+}
