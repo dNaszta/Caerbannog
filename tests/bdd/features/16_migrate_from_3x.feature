@@ -763,7 +763,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Given the migration "0003" was generated and saved for the virtual host "/"
     When I connect to "new-eu", a 4.x broker on the virtual host "/", and open the Migrations screen
     Then "0003 · Migrated from RabbitMQ 3.x legacy.json vhost /" is listed as Pending
-    And a connection on another virtual host does not list it
+    And on a connection to another virtual host it is listed but cannot be applied
 
   @fake-broker @m8-06b
   Scenario: The group of skipped items is last, closed, not filtered by the chips and absent when nothing is skipped
