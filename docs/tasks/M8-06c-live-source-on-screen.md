@@ -177,3 +177,22 @@ R1: `ReportViewBuilder.lossBlock` uses `LOSS_DETECTION_LIVE` for `SourceKind.Liv
 Full fast set (gradle `test`, mostly up to date from the build run of the same sources): core 2074, ui 719, desktopApp 136, data-rabbit 659, mcp-server 21, dev-seed 84, acceptance 1387 (906 skipped): 0 failures. `verifyTestDiscovery` BUILD SUCCESSFUL, "37 classes unchecked (run brokerTest, keychainTest, screenshotTest)". The acceptance count: the new scenario runs in the live-screen suite (1 run) and is listed as skipped by the 6 other suites that select `16_migrate_from_3x.feature` with another tag filter: 1380 to 1387 tests, 900 to 906 skipped.
 Mutations (restored after each): N1 lossBlock ignores the kind, N2 hint missing in CannotExport, N3 kindLabel swapped, N4 a fixed text back in a composable, N5 hint shown in LiveFailed, and round 0 again: M1 live offered whatever the status, M3 cancelLoading without cancel, M5 pill after disconnect, M9 echo of the broker reason: 9 of 9 killed. N4 needed a guard that did not exist: added `MigrateFromThreeTextsGuardTest` (ui, source guard like `SecretsOnScreenTest`).
 Added: `LiveLossBlockTest` exploratory tests (no queue at risk, one, 60, hostile names escaped, a quorum queue never listed). Screenshots viewed: the live report now says "or the broker did not report their index version ... queues it reports as version 2 are not listed" and lists only `jobs` and `orders`; CannotExport shows "Nothing was analysed." and the export hint above the button. No new finding.
+
+### Step 5, round 1 (architect re-review, 2026-11-10): ACCEPTED WITH FOLLOW-UPS, HEAD 16cfc42 (build 50ee5bc + 317253b)
+
+Looked at: `git diff 44da444..HEAD` (production and tests) and, for fit, the whole branch diff as in round 0. Not re-run: the suites (test developer round 1: core 2074, ui 719, desktopApp 136, data-rabbit 659, acceptance 1387, `verifyTestDiscovery` green, 9 of 9 mutations killed).
+
+| # | Severity | Finding | State |
+| --- | --- | --- | --- |
+| R1 | was major | The live report said "A definitions file cannot tell the index version". | Closed. `LOSS_DETECTION_LIVE` is chosen by `held.kind` in `lossBlock`; `LiveLossBlockTest` uses the real `analyseLive` over `FakeThreeXReads` (V1, V2, unreadable, quorum trap, one queue, sixty queues) and pins that the file text is unchanged for a file; the new scenario "A live report says that the broker reported the index version" is green. |
+| R2 | was major | `CannotExport` gave no way to get the file. | Closed. `FILE_EXPORT_HINT` (the owner-approved text, one constant for the file option and for `CannotExport`), tag `migrate3x-state-cannot-export-hint`, not shown in `LiveFailed` (Compose test). |
+| 3 | minor | Banner shape and icons. | Open by decision, moved to `M8-06e-report-polish` item 7 (written). |
+| 4 | minor | Texts in composables. | Closed. `NOTHING_ANALYSED`, `CHOOSE_FILE`, `FILE_EXPORT_HINT` in `MigrateFromThreeTexts`, `SourceCardView.kindLabel`; `MigrateFromThreeTextsGuardTest` keeps them there. |
+| 5 | idea | Split of the view model. | Open by decision: `M8-06f` before `M8-06d`; ordering note added to the `M8-06e` brief and the README. |
+| 6 | idea | `MigrateFromThreeTextsGuardTest` greps the source text of two files for string literals. It is cheap and does its job, but it breaks on a harmless reformat and does not see a new composable file. | Accepted as is. If it ever flakes, replace it with a Compose test that reads the semantics text. |
+
+Fit: no scope creep in round 1 (14 files, all for R1, R2, finding 4). Safety rules unchanged: no write capability reachable from the screen or view model, no secret, URL or body in any text, no transport change, no new dependency, no `java.*` in core, existing tags stable.
+
+M8-06c is DONE (built, verified, reviewed). Merge needs the owner's word.
+
+One FYI for the owner (wording the architect introduced, correcting a false claim; he can veto it): the live loss text reads "These queues use the old classic queue index (version 1), which is the 3.13 default, or the broker did not report their index version. RabbitMQ 4.3 and later cannot read the old index. The loss cannot be detected after the upgrade. This list comes from the broker: queues it reports as version 2 are not listed." (`MigrateFromThreeTexts.LOSS_DETECTION_LIVE`.) The other new texts he has already seen in the mockup notes: "Analyse live connection", "Analyse again", "Try again", the live hint and the loading hint.
