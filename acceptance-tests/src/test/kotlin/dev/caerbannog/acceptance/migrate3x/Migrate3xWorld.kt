@@ -28,13 +28,26 @@ internal object Migrate3xWorld {
     var lastUser: String? = null
     var lastPolicy: String? = null
 
+    /** M8-05: the review built on demand from [document]; null until a step needs it, reset whenever the document changes. */
+    var review: dev.caerbannog.core.migrate3x.ConversionReview? = null
+    var lastDecision: dev.caerbannog.core.migrate3x.DecisionResult? = null
+    var generation: dev.caerbannog.core.migrate3x.GenerationResult? = null
+
+    /** M8-05: every request a fake broker saw during generation. Generation has no broker, so this must stay empty. */
+    /** M8-05: the versions already in the migrations folder; the next free one is 0002. */
+    var existingVersions: Set<String> = setOf("0001")
+
+    val brokerRequests = mutableListOf<String>()
+
     fun edit(change: (DefinitionsDocument) -> DefinitionsDocument) {
         document = change(document ?: DefinitionsDocuments.document())
+        review = null
     }
 
     fun reset() {
         text = ""; result = null; assignment = null; document = null; live = null; report = null; exportedJson = null
         lastFinding = null; lastUser = null; lastPolicy = null
+        review = null; lastDecision = null; generation = null; brokerRequests.clear(); existingVersions = setOf("0001")
     }
 }
 
