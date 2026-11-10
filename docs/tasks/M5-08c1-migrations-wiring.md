@@ -1,0 +1,63 @@
+# M5-08c1: desktop wiring and view-model states
+
+Milestone: M5    Depends on: M5-08a, M5-08b (merged)    Size: M    Umbrella: `M5-08c-migrations-wiring-and-ux`
+
+## Goal
+A real apply works end to end in the desktop app: the Migrations screen uses the connection's real executor, the folder-backed repository and the history on disk, the profile's own topology control level and virtual host, a native folder chooser, and the history keys of the Connections view model. The screen keeps its existing banners (the new states are drawn in `M5-08c2`), so every outcome is already visible as text.
+
+## Why
+See the umbrella. Owner decisions 2026-11-10: progress A (runner callback), folder row A, texts kept.
+
+## Scope
+In:
+1. **Typed failure kind (`core`, one line in `data-rabbit`).** `ActionResult.Failed(reason, kind: FailureKind = FailureKind.Other)`, `enum class FailureKind { Other, Conflict }`; `ExecutorReasons.conflict(...)` returns `Conflict`; `MigrationApplyResult.ActionFailed` carries `kind`. Nothing decides "conflict" by reading text.
+2. **Progress hook (`core`).** `MigrationRunner.applyPending(..., onAction: (ApplyStep) -> Unit = {})`, `data class ApplyStep(val version: String, val index: Int, val total: Int)`, called before each action is sent.
+3. **View-model state (`MigrationsScreenState`).** Add `applyProgress: ApplyProgress?` (`version`, `index`, `total`), `applyOutcome: ApplyOutcome?` (`sealed`: `Failed(version, index, total, reason)`, `Conflict(version, index, total, reason)`, `NotRecorded(version, reason)`), `unavailableReason: String?`, `canShowFolder: Boolean` (true unless the folder problem is `MISSING` or no folder is chosen). Constructor parameter `migrationUnavailableReason: String? = null`; non-null disables Apply pending and Apply single (Import, Export and the dry run keep working). New `fun dismissOutcome()`. `applyPending`/`applySingle` fill `applyProgress` while running and `applyOutcome` when they end; both are cleared at the next apply and by `dismissOutcome()`.
+4. **Replace the old failure string.** In `MigrationsViewModel.applyPending` the text `"Action '${result.action.actionName}' failed on version '${result.version}': ${result.reason}"` is REPLACED. The view model sets the structured `applyOutcome` AND, so the existing banner shows it until `M5-08c2` draws the new states, composes `errorMessage` (the existing red banner `migrations:errorBanner`):
+   - failure: `Action <k> of <n> failed: <reason>. Migration <version> was not recorded. Running it again is safe: actions that already succeeded change nothing the second time.`
+   - conflict (`kind == Conflict`): `Action <k> of <n> stopped: <reason>. The existing resource was not changed. Migration <version> was not recorded. Running it again is safe.` (the reason already names the resource, for example `orders exists with different settings`)
+   - not recorded: `The migration was applied but could not be recorded; running it again is safe` (the runner's fixed text).
+   `M5-08c2` stops writing `errorMessage` for outcomes and renders the structured outcome instead.
+5. **Banner strings for the new states** (the existing `bannerMessage`, one string, first that applies in this order; `M5-08c2` replaces them with the drawn states): unavailable connection: `Migrations are not offered on this connection: <migrationUnavailableReason>`; history unreadable: `<HISTORY_UNREADABLE text> (<path>)`; folder unavailable: `<reason>: <path>`; read-only folder: `The folder is read-only (<path>)`; level Read-only: `Apply is disabled: this connection is set to Read-only`; no configure permission: the existing permission text. (The scenario "The topology control level of the connection is honoured" needs the level text.)
+6. **First use asks for the folder.** When the screen opens and the state is `ChooseFolder`, `Main.kt` calls `vm.chooseFolder()` once per visit (a `LaunchedEffect`), so the native dialog appears. If the user cancels, the list stays empty and `bannerMessage` is `Choose a migrations folder first`; reopening the screen asks again. (A button comes with `M5-08c2`.)
+7. **Adapters (`desktopApp`).** `SwingMigrationFolderChooser : MigrationFolderChooser` (`javax.swing.JFileChooser`, `DIRECTORIES_ONLY`, shown through `SwingUtilities.invokeAndWait` off the composition thread, starts in the current folder or the user's home, null on cancel) and `DesktopFolderOpener : FolderOpener` (`java.awt.Desktop.open` on the folder; a file path opens its parent; no-op when `Desktop.isDesktopSupported()` is false; never throws). No new dependency (`java.desktop` ships with the Compose runtime; checked once on the DMG).
+8. **Wiring (`CompositionRoot.kt`, `Main.kt`).** The composition root creates ONCE `JsonFileMigrationHistoryRepository(~/.caerbannog/migration-history.json, NowProvider { System.currentTimeMillis() })` and uses the existing `JsonFileAppSettings` as the `MigrationFolderStore`. The history repository is passed to `ConnectionsViewModel` as `historyKeys` and into `MigrationFolderPorts(store, chooser = SwingMigrationFolderChooser, repositoryFor = { FolderMigrationFileRepository(Path.of(it), ...) }, history)`. In `MigrationsWindowContent` remove the no-op executor, `InMemoryMigrationFileRepository`, `InMemoryMigrationHistoryRepository` and `val controlLevel = ...FULL_CONTROL`. The runner is built from the history repository and `composition.active.source?.migrationExecutor` (a null executor: `migrationUnavailableReason` from `composition.active.source` is passed to the view model, which blocks apply). The level is the current connection profile's `topologyControlLevel` combined with the permission result exactly as the Topology screen does; the virtual host is the connection's; the configure permission comes from the permission check. The view model is rebuilt when the connection, vhost, permission or level changes; a folder change reloads through the ports (no rebuild).
+Out: the screen states, test tags and the Connections banner (`M5-08c2`); MCP (`M5-09`); the 3.x pill (`M8-02`).
+
+## What a user sees after c1 (existing banners only)
+- Opening Migrations the first time: the system folder dialog; after choosing, the files of the folder are listed with the existing cards and statuses; the choice is remembered after a restart.
+- Apply works for real: Applied pills appear; the list reloads. A second apply is a no-op.
+- A failure: the red banner `migrations:errorBanner` shows `Action 2 of 3 failed: the broker refused the request. Migration 0003 was not recorded. Running it again is safe: ...`; a conflict: `Action 1 of 2 stopped: orders exists with different settings. The existing resource was not changed. ...`; not recorded: its fixed text. No dismiss-by-state, no progress bar (Apply is disabled while running: `isApplying`).
+- Problems: one banner line (the existing locked/error banner) with the reason and path (unavailable connection, unreadable history, missing, unreadable or read-only folder, Read-only level, missing permission, or "Choose a migrations folder first"). No buttons for Try again, Choose another folder, Show folder or Start with an empty history yet (reopening the screen retries; the empty-history action and the folder row arrive in `M5-08c2`).
+- Renaming or deleting a profile whose history cannot be updated leaves it as it is; the message appears only after `M5-08c2` (the view model already holds it in `errorMessage`).
+
+## Acceptance
+- BDD (`@fake-broker`, real view model and real repositories with fakes behind the ports; the suite filter drops `and not @m5-08c1`): the five `@m5-08c1` scenarios of `10`: "The topology control level of the connection is honoured"; "A failed apply shows which action failed and why" (the glue reads `errorMessage`: it contains `Action 2 of 3 failed: the broker refused the request` and `was not recorded` and `Running it again is safe`); "A conflict names the resource" (contains `Action 1 of 1 stopped: orders exists with different settings` and `was not changed`); "An apply that could not be recorded says so" (the exact text; `0003` still pending); "A connection that cannot apply migrations says why" (the banner contains the reason; apply disabled; import, export, dry run work). The two glue files change only where a step reads the new state; `M5-08c2` re-binds the same steps to the Compose screen.
+- Unit tests, tests first:
+  - `core` `MigrationsViewModelOutcomeTest`: failure with index and total and the composed `errorMessage`; conflict by `FailureKind` (a reason that merely contains "exists with different settings" but has kind `Other` is a failure, not a conflict); not recorded; progress filled by the runner hook (one step per action, none after a failure) and cleared after; `dismissOutcome`; unavailable reason disables apply but not import, export, dry run; `canShowFolder` for ready, read-only, missing, not a folder, unreadable, no folder; the banner priority order of Scope 5; the level text for Read-only.
+  - `core` `MigrationRunnerProgressTest`: `onAction` called in order before each send; default empty callback changes nothing.
+  - `data-rabbit` `ExecutorFailureKindTest`: a conflict (400 plus an existing resource, a policy that differs) is `Conflict`; every other failure is `Other`.
+  - `desktopApp` `CompositionRootMigrationsTest`: the history repository is the very instance passed to `ConnectionsViewModel` (rename and delete of a profile reach it); the level is the profile's (a Read-only profile gives apply disabled); the vhost and permission are the connection's; a null executor gives apply blocked with the reason; the folder store is `JsonFileAppSettings`; the view model is rebuilt on a vhost, permission or level change; no `FULL_CONTROL` literal remains in the wiring (source grep guard).
+  - `desktopApp` adapters: `SwingMigrationFolderChooserTest` skipped when `GraphicsEnvironment.isHeadless()` (cancel returns null, a chosen folder returns its path), `DesktopFolderOpenerTest` with a fake `Desktop` seam: opens a folder, opens a file's parent, does nothing and does not throw when unsupported.
+  - The old tests: NO existing test pins the old string (grep for `failed on version` finds only the source line); `MigrationsViewModelTest` line about 266 and the step `the message names the failing action and the broker's reason` assert `failed.reason` and are unchanged; any test that reads `errorMessage` after an apply failure changes to the composed text (assertions only: allowed refactor because the contract changes); the test developer lists each one in the Status block.
+- Manual check recorded in the Status block: on macOS the packaged DMG (`:desktopApp:packageDmg`) opens the chooser, the chosen folder is remembered after a restart, a real apply to a local 4.x broker declares a queue (visible in the management UI), a second apply is a no-op, deleting and recreating a profile does not inherit the old statuses.
+- Mutation checks to record: (a) `FULL_CONTROL` hard-coded again; (b) `historyKeys` not passed to `ConnectionsViewModel`; (c) the view model decides "conflict" from the reason text instead of `kind`; (f) `unavailableReason` ignored (apply stays enabled); (g) the progress callback never called; (h) `canShowFolder` true for a missing folder; (i) the chooser called on every reload instead of once per visit. Each turns a named test red.
+- `verifyTestDiscovery` green.
+
+## Design notes
+`core` stays free of `java.*` (adapters in `desktopApp`). The composition root owns the single history repository (one lock). The composed strings in `errorMessage` and `bannerMessage` are an interim for the existing banners; the structured fields are the contract `M5-08c2` renders. A native dialog runs off the composition thread; a cancelled chooser changes nothing.
+
+## UX
+None new (the existing banners). The approved mockup for `M5-08c2` is `docs/ux/Migrations.dc.html` and `docs/ux/Main.dc.html`.
+
+## MCP
+None here.
+
+## Open points
+1. `java.desktop` in the packaged runtime: the manual DMG check (unverified until then). 2. Windows and Linux chooser look and feel: best effort. 3. The dialog on every visit while no folder is chosen is an interim; `M5-08c2` adds the panel and button. 4. From `M5-08a`/`b` reviews: the executor comes from `StreamSource.migrationExecutor` (guarded); a binding delete that cannot be sent shows as any failed action ("this action cannot be sent to the broker"); migration files in the user's folder get default permissions.
+
+## Definition of done
+Tests first and passing, the manual end-to-end check recorded, no unrelated change, no new dependency, mutation checks recorded, `verifyTestDiscovery` green.
+
+## Status
+- Step 1 (architect): DONE 2026-11-10. Not started.
