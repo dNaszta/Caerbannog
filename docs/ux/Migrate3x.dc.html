@@ -52,11 +52,12 @@ body{margin:0}
 <header class="appbar">
 <h1>Migrate from RabbitMQ 3.x</h1>
 <button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Choose another file</button>
-<button class="btn outlined lead" type="button" aria-haspopup="menu"><span class="ms sm" aria-hidden="true">download</span>Export report</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export report</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">content_copy</span>Copy as text</button>
 <button class="connchip none" type="button" aria-haspopup="menu" aria-label="No connection. Open connection menu"><span class="ms sm" aria-hidden="true">power_off</span><span class="nm">No connection</span><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button>
 </header>
 <div class="content">
-<div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">This screen only reads a file. It needs no connection and sends nothing to any broker. The fixes are written as a normal migration that you apply on a 4.x connection.</span></div>
+<div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">This screen only reads a file. It needs no connection and sends nothing to any broker.</span><span class="t-bs dim">(M8-06b adds: The fixes are written as a normal migration that you apply on a 4.x connection.)</span></div>
 
 <!-- 5. The report (main state) -->
 <section id="state-report" style="display:flex;flex-direction:column;gap:16px">
@@ -87,14 +88,15 @@ body{margin:0}
 <div class="row"><span class="ms sm" aria-hidden="true">policy</span><span class="nm" style="flex:0 1 220px">ha-all</span><span class="t-bs" style="flex:1 1 auto;min-width:0">"ha-mode", "ha-sync-mode" are not accepted. Proposed: write the policy without them (it holds no other key, so it is not written).</span><span class="pill warn">Needs decision</span><button class="iconbtn" type="button" aria-label="Copy name ha-all" style="width:32px;height:32px"><span class="ms sm" aria-hidden="true">content_copy</span></button><button class="btn tonal" type="button" style="height:32px;padding:0 16px">Review</button></div>
 <div class="grp" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="sev warning">Warning</span>Classic to quorum: ordering by priority may change<span style="flex-grow:1"></span><span class="pill">241 items</span></div>
 <div class="grp" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="sev info">Info</span>Policy pattern the app could not evaluate<span style="flex-grow:1"></span><span class="pill">2 items</span></div>
-<div class="grp" role="button" tabindex="0" aria-expanded="true"><span class="ms sm" aria-hidden="true">expand_more</span><span class="sev info">Info</span>Users, virtual hosts and permissions (handled by the access migration)<span style="flex-grow:1"></span><span class="pill">9 items</span></div>
+<div class="grp" role="button" tabindex="0" aria-expanded="true"><span class="ms sm" aria-hidden="true">expand_more</span><span class="sev info">Info</span>One group per access rule: users, virtual hosts, permissions (handled by the access migration)<span style="flex-grow:1"></span><span class="pill">9 items</span></div>
 <div class="row"><span class="ms sm" aria-hidden="true">person</span><span class="nm" style="flex:0 1 220px">svc</span><span class="t-bs" style="flex:1 1 auto;min-width:0">Tags: management, policymaker. Algorithm: rabbit_password_hashing_sha256.</span><span class="pill" title="The password hash is never shown, copied or exported"><span class="ms sm" aria-hidden="true">visibility_off</span>hash hidden</span></div>
+<div class="row"><span class="ms sm" aria-hidden="true">person</span><span class="nm" style="flex:0 1 220px">monitoring</span><span class="t-bs" style="flex:1 1 auto;min-width:0">Tags: monitoring. No algorithm: the file holds no password for this user.</span><span class="pill"><span class="ms sm" aria-hidden="true">key_off</span>no password hash</span></div>
 <div class="row"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs" style="flex:1">Not decided here: the access migration (users, virtual hosts, permissions) is a later step of this feature. These rows are for your information only.</span></div>
 <div class="grp" id="skipped-group" role="button" tabindex="0" aria-expanded="false"><span class="ms sm" aria-hidden="true">chevron_right</span><span class="ms sm" aria-hidden="true">block</span>Skipped by you<span style="flex-grow:1"></span><span class="pill">1 item</span></div>
 </div>
 
 <div class="bar" id="decision-bar"><span class="ms" aria-hidden="true" style="color:#8A5100">pending_actions</span><div style="flex:1 1 240px"><b>381 items need a decision</b><div class="t-bs dim">1 decided (skipped, see the Skipped group), 0 accepted. Generate is possible when every item is decided.</div></div><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">skip_next</span>Show next undecided item</button><button class="btn filled lead" type="button" disabled><span class="ms sm" aria-hidden="true">auto_fix_high</span>Generate migration</button></div>
-<div class="t-bs dim">Every row has a copy button that copies its name (escaped as shown); the block has "Copy queue names" (all names, one per line, not only the first 10). The block lists the first 10 names; "Show all N" opens the whole list in place as a lazy list. Message-loss findings are also the first, closed group of the list, so the chip counts (taken from the report summary, which counts them) always add up to the groups. Row text is plain text only: names and messages from the file are never markup, control characters are shown escaped (for example \u0007). Long names are cut with an ellipsis and the full name is in the row's tooltip and copyable. The whole list lives in one vertical scroll with a scrollbar.</div>
+<div class="t-bs dim">Every row has a copy button that copies its name (escaped as shown); the block has "Copy queue names" (all names, one per line, not only the first 10). The block lists the first 10 names; "Show all N" opens the whole list in place as a lazy list. Message-loss findings are also the first, closed group of the list, so the chip counts (taken from the report summary, which counts them) always add up to the groups. Row text is plain text only: names and messages from the file are never markup, control characters are shown escaped (for example \u0007). Long names are cut with an ellipsis; a message is cut after 2 lines and the proposal after 1; the full name and message are in the row's tooltip, and the name is copyable. The review sheet (M8-06b) and both exports carry the full text and the "why". The whole list lives in one vertical scroll with a scrollbar.</div>
 </section>
 
 <section id="states-m8-06" style="display:flex;flex-direction:column;gap:24px;margin-top:16px">
@@ -213,7 +215,7 @@ body{margin:0}
 </section>
 
 <section id="state-export" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">12. Export report: menu, saved, copied, failed</div>
+<div class="t-ts">12. Export report: two buttons in the app bar ("Export report" saves JSON, "Copy as text" copies; decided by the architect 2026-11-10, replaces the menu), then the notices: saved, copied, failed</div>
 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
 <div class="popup" style="position:static;width:260px"><div class="row" style="min-height:48px"><span class="ms sm" aria-hidden="true">data_object</span>Save as JSON (caerbannog.compat-report/1)</div><div class="row" style="min-height:48px"><span class="ms sm" aria-hidden="true">content_copy</span>Copy as text</div></div>
 <div style="display:flex;flex-direction:column;gap:8px;flex:1 1 320px">
