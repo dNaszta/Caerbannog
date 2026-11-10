@@ -100,8 +100,8 @@ internal fun ReportState(
             ReviewSheet(sheet, review, Modifier.weight(1f))
             return@Column
         }
-        // M8-06e STUB: the wrong order on purpose (notice first, then render and copy); the real one is scope.launch { copy(reportText()); onReportCopied() }.
-        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { onReportCopied(); scope.launch { copy(reportText()) } })
+        // Render off the UI thread, copy, then tell the view model. Leaving the composition cancels the scope: nothing is copied and no notice shows.
+        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { scope.launch { copy(reportText()); onReportCopied() } })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
         // A state built without a review (no lines yet) shows no bar: the 06a screen.
