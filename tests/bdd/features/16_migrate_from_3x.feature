@@ -493,6 +493,238 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     When I apply it again on "new-eu"
     Then the broker topology is unchanged
 
+  # ---- M8-06a: the Migrate from 3.x screen, file source, report (view model level; the Compose tests bind the same words) ------
+  # The screen works with no broker connection at all. A live 3.x source, the 3.x pill and source locking arrive with M8-02 (M8-06c),
+  # the access migration with M8-12 (M8-06d). Mockup: docs/ux/Migrate3x.dc.html (states 1 to 12).
+
+  @smoke @fake-broker @m8-06a
+  Scenario: Open a definitions file and read the report on the screen
+    Given a definitions file "legacy.json" exported from RabbitMQ 3.13.7 with 3 classic queues, 2 exchanges and 4 bindings in "/"
+    When I open that file on the Migrate from 3.x screen
+    Then the screen shows the report for "legacy.json" from RabbitMQ 3.13.7
+    And the severity chips show the counts of blockers, warnings and infos
+    And the screen says how many items are compatible as they are and how many need a decision
+    And the compatible items are not listed as problems
+
+  @fake-broker @m8-06a
+  Scenario: The message-loss block is the first block and recommends a new broker with a Shovel
+    Given a definitions file with 2 classic queues without "x-queue-version"
+    When I open that file on the Migrate from 3.x screen
+    Then the first block of the report says an in-place upgrade to RabbitMQ 4.3 or later would silently empty classic queues
+    And it lists both queues and says the loss cannot be detected after the upgrade
+    And it recommends a new 4.x broker with this migration and a Shovel
+    And "upgrade in place" is never shown as a green option
+
+  @negative @fake-broker @m8-06a
+  Scenario Outline: A file that cannot be read shows its reason and no report
+    Given a file that <problem>
+    When I open that file on the Migrate from 3.x screen
+    Then the screen shows the error "<reason>" and no report
+    And I can choose another file
+
+    Examples:
+      | problem                          | reason                                    |
+      | is not valid JSON                | The file is not valid JSON                |
+      | is a JSON array                  | The file is not a definitions file        |
+      | is larger than the limit         | The file is larger than 64 MB             |
+      | cannot be read from the disk     | The file could not be read                |
+
+  @fake-broker @m8-06a
+  Scenario: A per-virtual-host export asks for the name and analyses nothing until it gets one
+    Given the per-virtual-host definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    When I open that file on the Migrate from 3.x screen
+    Then the screen asks for the virtual host name with an empty field and no default
+    And no report is shown
+    When I give the virtual host name "  orders  "
+    Then the report is shown for the virtual host "orders"
+    And the report says the file holds no users, virtual hosts or permissions, so the access migration is empty
+
+  @negative @fake-broker @m8-06a
+  Scenario: A virtual host name that cannot be used is shown as an inline error
+    Given the per-virtual-host definitions export taken from RabbitMQ 3.13.7 by the M8-00 spike
+    And I opened that file on the Migrate from 3.x screen
+    When I give the virtual host name "only spaces"
+    Then the field shows the refusal of the name as an inline error
+    And no report is shown
+    And I can try another name or choose another file
+
+  @fake-broker @m8-06a
+  Scenario: The report is filtered by severity and keeps the message-loss block first
+    Given the report of a file with blockers, warnings and infos is shown
+    When I turn off the chips "Warning" and "Info"
+    Then only blockers are listed
+    And the message-loss block is still first
+    And each chip still shows its own count
+
+  @fake-broker @m8-06a
+  Scenario: A very large report is shown as groups with counts and loads rows only when a group is opened
+    Given a definitions file with 60,000 classic queues
+    When I open that file on the Migrate from 3.x screen
+    Then the report shows groups with the number of findings in each
+    And the screen state holds no finding rows for a group that is closed
+    And opening a group offers its findings as a lazy list
+
+  @security @fake-broker @m8-06a
+  Scenario: A user row shows the hash as hidden and no hash reaches the screen
+    Given a definitions file with a user "svc" that has a password hash and a shovel parameter whose URI contains a password
+    When I open that file on the Migrate from 3.x screen
+    Then the row for the user "svc" shows its tags, its hashing algorithm and the text "hash hidden"
+    And no text, no semantics description and no screenshot of the screen contains the password hash or the password
+
+  @fake-broker @m8-06a
+  Scenario: A policy pattern the app could not evaluate says so and asks the user to check by hand
+    Given a definitions file with a policy whose pattern is "^(?!amq\.).*"
+    When I open that file on the Migrate from 3.x screen
+    Then the finding says the app could not evaluate the pattern and did not use it to decide which queues are mirrored
+    And it asks the user to check by hand
+
+  @security @fake-broker @m8-06a
+  Scenario: Names from the file are shown as plain text
+    Given a definitions file with a queue named "<b>x</b>" followed by a control character
+    When I open that file on the Migrate from 3.x screen
+    Then the row shows the name as plain text with the control character escaped
+    And nothing is interpreted as markup
+
+  @fake-broker @m8-06a
+  Scenario: Export the report from the screen as JSON or copy it as text
+    Given the report for "legacy.json" is shown
+    When I export the report
+    Then the app asks where to save a JSON file with the schema "caerbannog.compat-report/1"
+    And the saved file has no password, no password hash and no shovel URI
+    When I copy the report as text
+    Then the clipboard holds the text form of the report
+
+  @negative @fake-broker @m8-06a
+  Scenario: A report that cannot be saved says so and keeps the report
+    Given the report for "legacy.json" is shown
+    And the chosen place cannot be written
+    When I export the report
+    Then the screen says the report could not be saved, with a fixed reason
+    And the report is still shown
+
+  @fake-broker @m8-06a
+  Scenario: The report of a file survives connecting to a 4.x broker
+    Given I analysed the file "legacy.json" and the report is shown
+    When I connect to "new-eu", a broker running RabbitMQ 4
+    And I open the Migrate from 3.x screen again
+    Then the report for "legacy.json" is still shown
+
+  @safety @fake-broker @m8-06a
+  Scenario: The screen with a file source sends no request to any broker
+    Given a definitions file exported from RabbitMQ 3.13.7
+    When I open that file on the Migrate from 3.x screen and export the report
+    Then no request was sent to any broker
+
+  # ---- M8-06b: review, generate and save (view model level) ----------------------------------------------------------------------
+  # Uses the merged core review (ConversionReview). The screen never builds an action itself: it shows what the core returns.
+
+  @fake-broker @m8-06b
+  Scenario: The screen counts the items that need a decision
+    Given the report of a file with 3 items that need a decision is shown
+    Then the screen says "3 items need a decision"
+    When I accept the default proposal of the first item
+    Then the screen says "2 items need a decision"
+    And "Generate migration" is disabled
+
+  @smoke @fake-broker @m8-06b
+  Scenario: Accept the default proposal of an item with its tick
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    When I open the review of "orders"
+    Then the review shows the finding, why it matters, the default proposal and the alternatives
+    And the tick "Ordering by priority may change" is unticked and "Accept" is disabled
+    When I tick it and accept
+    Then the item shows as accepted with the tick
+
+  @fake-broker @m8-06b
+  Scenario: Choose an alternative for a finding
+    Given a definitions file with the classic queue "prio" with "x-max-priority" 5
+    When I open the review of "prio"
+    Then the default is to keep it classic and needs no tick
+    When I choose the quorum alternative and tick "Ordering by priority may change"
+    And I accept
+    Then the item shows as accepted as a quorum queue
+
+  @negative @fake-broker @m8-06b
+  Scenario: An item with only a manual fix cannot be accepted as it is
+    Given a definitions file with the non-durable queue "temp"
+    When I open the review of "temp"
+    Then the review shows the manual steps and "Accept" is disabled until an automatic alternative is chosen
+    And "Skip" and "Replace with my own actions" are offered
+
+  @fake-broker @m8-06b
+  Scenario: Skip an item and change the decision later
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    When I skip "orders"
+    Then the item shows as skipped and the count of undecided items goes down
+    When I open the review of "orders" again and accept it with the tick
+    Then the item shows as accepted and is no longer skipped
+
+  @fake-broker @m8-06b
+  Scenario: Replace an item with my own actions
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    When I open the review of "orders" and choose "Replace with my own actions"
+    Then the sheet shows the actions the app would write, as editable migration actions
+    When I change the queue to have the argument "x-delivery-limit" 5 and save
+    Then the item shows as replaced and the generated migration carries "x-delivery-limit" 5
+
+  @negative @fake-broker @m8-06b
+  Scenario Outline: A replacement the migration format refuses is shown as an error and not stored
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    And I opened the replace sheet of "orders"
+    When I enter <actions>
+    Then the sheet shows the error "<error>" and keeps what I typed
+    And the item is still undecided
+
+    Examples:
+      | actions                                   | error                                                  |
+      | an action that deletes a queue            | a replacement must not delete anything                 |
+      | a queue named ".."                        | the migration parser's own reason                      |
+      | an action for another virtual host        | an action is for another virtual host than the item's  |
+      | text that is not JSON                     | the migration parser's own reason                      |
+
+  @negative @fake-broker @m8-06b
+  Scenario: Generate is blocked while items are undecided and says how many
+    Given the report of a file with 3 items that need a decision and 2 of them are decided
+    Then "Generate migration" is disabled and the screen says "1 item needs a decision"
+    And choosing "Show next undecided item" opens the review of that item
+
+  @smoke @fake-broker @m8-06b
+  Scenario: Generate the migrations and save them into the migrations folder
+    Given every item of the report is decided
+    And a migrations folder is chosen that holds the versions 0001 and 0002
+    When I generate the migration
+    Then the screen lists one file per source virtual host with its version 0003, description, action count and the skipped items and notes
+    And the files are saved into the migrations folder
+    And nothing was sent to any broker
+
+  @fake-broker @m8-06b
+  Scenario: Generating asks for the migrations folder when none is chosen
+    Given every item of the report is decided and no migrations folder is chosen
+    When I generate the migration
+    Then the app asks for the migrations folder
+    And when I cancel nothing is saved and the screen says no folder was chosen
+
+  @negative @fake-broker @m8-06b
+  Scenario: A folder that cannot be written is reported and nothing is half-saved
+    Given every item of the report is decided and the migrations folder is read-only
+    When I generate the migration
+    Then the screen says the folder is read-only and no file was saved
+    And I can choose another folder or export the files instead
+
+  @fake-broker @m8-06b
+  Scenario: Generated files show up on the Migrations screen as pending for a matching connection
+    Given the migration "0003" was generated and saved for the virtual host "/"
+    When I connect to "new-eu", a 4.x broker on the virtual host "/", and open the Migrations screen
+    Then "0003 · Migrated from RabbitMQ 3.x legacy.json vhost /" is listed as Pending
+    And a connection on another virtual host does not list it
+
+  @fake-broker @m8-06b
+  Scenario: The result lists what was skipped and left out, and the notes
+    Given I skipped the queue "orders", which has a binding, and the file holds a message-loss queue
+    When I generate the migration
+    Then the result lists "orders" as skipped by me and the binding as left out
+    And the notes repeat the message-loss recommendation of a new broker with a Shovel
+
   @negative @fake-broker @m8-04
   Scenario: A migration file cannot contain a shovel action
     Given a migration file with the action "declareShovel"
