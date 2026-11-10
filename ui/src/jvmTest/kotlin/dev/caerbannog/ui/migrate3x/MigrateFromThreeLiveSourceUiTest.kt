@@ -179,6 +179,49 @@ class MigrateFromThreeLiveSourceUiTest {
         onNodeWithTag("migrate3x-source-live").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
     }
 
+    @Test
+    fun `the hint under the live button names the connection and says nothing is changed, only while live is selected`() = runDesktopComposeUiTest(1280, 800) {
+        show(MigrateFromThreeState.ChooseSource, picker = liveSelected)
+        assertEquals("Reads the definitions of legacy-eu with GET requests. Nothing on the broker is changed.", textOf("migrate3x-analyse-live-hint"))
+        show(MigrateFromThreeState.ChooseSource, picker = liveOffered)
+        assertNotDrawn("migrate3x-analyse-live-hint")
+    }
+
+    @Test
+    fun `the picker is a selectable group of radio buttons that follow the selected kind`() = runDesktopComposeUiTest(1280, 800) {
+        for ((picker, fileOn) in listOf(liveOffered to true, liveSelected to false)) {
+            show(MigrateFromThreeState.ChooseSource, picker = picker)
+            listOf("migrate3x-source-file", "migrate3x-source-live").forEach { tag ->
+                onNodeWithTag(tag).assert(SemanticsMatcher("role is RadioButton") { it.config.getOrNull(SemanticsProperties.Role) == androidx.compose.ui.semantics.Role.RadioButton })
+                onNodeWithTag(tag).assert(SemanticsMatcher("inside a selectable group") {
+                    generateSequence(it.parent) { n -> n.parent }.any { n -> n.config.contains(SemanticsProperties.SelectableGroup) }
+                })
+            }
+            if (fileOn) onNodeWithTag("migrate3x-source-file").assertIsSelected() else onNodeWithTag("migrate3x-source-live").assertIsSelected()
+        }
+    }
+
+    @Test
+    fun `Space and Enter on the focused enabled option choose it`() = runDesktopComposeUiTest(1280, 800) {
+        for (key in listOf(Key.Enter, Key.Spacebar)) {
+            val calls = MigrateCalls()
+            show(MigrateFromThreeState.ChooseSource, calls, picker = liveOffered)
+            onNodeWithTag("migrate3x-source-live").performSemanticsAction(SemanticsActions.RequestFocus)
+            onNodeWithTag("migrate3x-source-live").performKeyInput { pressKey(key) }
+            assertEquals(listOf("chooseSource:Live"), calls.events, "$key")
+        }
+    }
+
+    @Test
+    fun `the disabled live option is disabled, not focusable, and its description is the label and the reason`() = runDesktopComposeUiTest(1280, 800) {
+        show(MigrateFromThreeState.ChooseSource, picker = liveDisabled)
+        onNodeWithTag("migrate3x-source-live").assertIsNotEnabled()
+        onNodeWithTag("migrate3x-source-live").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
+        val description = onNodeWithTag("migrate3x-source-live").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+        assertTrue("Live connection: $reason" in description, "description: $description")
+        assertEquals(reason, textOf("migrate3x-source-live-reason"))
+    }
+
     // ---- the live read, and what can end it ----
 
     @Test

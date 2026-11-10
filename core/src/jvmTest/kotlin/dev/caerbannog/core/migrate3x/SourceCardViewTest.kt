@@ -60,6 +60,7 @@ class SourceCardViewTest {
         assertEquals("Analyse live connection", MigrateFromThreeTexts.ANALYSE_LIVE)
         assertEquals("Analyse again", MigrateFromThreeTexts.ANALYSE_AGAIN)
         assertEquals("Try again", MigrateFromThreeTexts.TRY_AGAIN)
+        assertEquals("Reads the definitions of legacy-eu with GET requests. Nothing on the broker is changed.", MigrateFromThreeTexts.analyseLiveHint("legacy-eu"))
         assertEquals("Reading and analysing legacy-eu", MigrateFromThreeTexts.liveLoading("legacy-eu"))
         assertEquals("Reading the broker can take a few seconds per virtual host. Nothing on it is changed.", MigrateFromThreeTexts.LIVE_LOADING_HINT)
         assertEquals("Live connection", SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE).label)

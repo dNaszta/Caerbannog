@@ -3,6 +3,7 @@ package dev.caerbannog.ui.appframe
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
@@ -106,6 +107,15 @@ class ConnectionControlMigrationUiTest {
         )
         open(state.copy(rows = rows, chip = chip.copy(text = "prod-eu", pill = null)))
         onAllNodesWithTag("connection-popup-migrate3x", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `keyboard - the entry takes the entry focus of the popup, and Space activates it`() = runDesktopComposeUiTest(1280, 600) {
+        val recorder = open(state)
+        onNode(SemanticsMatcher("focused node in the popup") { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Focused) == true }, useUnmergedTree = true)
+            .assert(hasTestTag("connection-popup-migrate3x"))
+        onNodeWithTag("connection-popup-migrate3x").performKeyInput { pressKey(Key.Spacebar) }
+        assertEquals(listOf("openMigrateFromThree"), recorder.events)
     }
 
     @Test

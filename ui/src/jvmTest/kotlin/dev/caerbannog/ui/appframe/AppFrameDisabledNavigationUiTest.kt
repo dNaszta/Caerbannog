@@ -144,6 +144,20 @@ class AppFrameDisabledNavigationUiTest {
     }
 
     @Test
+    fun `the disabled search shows its reason as tooltip and as description, the enabled search shows neither`() = runDesktopComposeUiTest(1280, 800) {
+        frame(onlyMigration, reason)
+        assertEquals(true, onNodeWithTag("searchBox").says(reason), "description of the disabled search")
+        assertTrue(tooltipShows("searchBox", reason), "hovering the disabled search shows the reason as a tooltip")
+    }
+
+    @Test
+    fun `the enabled search has no reason description and no tooltip`() = runDesktopComposeUiTest(1280, 800) {
+        frame(setOf(ConnectionFeature.Search, ConnectionFeature.MigrateFromThreeX), reason)
+        assertEquals(false, onNodeWithTag("searchBox").says(reason))
+        assertEquals(false, tooltipShows("searchBox", reason), "an enabled search has no tooltip")
+    }
+
+    @Test
     fun `no note for a connection that offers everything, also when a reason is passed, and none without a reason`() = runDesktopComposeUiTest(1280, 800) {
         frame(ConnectionFeature.entries.toSet(), reason)
         onAllNodesWithTag("navReasonNote", useUnmergedTree = true).assertCountEquals(0)

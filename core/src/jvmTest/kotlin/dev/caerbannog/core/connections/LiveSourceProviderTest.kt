@@ -49,6 +49,12 @@ class LiveSourceProviderTest {
     }
 
     @Test
+    fun `a link and a session that are about different connections give no live source`() {
+        val a = SessionState(current = CurrentConnection("b", PermissionCheckStatus.Done(PermissionCheckResult.MigrationSource("3.13.7"))))
+        assertNull(liveSourceOf(LinkState.Connected("a"), streamSource(), a))
+    }
+
+    @Test
     fun `without a held source, or before the check has finished, there is no live source`() {
         assertNull(liveSourceOf(LinkState.Connected("legacy-eu"), null, migration))
         assertNull(liveSourceOf(LinkState.Connected("legacy-eu"), streamSource(), SessionState()))

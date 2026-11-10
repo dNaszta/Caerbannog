@@ -56,7 +56,6 @@ class MigrateFromThreeViewModel(
     private val folders: MigrationFolderPorts,
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    // M8-06c STUB position: the brief says "after folders", which breaks the 8 positional callers (scope would land in this slot); tests use the name.
     /** M8-06c: what may be read live now; the default is "nothing". Read only: it has no write method. */
     private val liveSource: LiveSourceProvider = LiveSourceProvider.None,
 ) {

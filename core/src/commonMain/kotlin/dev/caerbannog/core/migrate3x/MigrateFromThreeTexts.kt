@@ -15,6 +15,7 @@ object MigrateFromThreeTexts {
 
     fun liveOption(name: String): String = "Live connection: $name"
     fun liveDisconnected(name: String): String = "from $name (disconnected)"
+    fun analyseLiveHint(name: String): String = "Reads the definitions of $name with GET requests. Nothing on the broker is changed."
     fun liveLoading(name: String): String = "Reading and analysing $name"
 
     const val HASH_HIDDEN: String = "hash hidden"
