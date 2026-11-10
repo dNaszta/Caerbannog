@@ -93,6 +93,16 @@ fun MigrationsScreen(
         modifier = modifier,
         onNavigate = onNavigate,
         actions = {
+            // M8-06a, owner decision 1: the second entry to the migration from 3.x (the first is the drawer item).
+            OutlinedButton(
+                onClick = { onNavigate(AppDestination.MigrateFromThree) },
+                modifier = Modifier.testTag("migrations:migrate3xBtn"),
+            ) {
+                ConnectionIcon(AppIcon.DriveFileMove, size = SmallIconSize)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(AppDestination.MigrateFromThree.label)
+            }
+
             OutlinedButton(
                 onClick = { showImportDialog = true },
                 enabled = state.canImport,

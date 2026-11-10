@@ -94,6 +94,8 @@ class AppComposition(
     /** What the Migrations screen needs around its files: the remembered folder, the chooser, the folder repositories and [migrationHistory]. */
     val migrationFolderPorts: MigrationFolderPorts,
     private val streamListScope: CoroutineScope,
+    /** The file loader, dialogs and the in-memory held analysis of the Migrate from 3.x screen (M8-06a). */
+    val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
 ) {
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
@@ -131,6 +133,7 @@ fun createAppComposition(
     navigation: AppNavigation = AppNavigation(),
     migrationHistoryFile: Path = Path.of(System.getProperty("user.home"), ".caerbannog", "migration-history.json"),
     migrationFolderChooser: MigrationFolderChooser = SwingMigrationFolderChooser(),
+    migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -181,7 +184,7 @@ fun createAppComposition(
         viewModel, active, streamList, streamListScope, clock,
         onOpenConnections = { navigation.open(AppDestination.Connections) }, shownTarget = shownTarget,
     )
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope)
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree)
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.

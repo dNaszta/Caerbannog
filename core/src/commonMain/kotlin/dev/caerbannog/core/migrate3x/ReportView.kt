@@ -14,7 +14,7 @@ const val LOSS_PREVIEW_COUNT: Int = 10
 
 /**
  * The block above the groups. Names are plain text (escaped like the text export). [preview] holds the first [LOSS_PREVIEW_COUNT] names,
- * [queueAt] any name (the expanded lazy list), [copyText] ALL names one per line. M8-06a STUB: no queues.
+ * [queueAt] any name (the expanded lazy list), [copyText] ALL names one per line.
  */
 class LossBlockView(
     val title: String,
@@ -66,6 +66,8 @@ class ReportView(
     val summary: ReportSummary,
     val summaryLine: String,
     val counts: DocumentCounts,
+    /** The header line under the file name, for example "3 virtual hosts, 482 queues, 61 exchanges, 1,204 bindings". */
+    val countsLine: String,
     val lossBlock: LossBlockView?,
     val accessNote: String?,
     val chips: List<ChipView>,

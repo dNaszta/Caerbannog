@@ -371,14 +371,23 @@ private fun AppBar(title: String, leading: @Composable RowScope.() -> Unit, acti
     }
 }
 
-/** The four drawer items. The app decides what to do with each; Topology and Migrations have no screen yet. */
-enum class AppDestination { Connections, Streams, Topology, Migrations }
+/** The drawer items. The app decides what to do with each. [label] is the text on the drawer item and in the app bar. */
+enum class AppDestination(val label: String) {
+    Connections("Connections"),
+    Streams("Streams"),
+    Topology("Topology"),
+    Migrations("Migrations"),
+
+    /** M8-06a: the file source and report of the migration from RabbitMQ 3.x; the name is used for tags and selection. */
+    MigrateFromThree("Migrate from 3.x"),
+}
 
 private val navItems: List<Pair<AppDestination, AppIcon>> = listOf(
     AppDestination.Connections to AppIcon.Power,
     AppDestination.Streams to AppIcon.Stream,
     AppDestination.Topology to AppIcon.Hub,
     AppDestination.Migrations to AppIcon.AccountTree,
+    AppDestination.MigrateFromThree to AppIcon.DriveFileMove,
 )
 
 @Composable
@@ -425,7 +434,7 @@ private fun NavItem(destination: AppDestination, icon: AppIcon, selected: Boolea
     ) {
         Row(Modifier.padding(start = 16.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ConnectionIcon(icon, IconSize)
-            Text(destination.name, style = MaterialTheme.typography.labelLarge)
+            Text(destination.label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
