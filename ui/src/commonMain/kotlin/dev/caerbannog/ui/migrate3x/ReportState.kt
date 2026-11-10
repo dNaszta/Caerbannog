@@ -1,5 +1,7 @@
 package dev.caerbannog.ui.migrate3x
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,18 +11,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
@@ -64,7 +64,6 @@ import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
 
 private const val LOSS_LIST_HEIGHT_DP = 360
-private const val SUMMARY_PANE_WIDTH_DP = 400
 
 /**
  * The report: a fixed header with the file and the actions, then the summary pane and one lazy list of groups with their rows.
@@ -142,35 +141,21 @@ private fun AccessNote(text: String) {
 }
 
 /**
- * Two panes: on the left the loss block, summary and chips (the "what is wrong, in total" part, first on the screen, scrolls on its own),
- * on the right the groups as one lazy list. One column would push the groups below the loss block; side by side a screen of 800 dp shows
- * a dozen group headers next to the block.
+ * One lazy list, as in the mockup: the loss banner (only when there is a loss block), the summary, the chips, then each group header
+ * followed by its rows when the group is open. Only the visible items are composed, so 240,000 findings stay fast.
  */
 @Composable
 private fun ReportBody(view: ReportView, copy: (String) -> Unit, onToggleSeverity: (Severity) -> Unit, onToggleGroup: (String) -> Unit) {
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        SummaryPane(view, copy, onToggleSeverity, Modifier.width(SUMMARY_PANE_WIDTH_DP.dp).fillMaxHeight())
-        GroupList(view, copy, onToggleGroup, Modifier.weight(1f).fillMaxHeight())
-    }
-}
-
-@Composable
-private fun SummaryPane(view: ReportView, copy: (String) -> Unit, onToggleSeverity: (Severity) -> Unit, modifier: Modifier) {
-    val scroll = rememberScrollState()
-    Box(modifier) {
-        Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            view.lossBlock?.let { LossBanner(it, copy) }
-            SummaryAndChips(view, onToggleSeverity)
-        }
-        VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).fillMaxHeight().testTag("migrate3x-summary-scrollbar"))
-    }
-}
-
-@Composable
-private fun GroupList(view: ReportView, copy: (String) -> Unit, onToggleGroup: (String) -> Unit, modifier: Modifier) {
     val listState = rememberLazyListState()
-    Box(modifier) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(end = 12.dp).testTag("migrate3x-report-list"),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            view.lossBlock?.let { loss -> item(key = "loss") { LossBanner(loss, copy) } }
+            item(key = "summary") { Text(view.summaryLine, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+            item(key = "chips") { Chips(view, onToggleSeverity) }
             view.groups.forEach { group ->
                 item(key = "g:${group.key}") { GroupHeader(group, onToggleGroup) }
                 if (group.open) {
@@ -253,12 +238,9 @@ private fun Fix(fix: FixView) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SummaryAndChips(view: ReportView, onToggleSeverity: (Severity) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(view.summaryLine, style = MaterialTheme.typography.bodyMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            view.chips.forEach { chip -> SeverityChip(chip, onToggleSeverity) }
-        }
+private fun Chips(view: ReportView, onToggleSeverity: (Severity) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+        view.chips.forEach { chip -> SeverityChip(chip, onToggleSeverity) }
     }
 }
 
@@ -308,9 +290,23 @@ private fun SeverityBadge(severity: Severity) {
 
 private fun severityLabel(severity: Severity): String = severity.name
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().testTag("migrate3x-row-$groupKey-$index")) {
+        // The row is cut (name one line, message two); the tooltip holds the full name and message. Nothing else: no hash exists in a RowView.
+        TooltipArea(
+            tooltip = {
+                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
+                    Text(
+                        listOfNotNull(row.name, row.message).joinToString("\n"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.widthIn(max = 480.dp).padding(8.dp),
+                    )
+                }
+            },
+        ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ConnectionIcon(kindIcon(row.kind), IconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             SelectionContainer(Modifier.weight(1f)) {
@@ -335,6 +331,7 @@ private fun ReportRow(row: RowView, groupKey: String, index: Int, copy: (String)
                     ConnectionIcon(AppIcon.ContentCopy, SmallIconSize, contentDescription = "Copy name")
                 }
             }
+        }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
