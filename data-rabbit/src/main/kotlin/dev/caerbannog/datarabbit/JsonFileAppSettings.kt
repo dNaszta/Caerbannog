@@ -6,6 +6,8 @@ import dev.caerbannog.core.migrations.MigrationFolderStore
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.RefreshInterval
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -54,7 +56,12 @@ class JsonFileAppSettings(
         set(value) {
             currentFolder = value
             write(FOLDER_KEY to (value?.let { JsonPrimitive(it) } ?: JsonNull))
+            folderSignal.tryEmit(value)
         }
+
+    private val folderSignal = MutableSharedFlow<String?>(extraBufferCapacity = 8)
+
+    override val changes: Flow<String?> get() = folderSignal
 
     private fun readInterval(root: JsonObject?): RefreshInterval {
         val seconds = (root?.get(KEY) as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull

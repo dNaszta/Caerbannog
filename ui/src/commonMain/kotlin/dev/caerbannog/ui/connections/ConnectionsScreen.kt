@@ -3,6 +3,7 @@ package dev.caerbannog.ui.connections
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -333,6 +334,13 @@ private fun EditPanel(
             (state.lastSaveResult as? SaveConnectionResult.NameAlreadyExists)?.let { collision ->
                 Spacer(modifier = Modifier.height(8.dp))
                 ErrorBanner("A connection named '${collision.name}' already exists.")
+            }
+
+            // A rename or delete whose migration history could not be updated: the profile was left as it is (fixed text from the view model).
+            val historyMessage = (state.lastSaveResult as? SaveConnectionResult.HistoryNotUpdated)?.message ?: state.errorMessage
+            historyMessage?.let { message ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(Modifier.testTag("connections:historyNotUpdatedBanner")) { ErrorBanner(message) }
             }
 
             Spacer(modifier = Modifier.height(14.dp))

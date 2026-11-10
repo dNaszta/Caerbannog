@@ -1,8 +1,17 @@
 package dev.caerbannog.core.migrations
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
 /** The folder the user chose for migration files, kept per machine (`settings.json`, key `migrationsFolder`); null means "ask". */
 interface MigrationFolderStore {
     var folder: String?
+
+    /**
+     * The folder each time it is set. The window rebuilds its view model when the inputs change, so the view model that asked for a folder may
+     * not be the one the user looks at; every view model reloads from this. A store that cannot tell keeps the empty default.
+     */
+    val changes: Flow<String?> get() = emptyFlow()
 }
 
 /** Asks the user for a folder (a desktop dialog in the real app, scripted in tests); null when the user cancels. Receives no secret. */

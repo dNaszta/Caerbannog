@@ -2,6 +2,8 @@ package dev.caerbannog.core.migrations.fakes
 
 import dev.caerbannog.core.migrations.MigrationFolderChooser
 import dev.caerbannog.core.migrations.MigrationFolderStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
  * M5-08b test double of the folder dialog: answers from a script (a null answer is "the user cancelled"), and records every [startIn] it
@@ -25,5 +27,13 @@ class FakeMigrationFolderChooser(vararg answers: String?) : MigrationFolderChoos
 
 /** M5-08b in-memory [MigrationFolderStore]; a fresh one is "no folder chosen on this machine". */
 class InMemoryMigrationFolderStore(initial: String? = null) : MigrationFolderStore {
+    private val signal = MutableSharedFlow<String?>(extraBufferCapacity = 8)
+
     override var folder: String? = initial
+        set(value) {
+            field = value
+            signal.tryEmit(value)
+        }
+
+    override val changes: Flow<String?> get() = signal
 }

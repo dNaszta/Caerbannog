@@ -38,6 +38,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -192,7 +194,15 @@ private fun migrationFolderPorts(settings: AppSettings, chooser: MigrationFolder
     )
 
 private class SessionFolderStore : MigrationFolderStore {
+    private val signal = MutableSharedFlow<String?>(extraBufferCapacity = 8)
+
     override var folder: String? = null
+        set(value) {
+            field = value
+            signal.tryEmit(value)
+        }
+
+    override val changes: Flow<String?> get() = signal
 }
 
 // The banner of the Topology screen needs the connected profile (user, level) and what the permission check found, nothing else.

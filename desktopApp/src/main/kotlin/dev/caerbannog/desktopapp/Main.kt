@@ -2,6 +2,7 @@ package dev.caerbannog.desktopapp
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -380,26 +381,28 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
     val migrationsVm = remember(inputs) { composition.createMigrationsViewModel(inputs, scope) }
     val state by migrationsVm.state.collectAsState()
 
-    // Once per visit, not per recomposition or reload: a cancelled dialog leaves the list empty and the next visit asks again.
-    LaunchedEffect(Unit) {
-        if (composition.migrationFolderPorts.store.folder == null) migrationsVm.chooseFolder()
-    }
+    // Callbacks held by a dialog outlive one composition; they must reach the view model built for the latest inputs, not the one they started with.
+    val current by rememberUpdatedState(migrationsVm)
+    val folderOpener = remember { DesktopFolderOpener() }
 
     MigrationsScreen(
         state = state,
-        onSelectVersion = migrationsVm::selectVersion,
-        onApplyPending = { scope.launch { migrationsVm.applyPending() } },
-        onApplySingle = { scope.launch { migrationsVm.applySingle(it) } },
-        onImportJson = { scope.launch { migrationsVm.importFile(it) } },
-        onExportTopology = { scope.launch { migrationsVm.exportCurrentTopology() } },
-        onUpdateFile = { ver, json ->
-            scope.launch {
-                composition.migrationFolderPorts.updateFile(ver, json)
-                migrationsVm.loadMigrations()
-            }
-        },
-        onValidateAgain = migrationsVm::loadMigrations,
-        onDismissError = migrationsVm::dismissError,
+        onSelectVersion = { current.selectVersion(it) },
+        onApplyPending = { scope.launch { current.applyPending() } },
+        onApplySingle = { scope.launch { current.applySingle(it) } },
+        onImportJson = { scope.launch { current.importFile(it) } },
+        onExportTopology = { scope.launch { current.exportCurrentTopology() } },
+        onUpdateFile = { ver, json -> scope.launch { current.updateFile(ver, json) } },
+        onValidateAgain = { current.loadMigrations() },
+        onDismissError = { current.dismissError() },
+        onChooseFolder = { current.chooseFolder() },
+        onChangeFolder = { current.changeFolder() },
+        onRetry = { current.retry() },
+        onShowFolder = folderOpener::show,
+        onStartWithEmptyHistory = { current.startWithEmptyHistory() },
+        onConfirmEmptyHistory = { current.confirmEmptyHistory() },
+        onCancelEmptyHistory = { current.cancelEmptyHistory() },
+        onDismissOutcome = { current.dismissOutcome() },
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,

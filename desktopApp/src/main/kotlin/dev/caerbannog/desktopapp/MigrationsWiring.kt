@@ -5,7 +5,6 @@ import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.migrations.ActionResult
 import dev.caerbannog.core.migrations.MigrationAction
-import dev.caerbannog.core.migrations.MigrationFolderPorts
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
@@ -72,9 +71,4 @@ fun AppComposition.createMigrationsViewModel(inputs: MigrationsInputs, scope: Co
 /** Stands in when there is no executor; the view model refuses to apply first, so this is the second lock, never the only one. */
 private object RefusingExecutor : TopologyMigrationExecutor {
     override suspend fun execute(action: MigrationAction): ActionResult = ActionResult.Failed(NO_EXECUTOR)
-}
-
-/** Saves an edited migration into the folder in use; nothing happens while no folder is chosen. */
-suspend fun MigrationFolderPorts.updateFile(version: String, rawJson: String) {
-    store.folder?.let(repositoryFor)?.updateFile(version, rawJson)
 }

@@ -49,8 +49,10 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.migrations.ActionDryRun
 import dev.caerbannog.core.migrations.MigrationEntry
 import dev.caerbannog.core.migrations.MigrationFile
+import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
+import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -71,7 +73,6 @@ fun MigrationsScreen(
     onValidateAgain: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
-    // M5-08c2 STUBS: accepted, not drawn yet.
     onChooseFolder: () -> Unit = {},
     onChangeFolder: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -94,6 +95,7 @@ fun MigrationsScreen(
         actions = {
             OutlinedButton(
                 onClick = { showImportDialog = true },
+                enabled = state.canImport,
                 modifier = Modifier.testTag("migrations:importBtn"),
             ) {
                 ConnectionIcon(AppIcon.UploadFile, size = SmallIconSize)
@@ -103,6 +105,7 @@ fun MigrationsScreen(
 
             OutlinedButton(
                 onClick = onExportTopology,
+                enabled = state.canExport,
                 modifier = Modifier.testTag("migrations:exportBtn"),
             ) {
                 ConnectionIcon(AppIcon.Download, size = SmallIconSize)
@@ -112,7 +115,7 @@ fun MigrationsScreen(
 
             Button(
                 onClick = onApplyPending,
-                enabled = state.isApplyPendingEnabled && !state.isApplying,
+                enabled = state.canApplyPending,
                 modifier = Modifier.testTag("migrations:applyPendingBtn"),
             ) {
                 ConnectionIcon(AppIcon.PlayArrow, size = SmallIconSize)
@@ -141,6 +144,14 @@ fun MigrationsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            FolderRow(state, onShowFolder, onChangeFolder)
+
+            // State banners: where the files and the history are, what applying is doing and how it ended.
+            state.unavailableReason?.let { UnavailableBanner(it) }
+            FolderAndHistoryBanners(state, onRetry, onChangeFolder, onShowFolder, onStartWithEmptyHistory)
+            state.applyProgress?.let { ApplyingBanner(it) }
+            state.applyOutcome?.let { OutcomeBanner(it, onDismissOutcome) }
 
             // Error Banner
             val errorMessage = state.errorMessage
@@ -194,7 +205,9 @@ fun MigrationsScreen(
 
             // Main Content Area: Left file list + Right detail
             val selectedFile = state.selectedFile
-            Row(
+            if (state.folder is MigrationFolderState.ChooseFolder) {
+                ChooseFolderPanel(onChooseFolder)
+            } else Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
@@ -213,7 +226,7 @@ fun MigrationsScreen(
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
 
-                    if (state.entries.isEmpty()) {
+                    if (state.entries.isEmpty() && state.invalidFiles.isEmpty()) {
                         Text(
                             text = "No migration files found.",
                             style = MaterialTheme.typography.bodyMedium,
@@ -229,6 +242,8 @@ fun MigrationsScreen(
                             onClick = { onSelectVersion(entry.file.version) },
                         )
                     }
+
+                    for (invalid in state.invalidFiles) InvalidFileRow(invalid)
                 }
 
                 // Right Column: Selected file detail & dry run
@@ -255,6 +270,8 @@ fun MigrationsScreen(
             }
         }
     }
+
+    state.confirmation?.let { EmptyHistoryDialog(it, onCancelEmptyHistory, onConfirmEmptyHistory) }
 
     // Import Dialog
     if (showImportDialog) {
@@ -429,14 +446,16 @@ private fun MigrationDetailPanel(
             val dryRun = state.dryRun
             if (dryRun != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val failedIndex = MigrationsWording.failedActionIndex(state.applyOutcome, file.version)
                     dryRun.actions.forEachIndexed { index, actionDryRun ->
-                        DryRunActionRow(actionDryRun, index)
+                        DryRunActionRow(actionDryRun, index, failed = index == failedIndex)
                     }
                 }
             }
 
             // Locked banner if configure permission missing
-            val bannerMessage = state.bannerMessage
+            // The unavailable banner (drawn above) wins over this one.
+            val bannerMessage = state.bannerMessage?.takeIf { state.unavailableReason == null }
             if (bannerMessage != null) {
                 Row(
                     modifier = Modifier
@@ -468,6 +487,7 @@ private fun MigrationDetailPanel(
             ) {
                 TextButton(
                     onClick = onEdit,
+                    enabled = state.canEditFile,
                     modifier = Modifier.testTag("migrations:editFileBtn"),
                 ) {
                     ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
@@ -488,7 +508,7 @@ private fun MigrationDetailPanel(
 
                 Button(
                     onClick = onApply,
-                    enabled = state.isApplySingleEnabled && !state.isApplying,
+                    enabled = state.canApplySingle,
                     modifier = Modifier.testTag("migrations:applySingleBtn"),
                 ) {
                     Text("Apply ${file.version}")
@@ -502,6 +522,7 @@ private fun MigrationDetailPanel(
 private fun DryRunActionRow(
     actionDryRun: ActionDryRun,
     index: Int,
+    failed: Boolean = false,
 ) {
     val isAllowed = actionDryRun.allowed
     val (icon, iconTint, pillText, pillBg, pillColor) = if (isAllowed) {
@@ -542,6 +563,10 @@ private fun DryRunActionRow(
                     color = Color(0xFFC62828),
                 )
             }
+        }
+        if (failed) {
+            Pill("Failed", Color(0xFFFFEBEE), Color(0xFFC62828), AppIcon.Error, Modifier.testTag("dryRunFailed:$index"))
+            Spacer(modifier = Modifier.width(6.dp))
         }
         Box(
             modifier = Modifier
