@@ -25,7 +25,7 @@ class ReportViewBuilderTest {
             val rules = held.report.findings.filter { key(it.rule, it.severity) == g.key }.map { it.rule }
             assertTrue(rules.isNotEmpty(), "key ${g.key} is not <rule>:<severity lowercase> of any finding")
         }
-        val order = view.groups.map { Triple(g(it), it.severity.ordinal, it.key) }
+        val order = view.groups.map { Triple(g(it), it.severity!!.ordinal, it.key) }
         assertEquals(order.sortedWith(compareBy({ it.first }, { it.second }, { it.third })), order, "order of ${view.groups.map { it.key }}")
     }
 

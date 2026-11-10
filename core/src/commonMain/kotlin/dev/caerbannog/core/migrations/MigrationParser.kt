@@ -17,7 +17,19 @@ sealed interface MigrationValidationResult {
     data class Invalid(val reason: String) : MigrationValidationResult
 }
 
+/** M8-06b STUB (signatures from the brief). */
+sealed interface ActionsParseResult {
+    data class Parsed(val actions: List<MigrationAction>) : ActionsParseResult
+    /** [reason] never holds input text. */
+    data class Invalid(val reason: String) : ActionsParseResult
+}
+
 object MigrationParser {
+    /** M8-06b STUB. */
+    fun parseActions(text: String): ActionsParseResult = ActionsParseResult.Invalid("M8-06b STUB")
+
+    /** M8-06b STUB. */
+    fun actionsToJson(actions: List<MigrationAction>): String = "[]"
 
     /** A migration file has a known shallow schema (a few levels); far below the reader's failure point near 10,000. */
     private const val MAX_FILE_DEPTH = 64

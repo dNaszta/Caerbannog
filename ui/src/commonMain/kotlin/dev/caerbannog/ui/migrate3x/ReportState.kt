@@ -284,7 +284,7 @@ private fun GroupHeader(group: GroupView, onToggle: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ConnectionIcon(if (group.open) AppIcon.ArrowDropDown else AppIcon.ChevronRight, IconSize)
-        SeverityBadge(group.severity)
+        group.severity?.let { SeverityBadge(it) }
         Text(group.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(MigrateFromThreeTexts.itemCount(group.count), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

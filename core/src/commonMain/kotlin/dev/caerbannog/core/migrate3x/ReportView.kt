@@ -30,7 +30,7 @@ class LossBlockView(
 }
 
 /** One group of findings: key = rule plus severity. Closed groups hold no rows ([ReportView.rows] is empty). */
-data class GroupView(val key: String, val title: String, val severity: Severity, val findingClass: FindingClass, val count: Int, val open: Boolean)
+data class GroupView(val key: String, val title: String, val severity: Severity?, val findingClass: FindingClass?, val count: Int, val open: Boolean)
 
 /** [user] is set for a user row: tags, algorithm and the fixed text [MigrateFromThreeTexts.HASH_HIDDEN]; there is no field that could hold a hash. */
 data class RowView(
@@ -41,6 +41,10 @@ data class RowView(
     val proposal: String,
     val verified: Boolean,
     val user: UserRowView?,
+    /** M8-06b STUB default: the review item of a row that needs a decision. */
+    val item: ReviewItem? = null,
+    /** M8-06b STUB default: the decision pill of such a row. */
+    val decision: DecisionPill? = null,
 )
 
 data class UserRowView(val tags: List<String>, val algorithm: String?, val hashText: String)

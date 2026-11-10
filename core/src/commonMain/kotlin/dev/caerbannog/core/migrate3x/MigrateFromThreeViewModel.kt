@@ -1,5 +1,6 @@
 package dev.caerbannog.core.migrate3x
 
+import dev.caerbannog.core.migrations.MigrationFolderPorts
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +21,8 @@ sealed interface MigrateFromThreeState {
 
     /** [error] is `InvalidName.reason` as returned, or null. The field always starts empty: there is no default value. */
     data class NeedsVirtualHost(val fileLabel: String, val error: String?) : MigrateFromThreeState
-    data class Report(val view: ReportView, val notice: ExportNotice?) : MigrateFromThreeState
+    /** [review] has a STUB default (M8-06b): the brief makes it required, and the developer removes the default. */
+    data class Report(val view: ReportView, val notice: ExportNotice?, val review: ReviewState = ReviewState.NONE) : MigrateFromThreeState
 }
 
 /**
@@ -36,6 +38,7 @@ class MigrateFromThreeViewModel(
     private val fileChooser: DefinitionsFileChooser,
     private val reportSaver: ReportFileSaver,
     private val holder: AnalysisHolder,
+    private val folders: MigrationFolderPorts,
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -178,6 +181,27 @@ class MigrateFromThreeViewModel(
         holder.clear()
         mutable.value = MigrateFromThreeState.ChooseSource
     }
+
+    // ---- M8-06b STUB: the events of "View model API". Every one does nothing yet. ----
+    fun openItem(item: ReviewItem) = Unit
+    fun closeItem() = Unit
+    fun chooseAlternative(findingId: String, index: Int) = Unit
+    fun setTick(ack: Acknowledgement, on: Boolean) = Unit
+    fun accept() = Unit
+    fun skip() = Unit
+    fun unskip(item: ReviewItem) = Unit
+    fun startReplace() = Unit
+    fun setReplaceText(text: String) = Unit
+    fun submitReplace(text: String) = Unit
+    fun backToProposal() = Unit
+    fun showNextUndecided() = Unit
+    fun generate() = Unit
+    fun generateAgain() = Unit
+    fun cancelGenerateAgain() = Unit
+    fun chooseFolder() = Unit
+    fun retrySave() = Unit
+    fun exportFiles() = Unit
+    fun dismissResult() = Unit
 
     private fun setNotice(notice: ExportNotice?) {
         mutable.update { if (it is MigrateFromThreeState.Report) it.copy(notice = notice) else it }

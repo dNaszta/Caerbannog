@@ -30,7 +30,7 @@ class MigrateFromThreeParts(
 
 /** A view model over the app's held analysis; [scope] ends with the screen. */
 fun AppComposition.createMigrateFromThreeViewModel(scope: CoroutineScope): MigrateFromThreeViewModel =
-    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, scope)
+    MigrateFromThreeViewModel(migrateFromThree.loader, migrateFromThree.chooser, migrateFromThree.saver, migrateFromThree.holder, migrationFolderPorts, scope)  // M8-06b: the same ports the Migrations screen uses
 
 @Composable
 internal fun MigrateFromThreeWindowContent(composition: AppComposition, control: ConnectionControlState) {

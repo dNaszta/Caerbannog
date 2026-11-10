@@ -25,7 +25,7 @@ class SecretsOnScreenTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val saver = FakeReportFileSaver()
         val loader = FakeDefinitionsFileLoader(mapOf("/x/legacy.json" to FileLoadResult.Loaded(ScreenFiles.withUserAndShovel)))
-        val vm = MigrateFromThreeViewModel(loader, FakeDefinitionsFileChooser(), saver, AnalysisHolder(), kotlinx.coroutines.CoroutineScope(dispatcher), dispatcher)
+        val vm = MigrateFromThreeViewModel(loader, FakeDefinitionsFileChooser(), saver, AnalysisHolder(), dev.caerbannog.core.migrations.fakes.FakeMigrationFolders().ports, kotlinx.coroutines.CoroutineScope(dispatcher), dispatcher)
         vm.open("/x/legacy.json")
         advanceUntilIdle()
         var state = vm.state.value as? MigrateFromThreeState.Report ?: error("expected a report, got ${vm.state.value}")

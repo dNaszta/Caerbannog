@@ -23,6 +23,9 @@ fun interface ReportFileSaver {
 
 /** What the screen holds after an analysis: the file label, the document (for the counts) and the report. */
 class HeldAnalysis(val fileLabel: String, val document: DefinitionsDocument, val report: CompatibilityReport) {
+    /** The review of this analysis (built once; the held analysis survives a new window view model, so decisions survive too). */
+    val review: ConversionReview = ConversionReview.start(document, report)
+
     override fun toString(): String = "HeldAnalysis($fileLabel, ${report.findings.size} findings)"
 }
 
@@ -34,13 +37,23 @@ class AnalysisHolder {
     private val state = MutableStateFlow<HeldAnalysis?>(null)
     val held: StateFlow<HeldAnalysis?> = state.asStateFlow()
 
+    private val savedState = MutableStateFlow(false)
+
+    /** M8-06b: files were saved from this analysis; reset by [hold] and [clear]. */
+    val saved: StateFlow<Boolean> = savedState.asStateFlow()
+
     fun hold(analysis: HeldAnalysis) {
         state.value = analysis
+        savedState.value = false
     }
 
     fun clear() {
         state.value = null
+        savedState.value = false
     }
+
+    /** M8-06b STUB: does nothing yet. */
+    fun recordSaved() = Unit
 }
 
 /** The line under the report after an export: [failed] picks the style. [text] is fixed text plus, for a save, the chosen path. */

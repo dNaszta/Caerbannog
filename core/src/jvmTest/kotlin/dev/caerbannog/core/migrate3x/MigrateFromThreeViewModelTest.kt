@@ -6,6 +6,7 @@ import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileChooser
 import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileLoader
 import dev.caerbannog.core.migrate3x.fakes.FakeReportFileSaver
 import dev.caerbannog.core.migrate3x.fakes.SuspendingDefinitionsFileLoader
+import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,9 +33,10 @@ class MigrateFromThreeViewModelTest {
         val chooser: FakeDefinitionsFileChooser = FakeDefinitionsFileChooser(),
         val saver: FakeReportFileSaver = FakeReportFileSaver(),
         val holder: AnalysisHolder = AnalysisHolder(),
+        val folders: FakeMigrationFolders = FakeMigrationFolders(),
     ) {
         fun vm(): MigrateFromThreeViewModel =
-            MigrateFromThreeViewModel(loader, chooser, saver, holder, CoroutineScope(StandardTestDispatcher(test.testScheduler)), StandardTestDispatcher(test.testScheduler))
+            MigrateFromThreeViewModel(loader, chooser, saver, holder, folders.ports, CoroutineScope(StandardTestDispatcher(test.testScheduler)), StandardTestDispatcher(test.testScheduler))
     }
 
     private fun TestScope.rig(files: Map<String, FileLoadResult> = mapOf(path to good)) = Rig(this, FakeDefinitionsFileLoader(files))

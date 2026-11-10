@@ -120,6 +120,20 @@ class ConversionReview private constructor(private val document: DefinitionsDocu
 
     fun decisionOf(item: ReviewItem): ItemDecision? = decisions[item]
 
+    // ---- M8-06b STUB: the four additions of "Core additions"; real bodies are the developer's. ----
+
+    /** M8-06b STUB. */
+    fun findingsOf(item: ReviewItem): List<Finding> = emptyList()
+
+    /** M8-06b STUB. */
+    fun previewActions(item: ReviewItem, accept: ItemDecision.Accept = ItemDecision.Accept()): List<MigrationAction> = emptyList()
+
+    /** M8-06b STUB. */
+    fun refusalOf(item: ReviewItem, decision: ItemDecision): DecisionRefusal? = null
+
+    /** M8-06b STUB. */
+    fun undecide(item: ReviewItem): Boolean = false
+
     /** Nothing is produced while an item is undecided. Fails loudly (IllegalStateException) when a version would pass 9999. */
     fun generate(request: GenerationRequest): GenerationResult =
         MigrationGenerator.generate(document, report, findingsByItem, decisions, pending, request)

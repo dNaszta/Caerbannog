@@ -61,6 +61,8 @@ fun MigrateFromThreeScreen(
     modifier: Modifier = Modifier,
     /** Called after the report text was put on the clipboard (the view model then shows "Report copied as text"). */
     onReportCopied: () -> Unit = {},
+    /** M8-06b STUB: the review, generate and save events (see [ReviewEvents]). The stub screen draws none of it yet. */
+    review: ReviewEvents = ReviewEvents.None,
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
