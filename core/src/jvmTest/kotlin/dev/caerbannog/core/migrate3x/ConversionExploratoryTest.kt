@@ -101,7 +101,7 @@ class ConversionExploratoryTest {
                 } else {
                     val reason = ((result as DecisionResult.Refused).reason as? DecisionRefusal.ReplaceInvalid)?.reason ?: fail("unexpected refusal ${result.reason}")
                     assertTrue(reason.isNotBlank())
-                    assertTrue(!reason.contains(sentinel) || n.contains(sentinel), "reason echoes input unexpectedly: $reason")
+                    assertTrue(!reason.contains(sentinel), "reason echoes input: $reason")
                 }
             }
         }

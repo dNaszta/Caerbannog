@@ -210,4 +210,39 @@ class ItemDecisionTest {
         assertEquals(replace, s.review.decisionOf(q("orders")))
         s.generated()
     }
+
+    private val hostileVhosts = listOf("amqp://u:S3CR3T@h", "line1\nline2", "v".repeat(65))
+
+    private fun reasonOf(result: DecisionResult): String {
+        val r = result as? DecisionResult.Refused ?: fail("expected a refusal but got $result")
+        return (r.reason as? DecisionRefusal.ReplaceInvalid ?: fail("expected ReplaceInvalid but got ${r.reason}")).reason
+    }
+
+    @Test
+    fun `a hostile action vhost is refused and never appears in the reason`() {
+        for (hostile in hostileVhosts) {
+            val s = classic()
+            val reason = reasonOf(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum", vhost = hostile)))))
+            assertTrue(reason.isNotBlank(), "reason is blank for '$hostile'")
+            assertTrue(!reason.contains(hostile) && !reason.contains("S3CR3T"), "reason echoes the hostile vhost: $reason")
+            assertEquals(null, s.review.decisionOf(q("orders")))
+        }
+    }
+
+    @Test
+    fun `a hostile item vhost is refused and never appears in the reason`() {
+        for (hostile in hostileVhosts) {
+            val s = started(D.document(queues = listOf(D.classicQueue("orders", vhost = hostile))))
+            val reason = reasonOf(s.review.decide(q("orders", hostile), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum", vhost = "other")))))
+            assertTrue(reason.isNotBlank(), "reason is blank for '$hostile'")
+            assertTrue(!reason.contains(hostile) && !reason.contains("S3CR3T"), "reason echoes the hostile vhost: $reason")
+        }
+    }
+
+    @Test
+    fun `a plain other vhost is still named in the reason`() {
+        val s = classic()
+        val reason = reasonOf(s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum", vhost = "other")))))
+        assertTrue(reason.contains("'other'"), "the plain vhost is named: $reason")
+    }
 }
