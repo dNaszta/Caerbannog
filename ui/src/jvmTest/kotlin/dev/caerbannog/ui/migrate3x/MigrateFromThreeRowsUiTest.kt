@@ -279,4 +279,29 @@ class MigrateFromThreeRowsUiTest {
         assertTrue(everything.contains("svc"), "the premise: the row is drawn")
         listOf("SENTINEL-HASH", "SENTINEL-PASSWORD").forEach { assertFalse(everything.contains(it), "the tooltip holds $it") }
     }
+
+    @Test
+    fun `the tooltip of a hostile name shows it escaped, no raw control or bidi character`() = runDesktopComposeUiTest(900, 700) {
+        val text = DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue("a\u202Eb\u0007<b>x</b>", durable = false)))
+        val held = MigrateScreenFiles.held(text)
+        val key = rule(held, "queue-not-durable")
+        val view = dev.caerbannog.core.migrate3x.ReportViewBuilder.build(held, openGroups = setOf(key))
+        show(MigrateFromThreeState.Report(view, null))
+        revealRow(view, key, 0)
+        onNodeWithTag(rowTag(key, 0)).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(2_000)
+        waitForIdle()
+        val everything = wholeScreenText()
+        assertTrue(everything.contains("a\\u202Eb\\u0007<b>x</b>"), "the escaped name is shown")
+        assertTrue(everything.none { it == '\u202E' || it == '\u0007' }, "a raw control or bidi character reached the screen")
+    }
+
+    @Test
+    fun `a narrow window still shows the export and copy buttons and the chips`() = runDesktopComposeUiTest(520, 700) {
+        val state = MigrateScreenFiles.report()
+        show(state)
+        onNodeWithTag("migrate3x-export").assertIsDisplayed()
+        scrollList(state.view.leadingItems() - 1)
+        onNodeWithTag("migrate3x-chip-info").assertIsDisplayed()
+    }
 }

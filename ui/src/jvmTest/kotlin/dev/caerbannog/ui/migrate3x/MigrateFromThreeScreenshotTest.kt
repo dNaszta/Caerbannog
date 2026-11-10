@@ -43,4 +43,5 @@ class MigrateFromThreeScreenshotTest {
     @Test fun `screenshot - report`() = runDesktopComposeUiTest(1280, 880) { shot(MigrateScreenFiles.report(MigrateScreenFiles.withUser), "migrate3x-06-report.png") }
     @Test fun `screenshot - report with every group open`() = runDesktopComposeUiTest(1280, 880) { shot(MigrateScreenFiles.report(MigrateScreenFiles.withUser, open = MigrateScreenFiles::allGroups), "migrate3x-07-report-open.png") }
     @Test fun `screenshot - saved notice`() = runDesktopComposeUiTest(1280, 880) { shot(MigrateScreenFiles.report(notice = ExportNotice("Report saved to /home/me/report.json", failed = false)), "migrate3x-08-saved.png") }
+    @Test fun `screenshot - narrow window`() = runDesktopComposeUiTest(520, 700) { shot(MigrateScreenFiles.report(MigrateScreenFiles.withUser), "migrate3x-09-narrow.png") }
 }
