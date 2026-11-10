@@ -10,6 +10,9 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToIndex
+import dev.caerbannog.core.migrate3x.ReportView
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalClipboard
 import dev.caerbannog.core.migrate3x.CompatibilityAnalyzer
@@ -141,3 +144,27 @@ internal fun DesktopComposeUiTest.assertTextHas(tag: String, vararg parts: Strin
 /** Every node of the screen, as text: texts and content descriptions, for the "no secret on the screen" checks. */
 @OptIn(ExperimentalTestApi::class)
 internal fun DesktopComposeUiTest.wholeScreenText(): String = onRoot(useUnmergedTree = true).fetchSemanticsNode().allText()
+
+// ---- single lazy column (owner decision 2026-11-10): banner, summary and chips are the first items of ONE lazy list, tagged `migrate3x-report-list` ----
+
+internal const val REPORT_LIST_TAG = "migrate3x-report-list"
+
+/** Items before the first group: the loss banner (only when there is a loss block), the summary and the chips. */
+internal fun ReportView.leadingItems(): Int = (if (lossBlock != null) 1 else 0) + 2
+
+/** Index in the lazy list of the header of [key]; each open group adds its rows right after its header. */
+internal fun ReportView.indexOfGroup(key: String): Int {
+    var index = leadingItems()
+    for (g in groups) { if (g.key == key) return index; index += 1 + rows(g.key).size }
+    error("no group $key")
+}
+
+@OptIn(ExperimentalTestApi::class)
+internal fun DesktopComposeUiTest.scrollList(index: Int) { onNodeWithTag(REPORT_LIST_TAG).performScrollToIndex(index); waitForIdle() }
+
+@OptIn(ExperimentalTestApi::class)
+internal fun DesktopComposeUiTest.revealTop(): Unit = scrollList(0)
+@OptIn(ExperimentalTestApi::class)
+internal fun DesktopComposeUiTest.revealGroup(view: ReportView, key: String): Unit = scrollList(view.indexOfGroup(key))
+@OptIn(ExperimentalTestApi::class)
+internal fun DesktopComposeUiTest.revealRow(view: ReportView, key: String, row: Int): Unit = scrollList(view.indexOfGroup(key) + 1 + row)

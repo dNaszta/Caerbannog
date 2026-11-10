@@ -116,6 +116,9 @@ class Migrate3xScreenSteps {
     @Given("a definitions file with a queue named {string} followed by a control character")
     fun queueWithControl(name: String) = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(name + "\u0007"))))
 
+    @Given("a definitions file with a queue named {string}, the right-to-left override U+202E and {string}")
+    fun queueWithOverride(before: String, after: String) = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue(before + "\u202E" + after, durable = false), DefinitionsFiles.queue(before + "\u202E" + after))))
+
     @Given("a definitions file exported from RabbitMQ 3.13.7")
     fun anyFile() = setFile(DefinitionsFiles.file(queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("temp", durable = false))))
 
@@ -149,6 +152,12 @@ class Migrate3xScreenSteps {
     fun turnOffChips(first: String, second: String) {
         listOf(first, second).forEach { w.viewModel().toggleSeverity(Severity.valueOf(it)) }
         w.settle()
+    }
+
+    @When("I open that file on the Migrate from 3.x screen and export the report as text")
+    fun openAndExportText() {
+        open()
+        w.clipboard = w.viewModel().reportText()
     }
 
     @When("I copy the report as text")
@@ -368,6 +377,21 @@ class Migrate3xScreenSteps {
         }
         val loss = assertNotNull(view().lossBlock)
         assertTrue(loss.preview.none { name -> name.any { it.code < 0x20 } }, "control character in the loss block")
+    }
+
+    @Then("the row and the text show the name as {string} with the override escaped")
+    fun overrideEscaped(shown: String) {
+        assertEquals("a\\u202Eb", shown, "the scenario names the escaped form")
+        val rows = allRows().filter { it.name?.startsWith("a") == true }
+        assertTrue(rows.isNotEmpty(), "no row for the queue")
+        rows.forEach { assertEquals(shown, it.name) }
+        assertTrue(assertNotNull(w.clipboard, "no text export").contains(shown), "the text export does not show $shown")
+    }
+
+    @Then("neither contains the override character itself")
+    fun noRawOverride() {
+        val everything = allRows().joinToString("\n") + "\n" + w.clipboard + "\n" + assertNotNull(view().lossBlock).copyText
+        assertFalse(everything.contains('\u202E'), "a raw U+202E reached the screen text")
     }
 
     // ---- loss preview and copy ---------------------------------------------------------------------------------------------------

@@ -117,7 +117,8 @@ class MigrateFromThreeStatesUiTest {
         view.chips.forEach { chip ->
             assertTextHas("migrate3x-chip-${chip.severity.name.lowercase()}", "${chip.count}")
         }
-        view.groups.forEach { g -> assertTextHas("migrate3x-group-${g.key}", "${g.count}") }
+        view.groups.forEach { g -> revealGroup(view, g.key); assertTextHas("migrate3x-group-${g.key}", "${g.count}") }
+        revealTop()
         assertTrue(nodes("migrate3x-row-${view.groups.first().key}-0").isEmpty(), "groups start closed")
     }
 
@@ -126,8 +127,10 @@ class MigrateFromThreeStatesUiTest {
         val state = MigrateScreenFiles.report()
         val calls = MigrateCalls()
         show(state, calls, text = "TEXT OF THE REPORT")
+        revealTop()
         onNodeWithTag("migrate3x-chip-warning").performClick()
         val key = state.view.groups.first().key
+        revealGroup(state.view, key)
         onNodeWithTag("migrate3x-group-$key").performClick()
         onNodeWithTag("migrate3x-export").performClick()
         assertEquals(listOf("severity:${Severity.Warning}", "group:$key", "export"), calls.events)
