@@ -112,8 +112,12 @@ class ConnectionControlMigrationUiTest {
     @Test
     fun `keyboard - the entry takes the entry focus of the popup, and Space activates it`() = runDesktopComposeUiTest(1280, 600) {
         val recorder = open(state)
-        onNode(SemanticsMatcher("focused node in the popup") { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Focused) == true }, useUnmergedTree = true)
-            .assert(hasTestTag("connection-popup-migrate3x"))
+        // The chip stays Focused while its popup is open, so the matcher is scoped to the popup (like ConnectionControlUiTest).
+        onNode(
+            SemanticsMatcher("focused node in the popup") { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Focused) == true }
+                .and(hasAnyAncestor(hasTestTag("connectionPopup"))),
+            useUnmergedTree = true,
+        ).assert(hasTestTag("connection-popup-migrate3x"))
         onNodeWithTag("connection-popup-migrate3x").performKeyInput { pressKey(Key.Spacebar) }
         assertEquals(listOf("openMigrateFromThree"), recorder.events)
     }
