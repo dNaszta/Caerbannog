@@ -238,19 +238,36 @@ class MigrationsViewModelOutcomeTest {
     }
 
     @Test
-    fun `dismissOutcome clears the outcome and nothing else of the list`() = runBlocking<Unit> {
+    fun `dismissOutcome clears the outcome, the progress and the composed error text, and nothing else of the list`() = runBlocking<Unit> {
         add(migration("0003", "a", "b"))
         executor.failures["b"] = ActionResult.Failed(refused)
         val vm = vm()
         vm.applyPending()
         val entries = vm.state.value.entries
         assertNotNull(vm.state.value.applyOutcome, "precondition: the apply left an outcome")
+        assertNotNull(vm.state.value.errorMessage, "precondition: the apply left the composed text")
 
         vm.dismissOutcome()
 
         assertNull(vm.state.value.applyOutcome)
         assertNull(vm.state.value.applyProgress)
+        assertNull(vm.state.value.errorMessage, "the red banner must go with the outcome")
         assertEquals(entries, vm.state.value.entries)
+    }
+
+    @Test
+    fun `dismissError, the banner's Dismiss, also clears the outcome`() = runBlocking<Unit> {
+        add(migration("0003", "a", "b"))
+        executor.failures["b"] = ActionResult.Failed(refused)
+        val vm = vm()
+        vm.applyPending()
+        assertNotNull(vm.state.value.applyOutcome, "precondition: the apply left an outcome")
+        assertNotNull(vm.state.value.errorMessage, "precondition: the apply left the composed text")
+
+        vm.dismissError()
+
+        assertNull(vm.state.value.errorMessage)
+        assertNull(vm.state.value.applyOutcome)
     }
 
     @Test

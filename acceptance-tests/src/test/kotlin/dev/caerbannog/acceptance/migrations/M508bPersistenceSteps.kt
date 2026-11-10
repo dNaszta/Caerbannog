@@ -285,7 +285,7 @@ class M508bPersistenceSteps {
     @Then("I see the path and that the folder does not exist")
     fun seePathMissing() {
         val path = checkNotNull(settings.folder)
-        assertEquals(MigrationFolderState.FolderUnavailable(path, FolderProblem.MISSING.message), vm.state.value.folder)
+        assertEquals(MigrationFolderState.FolderUnavailable(path, FolderProblem.MISSING), vm.state.value.folder)
         assertEquals("The folder does not exist", FolderProblem.MISSING.message)
     }
 
@@ -324,7 +324,7 @@ class M508bPersistenceSteps {
     @Then("I see the path and that the folder cannot be read")
     fun seePathUnreadable() {
         assertEquals(
-            MigrationFolderState.FolderUnavailable(folderFor("/work/migrations").toString(), FolderProblem.UNREADABLE.message),
+            MigrationFolderState.FolderUnavailable(folderFor("/work/migrations").toString(), FolderProblem.UNREADABLE),
             vm.state.value.folder,
         )
         assertEquals("The folder cannot be read", FolderProblem.UNREADABLE.message)

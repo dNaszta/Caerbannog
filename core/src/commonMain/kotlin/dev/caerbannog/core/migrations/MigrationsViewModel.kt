@@ -157,7 +157,7 @@ class MigrationsViewModel(
         val path = folderPorts?.store?.folder
         return when {
             listing == null -> MigrationFolderState.ChooseFolder
-            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem.message)
+            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem)
             listing is FolderListing.Listed && listing.readOnly && path != null -> MigrationFolderState.FolderReadOnly(path)
             else -> MigrationFolderState.Ready(path)
         }

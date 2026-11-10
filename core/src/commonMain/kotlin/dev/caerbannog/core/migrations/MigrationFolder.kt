@@ -48,7 +48,10 @@ sealed interface FolderListing {
 sealed interface MigrationFolderState {
     /** No folder chosen yet (or the user cancelled): nothing is read or written. */
     data object ChooseFolder : MigrationFolderState
-    data class FolderUnavailable(val path: String, val reason: String) : MigrationFolderState
+    data class FolderUnavailable(val path: String, val problem: FolderProblem) : MigrationFolderState {
+        /** The fixed text of [problem]. */
+        val reason: String get() = problem.message
+    }
     data class FolderReadOnly(val path: String, val reason: String = FOLDER_READ_ONLY_MESSAGE) : MigrationFolderState
     /** The folder lists and writes; [path] is null only for a view model built without folder ports (the old in-memory mode). */
     data class Ready(val path: String?) : MigrationFolderState

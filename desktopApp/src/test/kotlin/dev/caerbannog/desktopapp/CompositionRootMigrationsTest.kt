@@ -268,13 +268,13 @@ class CompositionRootMigrationsTest {
             composition.folderWithOneMigration()
             val inputs = composition.inputs()
             assertNull(inputs.executor)
-            assertTrue(!inputs.unavailableReason.isNullOrBlank(), "a missing executor always has a reason")
+            assertEquals("Connect to a broker first", inputs.unavailableReason)
 
             val vm = composition.createMigrationsViewModel(inputs, scope)
 
             assertFalse(vm.state.value.isApplyPendingEnabled)
             assertIs<MigrationApplyResult.Blocked>(vm.applyPending())
-            assertNotNull(vm.state.value.bannerMessage)
+            assertEquals("Migrations are not offered on this connection: Connect to a broker first", vm.state.value.bannerMessage)
         } finally {
             composition.close()
         }
