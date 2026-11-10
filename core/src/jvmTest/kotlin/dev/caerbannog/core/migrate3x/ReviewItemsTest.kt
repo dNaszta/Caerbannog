@@ -126,4 +126,14 @@ class ReviewItemsTest {
         assertTrue(text.contains("14"), "toString should show the number of items: $text")
         assertTrue(!text.contains("classic-plain") && !text.contains("SENTINEL"), "toString must not list names or secrets: $text")
     }
+
+    @Test
+    fun `items are ordered by their first qualifying finding`() {
+        val a = q("a"); val b = q("b")
+        val doc = D.document(queues = listOf(D.quorumQueue("a"), D.quorumQueue("b")))
+        val report = syntheticReport(
+            synthetic(b, Severity.Info, rule = "r1"), synthetic(a, Severity.Warning, rule = "r2"), synthetic(b, Severity.Warning, rule = "r3"),
+        )
+        assertEquals(listOf(a, b), ConversionReview.start(doc, report).items)
+    }
 }

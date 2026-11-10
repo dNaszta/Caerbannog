@@ -26,6 +26,9 @@ sealed interface DecisionRefusal {
     /** A chosen proposal carries an acknowledgement that is not in `acknowledged`. */
     data class TickMissing(val missing: Set<Acknowledgement>) : DecisionRefusal
 
+    /** A `Replace` holds a delete action (any `Delete*`). */
+    data object ReplaceHasDelete : DecisionRefusal
+
     /** The item is compatible, a binding, or unknown: nothing to decide. */
     data object NotAReviewItem : DecisionRefusal
 }
@@ -38,7 +41,7 @@ sealed interface DecisionResult {
 /** [existingVersions] are the versions already in the migrations folder; [source] is the connection or file label for the description. */
 data class GenerationRequest(val existingVersions: Set<String>, val source: String)
 
-enum class SkipReason { SkippedByUser, NameCannotBeWritten, UnknownKind }
+enum class SkipReason { SkippedByUser, NameCannotBeWritten }
 
 data class SkippedItem(val item: ReviewItem, val reason: SkipReason)
 

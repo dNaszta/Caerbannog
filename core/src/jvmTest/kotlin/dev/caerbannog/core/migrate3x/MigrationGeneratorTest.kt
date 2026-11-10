@@ -429,10 +429,77 @@ class MigrationGeneratorTest {
     }
 
     @Test
-    fun `generating twice gives the same result`() {
-        val s = started(fullFixture())
-        s.acceptEveryDefault().forEach { s.decide(it, ItemDecision.Skip) }
-        assertEquals(s.generated(), s.generated())
+    fun `the same document twice gives equal results`() {
+        fun run(): GenerationResult.Generated {
+            val s = started(fullFixture())
+            s.acceptEveryDefault().forEach { s.decide(it, ItemDecision.Skip) }
+            return s.generated()
+        }
+        assertEquals(run(), run())
+    }
+
+    @Test
+    fun `reversed document lists give actions in reversed document order`() {
+        fun doc(reverse: Boolean) = D.document(
+            queues = listOf(D.quorumQueue("q1"), D.quorumQueue("q2"), D.streamQueue("s1")).let { if (reverse) it.reversed() else it },
+            exchanges = listOf(D.exchange("e1"), D.exchange("e2")).let { if (reverse) it.reversed() else it },
+            policies = listOf(D.policy("p1", "^a$", D.args("max-length" to 1)), D.policy("p2", "^a$", D.args("max-length" to 1))).let { if (reverse) it.reversed() else it },
+        )
+        val forward = started(doc(false)).generated().actions().map { it.description }
+        val backward = started(doc(true)).generated().actions().map { it.description }
+        assertEquals(
+            listOf("Declare direct exchange e2", "Declare direct exchange e1", "Declare stream s1", "Declare quorum queue q2", "Declare quorum queue q1", "Declare policy p2", "Declare policy p1"),
+            backward,
+        )
+        assertEquals(forward.take(2).reversed() + forward.drop(2).take(3).reversed() + forward.drop(5).reversed(), backward)
+    }
+
+    @Test
+    fun `an unwritable classic non-durable queue does not stop generation`() {
+        val s = started(D.document(queues = listOf(D.classicQueue("..", durable = false), D.quorumQueue("ok"))))
+        val result = s.generated()
+        assertEquals(listOf(SkippedItem(q(".."), SkipReason.NameCannotBeWritten)), result.skipped)
+        assertEquals(listOf("ok"), result.actions().filterIsInstance<MigrationAction.DeclareQueue>().map { it.name })
+    }
+
+    @Test
+    fun `an unknown queue type is declared with that type and no x-queue-type argument, and a skipped one is listed`() {
+        val s = started(D.document(queues = listOf(D.queue("x", QueueKind.Other("x-foo"), arguments = D.args("x-max-length" to 5)), D.queue("y", QueueKind.Other("x-foo")))))
+        s.decide(q("x"), ItemDecision.Accept())
+        s.decide(q("y"), ItemDecision.Skip)
+        val result = s.generated()
+        assertEquals(MigrationAction.DeclareQueue("x", "x-foo", "/", arguments = mapOf("x-max-length" to w(5))), result.queue("x"))
+        assertEquals(listOf(SkippedItem(q("y"), SkipReason.SkippedByUser)), result.skipped)
+    }
+
+    @Test
+    fun `versions are the highest numeric existing one plus one, gaps are not filled, non-numeric names are ignored`() {
+        val s = started(D.document(queues = listOf(D.quorumQueue("a"))))
+        assertEquals(listOf("0004"), s.generated(GenerationRequest(setOf("0001", "0003"), "legacy-eu")).migrations.map { it.file.version })
+        assertEquals(listOf("0002"), s.generated(GenerationRequest(setOf("0001", "abc"), "legacy-eu")).migrations.map { it.file.version })
+    }
+
+    @Test
+    fun `past 9999 generation fails with IllegalStateException`() {
+        val s = started(D.document(queues = listOf(D.quorumQueue("a"))))
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) { s.review.generate(GenerationRequest(setOf("9999"), "legacy-eu")) }
+    }
+
+    @Test
+    fun `files are ordered by virtual host name, slash first, and get consecutive versions in that order`() {
+        val slash = started(D.document(queues = listOf(D.quorumQueue("b", "/orders"), D.quorumQueue("a")))).generated()
+        assertEquals(listOf("/" to "0001", "/orders" to "0002"), slash.migrations.map { it.vhost to it.file.version })
+        val named = started(D.document(queues = listOf(D.quorumQueue("z", "zeta"), D.quorumQueue("a", "alpha")))).generated(GenerationRequest(setOf("abc"), "legacy-eu"))
+        assertEquals(listOf("alpha" to "0001", "zeta" to "0002"), named.migrations.map { it.vhost to it.file.version })
+    }
+
+    @Test
+    fun `a binding to a queue replaced by a policy only is left out`() {
+        val s = twoEndsAndBinding()
+        s.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclarePolicy("p", "^a$", D.args("max-length" to 1)))))
+        val result = s.generated()
+        assertEquals(emptyList<MigrationAction>(), result.actions().filterIsInstance<MigrationAction.DeclareBinding>())
+        assertTrue(result.notes.any { it.item == bind("events", "orders", "k") }, "listed: ${result.noteTexts()}")
     }
 
     @Test

@@ -134,4 +134,37 @@ class ItemDecisionTest {
         assertEquals(listOf(q("a"), q("c")), s.review.pending)
         assertEquals(listOf(q("a"), q("b"), q("c")), s.review.items, "items stay whatever is decided")
     }
+
+    @Test
+    fun `an item named dot or dot dot is not a review item, even when it is a non-durable classic queue`() {
+        val s = started(D.document(queues = listOf(D.classicQueue("..", durable = false), D.classicQueue(".")), exchanges = listOf(D.exchange(".."))))
+        assertEquals(emptyList<ReviewItem>(), s.review.items)
+        assertEquals(emptyList<ReviewItem>(), s.review.pending)
+        assertEquals(refused(DecisionRefusal.NotAReviewItem), s.review.decide(q(".."), ItemDecision.Skip))
+        assertEquals(refused(DecisionRefusal.NotAReviewItem), s.review.decide(ex(".."), ItemDecision.Skip))
+    }
+
+    @Test
+    fun `an unknown queue type can be accepted and skipped`() {
+        val s = started(D.document(queues = listOf(D.queue("x", QueueKind.Other("x-foo")), D.queue("y", QueueKind.Other("x-foo")))))
+        s.report.only("queue-type-unknown", "x")
+        assertEquals(DecisionResult.Decided, s.review.decide(q("x"), ItemDecision.Accept()))
+        assertEquals(DecisionResult.Decided, s.review.decide(q("y"), ItemDecision.Skip))
+    }
+
+    @Test
+    fun `a Replace with a delete action is refused and decides nothing`() {
+        val s = classic()
+        for (delete in listOf(
+            MigrationAction.DeleteQueue("orders"), MigrationAction.DeleteExchange("e"), MigrationAction.DeleteBinding("e", "orders"),
+            MigrationAction.DeleteStream("s"), MigrationAction.DeletePolicy("p"),
+        )) {
+            assertEquals(refused(DecisionRefusal.ReplaceHasDelete), s.review.decide(q("orders"), ItemDecision.Replace(listOf(delete))), delete.actionName)
+            assertEquals(refused(DecisionRefusal.ReplaceHasDelete), s.review.decide(q("orders"), ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum"), delete))), "mixed ${delete.actionName}")
+        }
+        assertEquals(null, s.review.decisionOf(q("orders")))
+        assertEquals(listOf(q("orders")), s.review.pending)
+        val declares = ItemDecision.Replace(listOf(MigrationAction.DeclareQueue("orders", "quorum"), MigrationAction.DeclareExchange("e")))
+        assertEquals(DecisionResult.Decided, s.review.decide(q("orders"), declares))
+    }
 }
