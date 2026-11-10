@@ -198,6 +198,14 @@ class ManagementThreeXReadsTest {
         assertInstanceOf(ReadOutcome.Failed::class.java, reading(answering(200, deep)) { it.storageVersions("/") })
     }
 
+    @Test
+    fun `a storage_version that is not a JSON number counts as not there yet`() {
+        // Found by mutation 15 (a string "1" accepted as 1): only a number is a storage version, anything else is read again by the core.
+        val odd = """{"name":"s","storage_version":"1"},{"name":"b","storage_version":true},{"name":"n","storage_version":null},{"name":"f","storage_version":1.5}"""
+        val map = ok(reading(answering(200, """{"items":[$odd],"page_count":1}""")) { it.storageVersions("/") })
+        for (name in listOf("s", "b", "n", "f")) assertNull(map[name], "storage_version of $name")
+    }
+
     // ---- R5: redirects (these pin Ktor 3.0.3 behaviour of the shared client on purpose) ---------------------------------------------
 
     private class Hop(val method: String, val host: String, val scheme: String, val path: String, val authorization: String?)
