@@ -33,7 +33,12 @@ import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Hub
@@ -119,6 +124,11 @@ internal enum class AppIcon(val mockupName: String) {
     Download("download"),
     Edit("edit"),
     Rule("rule"),
+    Folder("folder"),
+    FolderOpen("folder_open"),
+    DriveFileMove("drive_file_move"),
+    History("history"),
+    RestartAlt("restart_alt"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -168,6 +178,11 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Download -> Icons.Outlined.FileDownload
     AppIcon.Edit -> Icons.Outlined.Edit
     AppIcon.Rule -> Icons.Outlined.Check
+    AppIcon.Folder -> Icons.Outlined.Folder
+    AppIcon.FolderOpen -> Icons.Outlined.FolderOpen
+    AppIcon.DriveFileMove -> Icons.Outlined.DriveFileMove
+    AppIcon.History -> Icons.Outlined.History
+    AppIcon.RestartAlt -> Icons.Outlined.RestartAlt
 }
 
 /** `.ms.sm` in the mockup. */

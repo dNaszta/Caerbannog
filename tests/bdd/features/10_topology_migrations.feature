@@ -155,7 +155,8 @@ Feature: Topology migrations
   # ---- M5-08: real execution, rerun safety, persistence and the migrations folder ----
   # Sub-tags: @m5-08a executor, conflicts, rerun (core + data-rabbit, in-memory repositories, fake HTTP);
   # @m5-08b persistence and the migrations folder (real files in temp folders, fake chooser);
-  # @m5-08c desktop wiring and the Migrations screen states. Owner decisions 2026-11-09: a failing action stops the
+  # @m5-08c1 desktop wiring and view-model states (real apply works end to end, existing banners); @m5-08c2 the screen states (the same scenarios are
+  # re-bound to the Compose screen without editing them, plus the screen-only ones). Owner decisions 2026-11-09: a failing action stops the
   # migration and it is not recorded; a rerun is safe by design; the user chooses the migrations folder.
 
   @m5-08 @m5-08a @fake-broker @negative
@@ -345,7 +346,7 @@ Feature: Topology migrations
       | NaN          |
       | 1e3          |
 
-  @m5-08 @m5-08c @fake-broker @negative
+  @m5-08 @m5-08c1 @fake-broker @negative
   Scenario: The topology control level of the connection is honoured
     Given the connection "uat-eu" has the topology control level "Read-only" although the broker would allow changes
     When I open the migrations screen
@@ -360,20 +361,64 @@ Feature: Topology migrations
     Then the connection has no migration executor and says migrations are not offered because it is a migration source only
     And no request that changes anything was sent to "legacy-eu"
 
-  @m5-08 @m5-08c @fake-broker
+  @m5-08 @m5-08c1 @fake-broker
   Scenario: A failed apply shows which action failed and why
     Given a pending migration "0003" whose second action is refused by the broker
     When I apply "0003" on the screen
-    Then the screen shows that action 2 of 3 failed with a fixed reason and that "0003" was not recorded
+    Then the screen says "Action 2 of 3 failed: the broker refused the request"
+    And it says migration "0003" was not recorded and that running it again is safe
 
-  @m5-08 @m5-08c @fake-broker
+  @m5-08 @m5-08c1 @fake-broker
   Scenario: A conflict names the resource
     Given the broker has the quorum queue "orders" with "x-delivery-limit" 3
     And a pending migration declares the quorum queue "orders" with "x-delivery-limit" 5
     When I apply the pending migrations on the screen
-    Then the screen says "orders" exists with different settings and nothing was changed
+    Then the screen says "Action 1 of 1 stopped: orders exists with different settings"
+    And it says the existing "orders" was not changed and "0001" was not recorded
 
-  @m5-08 @m5-08c @fake-broker
+  @m5-08 @m5-08c2 @fake-broker
+  Scenario: Applying shows its progress
+    Given a pending migration "0003" with three actions
+    When I apply "0003" on the screen and the second action is running
+    Then the screen says "Applying 0003: action 2 of 3"
+    And Apply pending, Import and Export are disabled
+
+  @m5-08 @m5-08c1 @fake-broker
+  Scenario: An apply that could not be recorded says so
+    Given the history cannot be written after the broker accepted every action of "0003"
+    When I apply "0003" on the screen
+    Then the screen says "The migration was applied but could not be recorded; running it again is safe"
+    And "0003" is still listed as pending
+
+  @m5-08 @m5-08c1 @fake-broker @negative
+  Scenario: A connection that cannot apply migrations says why
+    Given a connection whose migration executor is missing because "This broker runs RabbitMQ 3.x: it is a migration source only"
+    When I open the migrations screen
+    Then the screen says migrations are not offered on this connection and shows that reason
+    And "Apply pending" is disabled while files, dry run, Import and Export keep working
+
+  @m5-08 @m5-08c2 @fake-broker @negative
+  Scenario: The unreadable history can be moved aside from the screen
+    Given the applied-migrations history file is not valid JSON
+    When I open the migrations screen and choose "Start with an empty history"
+    Then a dialog asks to move migration-history.json to its timestamped name and says the old file is kept
+    And cancelling changes nothing and confirming makes every migration pending
+
+  @m5-08 @m5-08c2 @fake-broker @negative
+  Scenario: Deleting a profile whose history cannot be updated leaves it as it is
+    Given the history of the connection "uat-eu" cannot be updated
+    When I confirm deleting the connection "uat-eu"
+    Then the Connections screen shows "The migration history of this connection could not be updated, so the connection was left as it is"
+    And "uat-eu" is still listed
+
+  @m5-08 @m5-08c2 @fake-broker @negative
+  Scenario: Renaming a profile whose history cannot be updated leaves it as it is
+    Given the history of the connection "uat-eu" cannot be updated
+    When I save the connection "uat-eu" under the name "uat-eu-2"
+    Then the Connections screen shows "The migration history of this connection could not be updated, so the connection was left as it is"
+    And the connection is still named "uat-eu"
+
+  @m5-08 @m5-08c2 @fake-broker
   Scenario: The folder can be changed at any time
     Given a folder is chosen
     When I choose "Change folder" and pick another folder

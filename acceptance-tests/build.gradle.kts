@@ -1,5 +1,8 @@
 plugins {
     kotlin("jvm")
+    // M5-08c2: the migrations and connections scenarios are also bound to the real Compose screens (ui) through the Compose UI test API; test scope only.
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
 }
 
 kotlin {
@@ -38,6 +41,11 @@ dependencies {
     // Keyring and JNA native libs are on the classpath only because the file repository needs data-rabbit.
     // The real-keychain tests run only via :data-rabbit:keychainTest.
     testImplementation(project(":data-rabbit"))
+    // M5-08c2: the Compose screens and the Compose UI test API (same artifacts as the ui module's tests; no new third-party library).
+    testImplementation(project(":ui"))
+    testImplementation(compose.runtime)
+    testImplementation(compose.desktop.uiTestJUnit4)
+    testImplementation(compose.desktop.currentOs)
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     // M2-04: the stream list steps run the view model in virtual time ("30 seconds pass" advances a test scheduler).

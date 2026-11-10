@@ -124,6 +124,18 @@ body{margin:0}
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn text" type="button">Use Full control</button></div>
 <div class="t-bs dim">Dialog shown when Full control is picked and was not already selected. Cancel, Esc or a click outside keep the previous choice. The choice is saved only on Save.</div>
 </section>
+<section class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
+<div class="t-tl">Migration history could not be updated (M5-08c)</div>
+<div class="t-bs dim">A profile keeps its applied-migrations history under its name. Renaming or deleting the profile moves or removes that history FIRST; if that fails the profile is left exactly as it was and this banner shows above the buttons of the edit panel (Save or Delete profile), in the same place as "A connection named ... already exists". The delete confirmation dialog closes before the banner appears.</div>
+<div class="banner err"><span class="ms" aria-hidden="true">history_toggle_off</span><div>The migration history of this connection could not be updated, so the connection was left as it is</div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">delete</span>Delete profile</button>
+<span style="flex-grow:1"></span>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">wifi_tethering</span>Check connection and permissions</button>
+<button class="btn filled" type="button">Save</button>
+</div>
+<div class="t-bs dim">The banner stays until the next Save, Delete or selection. Trying again is allowed. Nothing else on the screen changes.</div>
+</section>
 </div>
 </main>
 </div>

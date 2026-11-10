@@ -108,6 +108,14 @@ class M508aExecutorSteps {
         import(queueJson(version, "q-$version-1", "q-$version-2", "q-$version-3"))
     }
 
+    /** M5-08c1: the scenario of the screen. A 400 on a queue that does not exist is the executor's fixed "the broker refused the request". */
+    @Given("a pending migration {string} whose second action is refused by the broker")
+    fun pendingWithSecondRefusedOnScreen(version: String) {
+        real()
+        broker.answerContaining("PUT", "/api/queues/%2F/q-$version-2", 400, sentinel)
+        import(queueJson(version, "q-$version-1", "q-$version-2", "q-$version-3"))
+    }
+
     @Then("the first action was applied and the third action was never sent")
     fun firstAppliedThirdNeverSent() {
         assertTrue(broker.hasQueue("/", "q-0003-1"), "the first action was not applied")

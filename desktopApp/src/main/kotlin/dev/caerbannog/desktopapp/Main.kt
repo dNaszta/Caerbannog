@@ -2,6 +2,7 @@ package dev.caerbannog.desktopapp
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -31,13 +32,6 @@ import dev.caerbannog.ui.publish.PublishEvents
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.core.connections.deleteStreamGate
-import dev.caerbannog.core.migrations.ActionResult
-import dev.caerbannog.core.migrations.InMemoryMigrationFileRepository
-import dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository
-import dev.caerbannog.core.migrations.MigrationAction
-import dev.caerbannog.core.migrations.MigrationRunner
-import dev.caerbannog.core.migrations.MigrationsViewModel
-import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.browser.PayloadViewKind
 import dev.caerbannog.core.streams.StreamManagementViewModel
 import dev.caerbannog.core.streams.UnavailableStreamManager
@@ -378,58 +372,37 @@ internal fun TopologyWindowContent(composition: AppComposition, control: Connect
     )
 }
 
-/** The Migrations screen. */
+/** The Migrations screen: the connection's real executor, the profile's own level, the folder repository and the history on disk. */
 @Composable
 private fun MigrationsWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val connections by composition.viewModel.state.collectAsState()
-    val currentConn = connections.currentConnection
     val scope = rememberCoroutineScope()
-    val source = composition.active.source
-    val connName = currentConn?.name.orEmpty()
-    val vhost = source?.vhost ?: "/"
-    val done = currentConn?.status as? PermissionCheckStatus.Done
-    val canConfigure = done?.result?.topologyUnlocked ?: false
-    val controlLevel = dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL
-
-    val fileRepo = remember { InMemoryMigrationFileRepository() }
-    val historyRepo = remember { InMemoryMigrationHistoryRepository() }
-    val executor = remember(composition.active) {
-        object : TopologyMigrationExecutor {
-            override suspend fun execute(action: MigrationAction): ActionResult {
-                return ActionResult.Success
-            }
-        }
-    }
-    val runner = remember(historyRepo, executor) { MigrationRunner(historyRepo, executor) }
-    val migrationsVm = remember(connName, vhost, canConfigure, controlLevel) {
-        MigrationsViewModel(
-            fileRepository = fileRepo,
-            runner = runner,
-            topologyCatalog = composition.active.source?.topology,
-            profileName = connName,
-            vhost = vhost,
-            hasConfigurePermission = canConfigure,
-            controlLevel = controlLevel,
-            scope = scope,
-        )
-    }
+    val inputs = composition.migrationsInputs(connections)
+    val migrationsVm = remember(inputs) { composition.createMigrationsViewModel(inputs, scope) }
     val state by migrationsVm.state.collectAsState()
+
+    // Callbacks held by a dialog outlive one composition; they must reach the view model built for the latest inputs, not the one they started with.
+    val current by rememberUpdatedState(migrationsVm)
+    val folderOpener = remember { DesktopFolderOpener() }
 
     MigrationsScreen(
         state = state,
-        onSelectVersion = migrationsVm::selectVersion,
-        onApplyPending = { scope.launch { migrationsVm.applyPending() } },
-        onApplySingle = { scope.launch { migrationsVm.applySingle(it) } },
-        onImportJson = { scope.launch { migrationsVm.importFile(it) } },
-        onExportTopology = { scope.launch { migrationsVm.exportCurrentTopology() } },
-        onUpdateFile = { ver, json ->
-            scope.launch {
-                fileRepo.updateFile(ver, json)
-                migrationsVm.loadMigrations()
-            }
-        },
-        onValidateAgain = migrationsVm::loadMigrations,
-        onDismissError = migrationsVm::dismissError,
+        onSelectVersion = { current.selectVersion(it) },
+        onApplyPending = { scope.launch { current.applyPending() } },
+        onApplySingle = { scope.launch { current.applySingle(it) } },
+        onImportJson = { scope.launch { current.importFile(it) } },
+        onExportTopology = { scope.launch { current.exportCurrentTopology() } },
+        onUpdateFile = { ver, json -> scope.launch { current.updateFile(ver, json) } },
+        onValidateAgain = { current.loadMigrations() },
+        onDismissError = { current.dismissError() },
+        onChooseFolder = { current.chooseFolder() },
+        onChangeFolder = { current.changeFolder() },
+        onRetry = { current.retry() },
+        onShowFolder = folderOpener::show,
+        onStartWithEmptyHistory = { current.startWithEmptyHistory() },
+        onConfirmEmptyHistory = { current.confirmEmptyHistory() },
+        onCancelEmptyHistory = { current.cancelEmptyHistory() },
+        onDismissOutcome = { current.dismissOutcome() },
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,

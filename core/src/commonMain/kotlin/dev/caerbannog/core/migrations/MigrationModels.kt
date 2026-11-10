@@ -236,6 +236,7 @@ sealed interface MigrationApplyResult {
         /** Number of actions of the migration. */
         val total: Int,
         val reason: String,
+        val kind: FailureKind = FailureKind.Other,
     ) : MigrationApplyResult
     data class Blocked(val reason: String) : MigrationApplyResult
     /** Every action was applied on the broker but the history could not be written; [reason] is fixed text. */

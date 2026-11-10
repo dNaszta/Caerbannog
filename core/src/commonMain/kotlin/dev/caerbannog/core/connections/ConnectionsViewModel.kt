@@ -336,6 +336,7 @@ class ConnectionsViewModel(
         lastCheckResult = null,
         lastSaveResult = null,
         lastCaCertificateValidationResult = null,
+        errorMessage = null,
     )
 
     private fun storePasswordIfPresent(name: String, password: String?) {

@@ -96,7 +96,7 @@ class MigrationRunnerRecordFailureTest {
     }
 
     @Test
-    fun `the view model shows the fixed text for NotRecorded, from apply pending and from apply single`() = runBlocking {
+    fun `the view model keeps the fixed text in the NotRecorded outcome, from apply pending and from apply single`() = runBlocking {
         val files = InMemoryMigrationFileRepository().also { it.addFile(migration("0001")) }
         val vm = MigrationsViewModel(
             fileRepository = files,
@@ -107,12 +107,12 @@ class MigrationRunnerRecordFailureTest {
 
         val pending = vm.applyPending()
         assertIs<MigrationApplyResult.NotRecorded>(pending)
-        assertEquals(text, vm.state.value.errorMessage)
+        assertEquals(ApplyOutcome.NotRecorded("0001", text), vm.state.value.applyOutcome)
         assertFalse(vm.state.value.isApplying)
 
         vm.dismissError()
         val single = vm.applySingle("0001")
         assertIs<MigrationApplyResult.NotRecorded>(single)
-        assertEquals(text, vm.state.value.errorMessage)
+        assertEquals(ApplyOutcome.NotRecorded("0001", text), vm.state.value.applyOutcome)
     }
 }

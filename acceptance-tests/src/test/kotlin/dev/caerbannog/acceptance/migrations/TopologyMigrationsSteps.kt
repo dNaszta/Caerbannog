@@ -57,6 +57,9 @@ class TopologyMigrationsSteps {
     internal var configurePermission: Boolean = true
     internal var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL
 
+    /** M5-08c1: the fixed reason the connection has no migration executor (a 3.x source, for example); null when it has one. */
+    internal var migrationUnavailableReason: String? = null
+
     internal var viewModel: MigrationsViewModel? = null
 
     /** M5-08b: a scenario with the real folder repositories (M508bPersistenceSteps) builds its view model here; null keeps the in-memory one. */
@@ -84,6 +87,7 @@ class TopologyMigrationsSteps {
         vhost = "/"
         configurePermission = true
         controlLevel = TopologyControlLevel.FULL_CONTROL
+        migrationUnavailableReason = null
         dryRunResult = null
         lastApplyResult = null
         lastImportResult = null
@@ -105,6 +109,7 @@ class TopologyMigrationsSteps {
             vhost = vhost,
             hasConfigurePermission = configurePermission,
             controlLevel = controlLevel,
+            migrationUnavailableReason = migrationUnavailableReason,
             scope = scope,
         )).also { viewModel = it }
     }
@@ -499,23 +504,8 @@ class TopologyMigrationsSteps {
         assertFalse(files.any { it.version == "0099" })
     }
 
-    @Given("a pending migration {string} whose second action is refused by the broker")
-    fun aPendingMigrationWhoseSecondActionIsRefusedByTheBroker(version: String) = runBlocking {
-        executor.failingActionIndex = 1
-        executor.failureReason = "Broker refused binding"
-        val json = """
-            {
-              "version": "$version",
-              "description": "Migration with failing action",
-              "up": [
-                { "action": "declareQueue", "name": "orders", "type": "quorum" },
-                { "action": "declareBinding", "exchange": "events", "queue": "orders", "routingKey": "order.created" }
-              ]
-            }
-        """.trimIndent()
-        fileRepository.importFile(json)
-        getVm().loadMigrations()
-    }
+    // M5-08c1: the step "a pending migration {string} whose second action is refused by the broker" moved to M508aExecutorSteps (three actions, the
+    // real executor over the scripted broker): the screen's failure text names "Action 2 of 3" and the executor's fixed reason.
 
     @Then("the migration stops at the second action")
     fun theMigrationStopsAtTheSecondAction() {

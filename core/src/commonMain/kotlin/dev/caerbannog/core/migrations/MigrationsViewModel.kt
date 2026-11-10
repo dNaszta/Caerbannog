@@ -36,13 +36,40 @@ data class MigrationsScreenState(
     val isExportEnabled: Boolean = true,
     /** The question waiting for Confirm or Cancel, or null. */
     val confirmation: String? = null,
+    /** The action being sent while an apply runs, else null. */
+    val applyProgress: ApplyProgress? = null,
+    /** How the last apply ended when it did not succeed; cleared by the next apply and by `dismissOutcome`. */
+    val applyOutcome: ApplyOutcome? = null,
+    /** Why this connection cannot apply migrations (for example a 3.x broker), or null. */
+    val unavailableReason: String? = null,
 ) {
+    /** True when a folder is chosen and exists, so "Show folder" has something to open; decided by the typed problem, never by text. */
+    val canShowFolder: Boolean
+        get() = when (folder) {
+            is MigrationFolderState.ChooseFolder -> false
+            is MigrationFolderState.FolderUnavailable -> folder.problem != FolderProblem.MISSING
+            is MigrationFolderState.FolderReadOnly, is MigrationFolderState.Ready -> true
+        }
+
+    // What the screen may enable, decided here from the structured state so the composables only read it (a flag set by the view model is not enough:
+    // the choose-folder, unavailable and history states must lock Apply whatever the flags say).
+    private val canChangeFiles: Boolean get() = isImportEnabled && !isApplying
+    val canImport: Boolean get() = canChangeFiles
+    val canExport: Boolean get() = canChangeFiles
+    val canEditFile: Boolean get() = canChangeFiles
+    private val mayApply: Boolean
+        get() = !isApplying && unavailableReason == null && historyProblem == null &&
+            (folder is MigrationFolderState.Ready || folder is MigrationFolderState.FolderReadOnly)
+    val canApplyPending: Boolean get() = isApplyPendingEnabled && mayApply
+    val canApplySingle: Boolean get() = isApplySingleEnabled && mayApply
+
     val selectedEntry: MigrationEntry?
         get() = entries.firstOrNull { it.file.version == selectedVersion }
 }
 
 class MigrationsViewModel(
-    private val fileRepository: MigrationFileRepository,
+    /** Used only without [folderPorts] (the in-memory mode of the tests); null reads and writes nothing. */
+    private val fileRepository: MigrationFileRepository?,
     private val runner: MigrationRunner,
     private val topologyCatalog: TopologyCatalog? = null,
     var profileName: String = "uat-eu",
@@ -51,6 +78,8 @@ class MigrationsViewModel(
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
     /** When set, files come from `repositoryFor(chosen folder)` and [fileRepository] is not used. */
     private val folderPorts: MigrationFolderPorts? = null,
+    /** Non-null disables Apply pending and Apply single (import, export and the dry run keep working). */
+    private val migrationUnavailableReason: String? = null,
     private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow(
@@ -64,6 +93,9 @@ class MigrationsViewModel(
     val state: StateFlow<MigrationsScreenState> = _state.asStateFlow()
 
     init {
+        folderPorts?.let { ports ->
+            scope.launch { ports.store.changes.collect { loadMigrations() } }
+        }
         loadMigrations()
     }
 
@@ -96,7 +128,7 @@ class MigrationsViewModel(
                 runner.dryRun(it, hasConfigurePermission, controlLevel, vhost)
             }
 
-            val canApply = hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY && historyProblem == null
+            val canApply = mayChangeTopology() && historyProblem == null
             val hasPending = entries.any { it.status is MigrationStatus.Pending }
             val canApplyPending = hasPending && canApply &&
                 entries.filter { it.status is MigrationStatus.Pending }.all { belongsToConnection(it.file) }
@@ -107,11 +139,8 @@ class MigrationsViewModel(
                 "Warning: an applied migration was modified on disk. Caerbannog will not apply the modified file again."
             } else null
 
-            val banner = if (!hasConfigurePermission) {
-                "Apply is disabled: the permission check found that user cannot change topology on $profileName. You can still edit, validate and export this file, then apply it on a connection that allows it."
-            } else null
-
             val folder = folderState(listing)
+            val banner = bannerMessage()
             val canWrite = folder is MigrationFolderState.Ready
 
             _state.update { current ->
@@ -133,10 +162,24 @@ class MigrationsViewModel(
                     historyProblem = historyProblem,
                     isImportEnabled = canWrite,
                     isExportEnabled = canWrite,
+                    unavailableReason = migrationUnavailableReason,
                 )
             }
         }
     }
+
+    private fun mayChangeTopology(): Boolean =
+        hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY && migrationUnavailableReason == null
+
+    /** The permission and level lines only; the folder, history, outcome and unavailable states are drawn from their structured fields. */
+    private fun bannerMessage(): String? = when {
+        controlLevel == TopologyControlLevel.READ_ONLY -> "Apply is disabled: this connection is set to Read-only"
+        !hasConfigurePermission ->
+            "Apply is disabled: the permission check found that user cannot change topology on $profileName. You can still edit, validate and export this file, then apply it on a connection that allows it."
+        else -> null
+    }
+
+    private fun unavailableText(reason: String) = "Migrations are not offered on this connection: $reason"
 
     /** The repository of the folder in use; null while no folder is chosen (nothing is read or written then). */
     private fun currentRepository(): MigrationFileRepository? =
@@ -148,7 +191,7 @@ class MigrationsViewModel(
         val path = folderPorts?.store?.folder
         return when {
             listing == null -> MigrationFolderState.ChooseFolder
-            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem.message)
+            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem)
             listing is FolderListing.Listed && listing.readOnly && path != null -> MigrationFolderState.FolderReadOnly(path)
             else -> MigrationFolderState.Ready(path)
         }
@@ -164,8 +207,7 @@ class MigrationsViewModel(
             val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost) }
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
-                hasConfigurePermission &&
-                controlLevel != TopologyControlLevel.READ_ONLY
+                mayChangeTopology()
 
             _state.update { current ->
                 current.copy(
@@ -180,49 +222,48 @@ class MigrationsViewModel(
     }
 
     suspend fun applyPending(): MigrationApplyResult {
+        if (_state.value.isApplying) return MigrationApplyResult.Blocked(APPLY_RUNNING)
         applyBlockReason()?.let { reason ->
             _state.update { it.copy(errorMessage = reason) }
             return MigrationApplyResult.Blocked(reason)
         }
-        _state.update { it.copy(isApplying = true, errorMessage = null) }
-        val files = currentRepository()?.listFiles().orEmpty()
-        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost)
-        when (result) {
-            is MigrationApplyResult.Success -> {
-                loadMigrations()
-            }
-            is MigrationApplyResult.ActionFailed -> {
-                val error = "Action '${result.action.actionName}' failed on version '${result.version}': ${result.reason}"
-                _state.update { it.copy(errorMessage = error) }
-                loadMigrations()
-            }
-            is MigrationApplyResult.NotRecorded -> {
-                _state.update { it.copy(errorMessage = result.reason) }
-                loadMigrations()
-            }
-            is MigrationApplyResult.Blocked -> {
-                _state.update { it.copy(errorMessage = result.reason) }
-            }
-        }
-        _state.update { it.copy(isApplying = false) }
-        return result
+        return apply(currentRepository()?.listFiles().orEmpty())
     }
 
     suspend fun applySingle(version: String): MigrationApplyResult {
+        if (_state.value.isApplying) return MigrationApplyResult.Blocked(APPLY_RUNNING)
         val entry = _state.value.entries.firstOrNull { it.file.version == version }
             ?: return MigrationApplyResult.Blocked("Migration file not found")
         applyBlockReason()?.let { return MigrationApplyResult.Blocked(it) }
-        return runner.applyPending(profileName, listOf(entry.file), hasConfigurePermission, controlLevel, vhost)
-            .also { result ->
-                if (result is MigrationApplyResult.NotRecorded) _state.update { it.copy(errorMessage = result.reason) }
-                loadMigrations()
-            }
+        return apply(listOf(entry.file))
+    }
+
+    /** Runs [files] through the runner, shows the action being sent, and leaves the structured outcome when it did not succeed. */
+    private suspend fun apply(files: List<MigrationFile>): MigrationApplyResult {
+        // Two callers can pass the cheap check above together; only one wins the flag.
+        while (true) {
+            val current = _state.value
+            if (current.isApplying) return MigrationApplyResult.Blocked(APPLY_RUNNING)
+            if (_state.compareAndSet(current, current.copy(isApplying = true, errorMessage = null, applyOutcome = null, applyProgress = null))) break
+        }
+        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost) { step ->
+            _state.update { it.copy(applyProgress = ApplyProgress(step.version, step.index, step.total)) }
+        }
+        val outcome = result.toOutcome()
+        val blockedReason = (result as? MigrationApplyResult.Blocked)?.reason
+        _state.update {
+            it.copy(applyOutcome = outcome, errorMessage = blockedReason, applyProgress = null)
+        }
+        if (result !is MigrationApplyResult.Blocked) loadMigrations()
+        _state.update { it.copy(isApplying = false) }
+        return result
     }
 
     /** The fixed reason nothing may be applied right now, or null: the history cannot be trusted, or there is no folder to read from. */
     private fun applyBlockReason(): String? {
         val current = _state.value
         return when {
+            migrationUnavailableReason != null -> unavailableText(migrationUnavailableReason)
             current.historyProblem != null -> HISTORY_UNREADABLE
             current.folder is MigrationFolderState.ChooseFolder -> NO_FOLDER
             current.folder is MigrationFolderState.FolderUnavailable -> current.folder.reason
@@ -373,8 +414,28 @@ class MigrationsViewModel(
         _state.update { it.copy(confirmation = null) }
     }
 
+    /** Saves an edited file through the folder in use and answers the parser's verdict; an `Invalid` reason is shown in `errorMessage`, never ignored. */
+    suspend fun updateFile(version: String, rawJson: String): MigrationValidationResult {
+        if (currentRepository() == null) {
+            _state.update { it.copy(errorMessage = NO_FOLDER) }
+            return MigrationValidationResult.Invalid(NO_FOLDER)
+        }
+        val repository = writableRepository() ?: return refuseWrite()
+        val result = repository.updateFile(version, rawJson)
+        when (result) {
+            is MigrationValidationResult.Valid -> loadMigrations()
+            is MigrationValidationResult.Invalid -> _state.update { it.copy(errorMessage = result.reason) }
+        }
+        return result
+    }
+
+    /** Clears the last apply's outcome, any progress and the error text. */
+    fun dismissOutcome() {
+        _state.update { it.copy(applyOutcome = null, applyProgress = null, errorMessage = null) }
+    }
+
     fun dismissError() {
-        _state.update { it.copy(errorMessage = null) }
+        _state.update { it.copy(errorMessage = null, applyOutcome = null) }
     }
 
     private companion object {
@@ -382,6 +443,7 @@ class MigrationsViewModel(
         const val FILE_NOT_WRITTEN = "The file could not be written"
         const val HISTORY_UNREADABLE = "The applied history cannot be read, so nothing can be applied"
         const val HISTORY_NOT_MOVED = "The history file could not be moved aside; it was not changed"
+        const val APPLY_RUNNING = "An apply is already running"
         const val NO_FOLDER = "Choose a migrations folder first"
         const val FOLDER_NOT_WRITABLE = "Choose a usable migrations folder first"
     }

@@ -154,7 +154,7 @@ class MigrationsViewModelFolderTest {
 
         val s = vm().state.value
 
-        assertEquals(MigrationFolderState.FolderUnavailable(folder, problem.message), s.folder)
+        assertEquals(MigrationFolderState.FolderUnavailable(folder, problem), s.folder)
         assertEquals(
             when (problem) {
                 FolderProblem.MISSING -> "The folder does not exist"
@@ -238,7 +238,7 @@ class MigrationsViewModelFolderTest {
 
         vm.retry()
 
-        assertEquals(MigrationFolderState.FolderUnavailable(folder, "The folder does not exist"), vm.state.value.folder)
+        assertEquals(MigrationFolderState.FolderUnavailable(folder, FolderProblem.MISSING), vm.state.value.folder)
         assertEquals(folder, store.folder)
         assertTrue(chooser.startedIn.isEmpty())
         assertTrue(repo.loads >= 2, "retry must ask the folder again")
