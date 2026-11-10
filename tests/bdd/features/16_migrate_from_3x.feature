@@ -603,6 +603,13 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the row shows the name as plain text with the control character escaped
     And nothing is interpreted as markup
 
+  @security @fake-broker @m8-06a
+  Scenario: A name with a right-to-left override cannot display reversed
+    Given a definitions file with a queue named "a", the right-to-left override U+202E and "b"
+    When I open that file on the Migrate from 3.x screen and export the report as text
+    Then the row and the text show the name as "a\u202Eb" with the override escaped
+    And neither contains the override character itself
+
   @fake-broker @m8-06a
   Scenario: Export the report from the screen as JSON or copy it as text
     Given the report for "legacy.json" is shown
