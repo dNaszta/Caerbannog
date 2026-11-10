@@ -343,12 +343,12 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- Review and the generated migration --------------------------------------------------------
 
-  @fake-broker
+  @fake-broker @m8-05
   Scenario: A classic to quorum conversion needs an explicit tick about ordering
     Given the report proposes to declare the classic queue "orders" as a quorum queue
     When I try to accept that proposal without ticking "Ordering by priority may change"
     Then the proposal is not accepted
-    And the conversion is not blocked: after I tick it I can accept the proposal
+    And after I tick it I can accept the proposal
 
   @fake-broker @m5-08 @m5-08a
   # Owned by M5-08a (the real executor reads back after each action); M8-05 only generates the file.
@@ -359,66 +359,134 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then the apply stops and says "jobs" was not found after it was declared
     And the migration is not recorded as applied
 
-  @smoke @fake-broker
+  # ---- M8-05: review and generation (pure core; one decision per ITEM, the findings explain it) ------------------------------
+  # An item (queue, exchange, binding, policy, operator policy) needs a decision when it has a blocker or a warning that always applies and is
+  # not a message-loss, not-covered, client-check or access finding (access is M8-12). Items without such a finding are written as they are.
+
+  @smoke @fake-broker @m8-05
   Scenario: Accept a proposal and generate a migration
-    Given the report proposes to declare "orders" as a quorum queue
-    When I accept that proposal
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    When I accept that proposal with the tick "Ordering by priority may change"
     And I generate the migration for "/"
     Then I get a migration file that declares the quorum queue "orders"
 
-  @fake-broker
+  @fake-broker @m8-05
   Scenario: Change a proposal before accepting it
-    Given the report proposes to declare "orders" as a quorum queue
-    When I change the proposal to add the argument "x-delivery-limit" with the value 5
-    And I accept it
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
+    When I replace the proposal by a quorum queue "orders" with the argument "x-delivery-limit" 5
     And I generate the migration for "/"
     Then the declared queue "orders" carries "x-delivery-limit" 5
 
-  @fake-broker
+  @fake-broker @m8-05
   Scenario: A skipped item stays out of the migration and in the report
-    Given the report proposes to declare "orders" as a quorum queue
+    Given the report proposes to declare the classic queue "orders" as a quorum queue
     When I skip that item
     And I generate the migration for "/"
     Then the migration does not declare "orders"
-    And the report shows "orders" as skipped
+    And the result lists "orders" as skipped
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-05
   Scenario: The migration cannot be generated while an item is undecided
-    Given the report has 3 findings and I decided only 2
+    Given the report has 3 items that need a decision and I decided only 2
     When I try to generate the migration
     Then I am told that 1 item still needs a decision
-    And no file is written
+    And no migration is produced
 
-  @negative @fake-broker
-  Scenario: A finding without a proposal needs a manual decision
-    Given a finding that has no proposed 4.x equivalent
-    When I review it
-    Then I can only skip it or write my own action
-    And I cannot accept a proposal
+  @negative @fake-broker @m8-05
+  Scenario: An item whose blocker has no automatic fix needs a manual decision
+    Given a definitions file with the non-durable queue "temp"
+    When I try to accept the default proposal for "temp"
+    Then it is refused and I can only skip it, choose the alternative "declare it durable", or replace it with my own action
 
-  @fake-broker
+  @fake-broker @m8-05
+  Scenario: A queue with x-max-priority stays classic unless the quorum alternative is chosen with the tick
+    Given a definitions file with the classic queue "prio" with "x-max-priority" 5
+    When I accept the default proposal for "prio"
+    Then the migration declares "prio" as a classic queue with "x-max-priority" 5
+    When I choose the quorum alternative without the tick
+    Then it is refused
+    When I choose the quorum alternative with the tick "Ordering by priority may change"
+    Then the migration declares "prio" as a quorum queue without "x-max-priority"
+
+  @fake-broker @m8-05
+  Scenario: The migration never sets the queue index version and a message-loss finding does not block it
+    Given a definitions file with the classic queue "orders" and no "x-queue-version"
+    And the report has a message-loss warning for "orders"
+    When I accept the proposal for "orders" with the tick and generate the migration for "/"
+    Then the migration declares "orders" without "x-queue-version"
+    And the result still lists the message-loss note for "orders" with the recommendation of a new broker and a Shovel
+
+  @fake-broker @m8-05
+  Scenario: A policy that only holds mirroring keys is not written
+    Given a definitions file with the policy "ha-all" that only sets "ha-mode" and "ha-sync-mode"
+    When I accept the proposal for "ha-all" and generate the migration for "/"
+    Then the migration does not declare "ha-all"
+    And the result says the policy held only keys that 4.x rejects
+
+  @fake-broker @m8-05
+  Scenario: A policy with other keys is written without the rejected ones
+    Given a definitions file with the policy "limits" that sets "ha-mode" and "max-length" 1000
+    When I accept the proposal for "limits" and generate the migration for "/"
+    Then the migration declares "limits" with "max-length" 1000 and without "ha-mode"
+
+  @fake-broker @m8-05
+  Scenario: Bindings of a skipped item are left out and listed
+    Given a definitions file with the queue "orders", the exchange "events" and a binding between them
+    When I skip "orders" and generate the migration for "/"
+    Then the migration declares "events" and no binding
+    And the result lists the binding as left out because "orders" is skipped
+
+  @negative @fake-broker @m8-05
+  Scenario: A name that cannot be written into a migration is reported
+    Given a definitions file with a queue named ".."
+    When I generate the migration for "/"
+    Then the result lists the queue as left out because its name cannot be written
+    And nothing else is lost silently
+
+  @fake-broker @m8-05
+  Scenario: Actions are written in a safe order
+    Given a definitions file with a binding, a policy, a queue and an exchange that are all compatible
+    When I generate the migration for "/"
+    Then the actions are in the order exchange, queue, policy, binding
+
+  @fake-broker @m8-05
   Scenario: The generated migration is an ordinary migration file
     Given I accepted every proposal for "/"
     When I generate the migration for "/"
     Then the file has the next free version number
     And the file is valid for the migrations screen
     And a dry run of it shows each action and whether it is allowed
+    And the file contains no delete action
 
-  @fake-broker
+  @fake-broker @m8-05
   Scenario: One migration is generated per source virtual host
     Given the report covers the virtual hosts "/" and "/orders"
     When I generate the migrations
     Then I get one migration for "/" and one for "/orders"
     And each can only be applied on a connection whose virtual host matches
 
-  @negative @fake-broker
+  @fake-broker @m8-05
+  Scenario: A single virtual host export writes a topology migration for the assigned name and no access migration
+    Given the per-virtual-host export was given the virtual host name "orders"
+    When I generate the migrations
+    Then I get one migration for "orders"
+    And the result says the file holds no users, virtual hosts or permissions and that "orders" must already exist on the 4.x broker
+
+  @security @fake-broker @m8-05
+  Scenario: Generating sends nothing to any broker and leaks no secret
+    Given a definitions file with a user "svc" that has a password hash and a shovel parameter whose URI contains a password
+    When I generate the migration for "/"
+    Then no request was sent to any broker
+    And neither the migration file nor the result nor its text contains the password hash or the password
+
+  @negative @fake-broker @m8-05
   Scenario: Applying a generated migration follows the usual guardrails
     Given a generated migration and the user has no configure permission on the 4.x connection
     When I open the migrations screen
     Then "Apply pending" is disabled
     And I am told that the user cannot change topology
 
-  @fake-broker
+  @fake-broker @m8-05
   Scenario: Applying a generated migration twice changes nothing the second time
     Given a generated migration that declares the quorum queue "orders"
     And it was applied on "new-eu"
