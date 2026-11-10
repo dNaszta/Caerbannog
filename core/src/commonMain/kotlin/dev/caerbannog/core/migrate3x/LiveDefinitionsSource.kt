@@ -1,6 +1,7 @@
 package dev.caerbannog.core.migrate3x
 
 import dev.caerbannog.core.connections.brokerMajorVersion
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -167,7 +168,8 @@ sealed interface LiveAnalysisOutcome {
  * Fetches [source] and analyses the export on the live facts. The result is not held here: `AnalysisHolder` holds it (decision D1), so it
  * survives a reconnect like a file. CPU work runs off the caller's thread, like the file import.
  */
-suspend fun analyseLive(source: DefinitionsSource): LiveAnalysisOutcome = when (val fetched = source.fetch()) {
+// M8-02b STUB: [dispatcher] is accepted but not used yet (F7); the default stays Dispatchers.Default.
+suspend fun analyseLive(source: DefinitionsSource, dispatcher: CoroutineDispatcher = Dispatchers.Default): LiveAnalysisOutcome = when (val fetched = source.fetch()) {
     is FetchResult.Fetched -> withContext(Dispatchers.Default) {
         LiveAnalysisOutcome.Analysed(
             HeldAnalysis(source.connectionName, fetched.document, CompatibilityAnalyzer.analyze(fetched.document, fetched.facts)),

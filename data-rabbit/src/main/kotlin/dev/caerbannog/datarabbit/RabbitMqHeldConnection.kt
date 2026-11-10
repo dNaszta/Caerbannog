@@ -35,6 +35,10 @@ class RabbitMqHeldConnection(
     override val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
     /** M5-08a R1: the fixed reason there is no executor (3.x, or the version could not be read). */
     override val migrationUnavailableReason: String? = null,
+    /** M8-02b STUB: not yet overridden meaningfully; the displayable version text the gateway read from the overview. */
+    override val brokerVersion: String? = null,
+    /** M8-02b STUB: the GET-only reads of a 3.x connection; null for 4.x and unknown versions. */
+    override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 

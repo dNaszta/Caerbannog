@@ -14,7 +14,12 @@ import kotlinx.serialization.json.JsonPrimitive
  * broker is a migration source only, and a version that cannot be read (any failure, any shape) gives no executor either. One
  * `GET /api/overview` decides; no write request is sent before the version is known.
  */
-internal data class MigrationAccess(val executor: TopologyMigrationExecutor?, val unavailableReason: String?) {
+internal data class MigrationAccess(
+    val executor: TopologyMigrationExecutor?,
+    val unavailableReason: String?,
+    /** M8-02b STUB: always null until built; the displayable version text of the one overview read. */
+    val version: String? = null,
+) {
 
     companion object {
         const val THREE_X = "This broker runs RabbitMQ 3.x: it is a migration source only"
