@@ -184,6 +184,41 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And no recorded path contains "/get", "/contents" or "/purge"
 
   @fake-broker @m8-06c
+  Scenario: The source picker offers the connected 3.x broker as a live source
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    When I open the Migrate from 3.x screen
+    Then the source picker offers "Definitions file" and "Live connection: legacy-eu"
+
+  @negative @fake-broker @m8-06c
+  Scenario: The live source is not offered while no 3.x broker is connected
+    Given a connection "new-eu" to a broker running RabbitMQ 4 is the held connection
+    When I open the Migrate from 3.x screen
+    Then the source picker offers "Definitions file" only
+    And the live option is shown disabled with the reason "Connect to a RabbitMQ 3.x broker to read it live"
+
+  @fake-broker @m8-06c
+  Scenario: A live source is shown as locked and read only
+    Given I analysed "legacy-eu" and the report is shown
+    Then the source card shows "legacy-eu" with the lock and the words "read only"
+    And no action on the screen changes anything on "legacy-eu"
+
+  @negative @fake-broker @m8-06c
+  Scenario: A user who may not export is offered the file import as a button
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    And the broker refuses the definitions export for this user because it is not an administrator
+    When I analyse the live connection
+    Then the screen says that this user cannot export definitions
+    And the button "Choose definitions file" is offered
+    And no report is shown
+
+  @fake-broker @m8-06c
+  Scenario: The connection popup of a 3.x broker offers Migrate from 3.x
+    Given a connection "legacy-eu" to a broker running RabbitMQ 3.13 is the held connection
+    When I open the connection popup
+    Then the popup offers "Migrate from 3.x"
+    And choosing it opens the Migrate from 3.x screen with the live source selected
+
+  @fake-broker @m8-06c
   Scenario: The analysis survives switching to the 4.x connection
     Given I analysed "legacy-eu" and the report is shown
     When I connect to "new-eu", a broker running RabbitMQ 4
