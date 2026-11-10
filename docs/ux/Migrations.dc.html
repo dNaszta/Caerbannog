@@ -33,6 +33,7 @@ body{margin:0}
 </header>
 <div class="content">
 <div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.</span></div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="ms sm" aria-hidden="true">folder</span><span class="t-bs dim">Migration files in</span><span class="mono">/Users/dana/work/migrations</span><span style="flex-grow:1"></span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Show folder</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">drive_file_move</span>Change folder</button></div>
 <div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
 <section style="flex:0 1 340px;min-width:0;display:flex;flex-direction:column;gap:8px">
 <div class="t-lm dim" style="padding:0 4px">Migration files</div>
@@ -79,6 +80,84 @@ body{margin:0}
 </div>
 </section>
 </div>
+<section id="states-m5-08c" style="display:flex;flex-direction:column;gap:24px;margin-top:16px">
+<div class="t-tl">Other states (M5-08c)</div>
+<div class="t-bs dim">The block above is the Ready state of a connection that may not change topology (permission banner). Everything below is the new behaviour of M5-08c. Texts are the fixed texts of the view model; file names and resource names are shown as plain text, never as markup. Banners can be dismissed (x) except the ones that describe a state that still holds. Nothing here is drawn for a state that does not apply.</div>
+
+<section id="state-folder-row" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">1. Folder row (every state where a folder is chosen, drawn under the info line)</div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="ms sm" aria-hidden="true">folder</span><span class="t-bs dim">Migration files in</span><span class="mono">/Users/dana/work/migrations</span><span style="flex-grow:1"></span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Show folder</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">drive_file_move</span>Change folder</button></div>
+<div class="t-bs dim">One folder for every connection of this machine, remembered in settings.json. "Change folder" opens the system folder dialog; cancelling changes nothing; choosing another folder keeps the applied history (it lives in the app's own data, per connection). "Show folder" opens it in the file manager and is drawn only when the folder exists.</div>
+</section>
+
+<section id="state-choose-folder" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">2. No folder chosen yet (first visit to Migrations; also after cancelling the dialog)</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">download</span>Export current topology</button><button class="btn filled lead" type="button" disabled><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
+<div class="card" style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;max-width:640px"><span class="ms" aria-hidden="true" style="color:var(--primary);font-size:40px">folder_open</span><div class="t-tl">Choose the folder for your migration files</div><div class="t-bs dim" style="font-size:14px;line-height:20px">Migration files are plain JSON files that you keep where you like, for example in a git repository. Nothing is read or written until you choose a folder. The list of applied migrations is not kept there: it stays with this app, per connection.</div><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Choose folder</button></div>
+<div class="t-bs dim">Import, Export and Apply are disabled. The text "Choose a migrations folder first" is what a disabled action reports if it is triggered anyway.</div>
+</section>
+
+<section id="state-folder-unavailable" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">3. Folder missing, not a folder, or cannot be read</div>
+<div class="banner err"><span class="ms" aria-hidden="true">folder_off</span><div style="flex:1"><b>The folder does not exist</b><div class="mono">/Users/dana/work/migrations</div><div class="t-bs" style="margin-top:4px">Nothing was created or changed. Reasons the app can give: "The folder does not exist", "The path is not a folder", "The folder cannot be read".</div></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px"><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">refresh</span>Try again</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">drive_file_move</span>Choose another folder</button></div>
+<div class="t-bs dim">Import, Export and Apply are disabled; the list is empty. The app never creates, copies or overwrites anything in the place of the folder. "Show folder" is NOT drawn here (the folder does not exist).</div>
+</section>
+
+<section id="state-read-only" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">4. Read-only folder (it lists, but nothing can be written)</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn outlined lead" type="button" disabled><span class="ms sm" aria-hidden="true">download</span>Export current topology</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
+<div class="banner warn"><span class="ms" aria-hidden="true">edit_off</span><div style="flex:1"><b>The folder is read-only</b><div class="mono">/Users/dana/work/migrations</div><div class="t-bs" style="margin-top:4px">You can read and apply the migrations; importing, exporting and editing need a writable folder.</div></div></div>
+<div class="t-bs dim">Apply stays enabled: the applied history is in the app's own data, not in this folder. Edit file is disabled as well.</div>
+</section>
+
+<section id="state-invalid-files" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">5. Files in the folder that are not valid migrations (listed after the valid ones)</div>
+<div class="pcard" style="max-width:340px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm mono">0007.json</span><span class="pill bad"><span class="ms sm" aria-hidden="true">error</span>Invalid</span></div><div class="t-bs dim">The file is not valid JSON</div></div>
+<div class="pcard" style="max-width:340px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm mono">a file with an unusual name</span><span class="pill bad"><span class="ms sm" aria-hidden="true">error</span>Invalid</span></div><div class="t-bs dim">the value of "version" has the wrong type</div></div>
+<div class="t-bs dim">An invalid row cannot be selected or applied and is never changed or deleted by the app. Its reason is the parser's fixed text (never file content). A file name that is long or holds unusual characters is shown as "a file with an unusual name".</div>
+</section>
+
+<section id="state-applying" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">6. Applying (one migration at a time, one action at a time)</div>
+<div class="banner info"><span class="ms" aria-hidden="true">sync</span><div style="flex:1"><b>Applying 0003: action 2 of 3</b><div class="t-bs" style="margin-top:4px">Declare quorum queue "orders" ... Each action is sent, then read back from the broker.</div><div style="height:4px;border-radius:2px;background:var(--sc-highest);margin-top:8px;overflow:hidden"><div style="width:66%;height:4px;background:var(--primary)"></div></div></div></div>
+<div class="t-bs dim">While it runs: Apply pending, Apply 0003, Import and Export are disabled; the list and the dry run stay readable. The progress comes from the runner (one step per action). It ends in the list (Applied), or in state 7, 8 or 9.</div>
+</section>
+
+<section id="state-failed" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">7. An action failed (the run stops there; the migration is not recorded)</div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div style="flex:1"><b>Action 2 of 3 failed: the broker refused the request</b><div class="t-bs" style="margin-top:4px">Migration 0003 was not recorded. Running it again is safe: actions that already succeeded change nothing the second time.</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div style="display:flex;align-items:center;gap:12px"><span class="ms" aria-hidden="true" style="color:var(--error)">error</span><span style="flex-grow:1">Bind <span class="mono">events</span> to <span class="mono">orders</span> with <span class="mono">order.created</span></span><span class="pill bad">Failed</span></div>
+<div class="t-bs dim">The reason is one of the executor's fixed texts: "the broker refused the request", "the broker did not answer", "the user is not allowed to do this", "this action cannot be sent to the broker", "&lt;name&gt; was not found after it was declared", ... Never the broker's own text. The failed action is marked in the dry-run list. Pending stays pending.</div>
+</section>
+
+<section id="state-conflict" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">8. A conflict (something already exists with other settings; it was not overwritten)</div>
+<div class="banner err"><span class="ms" aria-hidden="true">difference</span><div style="flex:1"><b>Action 1 of 2 stopped: "orders" exists with different settings</b><div class="t-bs" style="margin-top:4px">The existing "orders" was not changed. Migration 0003 was not recorded. To go on, change the file or the broker so that they agree, then apply again.</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div class="t-bs dim">Same place as state 7 with its own icon and wording; the resource is named as in the executor's reason. The app never deletes or recreates the existing resource.</div>
+</section>
+
+<section id="state-not-recorded" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">9. Applied but not recorded (the history could not be written)</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">save_as</span><div style="flex:1"><b>The migration was applied but could not be recorded; running it again is safe</b><div class="t-bs" style="margin-top:4px">The broker has the changes. The list still shows 0003 as Pending until the history can be written.</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div class="t-bs dim">Rare: the history file became unreadable or the disk refused the write. The run stopped after this migration.</div>
+</section>
+
+<section id="state-history-unreadable" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">10. The applied history cannot be read (blocks applying; the files are still listed)</div>
+<div class="banner err"><span class="ms" aria-hidden="true">history_toggle_off</span><div style="flex:1"><b>The applied history cannot be read, so nothing can be applied</b><div class="mono">/Users/dana/.caerbannog/migration-history.json</div><div class="t-bs" style="margin-top:4px">The file is not valid JSON. It was not changed.</div></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px"><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">refresh</span>Try again</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Show folder</button><button class="btn outlined danger lead" type="button"><span class="ms sm" aria-hidden="true">restart_alt</span>Start with an empty history</button></div>
+<div style="position:relative;min-height:260px;border-radius:12px;overflow:hidden;background:var(--sc-low)"><div class="scrim"><div class="dialog"><div class="t-tl">Start with an empty history?</div><div style="font:400 14px/20px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)">Move migration-history.json to migration-history.json.unreadable-20261110-143005 and start with an empty history? The old file is kept.</div><div style="font:400 12px/16px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)">Every migration then shows as pending for every connection. Running one again is safe because each action checks what is already there.</div><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn text" type="button">Move file and start</button></div></div></div></div>
+<div class="t-bs dim">"Show folder" opens the folder that holds the history file. The dialog names the real new file name (timestamp of the moment). Cancel, Esc or a click outside change nothing. If the move fails the banner says "The history file could not be moved aside; it was not changed". Applying stays blocked until the file reads or is moved aside.</div>
+</section>
+
+<section id="state-unavailable" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">11. This connection cannot apply migrations (a RabbitMQ 3.x source, or a version that could not be read)</div>
+<div class="banner info"><span class="ms" aria-hidden="true">lock</span><div style="flex:1"><b>Migrations are not offered on this connection</b><div class="t-bs" style="margin-top:4px">This broker runs RabbitMQ 3.x: it is a migration source only</div></div></div>
+<div class="banner info"><span class="ms" aria-hidden="true">lock</span><div style="flex:1"><b>Migrations are not offered on this connection</b><div class="t-bs" style="margin-top:4px">The broker version could not be read, so migrations are not offered</div></div></div>
+<div class="t-bs dim">Apply pending and Apply 0003 are disabled; files, dry run, Import and Export keep working (they do not change the broker). The second line is the fixed reason of the connection; it is drawn instead of the permission banner when both apply. The 3.x connection pill and the Read-only level belong to the 3.x task (M8-02).</div>
+</section>
+</section>
 </div>
 </main>
 </div>
