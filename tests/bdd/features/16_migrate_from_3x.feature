@@ -706,7 +706,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
     Examples:
       | actions                                   | error                                                  |
-      | an action that deletes a queue            | a replacement must not delete anything                 |
+      | an action that deletes a queue            | A replacement must not delete anything                 |
       | a queue named ".."                        | the migration parser's own reason                      |
       | an action for another virtual host        | an action is for another virtual host than the item's  |
       | text that is not JSON                     | the migration parser's own reason                      |
@@ -734,11 +734,29 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     And when I cancel nothing is saved and the screen says no folder was chosen
 
   @negative @fake-broker @m8-06b
-  Scenario: A folder that cannot be written is reported and nothing is half-saved
+  Scenario: A folder that cannot be written is reported and nothing is saved
     Given every item of the report is decided and the migrations folder is read-only
     When I generate the migration
     Then the screen says the folder is read-only and no file was saved
     And I can choose another folder or export the files instead
+
+  @negative @fake-broker @m8-06b
+  Scenario: A file that cannot be saved after another one was saved says which was saved
+    Given every item of the report is decided and the file holds two virtual hosts
+    And the second file cannot be saved
+    When I generate the migration
+    Then the screen says which file was saved and which was not
+    And the saved file stays in the migrations folder
+    And I can try again, choose another folder or export the file that was not saved
+
+  @fake-broker @m8-06b
+  Scenario: Generating again after files were saved asks first and writes new versions
+    Given the migrations "0003" and "0004" were generated and saved from this report
+    When I change one decision and generate the migration again
+    Then the screen first says that files were already saved and asks "Generate again?"
+    And when I cancel nothing is written
+    When I generate again and confirm
+    Then new files with the versions 0005 and 0006 are saved and "0003" and "0004" are unchanged
 
   @fake-broker @m8-06b
   Scenario: Generated files show up on the Migrations screen as pending for a matching connection
