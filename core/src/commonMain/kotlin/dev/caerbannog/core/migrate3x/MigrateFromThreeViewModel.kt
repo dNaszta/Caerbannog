@@ -593,7 +593,7 @@ class MigrateFromThreeViewModel(
             val exported = mutableListOf<SavedFile>()
             for (migration in generated.migrations.drop(alreadySaved.size)) {
                 val name = "${migration.file.version}.json"
-                when (val outcome = reportSaver.save(name, migration.file.rawJson)) {
+                when (val outcome = reportSaver.save(name, migration.file.rawJson, secret = migration.file.up.any { it is dev.caerbannog.core.migrations.MigrationAction.DeclareUser })) {
                     is SaveOutcome.Saved -> exported += GenerationReportBuilder.fileOf(migration, escapeForText(outcome.path))
                     SaveOutcome.Cancelled -> return@launch
                     is SaveOutcome.Failed -> {

@@ -2,7 +2,7 @@ package dev.caerbannog.core.migrate3x
 
 private const val GUEST = "guest"
 private const val ADMINISTRATOR = "administrator"
-private val allowedHashingAlgorithms = setOf("rabbit_password_hashing_sha256", "rabbit_password_hashing_sha512", "rabbit_password_hashing_md5")
+internal val allowedHashingAlgorithms = setOf("rabbit_password_hashing_sha256", "rabbit_password_hashing_sha512", "rabbit_password_hashing_md5")
 
 private fun userItem(user: UserDefinition) = ItemRef(ItemKind.User, null, user.name)
 

@@ -55,7 +55,10 @@ data class SkippedItem(val item: ReviewItem, val reason: SkipReason)
 data class GenerationNote(val text: String, val item: ReviewItem? = null)
 
 /** M8-12b: [access] is true for the access migration (its [vhost] is empty; the panel says "access"). */
-data class GeneratedMigration(val vhost: String, val file: MigrationFile, val access: Boolean = false)
+data class GeneratedMigration(val vhost: String, val file: MigrationFile, val access: Boolean = false) {
+    /** Without the file text: an access file holds password hashes, and a string template of a generation result must never show them. */
+    override fun toString(): String = "GeneratedMigration(vhost=$vhost, version=${file.version}, ${file.up.size} actions, access=$access)"
+}
 
 sealed interface GenerationResult {
     /** Nothing is produced. */
