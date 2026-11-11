@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.forwarding.ForwardingBlock
@@ -180,7 +181,11 @@ private fun ConfirmView(state: ForwardingScreenState.Confirm, events: Forwarding
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.testTag("forward-plan"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Forward ${state.queue} to ${state.destination}", style = MaterialTheme.typography.titleMedium)
-            state.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            // The two sentences the user must not miss: the messages are moved, and the source password is stored in clear text.
+            state.lines.forEach {
+                val emphasis = if (it == ForwardingTexts.MOVED || it == ForwardingTexts.CLEAR_TEXT) FontWeight.Bold else null
+                Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = emphasis)
+            }
             state.warnings.filterIsInstance<ForwardingWarning.DestinationNotQuorumOrStream>().forEachIndexed { i, w ->
                 WarningBanner(ForwardingTexts.warning(w), Modifier.testTag("forward-warning-$i"))
             }

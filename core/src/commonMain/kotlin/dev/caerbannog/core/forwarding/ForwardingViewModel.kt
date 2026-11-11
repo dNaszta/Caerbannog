@@ -86,7 +86,8 @@ class ForwardingViewModel(
         // The credentials are needed for the PUT only: polling and the later dry run use a request without them.
         val watched = built.copy(source = built.source.copy(credentials = null))
         request = watched
-        form = null
+        // Kept for a re-prepare after a stale plan, without the typed name and never with the password.
+        form = current.form.copy(password = null, typed = "")
         job?.cancel()
         val queue = current.queue
         mutable.value = ForwardingScreenState.Starting(queue)
