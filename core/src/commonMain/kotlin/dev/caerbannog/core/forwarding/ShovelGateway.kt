@@ -1,7 +1,15 @@
 package dev.caerbannog.core.forwarding
 
 /**
- * Exactly four operations, bound to the held 4.x connection. M8-07 STUB: the KDoc of the spec rule is the developer's (brief "Gateway").
+ * The only place the app touches a Shovel: exactly four operations, bound to the held 4.x connection.
+ *
+ * Spec rule ("Forwarding messages with a dynamic Shovel"): the one accepted exception to the queue message safety rule is that the app may
+ * configure a broker-side dynamic Shovel that moves the messages of a queue; the broker moves them, the app never touches a message.
+ * Allowed: creating, reading the status of and removing a dynamic Shovel through the management API, by this gateway only, with the safeguards.
+ * Not allowed, always: any code in the app process (or the MCP server) that gets, consumes, acknowledges, rejects, deletes or purges queue
+ * messages other than the requeue peek; deleting a queue as part of forwarding; a second read path; a Shovel with any `ack-mode` other than
+ * `on-confirm`; starting a Shovel without the confirmation; creating or changing anything on a 3.x broker; a Shovel as a migration action;
+ * an MCP tool that creates or removes a Shovel. So this interface has no get, consume, ack, purge, delete-queue and no list of parameters.
  */
 interface ShovelGateway {
     suspend fun dryRun(request: ForwardingRequest): DryRunOutcome

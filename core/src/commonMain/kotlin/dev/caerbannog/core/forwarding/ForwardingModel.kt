@@ -22,14 +22,20 @@ data class ShovelAddress(val tls: Boolean, val username: String, val host: Strin
     override fun toString() = "$scheme://$username@$host:$port/${percentEncode(vhost)}"
 
     companion object {
-        /** M8-07 STUB: ignores the profile switch and the credentials. */
+        /** [credentials] null = the profile user. The scheme follows the profile's TLS switch only; there is no fallback (D9a). */
         fun forProfile(profile: ConnectionProfile, host: String = profile.host, port: Int? = null, credentials: ShovelSourceCredentials? = null): ShovelAddress =
-            ShovelAddress(true, profile.username, host, port ?: 5671, profile.virtualHost) // M8-07 STUB
+            ShovelAddress(profile.tls, credentials?.username ?: profile.username, host, port ?: if (profile.tls) 5671 else 5672, profile.virtualHost)
     }
 }
 
-/** M8-07 STUB: does not encode. */
-internal fun percentEncode(text: String): String = text // M8-07 STUB
+/** Percent-encodes everything but the RFC 3986 unreserved characters, byte by byte in UTF-8 (so "/" prints %2F). */
+internal fun percentEncode(text: String): String = buildString {
+    for (byte in text.encodeToByteArray()) {
+        val c = (byte.toInt() and 0xFF).toChar()
+        if (c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c == '-' || c == '.' || c == '_' || c == '~') append(c)
+        else append('%').append("0123456789ABCDEF"[(byte.toInt() shr 4) and 0xF]).append("0123456789ABCDEF"[byte.toInt() and 0xF])
+    }
+}
 
 data class ForwardingSource(
     val connectionName: String,
