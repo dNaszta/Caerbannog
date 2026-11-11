@@ -126,11 +126,60 @@ class FakeTopologyMigrationExecutor(
             is MigrationAction.DeclareOperatorPolicy -> operatorPolicies[action.vhost to action.name] = action
             is MigrationAction.DeletePolicy -> policies.remove(action.vhost to action.name)
 
-            // M8-12a STUB: the broker model above is seeded but the four access actions neither change it nor ever conflict yet.
-            is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions -> Unit
+            is MigrationAction.DeclareVhost -> return declareVhost(action)
+            is MigrationAction.DeclareUser -> return declareUser(action)
+            is MigrationAction.SetPermissions -> return setPermissions(action)
+            is MigrationAction.SetTopicPermissions -> return setTopicPermissions(action)
         }
 
         return ActionResult.Success
+    }
+
+    private fun conflict(reason: String) = ActionResult.Failed(reason, FailureKind.Conflict)
+
+    /** The default virtual host exists on every broker with its own settings: exempt (D5). Only the settings the action carries are compared. */
+    private fun declareVhost(action: MigrationAction.DeclareVhost): ActionResult {
+        if (action.name == "/") return ActionResult.Success
+        val existing = vhosts[action.name]
+        if (existing == null) {
+            vhosts[action.name] = ExistingVhost(action.vhostDescription, action.tags, action.defaultQueueType)
+            return ActionResult.Success
+        }
+        val what = when {
+            action.vhostDescription.isNotEmpty() && action.vhostDescription != existing.description -> "a different description"
+            action.tags.isNotEmpty() && action.tags.toSet() != existing.tags.toSet() -> "different tags"
+            action.defaultQueueType != null && action.defaultQueueType != existing.defaultQueueType -> "a different default queue type"
+            else -> return ActionResult.Success
+        }
+        return conflict("The virtual host ${action.name} exists with $what")
+    }
+
+    // The hash is only compared with `matches` and never put in a reason.
+    private fun declareUser(action: MigrationAction.DeclareUser): ActionResult {
+        val existing = users[action.name]
+        if (existing == null) {
+            users[action.name] = ExistingUser(action.passwordHash, action.hashingAlgorithm, action.tags)
+            return ActionResult.Success
+        }
+        val what = when {
+            !existing.hash.matches(action.passwordHash) -> "a different password hash"
+            existing.tags.toSet() != action.tags.toSet() -> "different tags"
+            else -> return ActionResult.Success
+        }
+        return conflict("The user ${action.name} exists with $what")
+    }
+
+    private fun setPermissions(action: MigrationAction.SetPermissions): ActionResult {
+        val existing = permissions[action.vhost to action.user]
+        if (existing == null) { permissions[action.vhost to action.user] = action; return ActionResult.Success }
+        return if (existing == action) ActionResult.Success else conflict("The permissions of ${action.user} on ${action.vhost} exist with other patterns")
+    }
+
+    private fun setTopicPermissions(action: MigrationAction.SetTopicPermissions): ActionResult {
+        val key = Triple(action.vhost, action.user, action.exchange)
+        val existing = topicPermissions[key]
+        if (existing == null) { topicPermissions[key] = action; return ActionResult.Success }
+        return if (existing == action) ActionResult.Success else conflict("The topic permissions of ${action.user} on ${action.vhost} exist with other patterns")
     }
 
     fun clear() {

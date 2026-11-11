@@ -176,7 +176,7 @@ sealed interface MigrationAction {
         override val actionName: String get() = "declareUser"
         override val vhost: String get() = ""
         override val description: String get() = "Declare user $name"
-        override val detail: String? get() = null // M8-12a STUB: "administrator, password hash hidden" (tags, then the fixed text; never the value)
+        override val detail: String? get() = oneLine((tags + "password hash hidden").joinToString(", "))
         override val isBrokerLevel: Boolean get() = true
     }
 

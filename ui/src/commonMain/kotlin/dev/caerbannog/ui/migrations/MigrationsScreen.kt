@@ -53,6 +53,7 @@ import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationsWording
+import dev.caerbannog.core.migrations.redactedRaw
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -428,7 +429,7 @@ private fun MigrationDetailPanel(
                     .padding(12.dp),
             ) {
                 Text(
-                    text = file.rawJson,
+                    text = redactedRaw(file.rawJson), // D4: a password hash is never shown; the file keeps it
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     color = Color(0xFFECEFF1),
@@ -436,7 +437,7 @@ private fun MigrationDetailPanel(
                 )
 
                 OutlinedButton(
-                    onClick = { clipboardManager.setText(AnnotatedString(file.rawJson)) },
+                    onClick = { clipboardManager.setText(AnnotatedString(redactedRaw(file.rawJson))) },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .testTag("migrations:copyJsonBtn"),

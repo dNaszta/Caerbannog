@@ -20,6 +20,8 @@ data class MigrationsInputs(
     val vhost: String,
     val hasConfigurePermission: Boolean,
     val controlLevel: TopologyControlLevel,
+    /** The tags of the connection's user from the permission check (M8-12a); an access file needs "administrator". */
+    val userTags: Set<String> = emptySet(),
     val executor: TopologyMigrationExecutor?,
     /** Why there is no [executor]: never blank when there is none; null when there is one. */
     val unavailableReason: String?,
@@ -44,6 +46,7 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
         vhost = source?.vhost ?: "/",
         hasConfigurePermission = permission?.topologyUnlocked ?: false,
         controlLevel = profile?.topologyControlLevel ?: TopologyControlLevel.READ_ONLY,
+        userTags = permission?.userTags.orEmpty(),
         executor = executor,
         unavailableReason = if (executor != null) null else when {
             source == null -> NOT_CONNECTED
@@ -63,6 +66,7 @@ fun AppComposition.createMigrationsViewModel(inputs: MigrationsInputs, scope: Co
         vhost = inputs.vhost,
         hasConfigurePermission = inputs.hasConfigurePermission,
         controlLevel = inputs.controlLevel,
+        userTags = inputs.userTags,
         folderPorts = migrationFolderPorts,
         migrationUnavailableReason = inputs.unavailableReason,
         scope = scope,

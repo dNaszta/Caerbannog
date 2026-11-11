@@ -160,7 +160,8 @@ object MigrationParser {
             add(
                 buildJsonObject {
                     put("action", action.actionName)
-                    if (action.vhost != "/") put("vhost", action.vhost)
+                    // A virtual host and a user are named by "name"; a key "vhost" would say something else.
+                    if (action.vhost != "/" && action !is MigrationAction.DeclareVhost && action !is MigrationAction.DeclareUser) put("vhost", action.vhost)
                     ActionCodecs.forAction(action.actionName).write(action, this)
                 }
             )
