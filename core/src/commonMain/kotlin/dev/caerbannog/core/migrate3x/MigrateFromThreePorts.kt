@@ -17,8 +17,9 @@ sealed interface SaveOutcome {
 }
 
 /** Asks where to save and writes [text] there (native save dialog in the app). Never writes into the migrations folder (that is M8-06b). */
-fun interface ReportFileSaver {
-    suspend fun save(suggestedName: String, text: String): SaveOutcome
+interface ReportFileSaver {
+    /** M8-12b: [secret] is true for a file that holds password hashes: it is created readable by its owner only where the system allows (P13). */
+    suspend fun save(suggestedName: String, text: String, secret: Boolean = false): SaveOutcome
 }
 
 /** What the screen holds after an analysis: the file label, the document (for the counts) and the report. */

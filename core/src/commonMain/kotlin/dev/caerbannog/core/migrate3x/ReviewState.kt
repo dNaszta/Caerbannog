@@ -90,6 +90,12 @@ data class GenerationReport(
     val leftOut: List<LeftOutRow>,
     val notes: List<String>,
     val vhostHint: String?,
+    /** M8-12b: "Access: 1 virtual host, 4 users, ..."; null without an access file. */
+    val accessLine: String? = null,
+    val usersNotMigrated: List<LeftOutRow> = emptyList(),
+    val permissionsLeftOut: List<LeftOutRow> = emptyList(),
+    /** M8-12b: the secret-file warning (D3), set when any generated file holds a `declareUser`. */
+    val secretWarning: String? = null,
 )
 
 data class LeftOutRow(val label: String, val text: String)

@@ -54,7 +54,8 @@ data class SkippedItem(val item: ReviewItem, val reason: SkipReason)
 /** Fixed plain text. [item] is the item the note is about, when there is one. */
 data class GenerationNote(val text: String, val item: ReviewItem? = null)
 
-data class GeneratedMigration(val vhost: String, val file: MigrationFile)
+/** M8-12b: [access] is true for the access migration (its [vhost] is empty; the panel says "access"). */
+data class GeneratedMigration(val vhost: String, val file: MigrationFile, val access: Boolean = false)
 
 sealed interface GenerationResult {
     /** Nothing is produced. */
@@ -64,6 +65,11 @@ sealed interface GenerationResult {
         val migrations: List<GeneratedMigration>,
         val skipped: List<SkippedItem>,
         val notes: List<GenerationNote>,
+        /** M8-12b: the users the access migration does not declare, and the permissions of those users that it leaves out. */
+        val notMigrated: List<NotMigratedUser> = emptyList(),
+        val leftOutPermissions: List<LeftOutPermission> = emptyList(),
+        /** What the access file holds (counts, never a hash); null when there is no access file. */
+        val access: AccessSummary? = null,
     ) : GenerationResult
 }
 

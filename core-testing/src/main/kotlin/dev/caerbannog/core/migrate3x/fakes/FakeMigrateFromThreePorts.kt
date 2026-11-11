@@ -20,12 +20,12 @@ class FakeDefinitionsFileChooser(var next: String? = null) : DefinitionsFileChoo
 
 /** M8-06a: the native save dialog. Records what it was asked to write; [outcome] is what the dialog and the disk answer. */
 class FakeReportFileSaver(var outcome: SaveOutcome = SaveOutcome.Saved("/tmp/saved.json")) : ReportFileSaver {
-    data class Save(val suggestedName: String, val text: String)
+    data class Save(val suggestedName: String, val text: String, val secret: Boolean = false)
 
     val saves: MutableList<Save> = mutableListOf()
 
-    override suspend fun save(suggestedName: String, text: String): SaveOutcome {
-        saves += Save(suggestedName, text)
+    override suspend fun save(suggestedName: String, text: String, secret: Boolean): SaveOutcome {
+        saves += Save(suggestedName, text, secret)
         return outcome
     }
 }

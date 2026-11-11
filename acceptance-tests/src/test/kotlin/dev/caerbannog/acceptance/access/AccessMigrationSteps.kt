@@ -10,7 +10,30 @@ import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeTopologyMigrationExecutor
 import dev.caerbannog.core.json.SecretValue
+import dev.caerbannog.core.migrate3x.AnalysisHolder
 import dev.caerbannog.core.migrate3x.CompatibilityAnalyzer
+import dev.caerbannog.core.migrate3x.FileLoadResult
+import dev.caerbannog.core.migrate3x.GenerationReport
+import dev.caerbannog.core.migrate3x.GenerationState
+import dev.caerbannog.core.migrate3x.LiveAnalysisOutcome
+import dev.caerbannog.core.migrate3x.LiveDefinitionsSource
+import dev.caerbannog.core.migrate3x.MigrateFromThreeState
+import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
+import dev.caerbannog.core.migrate3x.MigrateFromThreeViewModel
+import dev.caerbannog.core.migrate3x.ReadOutcome
+import dev.caerbannog.core.migrate3x.SaveOutcome
+import dev.caerbannog.core.migrate3x.analyseLive
+import dev.caerbannog.core.migrate3x.fakes.DefinitionsFiles
+import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileChooser
+import dev.caerbannog.core.migrate3x.fakes.FakeDefinitionsFileLoader
+import dev.caerbannog.core.migrate3x.fakes.FakeReportFileSaver
+import dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads
+import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import dev.caerbannog.core.migrate3x.CompatibilityReportJson
 import dev.caerbannog.core.migrate3x.CompatibilityReportText
 import dev.caerbannog.core.migrate3x.DefinitionsParseResult
@@ -48,6 +71,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /** M8-12a: steps of the `@m8-12a` scenarios. They call the real runner and assert what the fake 4.x broker holds; the rules live in `core`. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class AccessMigrationSteps {
     private val hash = "SENTINEL-HASH"
     private val sha256 = "rabbit_password_hashing_sha256"
@@ -67,8 +91,20 @@ class AccessMigrationSteps {
     private val shown = mutableListOf<String>()
     private var logged = ""
 
+    // ---- M8-12b: the generation runs through the real view model over a fake folder and a fake saver ----
+    private var test = TestScope()
+    private var algorithm = sha256
+    private val extraUsers = mutableListOf<kotlinx.serialization.json.JsonObject>()
+    private val extraPermissions = mutableListOf<kotlinx.serialization.json.JsonObject>()
+    private var withDefaultVhost = false
+    private var folders = FakeMigrationFolders("/m")
+    private val saver = FakeReportFileSaver()
+    private var viewModel: MigrateFromThreeViewModel? = null
+    private var generationReport: GenerationReport? = null
+
     @Before
     fun reset() {
+        test = TestScope(); algorithm = sha256; extraUsers.clear(); extraPermissions.clear(); withDefaultVhost = false; folders = FakeMigrationFolders("/m"); saver.saves.clear(); viewModel = null; generationReport = null
         vhostName = "/orders"; vhostDescription = ""; vhostTags = emptyList(); tags = setOf("administrator"); level = TopologyControlLevel.FULL_CONTROL
         executor = FakeTopologyMigrationExecutor(); history = InMemoryMigrationHistoryRepository(); dryRun = null; applied = null; shown.clear()
     }
@@ -298,7 +334,188 @@ class AccessMigrationSteps {
     fun acceptedAll() = Unit
 
     @When("I generate the migrations")
-    fun generate() = Unit // generation is M8-12b; the hand-written access migration stands in
+    fun generate() = generateThroughTheScreen(readOnlyFolder = false)
+
+    private fun definitionsText(): String = DefinitionsFiles.accessFile(
+        vhosts = buildList { if (withDefaultVhost) add(DefinitionsFiles.vhost("/")); add(DefinitionsFiles.vhost(vhostName)) },
+        users = listOf(DefinitionsFiles.user("svc", hash, algorithm, listOf("management"))) + extraUsers,
+        permissions = listOf(DefinitionsFiles.permission("/orders", "svc")) + extraPermissions,
+        topicPermissions = listOf(DefinitionsFiles.topicPermission("/orders", "svc")),
+        queues = listOf(DefinitionsFiles.queue("jobs", type = "quorum", vhost = "/orders")),
+    )
+
+    private fun settle() = test.testScheduler.advanceUntilIdle()
+
+    /** The real Generate of the review over a fake folder; with [readOnlyFolder] the save fails and the files are exported through the fake saver. */
+    private fun generateThroughTheScreen(readOnlyFolder: Boolean) {
+        folders = FakeMigrationFolders("/m").also { it.folder("/m").readOnly = readOnlyFolder }
+        val loader = FakeDefinitionsFileLoader(mapOf("/data/legacy.json" to FileLoadResult.Loaded(definitionsText())))
+        val dispatcher = StandardTestDispatcher(test.testScheduler)
+        val vm = MigrateFromThreeViewModel(loader, FakeDefinitionsFileChooser(), saver, AnalysisHolder(), folders.ports, CoroutineScope(dispatcher), dispatcher)
+        viewModel = vm
+        vm.open("/data/legacy.json"); settle()
+        vm.generate(); settle()
+        if (readOnlyFolder) { saver.outcome = SaveOutcome.Saved("/home/me/exported.json"); vm.exportFiles(); settle() }
+        val state = vm.state.value as? MigrateFromThreeState.Report ?: error("the screen is not a report: ${vm.state.value}")
+        generationReport = (state.review.generation as? GenerationState.Done)?.report ?: error("generation did not finish: ${state.review.generation}")
+    }
+
+    private fun report(): GenerationReport = generationReport ?: error("nothing was generated")
+
+    /** The generated files in version order: from the folder after a save, else the texts the saver was given. */
+    private fun generatedTexts(): List<String> =
+        if (saver.saves.isNotEmpty()) saver.saves.sortedBy { it.suggestedName }.map { it.text }
+        else folders.folder("/m").files.toSortedMap().values.map { it.rawJson }
+
+    private fun accessActionNames(): List<String> =
+        (MigrationParser.parse(generatedTexts().first()) as? MigrationValidationResult.Valid)?.migration?.up?.map { it.actionName } ?: error("the first file does not parse")
+
+    @Then("there is an access migration with the actions in the order: declare virtual host, declare user, set permissions, set topic permissions")
+    fun accessOrder() {
+        assertEquals(listOf("declareVhost", "declareUser", "setPermissions", "setTopicPermissions"), accessActionNames().distinct(), "files: ${report().files.map { it.version to it.vhost }}")
+        assertEquals("access", report().files.first().vhost)
+    }
+
+    @Then("it has a lower version than the topology migrations")
+    fun lowerVersion() {
+        val versions = report().files.map { it.version }
+        assertTrue(versions.size >= 2, "no topology migration was generated: $versions")
+        assertEquals(versions.sorted(), versions)
+        assertEquals("access", report().files.first().vhost)
+    }
+
+    // ---- 12b: the review and the report ----
+
+    @When("I review the proposal for the user {string}")
+    fun reviewUser(user: String) {
+        val loader = FakeDefinitionsFileLoader(mapOf("/data/legacy.json" to FileLoadResult.Loaded(definitionsText())))
+        val dispatcher = StandardTestDispatcher(test.testScheduler)
+        val vm = MigrateFromThreeViewModel(loader, FakeDefinitionsFileChooser(), saver, AnalysisHolder(), folders.ports, CoroutineScope(dispatcher), dispatcher)
+        viewModel = vm
+        vm.open("/data/legacy.json"); settle()
+        val view = (vm.state.value as MigrateFromThreeState.Report).view
+        view.groups.forEach { vm.toggleGroup(it.key) }; settle()
+        userRow = (vm.state.value as MigrateFromThreeState.Report).view.let { v -> v.groups.flatMap { g -> v.rows(g.key).let { r -> (0 until r.size).map { r.at(it) } } } }.firstOrNull { it.user != null && it.name == user }
+        screenText = vm.state.value.toString()
+    }
+    private var userRow: dev.caerbannog.core.migrate3x.RowView? = null
+    private var screenText = ""
+
+    @Then("I see the name, the tags, the hashing algorithm and {string}")
+    fun seeUserRow(hidden: String) {
+        val row = userRow ?: error("no row for the user")
+        assertEquals("svc", row.name)
+        assertEquals(listOf("management"), row.user!!.tags)
+        assertEquals(sha256, row.user!!.algorithm)
+        assertTrue(hidden.contains(row.user!!.hashText) && row.user!!.hashText.isNotEmpty(), "the row says \"${row.user!!.hashText}\", expected a part of \"$hidden\"")
+    }
+
+    @Then("the hash is shown nowhere on the screen")
+    fun hashNotOnScreen() { assertFalse(screenText.contains(hash)); assertFalse(userRow.toString().contains(hash)) }
+
+    // ---- 12b: saving and exporting ----
+
+    @When("I save or export the access migration")
+    fun saveOrExport() = generateThroughTheScreen(readOnlyFolder = true)
+
+    @Then("I am warned that the file contains password hashes and must be kept secret")
+    fun warned() {
+        assertEquals(MigrateFromThreeTexts.SECRET_FILE_WARNING, report().secretWarning)
+        assertTrue(report().secretWarning.orEmpty().contains("password hashes") && report().secretWarning.orEmpty().contains("Keep it secret"))
+    }
+
+    @Then("the file is readable by its owner only where the system allows it")
+    fun ownerOnlyAsked() {
+        // The saver is asked for an owner-only file (the folder path is checked by FolderMigrationFileAccessModeTest).
+        assertEquals(listOf(true), saver.saves.take(1).map { it.secret }.ifEmpty { listOf(false) })
+        assertFalse(saver.saves.drop(1).any { it.secret }, "a topology file was asked for as a secret")
+    }
+
+    // ---- 12b: full export ----
+
+    @Given("a live 3.x connection whose user is an administrator")
+    fun liveAdmin() = Unit
+
+    private var liveReads = FakeThreeXReads()
+    private var liveHeld: dev.caerbannog.core.migrate3x.HeldAnalysis? = null
+
+    @When("I analyse it")
+    fun analyse() {
+        liveReads = FakeThreeXReads().apply { definitions = ReadOutcome.Ok(definitionsText()) }
+        liveHeld = (runBlocking { analyseLive(LiveDefinitionsSource("legacy-eu", "3.13.7", liveReads) { }) } as LiveAnalysisOutcome.Analysed).held
+    }
+
+    @Then("the users, virtual hosts and permissions come from the full export")
+    fun fromFull() {
+        val d = liveHeld!!.document
+        assertEquals(setOf("svc"), d.users.map { it.name }.toSet())
+        assertTrue(d.virtualHosts.isNotEmpty() && d.permissions.isNotEmpty(), "no access data in the live analysis")
+        assertTrue("definitions" in liveReads.calls, "the full export was not read: ${liveReads.calls}")
+    }
+
+    @Then("not from a per-virtual-host export")
+    fun notPerVhost() = assertTrue(liveReads.calls.none { it.startsWith("definitions:") && it != "definitions" }, "a per-virtual-host export was read: ${liveReads.calls}")
+
+    // ---- 12b: algorithms, not migrated, left out, default vhost ----
+
+    @Given("the export contains a user whose hashing algorithm is {string}")
+    fun userWithAlgorithm(name: String) { algorithm = name }
+
+    @When("I generate the access migration")
+    fun generateAccess() = generateThroughTheScreen(readOnlyFolder = false)
+
+    @Then("the user is declared with its hash and the algorithm {string}")
+    fun declaredWithAlgorithm(name: String) {
+        val migration = (MigrationParser.parse(generatedTexts().first()) as MigrationValidationResult.Valid).migration
+        val user = migration.up.filterIsInstance<MigrationAction.DeclareUser>().single { it.name == "svc" }
+        assertEquals(name, user.hashingAlgorithm)
+        assertTrue(user.passwordHash.matches(SecretValue.of(hash)))
+    }
+
+    @Given("the export contains the user {string} and a user {string} whose hashing algorithm is {string}")
+    fun guestAndOld(guest: String, old: String, algorithm: String) {
+        extraUsers += listOf(DefinitionsFiles.user(guest), DefinitionsFiles.user(old, algorithm = algorithm))
+    }
+
+    @Then("the access migration declares neither {string} nor {string}")
+    fun declaresNeither(a: String, b: String) {
+        val names = (MigrationParser.parse(generatedTexts().first()) as MigrationValidationResult.Valid).migration.up.filterIsInstance<MigrationAction.DeclareUser>().map { it.name }
+        assertTrue(names.isNotEmpty() && a !in names && b !in names, "declared users: $names")
+    }
+
+    @Then("the result lists {string} and {string} as not migrated, with {string} for {string}")
+    fun listsNotMigrated(a: String, b: String, text: String, forUser: String) {
+        val rows = report().usersNotMigrated
+        assertEquals(setOf(a, b), rows.map { it.label }.toSet(), "rows: $rows")
+        assertTrue(rows.first { it.label == forUser }.text.contains(text), rows.toString())
+    }
+
+    @Given("the export contains the user {string} with permissions on {string}")
+    fun guestWithPermissions(user: String, vhost: String) {
+        extraUsers += DefinitionsFiles.user(user); extraPermissions += DefinitionsFiles.permission(vhost, user)
+    }
+
+    @Then("the access migration has no permission action for {string}")
+    fun noPermissionFor(user: String) {
+        val up = (MigrationParser.parse(generatedTexts().first()) as MigrationValidationResult.Valid).migration.up
+        assertTrue(up.any { it is MigrationAction.SetPermissions }, "the premise: permission actions exist")
+        assertTrue(up.filterIsInstance<MigrationAction.SetPermissions>().none { it.user == user })
+    }
+
+    @Then("the result lists the left out permissions of {string}")
+    fun listsLeftOut(user: String) = assertTrue(report().permissionsLeftOut.any { it.label.startsWith("$user on ") }, report().permissionsLeftOut.toString())
+
+    @Given("the export has the virtual hosts {string} and {string}")
+    fun hasVhosts(a: String, b: String) { withDefaultVhost = a == "/" || b == "/" }
+
+    @Then("the access migration declares the virtual host {string} and not {string}")
+    fun declaresVhost(yes: String, no: String) {
+        val names = (MigrationParser.parse(generatedTexts().first()) as MigrationValidationResult.Valid).migration.up.filterIsInstance<MigrationAction.DeclareVhost>().map { it.name }
+        assertTrue(yes in names && no !in names, "declared virtual hosts: $names")
+    }
+
+    @Then("the result notes that the default virtual host already exists on 4.x and is not changed")
+    fun notesDefault() = assertTrue("The default virtual host / already exists on 4.x and is not changed" in report().notes, report().notes.toString())
 
     @Then("no action deletes a virtual host, a user or a permission")
     fun noDelete() {

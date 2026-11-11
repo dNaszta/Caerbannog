@@ -74,6 +74,21 @@ object MigrateFromThreeTexts {
     const val NO_FOLDER_CHOSEN: String = "No folder was chosen. Nothing was saved."
     const val NO_FREE_VERSION: String = "The migrations folder has no free version number left (the highest is 9999)."
 
+    // ---- M8-12b STUB: the wording of the access result (D3 warning, D6 lists); empty until built ----
+    const val SECRET_FILE_WARNING: String = "" // M8-12b STUB
+    const val NOT_MIGRATED_TITLE: String = "" // M8-12b STUB: "Users not migrated"
+    const val PERMISSIONS_LEFT_OUT_TITLE: String = "" // M8-12b STUB: "Permissions left out"
+    const val GUEST_NOT_MIGRATED: String = "" // M8-12b STUB
+    const val NO_HASH_NOT_MIGRATED: String = "" // M8-12b STUB
+    const val NO_ALGORITHM_NOT_MIGRATED: String = "" // M8-12b STUB
+    const val DEFAULT_VHOST_NOTE: String = "" // M8-12b STUB: "The default virtual host / already exists on 4.x and is not changed"
+    fun unsupportedAlgorithmNotMigrated(algorithm: String): String = "" // M8-12b STUB
+    const val USER_NOT_MIGRATED: String = "" // M8-12b STUB: "the user is not migrated"
+    const val ACCESS_PILL: String = "" // M8-12b STUB: "access, all virtual hosts"
+    const val READABLE_BY_YOU_ONLY: String = "" // M8-12b STUB: "readable by you only"
+    fun permissionLabel(user: String, vhost: String): String = "" // M8-12b STUB: "<user> on <vhost>"
+    fun accessLine(summary: AccessSummary): String = "" // M8-12b STUB
+
     const val GENERATE_HINT: String = "Generate is possible when every item is decided."
 
     /** "item 14 of 381": the place of the open item in the list of items that need a decision. */

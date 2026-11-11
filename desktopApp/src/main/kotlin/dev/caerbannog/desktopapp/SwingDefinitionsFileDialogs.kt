@@ -80,7 +80,7 @@ class SwingReportFileSaver(
     private val dialog: SaveFileDialog = JFileChooserSaveDialog(),
     private val write: (File, String) -> Unit = { file, text -> Files.writeString(file.toPath(), text, Charsets.UTF_8) },
 ) : ReportFileSaver {
-    override suspend fun save(suggestedName: String, text: String): SaveOutcome = withContext(Dispatchers.IO) {
+    override suspend fun save(suggestedName: String, text: String, secret: Boolean): SaveOutcome = withContext(Dispatchers.IO) {
         val target = onSwingThread { dialog.pick(startFolder(), suggestedName) } ?: return@withContext SaveOutcome.Cancelled
         try {
             write(target, text)
