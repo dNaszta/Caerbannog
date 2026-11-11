@@ -44,7 +44,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** M8-10: the two read-only migration tools of the MCP server and the guards around them. Red against the stubs (the tools are not built, the server lists 11 tools). */
+/** M8-10: the two read-only migration tools of the MCP server and the guards around them. Red against the stubs (the tools are not built, the server lists 11 tools, the tools are unavailable). */
 class McpMigrationToolsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private val sentinels = listOf("SENTINEL-HASH", "SENTINEL-PASSWORD", "amqp://", "amqps://", "src-uri", "dest-uri")
@@ -107,8 +107,35 @@ class McpMigrationToolsTest {
     }
 
     @Test
-    fun `without the providers the two tools are not listed`() {
-        assertEquals(11, toolNames(server(providers = false)).size)
+    fun `the tool list is thirteen also without the providers`() {
+        assertEquals(13, toolNames(server(providers = false)).size)
+    }
+
+    @Test
+    fun `without a definitions source provider the analyse tool says it is not available`() {
+        val out = server(providers = false).call("caerbannog_analyze_3x_definitions", """{"profile":"legacy-eu"}""")
+        assertTrue(out.isError, out.text)
+        assertEquals("This tool is not available in this server", out.text)
+    }
+
+    @Test
+    fun `without a shovel status provider the list tool says it is not available`() {
+        val out = server(providers = false).call("caerbannog_list_shovels", """{"profile":"legacy-eu"}""")
+        assertTrue(out.isError, out.text)
+        assertEquals("This tool is not available in this server", out.text)
+    }
+
+    @Test
+    fun `without a file loader the file input says it is not available but a profile still works`() {
+        val s = McpServer(
+            profileRepository = Repo(legacy, modern), connectionChecker = Reachable,
+            streamCatalogProvider = { _, _ -> FakeStreamCatalog() }, streamOffsetsProvider = { _, _ -> FakeStreamOffsets() }, topologyCatalogProvider = { _, _ -> FakeTopologyCatalog() },
+            definitionsSourceProvider = { p -> LiveDefinitionsSource(p.name, "3.13.7", FakeThreeXReads()) { } },
+        )
+        val out = s.call("caerbannog_analyze_3x_definitions", """{"file":"/data/legacy.json"}""")
+        assertTrue(out.isError, out.text)
+        assertEquals("This tool is not available in this server", out.text)
+        assertFalse(s.call("caerbannog_analyze_3x_definitions", """{"profile":"legacy-eu"}""").text == "This tool is not available in this server")
     }
 
     @Test
@@ -161,7 +188,8 @@ class McpMigrationToolsTest {
         val text = DefinitionsFixtures.read(DefinitionsFixtures.VHOST_V1)
         val out = analyseFile(fileServer(text))
         assertTrue(out.isError, out.text)
-        assertTrue(out.text.contains("one virtual host"), out.text)
+        assertEquals(MigrateFromThreeTexts.NEEDS_VHOST_NAME, out.text)
+        assertEquals("This file is an export of one virtual host; analyse it on the Migrate from 3.x screen, which asks for the virtual host name", out.text)
         assertFalse(out.text.contains("\"findings\""), "no report for a per-virtual-host export")
     }
 
@@ -195,6 +223,12 @@ class McpMigrationToolsTest {
         val clamped = analyseFile(s, """{"limit":5000}""").obj
         assertEquals(200, clamped["page"]!!.jsonObject["limit"]!!.jsonPrimitive.int)
         assertTrue(clamped["findings"]!!.jsonArray.size <= 200)
+        listOf("0", "-4").forEach { l ->
+            val one = analyseFile(s, """{"limit":$l}""").obj
+            assertEquals(1, one["page"]!!.jsonObject["limit"]!!.jsonPrimitive.int, "limit $l counts as 1")
+            assertEquals(1, one["findings"]!!.jsonArray.size)
+        }
+        assertEquals(analyseFile(s, """{"offset":0}""").obj["findings"], analyseFile(s, """{"offset":-7}""").obj["findings"], "a negative offset counts as 0")
         val past = analyseFile(s, """{"offset":999999}""").obj
         assertEquals(0, past["findings"]!!.jsonArray.size)
         assertTrue(past["page"]!!.jsonObject["total"]!!.jsonPrimitive.int > 0)

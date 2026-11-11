@@ -54,10 +54,11 @@ class CompatibilityReportJsonPageTest {
     }
 
     @Test
-    fun `a negative offset counts as 0 and a limit of 0 or less gives no findings`() {
+    fun `a negative offset counts as 0 and a limit below 1 counts as 1`() {
         assertEquals(page(4, 0)["findings"], page(4, -5)["findings"])
-        assertEquals(0, page(0, 0)["findings"]!!.jsonArray.size)
-        assertEquals(0, page(-3, 0)["findings"]!!.jsonArray.size)
+        assertEquals(page(1, 0)["findings"], page(0, 0)["findings"])
+        assertEquals(page(1, 0)["findings"], page(-3, 0)["findings"])
+        assertEquals(1, page(0, 0)["page"]!!.jsonObject["limit"]!!.jsonPrimitive.int)
     }
 
     @Test
