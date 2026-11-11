@@ -33,8 +33,6 @@ kotlin {
 
 tasks.named<Test>("jvmTest") {
     useJUnitPlatform()
-    // M8-06e: the 240,000-finding tests (ReportGroupingCacheTest next to MigrateFromThreeExploratoryTest) do not fit the default 512 MB of one test JVM.
-    maxHeapSize = "1g"
 }
 
 // Root `./gradlew test` (and `task test`) runs the same-named task in every project, but a Kotlin
