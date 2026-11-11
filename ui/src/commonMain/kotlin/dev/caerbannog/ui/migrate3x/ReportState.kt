@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.caerbannog.core.forwarding.ForwardingTexts
 import dev.caerbannog.core.migrate3x.ChipView
 import dev.caerbannog.core.migrate3x.DecisionPill
 import dev.caerbannog.core.migrate3x.ExportNotice
@@ -87,6 +88,7 @@ internal fun ReportState(
     review: ReviewEvents,
     onOpenMigrations: () -> Unit,
     onAnalyseLive: () -> Unit = {},
+    onForward: (() -> Unit)? = null,
 ) {
     val view = state.view
     val copy = rememberCopyToClipboard()
@@ -101,7 +103,7 @@ internal fun ReportState(
             return@Column
         }
         // Render off the UI thread, copy, then tell the view model. Leaving the composition cancels the scope: nothing is copied and no notice shows.
-        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { scope.launch { copy(reportText()); onReportCopied() } })
+        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onForward, onCopyText = { scope.launch { copy(reportText()); onReportCopied() } })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
         // A state built without a review (no lines yet) shows no bar: the 06a screen.
@@ -119,7 +121,7 @@ internal fun ReportState(
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: () -> Unit, onAnalyseLive: () -> Unit, onCopyText: () -> Unit) {
+private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: () -> Unit, onAnalyseLive: () -> Unit, onForward: (() -> Unit)?, onCopyText: () -> Unit) {
     val source = view.source
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -153,6 +155,12 @@ private fun ReportHeader(view: ReportView, onChooseFile: () -> Unit, onExport: (
                 OutlinedButton(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-analyse-again")) {
                     ConnectionIcon(AppIcon.Refresh, SmallIconSize)
                     Text(MigrateFromThreeTexts.ANALYSE_AGAIN, Modifier.padding(start = 8.dp), maxLines = 1)
+                }
+            }
+            if (onForward != null && source.kind == SourceKind.Live) {
+                Button(onClick = onForward, modifier = Modifier.testTag("migrate3x-forward")) {
+                    ConnectionIcon(AppIcon.SwapHoriz, SmallIconSize)
+                    Text(ForwardingTexts.BUTTON_FORWARD, Modifier.padding(start = 8.dp), maxLines = 1)
                 }
             }
             OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {

@@ -141,7 +141,9 @@ fun createAppComposition(
     permissionChecker: PermissionChecker = ManagementApiPermissionChecker(),
     reachabilityChecker: BrokerReachabilityChecker = StreamAndManagementReachabilityChecker(),
     log: (String) -> Unit = { System.err.println(it) },
-    gateway: ConnectionGateway = RabbitMqConnectionGateway(secretStore, log),
+    gateway: ConnectionGateway = RabbitMqConnectionGateway(
+        secretStore, profiles = { name -> JsonFileConnectionProfileRepository(profilesFile).list().firstOrNull { it.name == name } }, log = log,
+    ),
     appSettings: AppSettings = JsonFileAppSettings(JsonFileAppSettings.defaultFile(), log),
     uiDispatcher: CoroutineDispatcher = Dispatchers.Swing,
     navigation: AppNavigation = AppNavigation(),

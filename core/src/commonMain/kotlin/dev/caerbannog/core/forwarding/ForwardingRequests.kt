@@ -15,10 +15,17 @@ data class ForwardingForm(
 )
 
 object ForwardingRequests {
-    /** One queue, one request. Destination: the same queue name in the virtual host of [destinationProfile] (D5). M8-09 STUB. */
-    fun of(sourceProfile: ConnectionProfile, sourceVhost: String, queue: String, destinationProfile: ConnectionProfile, form: ForwardingForm): ForwardingRequest =
-        ForwardingRequest(
-            ForwardingSource(sourceProfile.name, ShovelAddress.forProfile(sourceProfile), sourceVhost, queue, null),
-            destinationProfile.name, "STUB", queue,
-        ) // M8-09 STUB
+    /**
+     * One queue, one request. Destination: the same queue name in the virtual host of [destinationProfile] (D5). The source address carries the
+     * virtual host of the queue ([sourceVhost]), not the one of the profile. The typed password is used only while [ForwardingForm.anotherUser] is on.
+     */
+    fun of(sourceProfile: ConnectionProfile, sourceVhost: String, queue: String, destinationProfile: ConnectionProfile, form: ForwardingForm): ForwardingRequest {
+        val credentials = form.password?.takeIf { form.anotherUser }?.let { ShovelSourceCredentials(form.user, it) }
+        val address = ShovelAddress.forProfile(sourceProfile.copy(virtualHost = sourceVhost), form.amqpHost, form.amqpPort, credentials)
+        return ForwardingRequest(
+            ForwardingSource(sourceProfile.name, address, sourceVhost, queue, credentials),
+            destinationProfile.name, destinationProfile.virtualHost, queue,
+            if (form.keepRunning) SrcDeleteAfter.NEVER else SrcDeleteAfter.QUEUE_LENGTH,
+        )
+    }
 }

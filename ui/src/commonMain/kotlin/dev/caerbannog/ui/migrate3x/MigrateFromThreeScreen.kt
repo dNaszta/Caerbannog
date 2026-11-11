@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import dev.caerbannog.core.forwarding.ForwardingScreenState
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
 import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
 import dev.caerbannog.core.migrate3x.SourceKind
@@ -85,8 +86,11 @@ fun MigrateFromThreeScreen(
     picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
     onChooseSource: (SourceKind) -> Unit = {},
     onAnalyseLive: () -> Unit = {},
-    /** M8-09: the "Forward messages" button of a live report (`migrate3x-forward`); null draws none. M8-09 STUB: not drawn yet. */
+    /** M8-09: the "Forward messages" button of a live report (`migrate3x-forward`); null draws none. */
     onForward: (() -> Unit)? = null,
+    /** M8-09: while the forwarding view is open ([ForwardingScreenState.Closed] otherwise) it takes the place of the body, under the info line. */
+    forwarding: ForwardingScreenState = ForwardingScreenState.Closed,
+    forwardingEvents: ForwardingEvents? = null,
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
@@ -97,6 +101,10 @@ fun MigrateFromThreeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (forwarding != ForwardingScreenState.Closed && forwardingEvents != null) {
+            ForwardingView(forwarding, forwardingEvents)
+            return@Column
+        }
         when (state) {
             MigrateFromThreeState.ChooseSource -> ChooseSourceState(picker, onChooseFile, onChooseSource, onAnalyseLive)
             is MigrateFromThreeState.Loading -> LoadingState(state, onCancelPrompt)
@@ -105,7 +113,7 @@ fun MigrateFromThreeScreen(
             is MigrateFromThreeState.LoadingLive -> LoadingLiveState(state, onCancelPrompt)
             is MigrateFromThreeState.CannotExport -> CannotExportState(state, onChooseFile)
             is MigrateFromThreeState.LiveFailed -> LiveFailedState(state, onAnalyseLive, onChooseFile)
-            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations, onAnalyseLive)
+            is MigrateFromThreeState.Report -> ReportState(state, reportText, onChooseFile, onToggleSeverity, onToggleGroup, onExport, onDismissNotice, onReportCopied, review, onOpenMigrations, onAnalyseLive, onForward)
         }
     }
 }

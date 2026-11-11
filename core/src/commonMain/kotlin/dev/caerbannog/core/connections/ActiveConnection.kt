@@ -178,6 +178,7 @@ class ActiveConnection(
                 ),
                 isCurrent,
             ),
+            shovels = connection.shovels,
             hasMqtt = hasMqtt,
         )
     }

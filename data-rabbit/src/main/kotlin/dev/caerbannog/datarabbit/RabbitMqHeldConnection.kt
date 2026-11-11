@@ -39,6 +39,8 @@ class RabbitMqHeldConnection(
     override val brokerVersion: String? = null,
     /** The GET-only reads of a 3.x connection; null for 4.x and unknown versions. */
     override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
+    /** M8-09: the management shovel gateway of a 4.x connection; the unavailable one for a 3.x source. */
+    override val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 
