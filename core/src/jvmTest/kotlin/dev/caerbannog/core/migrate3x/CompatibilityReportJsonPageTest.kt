@@ -58,7 +58,7 @@ class CompatibilityReportJsonPageTest {
         assertEquals(page(4, 0)["findings"], page(4, -5)["findings"])
         assertEquals(page(1, 0)["findings"], page(0, 0)["findings"])
         assertEquals(page(1, 0)["findings"], page(-3, 0)["findings"])
-        assertEquals(1, page(0, 0)["page"]!!.jsonObject["limit"]!!.jsonPrimitive.int)
+        assertEquals(1, (page(0, 0)["page"]?.jsonObject ?: throw AssertionError("no page object"))["limit"]!!.jsonPrimitive.int)
     }
 
     @Test
