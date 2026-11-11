@@ -143,6 +143,7 @@ class RealBrokerM8GateTest {
             )
             val analysed = run { analyseLive(LiveDefinitionsSource("old", version, reads) { delay(it) }) }
             val held = (analysed as? LiveAnalysisOutcome.Analysed ?: error("the live analysis did not finish: $analysed")).held
+            assertTrue(held.report.findings.any { it.findingClass == dev.caerbannog.core.migrate3x.FindingClass.MessageLoss && it.kind == ItemKind.Queue && it.name == "orders" }, "the report must carry a message-loss finding for orders")
             observed += held.toString() + CompatibilityReportJson.encode(held.report) + CompatibilityReportText.render(held.report)
 
             // ---- review: accept every proposal that can be accepted, skip only the rest
