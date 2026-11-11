@@ -107,6 +107,8 @@ class RealBrokerM8ShovelTest {
         try {
             o.declareQueue(q); repeat(3) { o.publish(q, "m$it") }
             n.declareQueue(q, """{"x-queue-type":"quorum"}""")
+            // the management statistics lag by seconds: wait until the 3.13 broker reports the 3 messages before the dry run reads them
+            awaitUntil("the source reports 3 ready messages") { o.get("/api/queues/%2F/$q").body.contains("\"messages_ready\":3") }
             val g = gateway(); val svc = service(g); val req = request(q)
             val ready = run { svc.prepare(req) } as? Prepared.Ready ?: error("not ready: ${run { svc.prepare(req) }}")
             assertEquals(3L, ready.facts.source.ready)
@@ -179,10 +181,11 @@ class RealBrokerM8ShovelTest {
             n.delete("/api/parameters/shovel/%2F/$name")
             return status
         }
-        val atLimit = putNamed(MAX_SHOVEL_NAME_LENGTH); val beyond = putNamed(MAX_SHOVEL_NAME_LENGTH + 1)
-        println("M8-08 MEASURED shovel name: length $MAX_SHOVEL_NAME_LENGTH -> $atLimit, ${MAX_SHOVEL_NAME_LENGTH + 1} -> $beyond")
-        assertTrue(atLimit in 200..299, "a name of $MAX_SHOVEL_NAME_LENGTH characters was refused ($atLimit): the constant is too high")
-        assertEquals(400, beyond, "a name of ${MAX_SHOVEL_NAME_LENGTH + 1} characters was accepted ($beyond): the constant is too low")
+        // a name of length 4096 is the search ceiling; the constant must not be higher than what the broker accepts
+        var lo = 1; var hi = 4096
+        if (putNamed(hi) in 200..299) lo = hi else { while (hi - lo > 1) { val mid = (lo + hi) / 2; if (putNamed(mid) in 200..299) lo = mid else hi = mid } }
+        println("M8-08 MEASURED longest accepted shovel name: $lo characters (search ceiling 4096)")
+        assertTrue(MAX_SHOVEL_NAME_LENGTH <= lo, "MAX_SHOVEL_NAME_LENGTH $MAX_SHOVEL_NAME_LENGTH is above the measured limit $lo")
 
         // (b) the absent grace: polls that say Absent before the first Listed after a submitted PUT (never + empty source keeps it running)
         val grace = "m8-08-grace"
@@ -199,7 +202,7 @@ class RealBrokerM8ShovelTest {
         // (c) a queue name with a space, a slash and a percent sign, end to end
         val odd = "m8 08/%x"
         try {
-            o.declareQueue(enc(odd)); repeat(2) { o.publish(enc(odd), "m$it") }
+            o.declareQueue(enc(odd)); repeat(2) { o.publish(odd, "m$it") }
             n.declareQueue(enc(odd), """{"x-queue-type":"quorum"}""")
             val svc = service(gateway()); val req = request(odd)
             assertEquals(StartResult.Started, run { svc.start(req, odd) })

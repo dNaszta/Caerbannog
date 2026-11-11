@@ -37,7 +37,7 @@ internal class ShovelRig(
 
     private fun engine(seen: MutableList<M508a.Seen>, script: (String, String) -> Pair<Int, String>?) = MockEngine { request ->
         val body = String(request.body.toByteArray())
-        seen += M508a.Seen(request.method.value, request.url.encodedPath, request.headers["Authorization"], request.headers["Content-Type"], body)
+        seen += M508a.Seen(request.method.value, request.url.encodedPath, request.headers["Authorization"], request.headers["Content-Type"] ?: request.body.contentType?.toString(), body)
         val reply = script(request.method.value, request.url.encodedPath) ?: (404 to "")
         respond(reply.second, HttpStatusCode.fromValue(reply.first), headersOf("Content-Type", "application/json"))
     }
