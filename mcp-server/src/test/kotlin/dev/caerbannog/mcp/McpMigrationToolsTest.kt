@@ -195,7 +195,7 @@ class McpMigrationToolsTest {
 
     // ---- caerbannog_analyze_3x_definitions: the page ----
 
-    private fun big(n: Int = 60_000) = DefinitionsFiles.classicQueues(n)
+    private fun big(n: Int = 400) = DefinitionsFiles.classicQueues(n)
 
     @Test
     fun `a page has the summary, the limit findings from the offset and the total`() {
@@ -236,12 +236,16 @@ class McpMigrationToolsTest {
 
     @Test
     fun `the response stays under 256 KB and says when the page was cut`() {
-        val out = analyseFile(fileServer(big()), """{"limit":200}""")
+        // 200 queues with 5,000 character names: the page of 200 findings is far above the cap.
+        val longNames = DefinitionsFiles.file(queues = (1..200).map { DefinitionsFiles.queue("q-" + it.toString().padStart(3, '0') + "x".repeat(5_000)) })
+        val out = analyseFile(fileServer(longNames), """{"limit":200}""")
         assertTrue(out.text.length <= 256 * 1024, "the response is ${out.text.length} characters")
         val page = out.obj["page"]!!.jsonObject
         val returned = page["returned"]!!.jsonPrimitive.int
         assertEquals(out.obj["findings"]!!.jsonArray.size, returned)
-        if (returned < 200) assertTrue(page["truncated"]?.jsonPrimitive?.boolean == true, "a cut page must say so")
+        assertTrue(returned in 1..199, "the page must be cut, returned $returned")
+        assertTrue(page["truncated"]?.jsonPrimitive?.boolean == true, "a cut page must say so")
+        assertTrue(page["total"]!!.jsonPrimitive.int >= 200, "the total counts all findings, not the cut page")
     }
 
     @Test
@@ -298,7 +302,7 @@ class McpMigrationToolsTest {
         val first = list.first()
         assertEquals(listOf("caerbannog-migrate-orders", "/", "running", 40, 80), listOf(first["name"]!!.jsonPrimitive.content, first["vhost"]!!.jsonPrimitive.content, first["state"]!!.jsonPrimitive.content, first["forwarded"]!!.jsonPrimitive.int, first["remaining"]!!.jsonPrimitive.int))
         val keys = list.flatMap { it.keys }.map { it.lowercase() }
-        assertTrue(keys.none { "uri" in it || "url" in it || "address" in it || "host" in it }, "an address-like key: $keys")
+        assertTrue(keys.none { "uri" in it || "url" in it || "address" in it || it.split(Regex("[^a-z]+")).contains("host") }, "an address-like key: $keys")
         assertEquals("terminated", list[1]["state"]!!.jsonPrimitive.content)
         assertTrue(list[1]["reason"]!!.jsonPrimitive.content.contains("failed to connect"))
     }

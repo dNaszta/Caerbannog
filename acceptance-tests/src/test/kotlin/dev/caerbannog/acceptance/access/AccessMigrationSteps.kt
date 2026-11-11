@@ -545,7 +545,7 @@ class AccessMigrationSteps {
     fun noApplyTool() {
         val names = Json.parseToJsonElement(shown.single()).jsonObject["result"]!!.jsonObject["tools"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
         assertTrue(names.isNotEmpty(), "no tools were listed")
-        assertTrue(names.none { "apply" in it || "migration" in it || "shovel" in it }, "tools: $names")
+        assertTrue(names.none { n -> "apply" in n || "migration" in n || ("shovel" in n && n != "caerbannog_list_shovels") }, "tools: $names")
     }
 
     @Then("the dry run tool lists the action as {string} without any hash")
