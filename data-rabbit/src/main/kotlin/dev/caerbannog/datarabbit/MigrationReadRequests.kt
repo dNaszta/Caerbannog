@@ -24,6 +24,9 @@ internal object MigrationReadRequests {
             MigrationRequests.bindingPath(action.vhost, action.exchange, action.destinationType, action.queue)
         is MigrationAction.DeleteBinding ->
             MigrationRequests.bindingPath(action.vhost, action.exchange, BindingDestinationType.QUEUE, action.queue)
+        // M8-12a STUB: the access actions are read and written by the executor of M8-12c; nothing is sent for them yet
+        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions ->
+            error("M8-12a STUB: access actions have no read request yet")
     }
 
     private fun item(collection: String, vhost: String, name: String) = MigrationRequests.collectionPath(collection, vhost, name)

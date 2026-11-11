@@ -9,6 +9,7 @@ internal object ActionCodecs {
         declareBindingCodec, deleteBindingCodec,
         declareStreamCodec, deleteStreamCodec,
         declarePolicyCodec, declareOperatorPolicyCodec, deletePolicyCodec,
+        declareVhostCodec, declareUserCodec, setPermissionsCodec, setTopicPermissionsCodec,
     ).associateBy(ActionCodec::name)
 
     /** The codec for [actionName], or null: an unknown action is refused, never given a default codec. */

@@ -7,14 +7,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** M8-04: no Shovel action, no vhost or user action yet (M8-12), and an untrusted action name is not echoed. */
+/** M8-04: no Shovel action, no delete action for a vhost or user, and an untrusted action name is not echoed. (M8-12a: `declareUser` is a known action now; its tests are in AccessActionCodecsTest.) */
 class MigrationUnknownActionTest {
 
     private val phrase = "which action is not supported"
 
     @Test
-    fun `declareShovel, deleteVhost and declareUser are refused as unknown actions`() {
-        for (name in listOf("declareShovel", "deleteVhost", "declareUser")) {
+    fun `declareShovel, deleteVhost, deleteUser and deletePermissions are refused as unknown actions`() {
+        for (name in listOf("declareShovel", "deleteVhost", "deleteUser", "deletePermissions")) {
             val message = reason(fileWith("""{ "action": "$name", "name": "x" }"""))
             assertTrue(message.endsWith(phrase), "for $name: \"$message\"")
         }

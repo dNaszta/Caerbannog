@@ -6,6 +6,8 @@ package dev.caerbannog.core.migrations
  * are the executor's fixed texts.
  */
 object MigrationsWording {
+    /** Stands in place of the Edit button of a file that holds a `declareUser`: the raw editor would show the password hash. */
+    const val HASH_FILE_NO_EDIT = "This file holds password hashes. Edit it outside the app."
     const val UNAVAILABLE_TITLE = "Migrations are not offered on this connection"
     const val HISTORY_TITLE = "The applied history cannot be read, so nothing can be applied"
     const val FOLDER_READ_ONLY_HINT = "You can read and apply the migrations; importing, exporting and editing need a writable folder."

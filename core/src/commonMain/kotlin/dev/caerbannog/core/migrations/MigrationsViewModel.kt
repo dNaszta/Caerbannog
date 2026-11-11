@@ -76,6 +76,8 @@ class MigrationsViewModel(
     var vhost: String = "/",
     var hasConfigurePermission: Boolean = true,
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+    /** M8-12a: the tags of the connection's user, passed to the runner. */
+    var userTags: Set<String> = emptySet(),
     /** When set, files come from `repositoryFor(chosen folder)` and [fileRepository] is not used. */
     private val folderPorts: MigrationFolderPorts? = null,
     /** Non-null disables Apply pending and Apply single (import, export and the dry run keep working). */
@@ -104,7 +106,9 @@ class MigrationsViewModel(
         newVhost: String = "/",
         newConfigurePermission: Boolean = true,
         newControlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+        newUserTags: Set<String> = emptySet(),
     ) {
+        userTags = newUserTags
         profileName = newProfile
         vhost = newVhost
         hasConfigurePermission = newConfigurePermission
@@ -125,14 +129,16 @@ class MigrationsViewModel(
 
             val selectedFile = selected?.file
             val dryRun = selectedFile?.let {
-                runner.dryRun(it, hasConfigurePermission, controlLevel, vhost)
+                runner.dryRun(it, hasConfigurePermission, controlLevel, vhost, userTags)
             }
 
-            val canApply = mayChangeTopology() && historyProblem == null
-            val hasPending = entries.any { it.status is MigrationStatus.Pending }
-            val canApplyPending = hasPending && canApply &&
-                entries.filter { it.status is MigrationStatus.Pending }.all { belongsToConnection(it.file) }
-            val canApplySingle = selected?.status is MigrationStatus.Pending && (dryRun?.canApply == true) && canApply
+            val pendingFiles = entries.filter { it.status is MigrationStatus.Pending }.map { it.file }
+            val canApply = mayChangeTopology(forFile = pendingFiles.isNotEmpty() && pendingFiles.all { f -> f.up.any { it.isBrokerLevel } }) && historyProblem == null
+            val hasPending = pendingFiles.isNotEmpty()
+            // Every pending file must be allowed by its own dry run: an access file by tag and level, a topology file by the old rules.
+            val canApplyPending = hasPending && canApply && pendingFiles.all { f -> belongsToConnection(f) && (f.up.none { it.isBrokerLevel } || runner.dryRun(f, hasConfigurePermission, controlLevel, vhost, userTags).canApply) }
+            val canApplySingle = selected?.status is MigrationStatus.Pending && (dryRun?.canApply == true) &&
+                mayChangeTopology(forFile = selectedFile?.up?.any { it.isBrokerLevel } == true) && historyProblem == null
 
             val hasModified = entries.any { it.status is MigrationStatus.Modified }
             val warning = if (hasModified) {
@@ -168,8 +174,9 @@ class MigrationsViewModel(
         }
     }
 
-    private fun mayChangeTopology(): Boolean =
-        hasConfigurePermission && controlLevel != TopologyControlLevel.READ_ONLY && migrationUnavailableReason == null
+    /** [forFile]: an access file does not need the configure permission (its dry run decides by tag and level); null asks about a topology file. */
+    private fun mayChangeTopology(forFile: Boolean = false): Boolean =
+        (hasConfigurePermission || forFile) && controlLevel != TopologyControlLevel.READ_ONLY && migrationUnavailableReason == null
 
     /** The permission and level lines only; the folder, history, outcome and unavailable states are drawn from their structured fields. */
     private fun bannerMessage(): String? = when {
@@ -198,16 +205,16 @@ class MigrationsViewModel(
     }
 
     /** A migration with an action for another virtual host can never be applied on this connection (spec V1). */
-    private fun belongsToConnection(file: MigrationFile): Boolean = file.up.all { it.vhost == vhost }
+    private fun belongsToConnection(file: MigrationFile): Boolean = file.up.all { it.isBrokerLevel || it.vhost == vhost }
 
     fun selectVersion(version: String) {
         scope.launch {
             val entry = _state.value.entries.firstOrNull { it.file.version == version }
             val file = entry?.file
-            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost) }
+            val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost, userTags) }
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
-                mayChangeTopology()
+                mayChangeTopology(forFile = file?.up?.any { it.isBrokerLevel } == true)
 
             _state.update { current ->
                 current.copy(
@@ -246,7 +253,7 @@ class MigrationsViewModel(
             if (current.isApplying) return MigrationApplyResult.Blocked(APPLY_RUNNING)
             if (_state.compareAndSet(current, current.copy(isApplying = true, errorMessage = null, applyOutcome = null, applyProgress = null))) break
         }
-        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost) { step ->
+        val result = runner.applyPending(profileName, files, hasConfigurePermission, controlLevel, vhost, userTags) { step ->
             _state.update { it.copy(applyProgress = ApplyProgress(step.version, step.index, step.total)) }
         }
         val outcome = result.toOutcome()

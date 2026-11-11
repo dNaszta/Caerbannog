@@ -2,6 +2,7 @@ package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.json.ArgumentValueJson
+import dev.caerbannog.core.json.SecretValue
 import dev.caerbannog.core.topology.BindingDestinationType
 
 /**
@@ -12,6 +13,9 @@ sealed interface MigrationAction {
     val vhost: String
     val description: String
     val isDestructive: Boolean get() = false
+
+    /** M8-12a: true for the four access actions (virtual host, user, permissions): they need the administrator tag, not the configure permission or the V1 vhost. */
+    val isBrokerLevel: Boolean get() = false
 
     /** One-line summary of arguments or definition for the migrations screen; null when there is nothing to show. */
     val detail: String? get() = null
@@ -145,6 +149,59 @@ sealed interface MigrationAction {
         override val actionName: String get() = "deletePolicy"
         override val description: String get() = "Delete policy $name"
         override val isDestructive: Boolean get() = true
+    }
+
+    // ---- M8-12a: the access actions. "Up" only: there is no delete action of any kind. ----
+
+    /** [vhost] is the name of the virtual host being declared. */
+    data class DeclareVhost(
+        val name: String,
+        val vhostDescription: String = "",
+        val tags: List<String> = emptyList(),
+        val defaultQueueType: String? = null,
+    ) : MigrationAction {
+        override val actionName: String get() = "declareVhost"
+        override val vhost: String get() = name
+        override val description: String get() = "Declare virtual host $name"
+        override val isBrokerLevel: Boolean get() = true
+    }
+
+    /** [passwordHash] is a secret: no equals, redacting toString; it is written to the file and never shown (see `redactedRaw`). [vhost] is not used. */
+    data class DeclareUser(
+        val name: String,
+        val passwordHash: SecretValue,
+        val hashingAlgorithm: String,
+        val tags: List<String> = emptyList(),
+    ) : MigrationAction {
+        override val actionName: String get() = "declareUser"
+        override val vhost: String get() = ""
+        override val description: String get() = "Declare user $name"
+        override val detail: String? get() = oneLine((tags + "password hash hidden").joinToString(", "))
+        override val isBrokerLevel: Boolean get() = true
+    }
+
+    data class SetPermissions(
+        override val vhost: String,
+        val user: String,
+        val configure: String = ".*",
+        val write: String = ".*",
+        val read: String = ".*",
+    ) : MigrationAction {
+        override val actionName: String get() = "setPermissions"
+        override val description: String get() = "Set permissions of $user on $vhost"
+        override val isBrokerLevel: Boolean get() = true
+    }
+
+    data class SetTopicPermissions(
+        override val vhost: String,
+        val user: String,
+        val exchange: String,
+        val write: String = ".*",
+        val read: String = ".*",
+    ) : MigrationAction {
+        override val actionName: String get() = "setTopicPermissions"
+        override val description: String get() = "Set topic permissions of $user on $vhost for $exchange"
+        override val isBrokerLevel: Boolean get() = true
     }
 }
 

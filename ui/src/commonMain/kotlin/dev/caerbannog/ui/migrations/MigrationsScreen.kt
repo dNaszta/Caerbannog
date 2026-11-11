@@ -52,7 +52,9 @@ import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
+import dev.caerbannog.core.migrations.redactedRaw
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -428,7 +430,7 @@ private fun MigrationDetailPanel(
                     .padding(12.dp),
             ) {
                 Text(
-                    text = file.rawJson,
+                    text = redactedRaw(file.rawJson), // D4: a password hash is never shown; the file keeps it
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     color = Color(0xFFECEFF1),
@@ -436,7 +438,7 @@ private fun MigrationDetailPanel(
                 )
 
                 OutlinedButton(
-                    onClick = { clipboardManager.setText(AnnotatedString(file.rawJson)) },
+                    onClick = { clipboardManager.setText(AnnotatedString(redactedRaw(file.rawJson))) },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .testTag("migrations:copyJsonBtn"),
@@ -487,6 +489,16 @@ private fun MigrationDetailPanel(
                 }
             }
 
+            // The raw editor would draw the real hash (decision B of M8-12a): no Edit button, a fixed text instead.
+            val holdsHash = state.selectedFile?.up?.any { it is MigrationAction.DeclareUser } == true
+            if (holdsHash) {
+                Text(
+                    text = MigrationsWording.HASH_FILE_NO_EDIT,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("migrations:hashFileNoEdit"),
+                )
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Action row
@@ -495,14 +507,16 @@ private fun MigrationDetailPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                TextButton(
-                    onClick = onEdit,
-                    enabled = state.canEditFile,
-                    modifier = Modifier.testTag("migrations:editFileBtn"),
-                ) {
-                    ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Edit file")
+                if (!holdsHash) {
+                    TextButton(
+                        onClick = onEdit,
+                        enabled = state.canEditFile,
+                        modifier = Modifier.testTag("migrations:editFileBtn"),
+                    ) {
+                        ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Edit file")
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
