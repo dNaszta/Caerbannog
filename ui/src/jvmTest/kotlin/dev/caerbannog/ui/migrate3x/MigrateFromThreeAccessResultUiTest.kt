@@ -1,7 +1,12 @@
 package dev.caerbannog.ui.migrate3x
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrate3x.GenerationReport
 import dev.caerbannog.core.migrate3x.GenerationState
 import dev.caerbannog.core.migrate3x.How
@@ -11,6 +16,7 @@ import dev.caerbannog.core.migrate3x.ReviewState
 import dev.caerbannog.core.migrate3x.SavedFile
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** M8-12b: the result panel of a generation with access data: the line, the access card, the secret warning (Saved and Exported) and the two lists, with the tags of the brief. */
 @OptIn(ExperimentalTestApi::class)
@@ -61,5 +67,57 @@ class MigrateFromThreeAccessResultUiTest {
         assertNotDrawn("migrate3x-result-users-not-migrated")
         assertNotDrawn("migrate3x-result-permissions-left-out")
         assertFalse(textOf("migrate3x-result").contains("Access:"))
+    }
+
+    // ---- M8-12b round 1: the panel is tall enough for an access result, and says who may apply the access file ----
+
+    private val defaultVhostNote = "The default virtual host / already exists on 4.x and is not changed"
+    private val adminSentence = "The access migration needs a user with the administrator tag and the level Full control; apply it before the topology files."
+
+    /** The data of the screenshot: the line, three users not migrated, two permissions left out and the default virtual host note. */
+    private fun screenshotReport() = report(How.Saved).copy(
+        usersNotMigrated = listOf(
+            LeftOutRow("guest", "not created; it has a publicly known password"),
+            LeftOutRow("old", "set a new password on the broker; its password hash uses rabbit_password_hashing_bcrypt, which 4.x does not accept"),
+            LeftOutRow("ldap-user", "no password hash in the export; set a password on the broker if it needs one"),
+        ),
+        permissionsLeftOut = listOf(LeftOutRow("guest on /", "the user is not migrated"), LeftOutRow("old on orders", "the user is not migrated")),
+        notes = listOf(defaultVhostNote),
+    )
+
+    @Test
+    fun `an access result shows the permissions left out and the default virtual host note, displayed and not only in the tree`() = runDesktopComposeUiTest(1280, 1000) {
+        showResult(screenshotReport())
+        onNodeWithText("Permissions left out (2)").assertIsDisplayed()
+        onNodeWithText("guest on /: the user is not migrated").assertIsDisplayed()
+        onNodeWithText(defaultVhostNote).assertIsDisplayed()
+    }
+
+    private fun manyRows(prefix: String) = (1..40).map { LeftOutRow("$prefix$it", "skipped by you") }
+
+    @Test
+    fun `a result without access keeps the old panel height`() = runDesktopComposeUiTest(1280, 1000) {
+        showResult(report(How.Saved, withAccess = false).copy(leftOut = manyRows("q")))
+        val height = onNodeWithTag("migrate3x-result").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        assertTrue(height <= 400.dp, "a result without access data grew to $height (the old maximum is 360 dp of content)")
+    }
+
+    @Test
+    fun `a result with an access section may be taller, up to 560 dp of content`() = runDesktopComposeUiTest(1280, 1000) {
+        showResult(report(How.Saved).copy(usersNotMigrated = manyRows("u")))
+        val height = onNodeWithTag("migrate3x-result").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        assertTrue(height >= 500.dp && height <= 620.dp, "an access result is $height high, expected the taller panel (560 dp of content)")
+    }
+
+    @Test
+    fun `the access sentence is drawn under the access line when an access file exists, and not otherwise`() = runDesktopComposeUiTest(1280, 1000) {
+        showResult(report(How.Saved))
+        assertTextHas("migrate3x-access-needs-admin", adminSentence)
+    }
+
+    @Test
+    fun `no access sentence for a result without an access file`() = runDesktopComposeUiTest(1280, 1000) {
+        showResult(report(How.Saved, withAccess = false))
+        assertNotDrawn("migrate3x-access-needs-admin")
     }
 }
