@@ -155,7 +155,7 @@ class MigrateFromThreeLiveSourceUiTest {
         show(MigrateFromThreeState.ChooseSource, picker = liveDisabled)
         val clickable = onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick), useUnmergedTree = true).fetchSemanticsNodes()
             .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }.toSet()
-        assertTrue(clickable.all { it in setOf("migrate3x-source-file", "migrate3x-source-live", "migrate3x-choose-file") }, "clickable things on the empty screen: $clickable")
+        assertTrue(clickable.all { it in setOf("migrate3x-source-file", "migrate3x-source-live", "migrate3x-choose-file", "help-tip-m3x-3", "help-tip-m3x-4", "howto-analyse-generate") }, "clickable things on the empty screen: $clickable")
     }
 
     @Test

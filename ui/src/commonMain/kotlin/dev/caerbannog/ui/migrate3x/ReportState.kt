@@ -248,6 +248,7 @@ private fun LossBanner(loss: LossBlockView, copy: (String) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ConnectionIcon(AppIcon.Warning, IconSize)
                 Text(loss.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                M3xTip(7)
             }
             Text(loss.detection, style = MaterialTheme.typography.bodyMedium)
             if (expanded) {
@@ -310,6 +311,7 @@ private fun Fix(fix: FixView) {
 private fun Chips(view: ReportView, onToggleSeverity: (Severity) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
         view.chips.forEach { chip -> SeverityChip(chip, onToggleSeverity) }
+        M3xTip(6)
     }
 }
 
