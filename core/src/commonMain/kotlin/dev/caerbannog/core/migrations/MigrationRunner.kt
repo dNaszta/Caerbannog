@@ -77,6 +77,8 @@ class MigrationRunner(
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
         vhost: String,
+        /** M8-12a: the tags of the connection's user; a broker-level action needs "administrator". STUB: not read yet. */
+        userTags: Set<String> = emptySet(),
     ): MigrationDryRun {
         if (!hasConfigurePermission) {
             val actions = migration.up.map {
@@ -168,6 +170,8 @@ class MigrationRunner(
         hasConfigurePermission: Boolean,
         controlLevel: TopologyControlLevel,
         vhost: String,
+        /** M8-12a: see [dryRun]. */
+        userTags: Set<String> = emptySet(),
         /** Called once per action, in order, just before it is sent (never after a failure). */
         onAction: (ApplyStep) -> Unit = {},
     ): MigrationApplyResult {

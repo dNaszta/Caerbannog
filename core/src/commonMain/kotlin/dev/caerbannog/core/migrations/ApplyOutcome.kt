@@ -32,4 +32,5 @@ private fun MigrationAction.resourceName(): String? = when (this) {
     is MigrationAction.DeclareOperatorPolicy -> name
     is MigrationAction.DeletePolicy -> name
     is MigrationAction.DeclareBinding, is MigrationAction.DeleteBinding -> null
+    is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions -> null // M8-12a STUB: user, vhost name; permission: the user name
 }

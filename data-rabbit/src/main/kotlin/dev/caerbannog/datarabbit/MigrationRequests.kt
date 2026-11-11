@@ -32,6 +32,7 @@ internal object MigrationRequests {
         is MigrationAction.DeclareStream,
         is MigrationAction.DeleteStream,
         is MigrationAction.DeletePolicy,
+        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions, // M8-12a STUB: M8-12c
         -> null
     }
 

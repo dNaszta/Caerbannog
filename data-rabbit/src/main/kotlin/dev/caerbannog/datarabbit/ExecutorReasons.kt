@@ -51,6 +51,7 @@ internal object ExecutorReasons {
         is MigrationAction.DeleteStream -> nameOr(action.name)
         is MigrationAction.DeletePolicy -> nameOr(action.name)
         is MigrationAction.DeclareBinding, is MigrationAction.DeleteBinding -> "The binding"
+        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions -> "The access item" // M8-12a STUB: the executor is M8-12c
     }
 
     private fun nameOr(name: String): String = if (echoableName(name)) name else "The resource"

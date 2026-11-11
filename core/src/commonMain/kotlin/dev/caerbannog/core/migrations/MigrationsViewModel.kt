@@ -76,6 +76,8 @@ class MigrationsViewModel(
     var vhost: String = "/",
     var hasConfigurePermission: Boolean = true,
     var controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+    /** M8-12a: the tags of the connection's user, passed to the runner (M8-12a STUB: not passed yet). */
+    var userTags: Set<String> = emptySet(),
     /** When set, files come from `repositoryFor(chosen folder)` and [fileRepository] is not used. */
     private val folderPorts: MigrationFolderPorts? = null,
     /** Non-null disables Apply pending and Apply single (import, export and the dry run keep working). */
@@ -104,7 +106,9 @@ class MigrationsViewModel(
         newVhost: String = "/",
         newConfigurePermission: Boolean = true,
         newControlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
+        newUserTags: Set<String> = emptySet(),
     ) {
+        userTags = newUserTags
         profileName = newProfile
         vhost = newVhost
         hasConfigurePermission = newConfigurePermission

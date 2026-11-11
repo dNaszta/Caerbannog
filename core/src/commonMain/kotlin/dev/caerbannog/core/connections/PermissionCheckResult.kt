@@ -18,10 +18,14 @@ sealed interface PermissionCheckResult {
     val publishingEnabled: Boolean
     val canBrowseStreams: Boolean get() = true
 
+    /** M8-12a: the tags of the connection's user (`GET /api/whoami`); not a secret. Empty unless the broker was asked. */
+    val userTags: Set<String> get() = emptySet()
+
     /** Read from the broker. */
     data class Checked(
         override val topologyUnlocked: Boolean,
         override val publishingEnabled: Boolean,
+        override val userTags: Set<String> = emptySet(),
     ) : PermissionCheckResult
 
     /** The broker could not be asked; these values are the user's declaration, kept with the reason. */
