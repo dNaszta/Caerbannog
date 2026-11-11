@@ -78,6 +78,12 @@ class McpServer(
     val messagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MessagePublisher)? = null,
     val mqttCatalogProvider: ((profile: ConnectionProfile, vhost: String) -> MqttCatalog)? = null,
     val mqttMessagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MqttMessagePublisher)? = null,
+    /** M8-10 STUB: the read-only definitions of a 3.x profile (`caerbannog_analyze_3x_definitions`). Not used yet. */
+    val definitionsSourceProvider: ((profile: ConnectionProfile) -> dev.caerbannog.core.migrate3x.DefinitionsSource)? = null,
+    /** M8-10 STUB: the loader of the `file` input of the same tool. */
+    val definitionsFileLoader: dev.caerbannog.core.migrate3x.DefinitionsFileLoader? = null,
+    /** M8-10 STUB: the read-only shovel status of a 4.x profile (`caerbannog_list_shovels`). Not used yet. */
+    val shovelStatusProvider: ((profile: ConnectionProfile, vhost: String) -> dev.caerbannog.core.forwarding.ShovelStatusReader)? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true

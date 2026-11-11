@@ -27,6 +27,12 @@ object CompatibilityReportJson {
         return pretty.encodeToString(JsonElement.serializer(), root)
     }
 
+    /**
+     * M8-10 STUB: one page of findings for the MCP tool: the same header and finding JSON as [encode] plus `"page": {"offset", "limit", "returned", "total"}`.
+     * The stub returns the whole report without a page.
+     */
+    fun encodePage(report: CompatibilityReport, limit: Int, offset: Int): String = encode(report) // M8-10 STUB
+
     private fun sourceJson(source: ReportSource): JsonObject = buildJsonObject {
         put("name", source.name)
         put("sourceVersion", source.sourceVersion)

@@ -27,6 +27,9 @@ internal class AccessRig(private val script: (String, String) -> Pair<Int, Strin
         respond(reply.second, HttpStatusCode.fromValue(reply.first), headersOf("Content-Type", "application/json"))
     }
 
+    /** The engine, for a test of another class over the same scripted broker. */
+    fun engineForReader(): MockEngine = engine
+
     private val executor = ManagementTopologyMigrationExecutor.overClient(HttpClient(engine), "http://broker.example:15672", "svc", "pw", UnavailableStreamManager) { }
 
     /** Runs one action; a thrown exception is reported as a failed assertion with its class (a stub must not read as an error). */
