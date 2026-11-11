@@ -29,9 +29,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
-/** The longest shovel name the broker accepts (to be confirmed by the live measurement in `RealBrokerM8ShovelTest`). */
-internal const val MAX_SHOVEL_NAME_LENGTH: Int = 255
-
 /**
  * The [ShovelGateway] over the management API of the held 4.x connection ([http], [requests]); the source probe uses a one-shot client from
  * [sourceHttp] (source profile and its stored password). Every request passes [ShovelPathAllowList]. The source password lives only in a local
@@ -70,8 +67,6 @@ internal class ManagementShovelGateway(
     }
 
     override suspend fun start(request: ForwardingRequest): StartOutcome {
-        val name = request.shovel.name
-        if (name.length > MAX_SHOVEL_NAME_LENGTH) return StartOutcome.Refused("The queue name is too long for a shovel name")
         val source = request.source
         val password = source.credentials?.passwordForRequest() ?: secrets.retrieve(source.connectionName)
             ?: return StartOutcome.Failed("The password of ${source.connectionName} is not stored")
