@@ -12,7 +12,7 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
 
   Background:
     Given the 4.x connection "new-eu" is the held connection
-    And the user of "new-eu" has the policymaker tag and configure permission on "/"
+    And the user of "new-eu" has the policymaker and monitoring tags and configure permission on "/"
     And the topology level of "new-eu" is Declare and edit
     And "legacy-eu" is a RabbitMQ 3.13 broker with the classic queue "orders" holding 120 messages
     And "new-eu" has the quorum queue "orders" with no messages
@@ -101,15 +101,14 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
   Scenario: A broker without the shovel plugins cannot forward
     Given the shovel plugins are not enabled on "new-eu"
     When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
-    Then forwarding is blocked
-    And I am told which plugins to enable
+    Then forwarding is blocked because the shovel plugins are off
 
   @negative @fake-broker @m8-07
   Scenario: Forwarding is blocked when the level is Read-only
     Given the topology level of "new-eu" is Read-only
     When I choose to forward "orders" from "legacy-eu" to "new-eu"
-    Then forwarding is disabled
-    And I am told that topology changes are locked on "new-eu"
+    Then forwarding is disabled because topology changes are locked on "new-eu"
+    And no request is sent to either broker
 
   @negative @fake-broker @m8-07
   Scenario: An existing shovel is never overwritten
@@ -137,7 +136,7 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
   Scenario: A plain profile says it is not encrypted
     Given "legacy-eu" has "Use TLS" turned off
     When I choose to forward "orders" from "legacy-eu" to "new-eu"
-    Then the confirmation and the progress view say "Not encrypted"
+    Then the confirmation says "Not encrypted"
 
   @fake-broker @m8-09
   Scenario: One queue at a time
@@ -237,3 +236,11 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     When I type the user "mover" and the password "s3cret" for this shovel
     Then the text of the request, of the credentials and of the address does not contain "s3cret"
     And the address reads "amqps://mover@legacy.example:5671/%2F"
+
+  @fake-broker @m8-09
+  Scenario: The screen says why forwarding is blocked and that a plain connection is not encrypted
+    Given the shovel plugins are not enabled on "new-eu"
+    When I open the forwarding of "orders"
+    Then I am told which plugins to enable
+    And with the level Read-only I am told that topology changes are locked on "new-eu"
+    And with "Use TLS" turned off on "legacy-eu" the progress view says "Not encrypted"
