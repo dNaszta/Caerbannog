@@ -112,12 +112,25 @@ internal fun DesktopComposeUiTest.show(
     clipboard: RecordingClipboard = RecordingClipboard(),
     /** M8-06c: the source picker; the default is what a screen without a 3.x connection shows. */
     picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
+) = showWith({ state }, calls, { calls.copied += text; text }, clipboard, picker)
+
+/**
+ * M8-06e: the screen with a state that may change while it is shown ([state] is read inside the composition, so a `mutableStateOf` works) and a
+ * `suspend` [reportText]. The event "reportCopied" is recorded when the screen calls `onReportCopied`.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun DesktopComposeUiTest.showWith(
+    state: () -> MigrateFromThreeState,
+    calls: MigrateCalls = MigrateCalls(),
+    reportText: suspend () -> String = { "" },
+    clipboard: RecordingClipboard = RecordingClipboard(),
+    picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
 ) {
     setContent {
         CompositionLocalProvider(LocalClipboard provides clipboard) {
             MigrateFromThreeScreen(
-                state = state,
-                reportText = { calls.copied += text; text },
+                state = state(),
+                reportText = reportText,
                 onChooseFile = { calls.events += "chooseFile" },
                 onGiveVirtualHost = { calls.events += "vhost:$it" },
                 onCancelPrompt = { calls.events += "cancel" },
@@ -125,6 +138,7 @@ internal fun DesktopComposeUiTest.show(
                 onToggleGroup = { calls.events += "group:$it" },
                 onExport = { calls.events += "export" },
                 onDismissNotice = { calls.events += "dismissNotice" },
+                onReportCopied = { calls.events += "reportCopied" },
                 picker = picker,
                 onChooseSource = { calls.events += "chooseSource:$it" },
                 onAnalyseLive = { calls.events += "analyseLive" },

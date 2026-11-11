@@ -157,12 +157,12 @@ class Migrate3xScreenSteps {
     @When("I open that file on the Migrate from 3.x screen and export the report as text")
     fun openAndExportText() {
         open()
-        w.clipboard = w.viewModel().reportText()
+        w.clipboard = w.reportText()
     }
 
     @When("I copy the report as text")
     fun copyAsText() {
-        w.clipboard = w.viewModel().reportText()
+        w.clipboard = w.reportText()
         w.viewModel().reportCopied(); w.settle()
     }
 
@@ -285,6 +285,16 @@ class Migrate3xScreenSteps {
         assertEquals("The virtual host name must not be empty", state.error)
     }
 
+    /**
+     * M8-06e item 2. The suite is view-model level and has no field: what the view model owns is that the prompt comes back for the SAME file (same
+     * label), because the screen keys the typed text on that label. The typed text itself is asserted by `MigrateFromThreeVirtualHostTextUiTest`.
+     */
+    @Then("the field still holds what I typed")
+    fun fieldKeepsText() {
+        val state = w.state() as? MigrateFromThreeState.NeedsVirtualHost ?: fail("Expected the prompt for the same file again but the screen is in ${w.state()}")
+        assertEquals(w.path.substringAfterLast('/'), state.fileLabel, "the prompt must be for the file that was opened, so that the screen keeps the typed text")
+    }
+
     @Then("I can try another name or choose another file")
     fun tryAnotherName() {
         giveVirtualHost("orders")
@@ -347,7 +357,7 @@ class Migrate3xScreenSteps {
     @Then("no text, no semantics description and no screenshot of the screen contains the password hash or the password")
     fun noSecrets() {
         val rows = allRows()
-        val everything = listOf(w.state().toString(), rows.joinToString("\n"), w.viewModel().reportText(), w.holder.held.value.toString())
+        val everything = listOf(w.state().toString(), rows.joinToString("\n"), w.reportText(), w.holder.held.value.toString())
         everything.forEach { text -> listOf("SENTINEL-HASH", "SENTINEL-PASSWORD").forEach { assertFalse(text.contains(it), "found $it in: ${text.take(200)}") } }
     }
 

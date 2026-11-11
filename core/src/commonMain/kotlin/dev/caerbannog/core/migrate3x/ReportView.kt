@@ -22,9 +22,11 @@ class LossBlockView(
     val preview: List<String>,
     val detection: String,
     val fixes: List<FixView>,
-    val copyText: String,
+    /** Built on the first read (only the Copy button reads it), so a report with many queues at risk does not join every name on each build. */
+    copyTextSupplier: () -> String,
     private val nameAt: (Int) -> String,
 ) {
+    val copyText: String by lazy(copyTextSupplier)
     fun queueAt(index: Int): String = nameAt(index)
     override fun toString(): String = "LossBlockView($title, $queueCount queues)"
 }

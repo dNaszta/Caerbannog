@@ -70,6 +70,7 @@ body{margin:0}
 <div class="mono">orders, orders-retry, invoices, billing.events, ... <span class="t-bs">(first 10 of 37)</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn text" type="button" style="height:32px;padding:0 8px">Show all 37</button><button class="btn text lead" type="button" style="height:32px;padding:0 8px"><span class="ms sm" aria-hidden="true">content_copy</span>Copy queue names</button></div>
 <div class="opt on" style="background:var(--ok-container);color:var(--on-ok-container);border-color:transparent"><span class="ms" aria-hidden="true">check_circle</span><div><b>Recommended: do not upgrade in place</b><div class="t-bs">Build a new 4.x broker, apply the migration this screen generates, then move the messages with a Shovel. A Shovel does not read the old index.</div></div></div>
 <div class="t-bs">Other ways, done by hand and not offered by this app: set the policy "queue-version: 2" and restart the node gracefully, then check that every queue shows version 2; or upgrade through 4.0, 4.1 or 4.2 first.</div>
+<div class="t-bs dim">Build note (M8-06e): the queue names in the list above are illustrative. The app shows them in the order of the report: by virtual host, then by name (case-sensitive), the same order as the text export.</div>
 </div></div>
 
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
@@ -110,6 +111,7 @@ body{margin:0}
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Choose definitions file</button><span class="t-bs dim">In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json</span></div>
 <div class="t-bs dim">Nothing is read until you choose a file. The file is read on this machine only; it is never uploaded. Files over 64 MB are refused.</div>
 </div>
+<div class="t-bs dim">Build note (M8-06e): an enabled option that is not selected shows its own icon, upload_file for the definitions file and travel_explore for the live connection (the same icon as the "Analyse live connection" button); the selected one shows check, a disabled one lock. The failure banners (rejected file, no export permission, live read failed) are one component: error container, leading icon (error, lock_person, error), bold title, details under it; the buttons sit under the banner, not inside it.</div>
 <div class="t-bs dim">Live option disabled (M8-06c, drawn above): no 3.x broker is the held connection. The option is greyed with a lock and the fixed reason "Connect to a RabbitMQ 3.x broker to read it live" under it (also its tooltip and accessible description). The picker never connects; it only reads the held connection.</div>
 <div class="card" style="display:flex;flex-direction:column;gap:16px">
 <div class="t-tm">Where does the 3.x topology come from?</div>
@@ -127,6 +129,7 @@ body{margin:0}
 <section id="state-loading" style="display:flex;flex-direction:column;gap:8px">
 <div class="t-ts">2. Loading and analysing</div>
 <div class="card" style="display:flex;align-items:center;gap:16px"><span class="ms" aria-hidden="true">hourglass_top</span><div style="flex:1"><div class="t-ts">Reading and analysing <span class="mono">legacy-eu-definitions.json</span></div><div class="t-bs dim">Large files can take a few seconds.</div></div><button class="btn text" type="button">Cancel</button></div>
+<div class="t-bs dim">Build note (M8-06e): the app draws an indeterminate progress circle instead of the hourglass icon, for the file loading and the live loading state alike (a static icon says nothing about progress). The text and the Cancel button are as drawn.</div>
 </section>
 
 <section id="state-error" style="display:flex;flex-direction:column;gap:8px">

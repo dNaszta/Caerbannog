@@ -18,6 +18,9 @@ object MigrateFromThreeTexts {
     fun analyseLiveHint(name: String): String = "Reads the definitions of $name with GET requests. Nothing on the broker is changed."
     fun liveLoading(name: String): String = "Reading and analysing $name"
 
+    /** M8-06e item 3: the notice after a saved JSON report; the path comes from the saver (a user's folder and file name), so it is escaped. */
+    fun reportSaved(path: String): String = "Report saved to ${escapeForText(path)}"
+
     /** M8-06c round 1 (R2, finding 4). */
     const val FILE_EXPORT_HINT: String = "In the 3.x management UI: Overview, Export definitions. Or: rabbitmqctl export_definitions file.json"
     const val NOTHING_ANALYSED: String = "Nothing was analysed."

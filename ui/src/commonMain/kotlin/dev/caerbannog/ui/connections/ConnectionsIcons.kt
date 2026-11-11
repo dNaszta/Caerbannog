@@ -65,6 +65,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Help
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.LockPerson
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.UploadFile
@@ -84,6 +86,8 @@ internal enum class AppIcon(val mockupName: String) {
     Add("add"),
     Lock("lock"),
     LockOpen("lock_open"),
+    LockPerson("lock_person"),
+    TravelExplore("travel_explore"),
     VerifiedUser("verified_user"),
     Help("help"),
     CheckCircle("check_circle"),
@@ -139,6 +143,8 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Add -> Icons.Outlined.Add
     AppIcon.Lock -> Icons.Outlined.Lock
     AppIcon.LockOpen -> Icons.Outlined.LockOpen
+    AppIcon.LockPerson -> Icons.Outlined.LockPerson
+    AppIcon.TravelExplore -> Icons.Outlined.TravelExplore
     AppIcon.VerifiedUser -> Icons.Outlined.VerifiedUser
     AppIcon.Help -> Icons.Outlined.Help
     AppIcon.CheckCircle -> Icons.Outlined.CheckCircle

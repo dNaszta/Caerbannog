@@ -282,7 +282,7 @@ class MigrateFromThreeViewModel(
         job = scope.launch {
             val json = withContext(analysisDispatcher) { CompatibilityReportJson.encode(held.report) }
             when (val outcome = reportSaver.save(suggestedName(held.fileLabel), json)) {
-                is SaveOutcome.Saved -> setNotice(ExportNotice("Report saved to ${outcome.path}", failed = false))
+                is SaveOutcome.Saved -> setNotice(ExportNotice(MigrateFromThreeTexts.reportSaved(outcome.path), failed = false))
                 SaveOutcome.Cancelled -> Unit
                 is SaveOutcome.Failed -> setNotice(ExportNotice("${MigrateFromThreeTexts.SAVE_FAILED_PREFIX}: ${outcome.reason}", failed = true))
             }
@@ -290,7 +290,7 @@ class MigrateFromThreeViewModel(
     }
 
     /** The text export of the whole report (whatever the chips show); the UI puts it on the clipboard and then calls [reportCopied]. */
-    fun reportText(): String = holder.held.value?.let { CompatibilityReportText.render(it.report) }.orEmpty()
+    suspend fun reportText(): String = withContext(analysisDispatcher) { holder.held.value?.let { CompatibilityReportText.render(it.report) }.orEmpty() }
 
     fun dismissNotice() = setNotice(null)
 

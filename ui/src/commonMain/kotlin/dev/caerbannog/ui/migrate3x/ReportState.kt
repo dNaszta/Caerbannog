@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,7 @@ import dev.caerbannog.core.migrate3x.RowView
 import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.core.migrate3x.SourceKind
 import dev.caerbannog.ui.components.rememberCopyToClipboard
+import kotlinx.coroutines.launch
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -75,7 +77,7 @@ private const val LOSS_LIST_HEIGHT_DP = 360
 @Composable
 internal fun ReportState(
     state: MigrateFromThreeState.Report,
-    reportText: () -> String,
+    reportText: suspend () -> String,
     onChooseFile: () -> Unit,
     onToggleSeverity: (Severity) -> Unit,
     onToggleGroup: (String) -> Unit,
@@ -88,6 +90,7 @@ internal fun ReportState(
 ) {
     val view = state.view
     val copy = rememberCopyToClipboard()
+    val scope = rememberCoroutineScope()
     // Hoisted: the list keeps its place while the sheet of an item is open in its stead.
     val listState = rememberLazyListState()
     Column(Modifier.fillMaxSize().testTag("migrate3x-state-report"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -97,7 +100,8 @@ internal fun ReportState(
             ReviewSheet(sheet, review, Modifier.weight(1f))
             return@Column
         }
-        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { copy(reportText()); onReportCopied() })
+        // Render off the UI thread, copy, then tell the view model. Leaving the composition cancels the scope: nothing is copied and no notice shows.
+        ReportHeader(view, onChooseFile, onExport, onAnalyseLive, onCopyText = { scope.launch { copy(reportText()); onReportCopied() } })
         state.notice?.let { Notice(it, onDismissNotice) }
         view.accessNote?.let { AccessNote(it) }
         // A state built without a review (no lines yet) shows no bar: the 06a screen.

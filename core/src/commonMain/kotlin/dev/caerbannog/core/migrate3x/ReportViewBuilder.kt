@@ -23,9 +23,13 @@ object ReportViewBuilder {
         val report = held.report
         val review = held.review
         val skipped = skippedItems(review)
-        val byKey = groupFindings(report.findings, skipped)
-        val visible = byKey.filterValues { it.first().severity in selected }
-        val groups = visible.map { (key, findings) -> groupView(key, findings, key in openGroups) } +
+        val removals = Removals.of(review, skipped)
+        val visible = held.groupIndex.groups
+            .filter { it.severity in selected }
+            .map { it to it.findings.size - removals.countOf(it.key) }
+            .filter { (_, count) -> count > 0 }
+        val visibleByKey = visible.associate { (group, _) -> group.key to group }
+        val groups = visible.map { (group, count) -> groupView(group, count, group.key in openGroups) } +
             listOfNotNull(skippedGroup(skipped, SKIPPED_GROUP_KEY in openGroups))
         return ReportView(
             fileLabel = held.fileLabel,
@@ -36,7 +40,7 @@ object ReportViewBuilder {
             summaryLine = summaryLine(report.summary),
             counts = documentCounts(held.document),
             countsLine = countsLine(held.document, report.source.singleVirtualHost),
-            lossBlock = lossBlock(report.findings, held.kind),
+            lossBlock = lossBlock(held.groupIndex.lossNames, held.kind),
             accessNote = MigrateFromThreeTexts.ACCESS_EMPTY.takeIf { report.source.singleVirtualHost != null },
             chips = chipOrder.map { severity ->
                 ChipView(severity, count(report.summary, severity), selected = severity in selected)
@@ -44,7 +48,7 @@ object ReportViewBuilder {
             groups = groups,
         ) { key ->
             if (key == SKIPPED_GROUP_KEY) skippedRows(review, skipped, SKIPPED_GROUP_KEY in openGroups)
-            else rowsOf(visible[key], key in openGroups) { decorate(rowFormatter(it), it, review) }
+            else rowsOf(visibleByKey[key], removals, key in openGroups) { decorate(rowFormatter(it), it, review) }
         }
     }
 
@@ -103,31 +107,33 @@ object ReportViewBuilder {
         return row.copy(item = item, decision = ReviewViewBuilder.pillOf(review.decisionOf(item)))
     }
 
-    /** One pass; the map keeps the groups in their display order, and every list keeps the report order of its findings. */
-    private fun groupFindings(findings: List<Finding>, skipped: List<ReviewItem>): Map<String, List<Finding>> {
-        val groups = HashMap<String, MutableList<Finding>>()
-        val skippedSet = skipped.toHashSet()
-        for (finding in findings) {
-            if (skippedSet.isNotEmpty() && ReviewRules.isReviewFinding(finding) && ReviewItem(finding.kind, finding.vhost, finding.name) in skippedSet) continue
-            groups.getOrPut(keyOf(finding)) { mutableListOf() } += finding
+    /** What the skipped items take out of the index: the removed findings per group key (counts) and their ids, from [ReviewRules] through `findingsOf`. */
+    private class Removals(private val counts: Map<String, Int>, private val ids: Set<String>) {
+        fun countOf(key: String): Int = counts[key] ?: 0
+        fun hasAny(key: String): Boolean = key in counts
+        fun removes(finding: Finding): Boolean = finding.id in ids
+
+        companion object {
+            fun of(review: ConversionReview, skipped: List<ReviewItem>): Removals {
+                if (skipped.isEmpty()) return Removals(emptyMap(), emptySet())
+                val counts = HashMap<String, Int>()
+                val ids = HashSet<String>()
+                for (item in skipped) for (finding in review.findingsOf(item)) {
+                    counts.merge(GroupIndex.keyOf(finding), 1, Int::plus)
+                    ids += finding.id
+                }
+                return Removals(counts, ids)
+            }
         }
-        val order = compareBy<Map.Entry<String, List<Finding>>>(
-            { if (it.value.first().findingClass == FindingClass.MessageLoss) 0 else 1 },
-            { it.value.first().severity.ordinal },
-            { it.key },
-        )
-        return groups.entries.sortedWith(order).associate { it.key to it.value }
     }
 
-    private fun keyOf(finding: Finding): String = "${finding.rule}:${finding.severity.name.lowercase()}"
+    private fun groupView(group: IndexedGroup, count: Int, open: Boolean): GroupView =
+        GroupView(group.key, MigrateFromThreeTexts.ruleTitle(group.rule), group.severity, group.findingClass, count, open)
 
-    private fun groupView(key: String, findings: List<Finding>, open: Boolean): GroupView {
-        val first = findings.first()
-        return GroupView(key, MigrateFromThreeTexts.ruleTitle(first.rule), first.severity, first.findingClass, findings.size, open)
-    }
-
-    private fun rowsOf(findings: List<Finding>?, open: Boolean, rowFormatter: (Finding) -> RowView): RowSource {
-        if (findings == null || !open) return RowSource.EMPTY
+    /** A group without removals reads the index list itself; one with removals filters its list once, only when it is open and drawn. */
+    private fun rowsOf(group: IndexedGroup?, removals: Removals, open: Boolean, rowFormatter: (Finding) -> RowView): RowSource {
+        if (group == null || !open) return RowSource.EMPTY
+        val findings = if (removals.hasAny(group.key)) group.findings.filterNot(removals::removes) else group.findings
         return object : RowSource {
             override val size: Int = findings.size
             override fun at(index: Int): RowView = rowFormatter(findings[index])
@@ -159,8 +165,7 @@ object ReportViewBuilder {
     }
 
     /** The queues at risk, names escaped like the text export. Null when no queue is at risk. Never filtered by the chips. */
-    private fun lossBlock(findings: List<Finding>, kind: SourceKind): LossBlockView? {
-        val names = findings.filter { it.findingClass == FindingClass.MessageLoss }.map { escapeForText(it.name.orEmpty()) }
+    private fun lossBlock(names: List<String>, kind: SourceKind): LossBlockView? {
         if (names.isEmpty()) return null
         return LossBlockView(
             title = MigrateFromThreeTexts.lossTitle(names.size),
@@ -172,7 +177,7 @@ object ReportViewBuilder {
                 FixView(MigrateFromThreeTexts.LOSS_FIX_POLICY_TITLE, MigrateFromThreeTexts.LOSS_FIX_POLICY_TEXT, recommended = false),
                 FixView(MigrateFromThreeTexts.LOSS_FIX_UPGRADE_THROUGH_TITLE, MigrateFromThreeTexts.LOSS_FIX_UPGRADE_THROUGH_TEXT, recommended = false),
             ),
-            copyText = names.joinToString("\n"),
+            copyTextSupplier = { names.joinToString("\n") },
         ) { names[it] }
     }
 }

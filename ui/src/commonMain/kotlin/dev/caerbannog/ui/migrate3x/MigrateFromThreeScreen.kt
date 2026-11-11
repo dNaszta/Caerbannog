@@ -66,7 +66,7 @@ import dev.caerbannog.ui.connections.SmallIconSize
 @Composable
 fun MigrateFromThreeScreen(
     state: MigrateFromThreeState,
-    reportText: () -> String,
+    reportText: suspend () -> String,
     onChooseFile: () -> Unit,
     onGiveVirtualHost: (String) -> Unit,
     onCancelPrompt: () -> Unit,
@@ -117,7 +117,7 @@ private fun ChooseSourceState(picker: SourcePicker, onChooseFile: () -> Unit, on
         if (picker.selected == SourceKind.Live && live != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-analyse-live")) {
-                    ConnectionIcon(AppIcon.Link, SmallIconSize)
+                    ConnectionIcon(AppIcon.TravelExplore, SmallIconSize)
                     Text(MigrateFromThreeTexts.ANALYSE_LIVE, Modifier.padding(start = 8.dp))
                 }
                 Text(
@@ -172,7 +172,7 @@ private fun SourcePickerRow(picker: SourcePicker, onChooseSource: (SourceKind) -
                             .semantics { reason?.let { contentDescription = "${option.label}: $it" } },
                     ) {
                         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ConnectionIcon(if (selected) AppIcon.Check else if (enabled) AppIcon.Link else AppIcon.Lock, SmallIconSize)
+                            ConnectionIcon(if (selected) AppIcon.Check else if (!enabled) AppIcon.Lock else if (kind == SourceKind.Live) AppIcon.TravelExplore else AppIcon.UploadFile, SmallIconSize)
                             Text(option.label, style = MaterialTheme.typography.labelLarge)
                         }
                     }
@@ -203,7 +203,7 @@ private fun LoadingLiveState(state: MigrateFromThreeState.LoadingLive, onCancel:
 @Composable
 private fun CannotExportState(state: MigrateFromThreeState.CannotExport, onChooseFile: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-cannot-export"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FailureBanner(state.text)
+        FailureBanner(AppIcon.LockPerson, state.text)
         Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             MigrateFromThreeTexts.FILE_EXPORT_HINT,
@@ -218,20 +218,12 @@ private fun CannotExportState(state: MigrateFromThreeState.CannotExport, onChoos
 @Composable
 private fun LiveFailedState(state: MigrateFromThreeState.LiveFailed, onAnalyseLive: () -> Unit, onChooseFile: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-live-failed"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FailureBanner(state.text)
+        FailureBanner(AppIcon.Error, state.text)
         Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onAnalyseLive, modifier = Modifier.testTag("migrate3x-try-again")) { Text(MigrateFromThreeTexts.TRY_AGAIN) }
             ChooseFileButton(onChooseFile)
         }
-    }
-}
-
-@Composable
-private fun FailureBanner(text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ConnectionIcon(AppIcon.Error, IconSize, tint = MaterialTheme.colorScheme.error)
-        Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
     }
 }
 
@@ -259,11 +251,9 @@ private fun LoadingState(state: MigrateFromThreeState.Loading, onCancel: () -> U
 @Composable
 private fun RejectedState(state: MigrateFromThreeState.Rejected, onChooseFile: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-rejected"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ConnectionIcon(AppIcon.Error, IconSize, tint = MaterialTheme.colorScheme.error)
-            Text(state.text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+        FailureBanner(AppIcon.Error, state.text) {
+            Text(state.fileLabel, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
         }
-        Text(state.fileLabel, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
         Text(MigrateFromThreeTexts.NOTHING_ANALYSED, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) {
             ConnectionIcon(AppIcon.UploadFile, SmallIconSize)
@@ -275,6 +265,8 @@ private fun RejectedState(state: MigrateFromThreeState.Rejected, onChooseFile: (
 @Composable
 private fun VirtualHostPrompt(state: MigrateFromThreeState.NeedsVirtualHost, onGive: (String) -> Unit, onChooseFile: () -> Unit) {
     // Empty on purpose: there is no default and "/" is not assumed. The text goes out as typed; the view model trims it.
+    // The typed text is owned here and keyed on the file label ONLY, never on the state or its error: a refusal re-emits this state with an error
+    // and the user must find the text as typed; a new file (another label) starts empty.
     var name by remember(state.fileLabel) { mutableStateOf("") }
     Column(Modifier.testTag("migrate3x-state-needs-virtual-host"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Which virtual host is this file from?", style = MaterialTheme.typography.titleMedium)
