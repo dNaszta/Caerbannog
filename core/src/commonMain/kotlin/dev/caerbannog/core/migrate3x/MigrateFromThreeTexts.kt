@@ -74,6 +74,30 @@ object MigrateFromThreeTexts {
     const val NO_FOLDER_CHOSEN: String = "No folder was chosen. Nothing was saved."
     const val NO_FREE_VERSION: String = "The migrations folder has no free version number left (the highest is 9999)."
 
+    // ---- the access result (owner decisions D3 and D6, pinned in AccessGenerationReportTest) ----
+    const val SECRET_FILE_WARNING: String =
+        "This file contains password hashes. Anyone who has it can try to guess the passwords offline. " +
+            "Keep it secret: do not commit it to git or put it in a shared or synced folder."
+    const val NOT_MIGRATED_TITLE: String = "Users not migrated"
+    const val PERMISSIONS_LEFT_OUT_TITLE: String = "Permissions left out"
+    const val GUEST_NOT_MIGRATED: String = "not created; it has a publicly known password"
+    const val NO_HASH_NOT_MIGRATED: String = "no password hash in the export; set a password on the broker if it needs one"
+    const val NO_ALGORITHM_NOT_MIGRATED: String = "its password hash has no hashing algorithm; set a new password on the broker"
+    const val DEFAULT_VHOST_NOTE: String = "The default virtual host / already exists on 4.x and is not changed"
+    fun unsupportedAlgorithmNotMigrated(algorithm: String): String =
+        "set a new password on the broker; its password hash uses $algorithm, which 4.x does not accept"
+    const val USER_NOT_MIGRATED: String = "the user is not migrated"
+    const val ACCESS_PILL: String = "access, all virtual hosts"
+    const val READABLE_BY_YOU_ONLY: String = "readable by you only"
+    const val ACCESS_FILE_LABEL: String = "access"
+    const val ACCESS_NEEDS_ADMIN: String =
+        "The access migration needs a user with the administrator tag and the level Full control; apply it before the topology files."
+    fun permissionLabel(user: String, vhost: String): String = "$user on $vhost"
+
+    fun accessLine(summary: AccessSummary): String =
+        "Access: ${plural(summary.virtualHosts, "virtual host")}, ${plural(summary.users, "user")}, " +
+            "${plural(summary.permissions, "permission")}, ${plural(summary.topicPermissions, "topic permission")}"
+
     const val GENERATE_HINT: String = "Generate is possible when every item is decided."
 
     /** "item 14 of 381": the place of the open item in the list of items that need a decision. */

@@ -101,7 +101,7 @@ class ReportTextSuspendTest {
     @Test
     fun `a copy is not work of the report job - it does not cancel a running export and is not cancelled by it`() = runTest {
         val gate = CompletableDeferred<SaveOutcome>()
-        val saver = ReportFileSaver { _, _ -> gate.await() }
+        val saver = object : ReportFileSaver { override suspend fun save(suggestedName: String, text: String, secret: Boolean) = gate.await() }
         val rig = Rig(this, ScreenFiles.held(), saver)
         rig.vm.exportReportJson()
         rig.analysis.scheduler.advanceUntilIdle(); advanceUntilIdle() // the export is now waiting in the saver

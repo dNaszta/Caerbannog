@@ -242,7 +242,10 @@ data class MigrationFile(
     val up: List<MigrationAction>,
     val rawJson: String,
     val checksum: String,
-)
+) {
+    /** Never [rawJson]: an access file holds password hashes, and no string template of a file (or of anything that holds one) may show them. */
+    override fun toString(): String = "MigrationFile(version=$version, description=$description, ${up.size} actions, checksum=$checksum)"
+}
 
 /**
  * Lifecycle state of a migration file for a specific connection profile.

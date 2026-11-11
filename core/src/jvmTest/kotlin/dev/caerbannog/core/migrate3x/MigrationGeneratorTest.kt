@@ -343,7 +343,8 @@ class MigrationGeneratorTest {
     @Test
     fun `a virtual host without any action gets no file`() {
         val s = started(D.document(virtualHosts = listOf(D.virtualHost("/"), D.virtualHost("empty")), queues = listOf(D.quorumQueue("a")), users = listOf(D.user("svc")), permissions = listOf(D.permission("empty", "svc"))))
-        assertEquals(listOf("/"), s.generated().migrations.map { it.vhost })
+        // M8-12b: "empty" holds no topology, so no topology file; it is declared by the access file (first, empty vhost)
+        assertEquals(listOf("", "/"), s.generated().migrations.map { it.vhost })
     }
 
     @Test
@@ -409,13 +410,15 @@ class MigrationGeneratorTest {
     }
 
     @Test
-    fun `every access finding gives the access note and nothing else about access`() {
+    fun `the access findings no longer give the old note, the access data goes into the access file and the topology file holds the queue only`() {
         val s = started(D.document(virtualHosts = listOf(D.virtualHost("/")), queues = listOf(D.quorumQueue("a")), users = listOf(D.user("svc")), permissions = listOf(D.permission("/", "svc"))))
         val access = s.report.findings.count { it.findingClass == FindingClass.Access }
         assertTrue(access >= 3, "the report should have vhost, user and permission findings but has $access")
         val result = s.generated()
-        assertEquals(access, result.noteTexts().count { it == "Handled by the access migration (not part of this generation)" }, "notes: ${result.noteTexts()}")
-        assertEquals(listOf<MigrationAction>(MigrationAction.DeclareQueue("a", "quorum", "/")), result.actions())
+        assertEquals(0, result.noteTexts().count { it == "Handled by the access migration (not part of this generation)" }, "the stale note is gone: ${result.noteTexts()}")
+        assertEquals(listOf<MigrationAction>(MigrationAction.DeclareQueue("a", "quorum", "/")), result.allActions().filter { !it.isBrokerLevel })
+        // "/" is the default virtual host and is not declared (D5); the user and the permissions of "/" are
+        assertEquals(listOf("declareUser", "setPermissions"), result.allActions().filter { it.isBrokerLevel }.map { it.actionName })
     }
 
     // ---- incomplete, determinism ----
@@ -435,7 +438,11 @@ class MigrationGeneratorTest {
             s.acceptEveryDefault().forEach { s.decide(it, ItemDecision.Skip) }
             return s.generated()
         }
-        assertEquals(run(), run())
+        // A password hash is a SecretValue (no equals), so the access actions of two runs are never equal objects: the files are compared by their text.
+        fun GenerationResult.Generated.view() = listOf(
+            migrations.map { Triple(it.vhost, it.access, it.file.rawJson) }, migrations.map { it.file.checksum }, skipped, notes, notMigrated, leftOutPermissions, access,
+        )
+        assertEquals(run().view(), run().view())
     }
 
     @Test

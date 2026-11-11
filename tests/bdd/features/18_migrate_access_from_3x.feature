@@ -212,3 +212,12 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And "new-eu" has the default virtual host "/" with its own description
     When I apply the access migration
     Then the apply continues and the virtual host "/" is unchanged
+
+  @fake-broker @m8-12b
+  Scenario: The default virtual host is not declared by the access migration
+    Given the export has the virtual hosts "/" and "/orders"
+    And I accepted every proposal
+    When I generate the migrations
+    Then the access migration declares the virtual host "/orders" and not "/"
+    And the result notes that the default virtual host already exists on 4.x and is not changed
+

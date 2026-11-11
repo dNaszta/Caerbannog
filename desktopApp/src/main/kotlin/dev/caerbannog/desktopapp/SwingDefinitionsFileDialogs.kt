@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import javax.swing.JFileChooser
 import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
@@ -80,15 +81,32 @@ class SwingReportFileSaver(
     private val dialog: SaveFileDialog = JFileChooserSaveDialog(),
     private val write: (File, String) -> Unit = { file, text -> Files.writeString(file.toPath(), text, Charsets.UTF_8) },
 ) : ReportFileSaver {
-    override suspend fun save(suggestedName: String, text: String): SaveOutcome = withContext(Dispatchers.IO) {
+    override suspend fun save(suggestedName: String, text: String, secret: Boolean): SaveOutcome = withContext(Dispatchers.IO) {
         val target = onSwingThread { dialog.pick(startFolder(), suggestedName) } ?: return@withContext SaveOutcome.Cancelled
         try {
+            if (secret) restrictToOwner(target)
             write(target, text)
             SaveOutcome.Saved(target.path)
         } catch (_: IOException) {
             SaveOutcome.Failed(WRITE_FAILED)
         } catch (_: SecurityException) {
             SaveOutcome.Failed(WRITE_FAILED)
+        }
+    }
+
+    /**
+     * A file that holds password hashes is readable by its owner only (P13): created with mode 600, or set to it before the text is written over an
+     * existing file. Best effort: a system without POSIX permissions keeps its default (not verified on Windows), and the save goes on.
+     */
+    private fun restrictToOwner(target: File) {
+        val path = target.toPath()
+        val ownerOnly = PosixFilePermissions.fromString("rw-------")
+        try {
+            if (Files.exists(path)) Files.setPosixFilePermissions(path, ownerOnly) else Files.createFile(path, PosixFilePermissions.asFileAttribute(ownerOnly))
+        } catch (_: UnsupportedOperationException) {
+            // No POSIX permissions here.
+        } catch (_: IOException) {
+            // The write below reports a real failure.
         }
     }
 

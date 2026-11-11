@@ -34,6 +34,13 @@ internal object ReviewFiles {
     /** Two source virtual hosts: "/" and "other", each with one classic queue. */
     val twoVhosts: String = DefinitionsFiles.file(
         queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("billing", vhost = "other")),
+        // M8-12b: only "/" is declared. A declared virtual host other than "/" makes an access file (the first file, numbers shift); [twoDeclaredVhosts] is that case.
+        vhosts = listOf("/"),
+    )
+
+    /** Two source virtual hosts, both declared: the generation writes an access file first, then one topology file per virtual host. */
+    val twoDeclaredVhosts: String = DefinitionsFiles.file(
+        queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("billing", vhost = "other")),
         vhosts = listOf("/", "other"),
     )
 

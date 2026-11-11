@@ -178,7 +178,8 @@ class Migrate3xReviewSteps {
         showFile(
             DefinitionsFiles.file(
                 queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("billing", vhost = "other")),
-                vhosts = listOf("/", "other"),
+                // M8-12b: only "/" is declared; a declared virtual host other than "/" makes an access file (first file, numbers shift)
+                vhosts = listOf("/"),
             ),
         )
         decideEverything()

@@ -100,7 +100,7 @@ class GenerateFlowTest {
 
     @Test
     fun `a result for a file with more than one virtual host says each file applies only on a matching connection`() = runTest {
-        val (r, _) = rig(ReviewFiles.twoVhosts)
+        val (r, _) = rig(ReviewFiles.twoDeclaredVhosts)
         r.decideAll(); r.generate()
         assertEquals("Each file applies only on a connection whose virtual host matches. A source with 2 virtual hosts needs one 4.x profile per virtual host.", r.done().vhostHint)
         val (one, _) = rig(ReviewFiles.orders)

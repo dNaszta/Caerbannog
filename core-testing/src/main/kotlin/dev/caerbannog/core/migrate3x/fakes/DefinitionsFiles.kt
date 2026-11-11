@@ -79,6 +79,49 @@ object DefinitionsFiles {
         return Json.encodeToString(JsonElement.serializer(), root)
     }
 
+    // ---- M8-12b: access data of a full 3.x export (virtual hosts with settings, users with a hash, permissions) ----
+
+    fun vhost(name: String, description: String? = null, tags: List<String> = emptyList(), defaultQueueType: String? = null): JsonObject = buildJsonObject {
+        put("name", name)
+        description?.let { put("description", it) }
+        if (tags.isNotEmpty()) put("tags", JsonArray(tags.map(::JsonPrimitive)))
+        defaultQueueType?.let { put("default_queue_type", it) }
+    }
+
+    /** [hash] null leaves `password_hash` out (external authentication); [algorithm] null leaves `hashing_algorithm` out. */
+    fun user(name: String, hash: String? = "SENTINEL-HASH", algorithm: String? = "rabbit_password_hashing_sha256", tags: List<String> = emptyList()): JsonObject = buildJsonObject {
+        put("name", name)
+        hash?.let { put("password_hash", it) }
+        algorithm?.let { put("hashing_algorithm", it) }
+        put("tags", JsonArray(tags.map(::JsonPrimitive)))
+        put("limits", JsonObject(emptyMap()))
+    }
+
+    fun permission(vhost: String, user: String, configure: String = ".*", write: String = ".*", read: String = ".*"): JsonObject = buildJsonObject {
+        put("user", user); put("vhost", vhost); put("configure", configure); put("write", write); put("read", read)
+    }
+
+    fun topicPermission(vhost: String, user: String, exchange: String = "amq.topic", write: String = ".*", read: String = ".*"): JsonObject = buildJsonObject {
+        put("user", user); put("vhost", vhost); put("exchange", exchange); put("write", write); put("read", read)
+    }
+
+    /** A full export with access data and, optionally, queues. The version is 3.13.7. */
+    fun accessFile(
+        vhosts: List<JsonObject>,
+        users: List<JsonObject> = emptyList(),
+        permissions: List<JsonObject> = emptyList(),
+        topicPermissions: List<JsonObject> = emptyList(),
+        queues: List<JsonObject> = emptyList(),
+    ): String {
+        val root = buildJsonObject {
+            put("rabbit_version", "3.13.7"); put("rabbitmq_version", "3.13.7")
+            put("users", JsonArray(users)); put("vhosts", JsonArray(vhosts)); put("permissions", JsonArray(permissions)); put("topic_permissions", JsonArray(topicPermissions))
+            put("queues", JsonArray(queues)); put("exchanges", JsonArray(emptyList())); put("bindings", JsonArray(emptyList())); put("policies", JsonArray(emptyList()))
+            put("parameters", JsonArray(emptyList()))
+        }
+        return Json.encodeToString(JsonElement.serializer(), root)
+    }
+
     /** [count] classic queues named `q-00001`, ... in the virtual host "/". */
     fun classicQueues(count: Int): String = file(queues = (1..count).map { queue("q-" + it.toString().padStart(5, '0')) })
 }

@@ -29,12 +29,15 @@ class GeneratedFileRoundTripTest {
     @Test
     fun `every generated file of the full fixture parses to the same actions`() {
         val result = fullGeneration()
-        assertEquals(setOf("/", "v1"), result.migrations.map { it.vhost }.toSet(), "the fixture has topology in two virtual hosts")
+        // M8-12b: the access file comes first and has no virtual host (its vhost is empty)
+        assertEquals(setOf("", "/", "v1"), result.migrations.map { it.vhost }.toSet(), "the fixture has topology in two virtual hosts and an access file")
         for (m in result.migrations) {
             val parsed = MigrationParser.parse(m.file.rawJson, emptySet())
             assertTrue(parsed is MigrationValidationResult.Valid, "the file of ${m.vhost} does not parse: $parsed")
             val file = (parsed as MigrationValidationResult.Valid).migration
-            assertEquals(m.file.up, file.up)
+            // a hash is a SecretValue (no equals): the actions are compared through the codec output, which writes the hash back unchanged
+            assertEquals(MigrationParser.actionsToJson(m.file.up), MigrationParser.actionsToJson(file.up))
+            assertEquals(m.file.up.size, file.up.size)
             assertEquals(m.file.version, file.version)
             assertEquals(m.file.checksum, MigrationParser.computeChecksum(m.file.rawJson))
             assertTrue(m.file.up.isNotEmpty())
@@ -54,7 +57,7 @@ class GeneratedFileRoundTripTest {
     fun `no generated action is a delete, a shovel or a destructive action`() {
         for (action in fullGeneration().allActions()) {
             assertFalse(action.isDestructive, "destructive: ${action.description}")
-            assertTrue(action.actionName.startsWith("declare"), "not a declaration: ${action.actionName}")
+            assertTrue(action.actionName.startsWith("declare") || action.actionName.startsWith("set"), "not a declaration: ${action.actionName}")
             assertFalse(action.actionName.contains("shovel", ignoreCase = true))
         }
         assertTrue(fullGeneration().allActions().isNotEmpty())
@@ -63,7 +66,8 @@ class GeneratedFileRoundTripTest {
     @Test
     fun `the dry run lists every action of every file and allows them with permission and enough level`() {
         for (m in fullGeneration().migrations) {
-            val dry = runner.dryRun(m.file, true, TopologyControlLevel.DECLARE_AND_EDIT, m.vhost)
+            // the access file needs an administrator at Full control, any virtual host (M8-12a)
+            val dry = if (m.access) runner.dryRun(m.file, true, TopologyControlLevel.FULL_CONTROL, "/", setOf("administrator")) else runner.dryRun(m.file, true, TopologyControlLevel.DECLARE_AND_EDIT, m.vhost)
             assertEquals(m.file.up, dry.actions.map { it.action })
             assertTrue(dry.canApply, "blocked: ${dry.blockedReason}")
             assertTrue(dry.actions.all { it.allowed })

@@ -113,7 +113,8 @@ class FolderMigrationFileRepository(
 
     private fun writeOrInvalid(target: Path, result: MigrationValidationResult.Valid): MigrationValidationResult =
         try {
-            AtomicFileWriter.write(target, result.migration.rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = false)
+            // A file that holds a password hash is readable by its owner only (P13); every other file keeps the process default.
+            AtomicFileWriter.write(target, result.migration.rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = result.migration.up.any { it is MigrationAction.DeclareUser })
             result
         } catch (_: IOException) {
             MigrationValidationResult.Invalid(NOT_WRITTEN)
@@ -125,7 +126,7 @@ class FolderMigrationFileRepository(
         val rawJson = MigrationParser.exportToJson(version, description, actions)
         val parsed = MigrationParser.parse(rawJson) as? MigrationValidationResult.Valid ?: throw MigrationWriteException(NOT_WRITTEN)
         try {
-            AtomicFileWriter.write(target, rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = false)
+            AtomicFileWriter.write(target, rawJson.toByteArray(Charsets.UTF_8), mover, ownerOnly = actions.any { it is MigrationAction.DeclareUser })
         } catch (_: IOException) {
             throw MigrationWriteException(NOT_WRITTEN)
         }

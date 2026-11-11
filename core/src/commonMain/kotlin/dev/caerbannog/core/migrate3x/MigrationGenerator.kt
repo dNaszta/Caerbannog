@@ -15,7 +15,6 @@ internal object MigrationGenerator {
     private const val QUEUE_TYPE = "x-queue-type"
     private const val QUEUE_VERSION = "x-queue-version"
     private const val LAST_VERSION = 9999L
-    private const val ACCESS_NOTE = "Handled by the access migration (not part of this generation)"
 
     /** What became of one item of the document. */
     private sealed interface Outcome {
@@ -49,6 +48,10 @@ internal object MigrationGenerator {
                 "This file is an export of one virtual host and holds no users, virtual hosts or permissions; " +
                     "the virtual host \"${it.assignedName}\" must already exist on the 4.x broker",
             )
+        }
+        // The default virtual host exists on every 4.x broker with its own settings: the access migration never declares it (D5).
+        if (document.origin !is DefinitionsOrigin.SingleVirtualHost && document.virtualHosts.any { it.name == "/" }) {
+            notes += GenerationNote(MigrateFromThreeTexts.DEFAULT_VHOST_NOTE)
         }
         notes += reportNotes(report)
 
@@ -97,7 +100,8 @@ internal object MigrationGenerator {
             }
         }
 
-        return GenerationResult.Generated(files(actions, request), skipped, notes)
+        val access = AccessGenerator.generate(document, request)
+        return GenerationResult.Generated(files(actions, request, access.file), skipped, notes, access.notMigrated, access.leftOutPermissions, access.summary)
     }
 
     /**
@@ -159,7 +163,6 @@ internal object MigrationGenerator {
                         )
                     }
                 }
-                FindingClass.Access -> notes += GenerationNote(ACCESS_NOTE, finding.name?.let { ReviewItem(finding.kind, finding.vhost, it) })
                 else -> Unit
             }
         }
@@ -254,19 +257,28 @@ internal object MigrationGenerator {
 
     // ---- files ----
 
-    private fun files(actions: List<MigrationAction>, request: GenerationRequest): List<GeneratedMigration> {
+    /** The access file (when there is one) takes the first free number, the topology files follow: access is applied first (P10). */
+    private fun files(actions: List<MigrationAction>, request: GenerationRequest, accessFile: MigrationFile?): List<GeneratedMigration> {
         val byVhost = actions.groupBy { it.vhost }
-        if (byVhost.isEmpty()) return emptyList()
+        if (byVhost.isEmpty() && accessFile == null) return emptyList()
         val highest = request.existingVersions
             .filter { it.isNotEmpty() && it.all { c -> c in '0'..'9' } }
             .maxOfOrNull { it.toLongOrNull() ?: Long.MAX_VALUE } ?: 0L
-        return byVhost.keys.sorted().mapIndexed { index, vhost ->
+        fun versionAt(index: Int): String {
             val number = minOf(highest, LAST_VERSION) + index + 1
             check(number <= LAST_VERSION) { "the next migration version would pass $LAST_VERSION" }
-            val version = number.toString().padStart(4, '0')
-            val raw = MigrationParser.exportToJson(version, "Migrated from RabbitMQ 3.x ${request.source} vhost $vhost", byVhost.getValue(vhost))
+            return number.toString().padStart(4, '0')
+        }
+        val access = listOfNotNull(accessFile?.let {
+            val raw = MigrationParser.exportToJson(versionAt(0), it.description, it.up)
+            GeneratedMigration("", parsed(raw, request.existingVersions), access = true)
+        })
+        val offset = access.size
+        val topology = byVhost.keys.sorted().mapIndexed { index, vhost ->
+            val raw = MigrationParser.exportToJson(versionAt(index + offset), "Migrated from RabbitMQ 3.x ${request.source} vhost $vhost", byVhost.getValue(vhost))
             GeneratedMigration(vhost, parsed(raw, request.existingVersions))
         }
+        return access + topology
     }
 
     private fun parsed(raw: String, existingVersions: Set<String>): MigrationFile = when (val result = MigrationParser.parse(raw, existingVersions)) {
