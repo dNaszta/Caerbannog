@@ -196,6 +196,46 @@ class ForwardingServiceTest {
         assertTrue(gateway.calls.none { it is ShovelCall.Remove })
     }
 
+    // ---- step 2b, ruling 5 ----
+
+    @Test
+    fun `a poll after Finished or Failed returns the state and sends no request`() = runTest {
+        for (final in listOf(ForwardingState.Finished, ForwardingState.Failed("r", true))) {
+            val gateway = Fwd.gateway()
+            assertEquals(final, service(gateway).poll(request, final))
+            assertEquals(emptyList(), gateway.calls, "a request after $final")
+        }
+    }
+
+    @Test
+    fun `the cleanup uses the gate of creating - a locked connection sends no remove and the state says not cleaned up`() = runTest {
+        for ((level, unlocked) in listOf(READ_ONLY to true, DECLARE_AND_EDIT to false)) {
+            val gateway = Fwd.gateway().apply { statusScript(StatusOutcome.Listed(Fwd.status(request, ShovelRunState.TERMINATED, reason = "boom"))) }
+            val state = service(gateway, level, unlocked).poll(request, ForwardingState.Started())
+            assertEquals(ForwardingState.Failed("boom", cleanedUp = false), state, "level $level unlocked=$unlocked")
+            assertTrue(gateway.calls.none { it is ShovelCall.Remove }, "a remove was sent on a locked connection")
+        }
+    }
+
+    @Test
+    fun `a cleanup remove that is anything but Removed gives not cleaned up`() = runTest {
+        val outcomes = listOf(RemoveOutcome.NotFound, RemoveOutcome.NotPermitted, RemoveOutcome.Unreachable, RemoveOutcome.Failed("x"))
+        for (outcome in outcomes) {
+            val gateway = Fwd.gateway().apply {
+                statusScript(StatusOutcome.Listed(Fwd.status(request, ShovelRunState.TERMINATED, reason = "boom")))
+                removeOutcome(outcome)
+            }
+            assertEquals(ForwardingState.Failed("boom", cleanedUp = false), service(gateway).poll(request, ForwardingState.Started()), "$outcome")
+        }
+    }
+
+    @Test
+    fun `a terminated shovel without a reason is reported with the fixed text`() = runTest {
+        val gateway = Fwd.gateway().apply { statusScript(StatusOutcome.Listed(Fwd.status(request, ShovelRunState.TERMINATED, reason = null))) }
+        assertEquals("The shovel stopped without giving a reason", ForwardingTexts.NO_REASON)
+        assertEquals(ForwardingState.Failed(ForwardingTexts.NO_REASON, cleanedUp = true), service(gateway).poll(request, ForwardingState.Started()))
+    }
+
     // ---- remove ----
 
     @Test

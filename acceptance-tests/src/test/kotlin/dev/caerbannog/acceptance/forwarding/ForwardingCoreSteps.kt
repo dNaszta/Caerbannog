@@ -46,7 +46,7 @@ class ForwardingCoreSteps {
     @Given("the 4.x connection {string} is the held connection")
     fun held(name: String) = Unit
 
-    @Given("the user of {string} has the policymaker tag and configure permission on {string}")
+    @Given("the user of {string} has the policymaker and monitoring tags and configure permission on {string}")
     fun userTags(name: String, vhost: String) = w.gateway.userTags("policymaker", "monitoring") // monitoring too: without it forwarding is blocked (brief decision 2)
 
     @Given("the topology level of {string} is Declare and edit")
@@ -297,14 +297,17 @@ class ForwardingCoreSteps {
     @Then("I am told the user needs the policymaker tag")
     fun needsPolicymaker() = assertTrue(ForwardingBlock.NoPolicymakerTag in blocks(), "blocks: ${blocks()}")
 
-    @Then("I am told which plugins to enable")
-    fun plugins() = assertTrue(ForwardingBlock.ShovelPluginsOff in blocks(), "blocks: ${blocks()}")
+    @Then("forwarding is blocked because the shovel plugins are off")
+    fun plugins() { assertIs<Prepared.Blocked>(w.prepared); assertTrue(ForwardingBlock.ShovelPluginsOff in blocks(), "blocks: ${blocks()}") }
 
-    @Then("I am told that topology changes are locked on {string}")
+    @Then("forwarding is disabled because topology changes are locked on {string}")
     fun locked(name: String) {
+        assertIs<Prepared.Blocked>(w.prepared)
         assertEquals(listOf(ForwardingBlock.TopologyLocked), blocks())
-        assertEquals(emptyList(), w.gateway.calls, "a locked connection sent a request")
     }
+
+    @Then("no request is sent to either broker")
+    fun noRequestEither() = assertEquals(emptyList(), w.gateway.calls, "a locked connection sent a request")
 
     @Then("I see its state instead of a new start")
     fun seeState() = assertTrue(blocks().any { it is ForwardingBlock.ShovelExists }, "blocks: ${blocks()}")
@@ -334,10 +337,11 @@ class ForwardingCoreSteps {
         assertTrue(starts.all { it.request.source.address.scheme == "amqps" })
     }
 
-    @Then("the confirmation and the progress view say {string}")
+    @Then("the confirmation says {string}")
     fun notEncrypted(text: String) {
+        assertEquals("Not encrypted", text)
         assertTrue(confirmation().notEncrypted)
-        said(text) // the progress view is drawn by M8-09; the planner warning it reads is checked in ForwardingPlannerTest
+        said(text)
         assertTrue(ForwardingWarning.NotEncrypted("legacy-eu") in warnings())
     }
 

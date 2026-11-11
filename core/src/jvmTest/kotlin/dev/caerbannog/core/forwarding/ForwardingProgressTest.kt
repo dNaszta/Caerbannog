@@ -48,6 +48,11 @@ class ForwardingProgressTest {
     }
 
     @Test
+    fun `terminated without a reason gives the fixed no-reason text`() {
+        assertEquals(ForwardingState.Failed(ForwardingTexts.NO_REASON, false), next(ForwardingState.Running(1, 2), listed(ShovelRunState.TERMINATED, reason = null)))
+    }
+
+    @Test
     fun `a read that is not permitted, unreachable or failed keeps the previous state`() {
         val before = ForwardingState.Running(40, 80)
         for (read in listOf(StatusOutcome.NotPermitted, StatusOutcome.Unreachable, StatusOutcome.Failed("boom"))) {
