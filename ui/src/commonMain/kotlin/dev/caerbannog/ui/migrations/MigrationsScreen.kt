@@ -52,6 +52,7 @@ import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
 import dev.caerbannog.ui.appframe.AppDestination
@@ -488,6 +489,16 @@ private fun MigrationDetailPanel(
                 }
             }
 
+            // The raw editor would draw the real hash (decision B of M8-12a): no Edit button, a fixed text instead.
+            val holdsHash = state.selectedFile?.up?.any { it is MigrationAction.DeclareUser } == true
+            if (holdsHash) {
+                Text(
+                    text = MigrationsWording.HASH_FILE_NO_EDIT,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("migrations:hashFileNoEdit"),
+                )
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Action row
@@ -496,14 +507,16 @@ private fun MigrationDetailPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                TextButton(
-                    onClick = onEdit,
-                    enabled = state.canEditFile,
-                    modifier = Modifier.testTag("migrations:editFileBtn"),
-                ) {
-                    ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Edit file")
+                if (!holdsHash) {
+                    TextButton(
+                        onClick = onEdit,
+                        enabled = state.canEditFile,
+                        modifier = Modifier.testTag("migrations:editFileBtn"),
+                    ) {
+                        ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Edit file")
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
