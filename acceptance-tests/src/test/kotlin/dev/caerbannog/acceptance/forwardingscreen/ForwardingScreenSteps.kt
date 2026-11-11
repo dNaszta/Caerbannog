@@ -65,14 +65,13 @@ class ForwardingScreenSteps {
         val holder = AnalysisHolder().also { it.hold(HeldAnalysis("legacy-eu", doc, CompatibilityAnalyzer.analyze(doc), SourceKind.Live)) }
         val source = ConnectionProfile("legacy-eu", "legacy.example", "/", "svc-reader", tls = sourceTls)
         val destination = DestinationConnection(ConnectionProfile("new-eu", "new.example", "/", "svc", tls = true))
-        val dispatcher = StandardTestDispatcher(test.testScheduler)
         return ForwardingViewModel(
             ForwardingService(gateway) { ForwardingContext(level, true) }, holder, { destination }, { if (it == "legacy-eu") source else null },
-            { ForwardingContext(level, true) }, CoroutineScope(dispatcher),
+            { ForwardingContext(level, true) }, test.backgroundScope,
         ).also { vm = it }
     }
 
-    private fun settle() = test.testScheduler.advanceUntilIdle()
+    private fun settle() = test.testScheduler.runCurrent()
     private fun pollOnce() { test.testScheduler.advanceTimeBy(FORWARDING_POLL_MILLIS); test.testScheduler.runCurrent(); settle() }
     private fun orders() = QueueRow("/", "orders")
 
@@ -163,7 +162,7 @@ class ForwardingScreenSteps {
     fun onlyThat() { assertEquals("orders", assertIs<ForwardingScreenState.Confirm>(state, "state is $state").queue) }
 
     @Then("there is no action that forwards every queue")
-    fun noAll() = assertTrue(ForwardingViewModel::class.java.methods.none { it.name.lowercase().let { n -> "all" in n && n != "getstate" } })
+    fun noAll() = assertTrue(ForwardingViewModel::class.java.methods.none { it.name.lowercase().let { n -> "all" in n && n != "getstate" && n != "notifyall" } })
 
     @Then("I see that about {int} messages stayed on the source")
     fun stayed(n: Int) {
@@ -198,6 +197,7 @@ class ForwardingScreenSteps {
         vm.close(); settle()
         assertEquals(ForwardingScreenState.Closed, state)
         assertFalse(state.toString().contains("s3cret-SENTINEL"))
+        gateway.shovels.clear() // the fake keeps the started shovel; the real one would show it as existing
         vm.open(); settle(); vm.pick(orders()); settle()
         val form = assertIs<ForwardingScreenState.Confirm>(state, "state is $state").form
         assertEquals(listOf(false, "", null), listOf(form.anotherUser, form.user, form.password))

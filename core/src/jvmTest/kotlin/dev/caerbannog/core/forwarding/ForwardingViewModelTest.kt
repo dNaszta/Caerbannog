@@ -14,7 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,15 +41,15 @@ internal class FwdRig(
         it.hold(HeldAnalysis("legacy-eu", h.document, h.report, kind))
     }
     var destinationConnection: DestinationConnection? = destination?.let { DestinationConnection(it) }
-    private val dispatcher = StandardTestDispatcher(test.testScheduler)
     val vm = ForwardingViewModel(
         ForwardingService(gateway) { ForwardingContext(level, unlocked) }, holder, { destinationConnection },
-        { if (it == "legacy-eu") source else null }, { ForwardingContext(level, unlocked) }, CoroutineScope(dispatcher),
+        { if (it == "legacy-eu") source else null }, { ForwardingContext(level, unlocked) }, test.backgroundScope,
     )
     val test = test
     val state get() = vm.state.value
 
-    fun settle() = test.testScheduler.advanceUntilIdle()
+    /** The polling loop never ends while the shovel is STARTING, so the view model runs on the background scope and the test runs only what is due. */
+    fun settle() = test.testScheduler.runCurrent()
     fun open() { vm.open(); settle() }
     fun orders() = QueueRow("/", "orders")
     fun pickOrders() { open(); vm.pick(orders()); settle() }
@@ -329,8 +329,8 @@ class ForwardingViewModelTest {
 
     @Test
     fun `there is no event that forwards every queue`() {
-        val names = ForwardingViewModel::class.java.methods.map { it.name.lowercase() }
-        assertTrue(names.none { "all" in it && it != "getstate" }, "an event for all queues: $names")
+        val names = ForwardingViewModel::class.java.declaredMethods.map { it.name.lowercase() }.filterNot { '$' in it }
+        assertTrue(names.none { "all" in it && it != "getstate" && it !in setOf("notifyall") }, "an event for all queues: $names")
         assertEquals(1, names.count { it == "pick" })
     }
 }
