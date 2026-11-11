@@ -136,4 +136,24 @@ class RealBrokerM8AccessTest {
         assertEquals(emptyList<String>(), sent, "a request was sent before the runner refused")
         assertTrue(MigrationParser.computeChecksum("x").isNotEmpty())
     }
+
+    @Test
+    fun `measurements - the vhost tags body format and where the settings are answered`() {
+        val v = "m812c-meas"; val v2 = "m812c-meas2"
+        try {
+            // what the executor sends: tags as a JSON array
+            assertEquals(ActionResult.Success, runBlocking { executor().execute(MigrationAction.DeclareVhost(v, "Orders", listOf("prod", "eu"), "quorum")) })
+            val got = n.get("/api/vhosts/$v")
+            println("M8-12c MEASURED vhost GET after the executor PUT (array tags): ${got.body}")
+            val obj = got.obj
+            val meta = obj["metadata"] as? kotlinx.serialization.json.JsonObject
+            println("M8-12c MEASURED description at top level: ${"description" in obj.keys}, in metadata: ${meta?.containsKey("description")}; default_queue_type top: ${"default_queue_type" in obj.keys}, metadata: ${meta?.containsKey("default_queue_type")}; tags top: ${"tags" in obj.keys}, metadata: ${meta?.containsKey("tags")}")
+            // the comma string form
+            val asString = n.put("/api/vhosts/$v2", """{"description":"d","tags":"prod,eu","default_queue_type":"quorum"}""")
+            println("M8-12c MEASURED PUT with tags as a comma string: ${asString.status}; GET: ${n.get("/api/vhosts/$v2").body}")
+            val asArray = n.put("/api/vhosts/$v2", """{"description":"d","tags":["prod","eu"],"default_queue_type":"quorum"}""")
+            println("M8-12c MEASURED PUT with tags as an array: ${asArray.status}")
+            assertTrue(got.ok && (meta != null || "description" in obj.keys), "the settings are answered nowhere I read")
+        } finally { n.delete("/api/vhosts/$v"); n.delete("/api/vhosts/$v2") }
+    }
 }
