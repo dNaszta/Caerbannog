@@ -139,8 +139,11 @@ class ManagementHttpWriteTest {
 
     // ---- the caller guard ------------------------------------------------------------------------------------------------
 
-    /** The only classes of `src/main` allowed to call `put` or `delete` of ManagementHttp: the migration executor and its writer. */
-    private val allowedCallers = setOf("MigrationWriter.kt", "ManagementTopologyMigrationExecutor.kt")
+    /**
+     * The only classes of `src/main` allowed to call `put` or `delete` of ManagementHttp: the migration executor and its writer, and (M8-08) the
+     * shovel gateway, which sends only what `ShovelPathAllowList` allows.
+     */
+    private val allowedCallers = setOf("MigrationWriter.kt", "ManagementTopologyMigrationExecutor.kt", "ManagementShovelGateway.kt")
 
     @Test
     fun `only the migration executor calls ManagementHttp put or delete`() {
@@ -153,6 +156,15 @@ class ManagementHttpWriteTest {
         val offenders = files.filter { it.name !in allowedCallers && it.name != "ManagementHttp.kt" && it.name != "M508aTestStubs.kt" }
             .filter { f -> f.readLines().any { call.containsMatchIn(it.substringBefore("//")) } }
         assertTrue(offenders.isEmpty(), "management PUT or DELETE from a class that is not the migration executor: ${offenders.map { it.name }}")
+    }
+
+    @Test
+    fun `the shovel gateway is the second caller, sends put and delete only through the shovel allow-list, and never post`() {
+        val text = File("src/main/kotlin/dev/caerbannog/datarabbit/ManagementShovelGateway.kt").readText().lines().joinToString("\n") { it.substringBefore("//") }
+        assertTrue(Regex("""\.put\(""").containsMatchIn(text) && Regex("""\.delete\(""").containsMatchIn(text), "the shovel gateway does not send a PUT and a DELETE yet")
+        assertTrue(text.contains("ShovelPathAllowList.checked"), "the shovel gateway does not pass its paths through ShovelPathAllowList")
+        assertTrue(!Regex("""\.post\(""").containsMatchIn(text), "the shovel gateway must never POST")
+        listOf("/get", "/contents", "/purge", "definitions", "api/parameters\"").forEach { assertTrue(!text.contains(it), "the shovel gateway source mentions $it") }
     }
 
     @Test

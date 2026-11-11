@@ -29,7 +29,7 @@ data class ShovelAddress(val tls: Boolean, val username: String, val host: Strin
 }
 
 /** Percent-encodes everything but the RFC 3986 unreserved characters, byte by byte in UTF-8 (so "/" prints %2F). */
-internal fun percentEncode(text: String): String = buildString {
+fun percentEncode(text: String): String = buildString {
     for (byte in text.encodeToByteArray()) {
         val c = (byte.toInt() and 0xFF).toChar()
         if (c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c == '-' || c == '.' || c == '_' || c == '~') append(c)

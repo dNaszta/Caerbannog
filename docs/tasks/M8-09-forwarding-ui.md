@@ -25,6 +25,10 @@ Mockup `docs/ux/Migrate3x.dc.html` (forwarding section, from `M8-06`). Blocked u
 ## MCP
 None (UI); see `M8-10` for what is exposed.
 
+## Follow-up carried from M8-07 and M8-08 (architect, 2026-11-11)
+- Move the fixed failure texts of `ForwardingService` ("The broker could not be reached", "The broker did not allow creating the shovel", "... removing the shovel") from the service into `ForwardingTexts` when this screen shows them (M8-07 review finding 1). Pin the exact confirmation strings here when the owner sees the dialog (M8-07 ruling 4). The screen texts for the blocks (plugins, locked, not encrypted) are the new `@m8-09` scenario.
+- No name length rule exists (M8-08 step 5): do not add one in the dialog.
+
 ## Open points
 P5 decided (default `queue-length`, `never` only with a warning); P4 (Full control to remove) and P8 (AMQP host and port asked in the dialog) decided 2026-11-09. The confirmation must state that the broker stores the credentials until the Shovel is removed (P1).
 
