@@ -3,6 +3,14 @@ package dev.caerbannog.core.migrate3x
 /** The fixed words of the Migrate from 3.x screen (owner decision 5: as in `docs/ux/Migrate3x.dc.html`). Never built from file content. */
 object MigrateFromThreeTexts {
     /** M8-06c (owner decision 2026-11-10): one line for both sources. */
+    // M8-14 STUB: empty until the developer writes the texts pinned by MigrateHelpTextsTest.
+    const val ADVICE_TOP: String = ""
+    const val ADVICE_VHOST: String = ""
+    const val ADVICE_NEXT_STEP: String = ""
+    const val DELETE_THE_FILE: String = ""
+    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = emptyList()
+    val HELP_TIP_3X_PILL: String = ""
+
     const val INFO_LINE: String = "This screen only reads a file or the connected 3.x broker. It sends nothing that changes any broker."
     /** M8-10: what the MCP tool answers for a per-vhost export (it cannot ask for a vhost name). */
     const val NEEDS_VHOST_NAME: String = "This file is an export of one virtual host; analyse it on the Migrate from 3.x screen, which asks for the virtual host name"
