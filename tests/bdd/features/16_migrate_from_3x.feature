@@ -933,27 +933,35 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
 
   # ---- MCP -----------------------------------------------------------------------------------------
 
-  @mcp @fake-broker
+  @mcp @fake-broker @m8-10
   Scenario: The MCP report tool is read-only and returns no secrets
     When an agent calls "caerbannog_analyze_3x_definitions" for "legacy-eu"
     Then it returns the compatibility report
     And only read requests were sent to "legacy-eu"
     And the output contains no password, no password hash and no shovel URI
 
-  @mcp @safety @security @fake-broker
+  @mcp @safety @security @fake-broker @m8-10
   Scenario: No MCP tool returns a password hash
     Given a definitions file with a user "svc" that has a password hash
     When an agent calls "caerbannog_analyze_3x_definitions" for that file
     Then the output does not contain the hash
     And no other tool returns a hash for a generated or imported migration
 
-  @mcp @safety @fake-broker
+  @mcp @safety @fake-broker @m8-10
   Scenario: No MCP tool can create or remove a shovel
     When an agent lists the available tools
     Then there is no tool that creates or removes a shovel
     And there is no tool that converts or forwards on its own
 
-  @mcp @fake-broker
+  @mcp @fake-broker @m8-10
+  Scenario: The MCP report tool returns one page of findings and says how many there are
+    Given a definitions file with 60,000 classic queues
+    When an agent calls "caerbannog_analyze_3x_definitions" for that file with limit 50 and offset 100
+    Then it returns the summary and 50 findings starting at the finding 100
+    And it says how many findings there are in all
+    And the response stays under the size cap
+
+  @mcp @fake-broker @m8-10
   Scenario: The MCP shovel status tool shows no address
     Given a shovel "caerbannog-migrate-orders" is running on "new-eu"
     When an agent calls "caerbannog_list_shovels" for "new-eu"
@@ -983,7 +991,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Then I am told that this user cannot export definitions
     And I am offered to import a definitions file instead
 
-  @gate-M8 @broker-3x
+  @gate-M8 @broker-3x @m8-11
   Scenario: Migrate a 3.13 topology to 4.x and move a message
     Given a real RabbitMQ 3.13 broker with the classic queue "orders" holding the message "hello" and a mirroring policy
     And the 3.13 broker has the user "svc" with a known password
