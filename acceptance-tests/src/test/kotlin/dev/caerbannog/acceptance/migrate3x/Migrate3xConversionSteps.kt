@@ -490,7 +490,7 @@ class Migrate3xConversionSteps {
 
     // M8-12b: the generation now writes the access migration, which holds the hash in its own text by design (the broker needs it). The hash may be there and
     // nowhere else: not in the topology files, the result, the notes, any toString (the access file's own toString is checked by AccessSecretsToStringTest).
-    @Then("neither the migration file nor the result nor its text contains the password hash or the password")
+    @Then("neither a topology migration file nor the result nor its text contains the password hash or the password")
     fun noSecret() {
         val result = fresh()
         val texts = listOf(result.toString(), review().toString()) + result.migrations.filter { !it.access }.flatMap { listOf(it.file.rawJson, it.file.toString()) } + result.notes.map { "${it.text} ${it.item}" } + result.skipped.map { it.toString() }

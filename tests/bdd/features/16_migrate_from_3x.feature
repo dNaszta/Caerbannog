@@ -620,7 +620,7 @@ Feature: Migrate from RabbitMQ 3.x to 4.x
     Given a definitions file with a user "svc" that has a password hash and a shovel parameter whose URI contains a password
     When I generate the migration for "/"
     Then no request was sent to any broker
-    And neither the migration file nor the result nor its text contains the password hash or the password
+    And neither a topology migration file nor the result nor its text contains the password hash or the password
 
   @negative @fake-broker @m8-05
   Scenario: Applying a generated migration follows the usual guardrails

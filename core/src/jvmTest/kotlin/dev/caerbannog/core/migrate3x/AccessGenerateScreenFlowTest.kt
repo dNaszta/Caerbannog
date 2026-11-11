@@ -27,7 +27,7 @@ class AccessGenerateScreenFlowTest {
         val report = r.done()
         assertEquals(listOf("access", "/"), report.files.map { it.vhost })
         assertEquals(listOf("0001", "0002"), report.files.map { it.version })
-        assertTrue(folder.files.getValue("0001").toString().contains("SENTINEL-HASH-xyz"), "the file must hold the real hash")
+        assertTrue(folder.files.getValue("0001").rawJson.contains("SENTINEL-HASH-xyz"), "the file must hold the real hash")
         assertEquals("Access: 1 virtual host, 1 user, 1 permission, 0 topic permissions", report.accessLine)
         assertEquals(MigrateFromThreeTexts.SECRET_FILE_WARNING, report.secretWarning)
         assertEquals(listOf("guest"), report.usersNotMigrated.map { it.label })
