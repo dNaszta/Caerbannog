@@ -74,4 +74,7 @@ interface HeldConnection : AutoCloseable {
 
     /** M8-02a (implied by the brief, guardedSource needs it): the GET-only reads of a 3.x source connection; null for every other connection. */
     val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? get() = null
+
+    /** M8-09: the shovel gateway of a held 4.x connection; a connection that is not one refuses every operation (a 3.x broker is never a shovel destination). */
+    val shovels: dev.caerbannog.core.forwarding.ShovelGateway get() = dev.caerbannog.core.forwarding.UnavailableShovelGateway
 }

@@ -71,6 +71,8 @@ class StreamSource(
     val brokerVersion: String? = null,
     /** M8-02a: reads a live 3.x connection into a definitions document and facts; never null: a connection that is not a 3.x source refuses with a fixed text (rulings 2). */
     val definitionsSource: dev.caerbannog.core.migrate3x.DefinitionsSource = dev.caerbannog.core.migrate3x.UnavailableDefinitionsSource(""),
+    /** M8-09: the shovel gateway of the same held connection; a connection that is not a held 4.x one refuses. */
+    val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
 )

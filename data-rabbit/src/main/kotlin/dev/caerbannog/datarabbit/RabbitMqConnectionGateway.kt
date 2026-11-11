@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.isMigrationSourceOnly
 import dev.caerbannog.core.connections.SecretStore
+import dev.caerbannog.core.forwarding.UnavailableShovelGateway
 import java.io.IOException
 import java.security.GeneralSecurityException
 import kotlin.coroutines.cancellation.CancellationException
@@ -20,6 +21,8 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class RabbitMqConnectionGateway(
     private val secretStore: SecretStore,
+    /** M8-09: finds a saved profile by name; the shovel source probe reads the 3.x profile through it. Before [log] so a trailing lambda stays the log. */
+    private val profiles: (String) -> ConnectionProfile? = { null },
     private val log: (String) -> Unit = {},
 ) : ConnectionGateway {
 
@@ -70,6 +73,8 @@ class RabbitMqConnectionGateway(
                 manager = manager,
                 brokerVersion = access.version,
                 threeXReads = access.version?.takeIf { isMigrationSourceOnly(it) }?.let { ManagementThreeXReads(http, requests) },
+                // A 3.x connection is a source only: it never gets a shovel gateway, so it can never be a shovel destination.
+                shovels = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelGateway else ManagementShovelGateway(http, requests, profiles, secretStore),
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),

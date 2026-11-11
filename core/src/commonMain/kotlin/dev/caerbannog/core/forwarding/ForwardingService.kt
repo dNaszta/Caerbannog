@@ -56,8 +56,8 @@ class ForwardingService(private val gateway: ShovelGateway, private val context:
         return when (val started = gateway.start(request)) {
             StartOutcome.Submitted -> StartResult.Started
             is StartOutcome.Refused -> StartResult.Refused(started.reason)
-            StartOutcome.NotPermitted -> StartResult.Failed("The broker did not allow creating the shovel")
-            StartOutcome.Unreachable -> StartResult.Failed("The broker could not be reached")
+            StartOutcome.NotPermitted -> StartResult.Failed(ForwardingTexts.CREATE_NOT_ALLOWED)
+            StartOutcome.Unreachable -> StartResult.Failed(ForwardingTexts.BROKER_UNREACHABLE)
             is StartOutcome.Failed -> StartResult.Failed(started.reason)
         }
     }
@@ -78,8 +78,8 @@ class ForwardingService(private val gateway: ShovelGateway, private val context:
         if (ctx.level != TopologyControlLevel.FULL_CONTROL || !ctx.topologyUnlocked) return RemoveResult.NeedsFullControl
         return when (val removed = gateway.remove(shovel)) {
             RemoveOutcome.Removed, RemoveOutcome.NotFound -> RemoveResult.Removed
-            RemoveOutcome.NotPermitted -> RemoveResult.Failed("The broker did not allow removing the shovel")
-            RemoveOutcome.Unreachable -> RemoveResult.Failed("The broker could not be reached")
+            RemoveOutcome.NotPermitted -> RemoveResult.Failed(ForwardingTexts.REMOVE_NOT_ALLOWED)
+            RemoveOutcome.Unreachable -> RemoveResult.Failed(ForwardingTexts.BROKER_UNREACHABLE)
             is RemoveOutcome.Failed -> RemoveResult.Failed(removed.reason)
         }
     }
