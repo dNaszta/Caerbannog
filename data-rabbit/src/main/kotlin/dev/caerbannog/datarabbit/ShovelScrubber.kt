@@ -1,6 +1,9 @@
 package dev.caerbannog.datarabbit
 
-/** Removes secrets and `scheme://user[:pw]@` from broker text before it becomes a reason. M8-08 STUB: returns the text as it is. */
+/** Removes secrets and `scheme://user[:pw]@` from broker text before it becomes a reason. */
 internal object ShovelScrubber {
-    fun scrub(text: String, secrets: List<String> = emptyList()): String = text // M8-08 STUB
+    private val credentialsInUri = Regex("""[A-Za-z][A-Za-z0-9+.-]*://[^@\s]*@""")
+
+    fun scrub(text: String, secrets: List<String> = emptyList()): String =
+        secrets.filter { it.isNotEmpty() }.fold(text) { acc, secret -> acc.replace(secret, "***") }.replace(credentialsInUri, "***@")
 }
