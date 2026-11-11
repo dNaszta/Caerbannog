@@ -44,6 +44,9 @@ class AccessGenerationReportTest {
         assertEquals("Access: 1 virtual host, 4 users, 6 permissions, 1 topic permission", MigrateFromThreeTexts.accessLine(AccessSummary(1, 4, 6, 1)))
         assertEquals("Access: 2 virtual hosts, 1 user, 1 permission, 2 topic permissions", MigrateFromThreeTexts.accessLine(AccessSummary(2, 1, 1, 2)))
         assertEquals("Access: 1 virtual host, 1 user, 1 permission, 0 topic permissions", report(generated(full)).accessLine)
+        // the thousands separator of every other count of the screen ("1,204 bindings"): a private helper must not shadow `plural`
+        assertEquals("Access: 1,204 virtual hosts, 12,345 users, 6 permissions, 1 topic permission", MigrateFromThreeTexts.accessLine(AccessSummary(1204, 12345, 6, 1)))
+        assertEquals("60,000 items", MigrateFromThreeTexts.itemCount(60_000))
     }
 
     @Test

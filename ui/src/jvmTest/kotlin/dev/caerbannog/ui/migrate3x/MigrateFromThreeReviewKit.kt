@@ -71,6 +71,11 @@ internal object ReviewScreenFiles {
     )
     val twoVhosts: String = DefinitionsFiles.file(
         queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("billing", vhost = "other")),
+        // M8-12b: only "/" is declared; a declared virtual host other than "/" makes an access file (first file, numbers shift): see twoDeclaredVhosts
+        vhosts = listOf("/"),
+    )
+    val twoDeclaredVhosts: String = DefinitionsFiles.file(
+        queues = listOf(DefinitionsFiles.queue("orders"), DefinitionsFiles.queue("billing", vhost = "other")),
         vhosts = listOf("/", "other"),
     )
 }

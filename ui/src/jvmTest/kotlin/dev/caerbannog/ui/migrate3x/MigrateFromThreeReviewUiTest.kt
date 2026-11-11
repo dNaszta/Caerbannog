@@ -407,11 +407,12 @@ class MigrateFromThreeReviewUiTest {
 
     @Test
     fun `a file with two virtual hosts says each file applies only on a matching connection`() = runDesktopComposeUiTest(1280, 900) {
-        val rig = LiveRig(ReviewScreenFiles.twoVhosts)
+        val rig = LiveRig(ReviewScreenFiles.twoDeclaredVhosts)
         showLive(rig)
         listOf("orders" to "/", "billing" to "other").forEach { (name, _) -> clickReview(rig, ORDERS_GROUP, name); click(tickTag); click("migrate3x-accept") }
         click("migrate3x-generate")
-        assertTextHas("migrate3x-result", "2 migrations saved", "Each file applies only on a connection whose virtual host matches. A source with 2 virtual hosts needs one 4.x profile per virtual host.")
+        // the access file (declares "other") comes first: three files
+        assertTextHas("migrate3x-result", "3 migrations saved", "Each file applies only on a connection whose virtual host matches. A source with 2 virtual hosts needs one 4.x profile per virtual host.")
     }
 
     @Test

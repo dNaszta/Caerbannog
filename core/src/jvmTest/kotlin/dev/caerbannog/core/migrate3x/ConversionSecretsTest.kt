@@ -16,7 +16,9 @@ class ConversionSecretsTest {
         put("result toString", result.toString())
         put("notes", result.notes.joinToString("\n") { "${it.text} ${it.item}" })
         put("skipped", result.skipped.joinToString("\n"))
-        result.migrations.forEach { put("file ${it.vhost} rawJson", it.file.rawJson); put("file ${it.vhost} toString", it.file.toString()) }
+        // M8-12b: the access file holds the real hash in its own text by design, so its text is not scanned here; no hash may be anywhere else
+        // (the toString of MigrationFile and the access file is covered by AccessSecretsToStringTest)
+        result.migrations.filter { !it.access }.forEach { put("file ${it.vhost} rawJson", it.file.rawJson); put("file ${it.vhost} toString", it.file.toString()) }
     }
 
     private fun assertClean(document: DefinitionsDocument) {
