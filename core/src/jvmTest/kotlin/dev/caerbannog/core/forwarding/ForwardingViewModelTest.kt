@@ -213,6 +213,31 @@ class ForwardingViewModelTest {
         assertEquals(listOf(false, "", null, ""), listOf(form.anotherUser, form.user, form.password, form.typed), "the form was not wiped")
     }
 
+    // ---- round 1, finding 1: a stale plan must not leave the screen on Starting ----
+
+    @Test
+    fun `a shovel that appeared after the dry run blocks the start, the state becomes Blocked and nothing is started`() = runTest {
+        val r = FwdRig(this)
+        r.gateway.appearAfterDryRun(ShovelStatus(Fwd.request().shovel, ShovelRunState.RUNNING, null, 5, 10))
+        r.pickOrders()
+        assertIs<ForwardingScreenState.Confirm>(r.state)
+        r.typeAndConfirm()
+        val blocked = assertIs<ForwardingScreenState.Blocked>(r.state, "the screen is stuck: ${r.state}")
+        assertTrue(blocked.blocks.single() is ForwardingBlock.ShovelExists, "blocks: ${blocked.blocks}")
+        assertTrue(r.starts.isEmpty(), "a start was sent over an existing shovel: ${r.gateway.calls}")
+    }
+
+    @Test
+    fun `a level that dropped while the dialog was open blocks the start with the locked block and sends no request`() = runTest {
+        val r = FwdRig(this); r.pickOrders()
+        val calls = r.gateway.calls.size
+        r.level = TopologyControlLevel.READ_ONLY
+        r.typeAndConfirm()
+        val blocked = assertIs<ForwardingScreenState.Blocked>(r.state, "the screen is stuck: ${r.state}")
+        assertEquals(listOf(ForwardingBlock.TopologyLocked), blocked.blocks)
+        assertEquals(calls, r.gateway.calls.size, "a request was sent on a locked connection: ${r.gateway.calls}")
+    }
+
     // ---- progress and end ----
 
     private fun running(forwarded: Long, remaining: Long? = 80) = StatusOutcome.Listed(ShovelStatus(Fwd.request().shovel, ShovelRunState.RUNNING, null, forwarded, remaining))

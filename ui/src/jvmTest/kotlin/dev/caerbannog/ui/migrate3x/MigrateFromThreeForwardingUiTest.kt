@@ -3,6 +3,7 @@ package dev.caerbannog.ui.migrate3x
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -179,6 +180,20 @@ class MigrateFromThreeForwardingUiTest {
         assertTextHas("forward-other-user", ForwardingTexts.LABEL_ANOTHER_USER)
         onNodeWithTag("forward-cancel").performClick()
         assertEquals(listOf("cancel"), events.log)
+    }
+
+    @Test
+    fun `the move sentence and the clear-text disclosure are drawn bold`() = runDesktopComposeUiTest(1280, 800) {
+        showForwarding(confirmState(listOf(ForwardingTexts.MOVED, ForwardingTexts.CLEAR_TEXT, ForwardingTexts.SOURCE_KEPT)))
+        fun weightOf(text: String): Int? {
+            val node = onNode(androidx.compose.ui.test.hasText(text), useUnmergedTree = true).fetchSemanticsNode()
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            node.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)?.action?.invoke(results)
+            return results.firstOrNull()?.layoutInput?.style?.fontWeight?.weight
+        }
+        assertTrue((weightOf(ForwardingTexts.MOVED) ?: 0) >= 600, "MOVED is not bold: ${weightOf(ForwardingTexts.MOVED)}")
+        assertTrue((weightOf(ForwardingTexts.CLEAR_TEXT) ?: 0) >= 600, "CLEAR_TEXT is not bold: ${weightOf(ForwardingTexts.CLEAR_TEXT)}")
+        assertTrue((weightOf(ForwardingTexts.SOURCE_KEPT) ?: 0) < 600, "an ordinary line must stay regular: ${weightOf(ForwardingTexts.SOURCE_KEPT)}")
     }
 
     // ---- typed name, password ----
