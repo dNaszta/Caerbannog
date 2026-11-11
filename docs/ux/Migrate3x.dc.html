@@ -244,6 +244,42 @@ body{margin:0}
 <div class="appbar" style="padding:0;border:1px dashed var(--outline-variant);border-radius:12px"><h1 style="padding-left:16px">Migrations</h1><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">move_up</span>Migrate from 3.x</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
 <div class="t-bs dim">Recommended: a button on the Migrations screen and the drawer item shown at the left of this mockup. On a connection that is RabbitMQ 3.x the connection popup also offers "Migrate from 3.x" (the pill's only action, M8-06c). If the report is held (it survives connecting to another broker), the drawer item shows a small dot.</div>
 </section>
+
+<section id="state-forward" style="display:flex;flex-direction:column;gap:12px">
+<div class="t-ts">14. Forward messages (M8-09; drawn by the architect 2026-11-11, owner review needed). Entry: the button "Forward messages" in the app bar of the report, only while the held analysis is a live 3.x analysis</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div class="t-tm">14a. Pick one queue (the queues of the held analysis; one at a time; there is no "forward all")</div>
+<div class="tf" style="max-width:360px"><span class="l">Find a queue</span><div class="v"><span>ord</span></div></div>
+<div class="list"><div class="row"><span class="ms sm" aria-hidden="true">inbox</span><span class="nm" style="flex:1">orders</span><span class="t-bs dim">virtual host /</span><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">move_up</span>Forward messages</button></div><div class="row"><span class="ms sm" aria-hidden="true">inbox</span><span class="nm" style="flex:1">orders-retry</span><span class="t-bs dim">virtual host /</span><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">move_up</span>Forward messages</button></div></div>
+<div class="t-bs dim">The button is disabled with its reason when no 4.x connection is Connected ("Connect to a RabbitMQ 4.x broker first") or when the level is Read-only ("Topology changes are locked on new-eu").</div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div class="t-tm">14b. The plan: facts, blocks and warnings (after the dry run, which sends only GET requests)</div>
+<div class="t-bs">From legacy-eu, virtual host /, queue <span class="mono">orders</span>: 120 ready, 0 unacknowledged. To new-eu, virtual host /, queue <span class="mono">orders</span>: quorum queue.</div>
+<div class="banner err"><span class="ms sm" aria-hidden="true">block</span><div class="t-bs"><b>Forwarding is blocked.</b> The queue orders does not exist on new-eu. Apply the migration that declares it first.</div></div>
+<div class="t-bs dim">Other blocks, same shape: topology locked on new-eu; the user needs the policymaker tag; the user cannot read the shovel status and needs the monitoring tag; the shovel plugins are not enabled (names rabbitmq_shovel and rabbitmq_shovel_management); a shovel named caerbannog-migrate-orders already exists (its state and forwarded count are shown, with Remove shovel when the level is Full control). Warning, same card in the warning tone: "The destination queue is a classic queue, not a quorum queue."</div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div class="t-tm">14c. The confirmation (nothing is sent until the typed name matches exactly)</div>
+<div class="t-bs">From: legacy-eu, virtual host /, queue orders (amqps://app@legacy.example:5671/%2F)</div>
+<div class="t-bs">To: new-eu, virtual host /, queue orders</div>
+<div class="t-bs">The messages are moved: they leave the source queue when the destination confirms. The app cannot undo it. The source queue itself is not deleted. The shovel keeps credentials on the destination broker until it finishes or is removed. The source password is stored there in clear text, and any administrator of that broker can read it until the shovel finishes or is removed.</div>
+<div class="tf" style="max-width:360px"><span class="l">AMQP host and port as new-eu reaches them</span><div class="v"><span>legacy.example : 5671</span></div></div>
+<div class="opt"><span class="ms" aria-hidden="true">person</span><div><b>Use another user for this Shovel</b><div class="t-bs">Off: the user of legacy-eu. On: a user name and a masked password typed for this run, kept in memory only, cleared when the dialog closes.</div></div></div>
+<div class="opt"><span class="ms" aria-hidden="true">history</span><div><b>Keep the shovel running after the messages are moved</b><div class="t-bs">Off (default): the shovel moves the messages that are there and removes itself. On: it keeps forwarding. The shovel and its credentials stay until you remove the shovel.</div></div></div>
+<div class="tf" style="max-width:360px"><span class="l">Type the source queue name to confirm</span><div class="v"><span>orders</span></div></div>
+<div style="display:flex;gap:12px"><button class="btn filled" type="button">Forward messages</button><button class="btn text" type="button">Cancel</button></div>
+<div class="t-bs dim">With a plain source address (Use TLS off) the dialog adds "Not encrypted: the shovel reaches the source over a plain connection." under the From line. The Forward button stays disabled until the typed text equals the queue name exactly.</div>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div class="t-tm">14d. Progress (the app polls the shovel status every 2 seconds while this view is open) and the end states</div>
+<div class="t-bs"><span class="ms sm" aria-hidden="true">sync</span> Running. Moved about 40 of 120 messages.</div>
+<div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div class="t-bs" style="flex:1">Finished. About 20 messages stayed on the source because they were published meanwhile. An exact cut-over needs the publishers stopped first.</div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div class="t-bs" style="flex:1"><b>The forwarding failed:</b> failed to connect to source. The shovel was removed, so no stored credentials remain.</div></div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div class="t-bs" style="flex:1"><b>The forwarding failed</b>, and the shovel could not be removed here. It and its stored password remain on new-eu; a user with the level Full control must remove it.</div><button class="btn tonal" type="button">Remove shovel</button></div>
+<div class="t-bs dim">Remove shovel (a button on the running view and on a shovel that exists) needs the level Full control; below it the button is disabled with "Removing a shovel needs Full control". It deletes the shovel only, never a queue. After Finished there is no Remove button: the shovel removed itself. Leaving the screen stops the polling, not the shovel; opening the queue again shows the existing shovel and its state.</div>
+</div>
+</section>
 </section>
 </div>
 </main>
