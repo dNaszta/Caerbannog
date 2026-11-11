@@ -1,0 +1,25 @@
+# Access actions: the real executor, the hash comparison and the live proof
+
+Milestone: M8    Depends on: M8-12a (the actions and the fake)    Size: M
+
+## Goal
+`ManagementTopologyMigrationExecutor` applies the four access actions on the held 4.x connection with the measured request bodies, never overwrites a different user, and a hash exported from 3.13 lets the user log in on 4.x (live).
+
+## Scope
+In (module `data-rabbit`):
+1. Requests (bodies per S-M, `docs/tasks/M8-00-spike-results.md`): `PUT /api/vhosts/{name}` (`description`, `tags` as the management API wants them, `default_queue_type` when present), `PUT /api/users/{name}` (`password_hash`, `hashing_algorithm` ALWAYS sent, `tags` as a comma separated string as the API expects: verify in the live test), `PUT /api/permissions/{vhost}/{user}` (`configure`, `write`, `read`), `PUT /api/topic-permissions/{vhost}/{user}` (`exchange`, `write`, `read`). Names percent-encoded with `ManagementRequests.encode`.
+2. Idempotency before each write: vhost: `GET /api/vhosts/{name}`: exists = `NoOp` (D5), 404 = create. Permissions: `GET /api/permissions/{vhost}/{user}`: same patterns = `NoOp`, different = `Conflict`, none = create. Topic permissions: `GET /api/topic-permissions/{vhost}/{user}`, same logic per exchange. User: `GET /api/users/{name}` (404 = create; on 4.4 it hides the hash), then, when it exists, the hash comparison: `GET /api/definitions` of the 4.x broker read through a redacting reader `RedactedDefinitions` (a small class in `data-rabbit`: parses the JSON, keeps ONLY `users` (name, hash, algorithm, tags) in memory, drops everything else at once, in particular every Shovel parameter and federation URI), compared with the action's hash (`SecretValue.matches`): equal hash and tags = `NoOp`; different = `Conflict("The user <name> exists with a different password hash")` or "... different tags" (a name is echoed only through the echo rule); the hash and the definitions text never leave the reader, a test with a sentinel password in a Shovel parameter asserts it appears nowhere (the scenario "A different hash is never overwritten ...").
+3. `ExecutorPathAllowList`: add exactly the four PUT shapes and the GETs above and `GET /api/definitions`; a test asserts no DELETE of vhost, user or permission is allowed and that `GET /api/definitions` is allowed only to the redacting reader (the existing `ShovelPathAllowList` still forbids it for the shovel gateway). The one `SecretValue.expose()` caller in `data-rabbit` is the user request builder (source-scan guard from `M8-12a`).
+4. Failures: a refused request is a `Failed`/`Conflict` with a FIXED text; no response body, URL or header in a reason (existing rule of the executor).
+5. Live class `RealBrokerM8AccessTest` (tag `broker`, `@broker-3x`, two containers like `RealBrokerM8ShovelTest`): (1) "A real hash from RabbitMQ 3.13 lets the user log in on 4.x": create user `svc` with a known password and permissions on 3.13, export `GET /api/definitions`, parse with the app, build the access migration with the real codec, apply on 4.x, log in as `svc` on 4.x management with the old password; (2) a second apply is all `NoOp`; (3) a different hash on 4.x is a `Conflict` and the stored hash is unchanged; (4) an existing vhost with another description is left alone; (5) the apply as a user without the administrator tag is refused by the runner before any request (the 4.x answer is not needed). Each test cleans its users, vhosts and containers; tests are bounded.
+Out: generation, UI.
+
+## Acceptance
+BDD (bound as `data-rabbit` unit tests named after the scenarios, and the live class): "A different hash is never overwritten, the comparison reads the target definitions", "A real hash from RabbitMQ 3.13 lets the user log in on 4.x". Unit: bodies per action (captured with the Ktor mock engine as `ManagementHttpWriteTest`), the redacting reader (sentinel), the allow-list table, idempotency table per action. Existing executor tests unchanged.
+Limits: `:data-rabbit:test --tests '*Executor*' --tests '*Access*' --tests '*ManagementHttpWrite*'` per step; the live class once in step 4 (`./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8Access*'`).
+
+## MCP
+None.
+
+## Status
+- Step 1 (architect, 2026-11-11): briefed.

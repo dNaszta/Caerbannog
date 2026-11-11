@@ -14,59 +14,59 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     Given the 4.x connection "new-eu" is the held connection
     And a definitions file exported from RabbitMQ 3.13 with the virtual host "/orders", the user "svc" with tags "management" and permissions on "/orders"
 
-  @smoke @fake-broker
+  @smoke @fake-broker @m8-12b
   Scenario: The access migration declares vhosts, users and permissions in order
     Given I accepted every proposal
     When I generate the migrations
     Then there is an access migration with the actions in the order: declare virtual host, declare user, set permissions, set topic permissions
     And it has a lower version than the topology migrations
 
-  @security @fake-broker
+  @security @fake-broker @m8-12b
   Scenario: The review and the report show a user without the hash
     When I review the proposal for the user "svc"
     Then I see the name, the tags, the hashing algorithm and "password hash hidden"
     And the hash is shown nowhere on the screen
 
-  @security @fake-broker
+  @security @fake-broker @m8-12a
   Scenario: A dry run never shows a hash
     Given the access migration is generated
     When I run a dry run of it
     Then I see "Declare user svc" for each user
     And no hash is shown
 
-  @security @safety @fake-broker
+  @security @safety @fake-broker @m8-12a
   Scenario: No hash appears in any log, report text, error string or MCP output
     Given I accepted every proposal and applied the access migration, and one action fails with an error
     Then the hash appears in no log, no report, no exported report, no error text, no history entry and no MCP output
 
-  @security @fake-broker
+  @security @fake-broker @m8-12b
   Scenario: Saving a migration file that holds hashes warns the user
     When I save or export the access migration
     Then I am warned that the file contains password hashes and must be kept secret
     And the file is readable by its owner only where the system allows it
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-12a
   Scenario: Access actions are disabled without the administrator tag
     Given the user of "new-eu" has no administrator tag
     When I open the access migration
     Then "Apply pending" is disabled
     And I am told that creating virtual hosts, users and permissions needs the administrator tag
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-12a
   Scenario: Access actions are disabled below Full control
     Given the user of "new-eu" is an administrator and the level is Declare and edit
     When I open the access migration
     Then "Apply pending" is disabled
     And I am told that this needs the level Full control
 
-  @fake-broker
+  @fake-broker @m8-12b
   Scenario: Access needs the full export of the source
     Given a live 3.x connection whose user is an administrator
     When I analyse it
     Then the users, virtual hosts and permissions come from the full export
     And not from a per-virtual-host export
 
-  @fake-broker
+  @fake-broker @m8-12a
   Scenario: The access migration applies from an administrator profile of any virtual host
     Given the connection "new-eu" has the virtual host "/"
     And the virtual host "/orders" does not exist on the 4.x broker
@@ -74,14 +74,14 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     Then the virtual host "/orders" is created
     And the single-virtual-host rule is not applied to these actions
 
-  @fake-broker
+  @fake-broker @m8-12a
   Scenario: Applying the access migration twice changes nothing the second time
     Given the access migration was applied on "new-eu"
     When I apply it again
     Then nothing on the broker changes
     And it is recorded as applied
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-12a
   Scenario: A user that exists with a different password hash is a conflict
     Given the user "svc" already exists on "new-eu" with another password hash
     When I apply the access migration
@@ -89,7 +89,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     And the password hash of "svc" is unchanged
     And the message names what differs without showing any hash
 
-  @negative @fake-broker
+  @negative @fake-broker @m8-12a
   Scenario: Permissions that exist with other patterns are a conflict
     Given "svc" has other permissions on "/orders" on "new-eu"
     When I apply the access migration
@@ -116,7 +116,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
       | rabbit_password_hashing_bcrypt  |
       | a_name_nobody_knows             |
 
-  @fake-broker
+  @fake-broker @m8-12b
   Scenario Outline: Hash algorithms of the allow-list are carried over
     Given the export contains a user whose hashing algorithm is "<algorithm>"
     When I generate the access migration
@@ -134,7 +134,7 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     When I analyse the file
     Then the user is reported as a blocker because without the algorithm the login would fail
 
-  @security @fake-broker
+  @security @fake-broker @m8-12c
   Scenario: A different hash is never overwritten, the comparison reads the target definitions
     Given the user "svc" exists on "new-eu" with another password hash
     When I apply the access migration
@@ -154,22 +154,44 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     When I analyse the file
     Then there is a warning that the migration gives this user the administrator tag on 4.x
 
-  @fake-broker
+  @fake-broker @m8-12a
   Scenario: The migration never deletes a virtual host, user or permission
     Given I accepted every proposal
     When I generate the migrations
     Then no action deletes a virtual host, a user or a permission
 
-  @negative @mcp @safety @fake-broker
+  @negative @mcp @safety @fake-broker @m8-12a
   Scenario: No MCP tool applies a migration, so access actions can only be applied in the app
     Given a migration with a "declareUser" action
     When an agent lists the available tools
     Then there is no tool that applies a migration
     And the dry run tool lists the action as "Declare user" without any hash
 
-  @broker-3x
+  @broker-3x @m8-12c
   Scenario: A real hash from RabbitMQ 3.13 lets the user log in on 4.x
     Given a real RabbitMQ 3.13 broker with the user "svc" and a known password
     And a real RabbitMQ 4 broker
     When the access migration generated from the 3.13 definitions is applied to the 4 broker
     Then "svc" can authenticate on the 4 broker with the old password
+
+  @fake-broker @m8-12b
+  Scenario: guest and users that need a manual password are not generated and are listed
+    Given I accepted every proposal
+    And the export contains the user "guest" and a user "old" whose hashing algorithm is "rabbit_password_hashing_bcrypt"
+    When I generate the migrations
+    Then the access migration declares neither "guest" nor "old"
+    And the result lists "guest" and "old" as not migrated, with "set a new password on the broker" for "old"
+
+  @fake-broker @m8-12b
+  Scenario: Permissions of users that are not declared are left out and listed
+    Given I accepted every proposal
+    And the export contains the user "guest" with permissions on "/orders"
+    When I generate the migrations
+    Then the access migration has no permission action for "guest"
+    And the result lists the left out permissions of "guest"
+
+  @fake-broker @m8-12a
+  Scenario: A virtual host that already exists is left as it is
+    Given the virtual host "/orders" already exists on "new-eu" with another description
+    When I apply the access migration
+    Then the apply continues and the virtual host "/orders" is unchanged
