@@ -95,8 +95,8 @@ class ExecutorPathAllowListTest {
     @Test
     fun `other API areas and wrong verbs are refused`() {
         for ((method, path) in listOf(
-            "GET" to "/api/overview", "GET" to "/api/definitions", "POST" to "/api/definitions", "GET" to "/api/users", "PUT" to "/api/users/x",
-            "DELETE" to "/api/vhosts/x", "PUT" to "/api/vhosts/x", "GET" to "/api/connections", "DELETE" to "/api/connections/x",
+            "GET" to "/api/overview", "POST" to "/api/definitions", "GET" to "/api/users",
+            "DELETE" to "/api/vhosts/x", "GET" to "/api/connections", "DELETE" to "/api/connections/x",
             "PUT" to "/api/parameters/shovel/%2F/s", "POST" to "/api/exchanges/%2F/amq.default/publish", "GET" to "/api/queues/%2F",
             "GET" to "/api/queues", "GET" to "/api/bindings/%2F", "POST" to "/api/queues/%2F/orders", "POST" to "/api/exchanges/%2F/e",
             "PUT" to "/api/bindings/%2F/e/events/q/orders", "DELETE" to "/api/bindings/%2F/e/events/q/orders", "DELETE" to "/api/bindings/%2F/e/events/x/orders/k",

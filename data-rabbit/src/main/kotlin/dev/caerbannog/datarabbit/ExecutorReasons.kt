@@ -16,6 +16,15 @@ internal object ExecutorReasons {
     const val BINDING_NOT_IDENTIFIED = "the binding could not be identified"
     const val OTHER_BINDING_REMOVED = "a different binding was removed"
     const val NOT_A_REQUEST = "this action cannot be sent to the broker"
+    const val USER_NOT_COMPARABLE = "the existing user could not be compared"
+
+    /**
+     * A name in an access conflict text: the echo rule, plus a virtual host written with its leading slash (`/orders`), which is the normal form
+     * of a 3.x virtual host name. Anything else is not echoed and the wording stays the same without it.
+     */
+    fun accessName(name: String): String? = name.takeIf { echoableName(it) || (it.startsWith("/") && echoableName(it.removePrefix("/"))) }
+
+    fun accessConflict(text: String) = ActionResult.Failed(text, FailureKind.Conflict)
 
     fun failed(reason: String): ActionResult.Failed = ActionResult.Failed(reason)
 
@@ -51,7 +60,9 @@ internal object ExecutorReasons {
         is MigrationAction.DeleteStream -> nameOr(action.name)
         is MigrationAction.DeletePolicy -> nameOr(action.name)
         is MigrationAction.DeclareBinding, is MigrationAction.DeleteBinding -> "The binding"
-        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions -> "The access item" // M8-12a STUB: the executor is M8-12c
+        is MigrationAction.DeclareVhost -> "The virtual host"
+        is MigrationAction.DeclareUser -> "The user"
+        is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions -> "The permissions"
     }
 
     private fun nameOr(name: String): String = if (echoableName(name)) name else "The resource"

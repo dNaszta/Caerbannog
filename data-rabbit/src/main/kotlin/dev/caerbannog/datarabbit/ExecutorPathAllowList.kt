@@ -26,6 +26,10 @@ internal object ExecutorPathAllowList {
         val segments = path.removePrefix("/api/").split('/')
         if (segments.withIndex().any { (index, segment) -> !isSafeSegment(segment, allowPlus = isPropertiesKey(segments, index)) }) return false
         return when (segments.first()) {
+            // M8-12c: the access items are read and created, never deleted; the definitions are read by the redacting reader only.
+            "vhosts", "users" -> segments.size == 2 && (method == "GET" || method == "PUT")
+            "permissions", "topic-permissions" -> segments.size == ITEM_SEGMENTS && (method == "GET" || method == "PUT")
+            "definitions" -> segments.size == 1 && method == "GET"
             in collections -> segments.size == ITEM_SEGMENTS && method in ITEM_METHODS
             "bindings" -> isBindingShape(segments) && when (segments.size) {
                 BINDING_SEGMENTS -> method == "GET" || method == "POST"

@@ -28,11 +28,13 @@ class PermissionCheckerPlainTest {
 
     @Test
     fun `plain asks the permissions over http with basic auth and unlocks topology and publishing for full permissions`() {
-        PlainManagementServer(mapOf(path to (200 to body(".*", ".*")))).use { server ->
+        PlainManagementServer(mapOf(path to (200 to body(".*", ".*")), "/api/whoami" to (200 to """{"name":"svc","tags":["administrator","management"]}"""))).use { server ->
             val result = check(profile(server.port, tls = false))
 
-            assertEquals(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true), result)
-            val request = server.seen.single()
+            // M8-12c: the same check also reads whoami (the tags of the user): two requests, the permissions first.
+            assertEquals(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true, userTags = setOf("administrator", "management")), result)
+            assertEquals(listOf(path, "/api/whoami"), server.seen.map { it.rawPath })
+            val request = server.seen.first()
             assertEquals(path, request.rawPath)
             assertEquals("Basic " + Base64.getEncoder().encodeToString("svc:$password".toByteArray()), request.authorization)
         }
