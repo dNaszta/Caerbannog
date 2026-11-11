@@ -2,6 +2,15 @@ package dev.caerbannog.core.forwarding
 
 /** The sentences of the confirmation (spec "Forwarding messages with a dynamic Shovel", safeguards 1, 5, 7, 8). Never a password. */
 object ForwardingTexts {
+    // M8-14b STUB: empty until the developer writes the texts pinned by ForwardingHelpTextsTest.
+    const val ADVICE_TOP: String = ""
+    const val ADVICE_PICK: String = ""
+    const val ADVICE_MOVE: String = ""
+    const val ADVICE_LEAVE: String = ""
+    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = emptyList()
+    fun tip(id: String): String = HELP_TIPS.firstOrNull { it.id == id }?.text.orEmpty() // M8-14b STUB
+    fun failureAdvice(cleanedUp: Boolean): String = ""
+
     /** The reason of a terminated shovel that gave none. */
     const val NO_REASON: String = "The shovel stopped without giving a reason"
 

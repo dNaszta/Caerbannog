@@ -43,6 +43,10 @@ object HowToTexts {
         keyPhrases = listOf("Definitions file", "Live connection", "message-loss", "Generate migration", "Open Migrations", "administrator"),
     )
 
-    /** Every how-to of the app; M8-14b adds the other two. */
-    val all: List<HowTo> = listOf(ANALYSE_AND_GENERATE)
+    // M8-14b STUB: empty, the real wording is the developer's job (pinned by HowToTextsAppliedAndMovedTest).
+    val APPLY_MIGRATIONS: HowTo = HowTo("apply-migrations", "", emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+    val MOVE_MESSAGES: HowTo = HowTo("move-messages", "", emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+
+    /** Every how-to of the app. */
+    val all: List<HowTo> = listOf(ANALYSE_AND_GENERATE, APPLY_MIGRATIONS, MOVE_MESSAGES)
 }

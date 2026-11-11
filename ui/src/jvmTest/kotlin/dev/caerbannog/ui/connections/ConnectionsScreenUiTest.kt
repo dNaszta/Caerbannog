@@ -2010,4 +2010,30 @@ class ConnectionsScreenUiTest {
 
         assertEquals(listOf(dev.caerbannog.ui.appframe.AppDestination.Streams), seen)
     }
+
+    // ---- M8-14b row 19: the card explains the 3.x pill; only that pill gets the tip ----
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the 3x pill of a card has a tip that says the broker is only read`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.MigrationSource("3.13.7")
+        setContent { ConnectionsScreen(permissionViewModel(prod), chipControl("prod-eu", ChipState.Connected), noControlEvents) }
+        selectProfile(0)
+        checkButton()
+        val tips = onAllNodesWithTag("help-tip-conn-19", useUnmergedTree = true).fetchSemanticsNodes()
+        assertEquals(1, tips.size, "the tip next to the 3.x pill")
+        val text = tips.single().let { n -> (n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.joinToString(" ") ?: n.children.mapNotNull { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.joinToString(" ") }.joinToString(" ")) }
+        assertEquals(dev.caerbannog.core.migrate3x.MigrateFromThreeTexts.HELP_TIP_3X_PILL, text)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `any other pill has no 3x tip`() = runDesktopComposeUiTest {
+        fakeChecker.result = PermissionCheckResult.Checked(topologyUnlocked = false, publishingEnabled = true)
+        setContent { ConnectionsScreen(permissionViewModel(prod)) }
+        selectProfile(0)
+        checkButton()
+        assertTagged("permissionPill:prod-eu", "Topology locked")
+        assertEquals(0, onAllNodesWithTag("help-tip-conn-19", useUnmergedTree = true).fetchSemanticsNodes().size, "the tip belongs to the 3.x pill only")
+    }
 }

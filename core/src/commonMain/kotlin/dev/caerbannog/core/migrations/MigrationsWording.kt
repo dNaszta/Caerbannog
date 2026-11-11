@@ -6,6 +6,12 @@ package dev.caerbannog.core.migrations
  * are the executor's fixed texts.
  */
 object MigrationsWording {
+    // M8-14b STUB: empty until the developer writes the texts pinned by MigrationsHelpTextsTest.
+    const val ADVICE_TOP: String = ""
+    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = emptyList()
+    fun tip(id: String): String = HELP_TIPS.firstOrNull { it.id == id }?.text.orEmpty() // M8-14b STUB
+    fun applyAdvice(outcome: ApplyOutcome?): String? = null
+
     /** Stands in place of the Edit button of a file that holds a `declareUser`: the raw editor would show the password hash. */
     const val HASH_FILE_NO_EDIT = "This file holds password hashes. Edit it outside the app."
     const val UNAVAILABLE_TITLE = "Migrations are not offered on this connection"
