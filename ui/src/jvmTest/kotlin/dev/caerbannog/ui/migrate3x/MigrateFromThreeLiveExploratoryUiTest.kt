@@ -19,6 +19,8 @@ import dev.caerbannog.core.migrate3x.SourceOption
 import dev.caerbannog.core.migrate3x.SourcePicker
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import kotlin.test.assertTrue
 
 /** M8-06c step 4 exploratory: hostile connection names, narrow windows and the keyboard through the picker. Nothing may crash or draw outside the window. */
@@ -62,13 +64,25 @@ class MigrateFromThreeLiveExploratoryUiTest {
     }
 
     @Test
-    fun `Tab walks from the file option to the live option to the button, and Space on the live option selects it`() = runDesktopComposeUiTest(1280, 800) {
+    fun `Tab walks from the file option through the tips to the live option, the file button and the How to link, and Space on the live option selects it`() = runDesktopComposeUiTest(1280, 800) {
         val calls = MigrateCalls()
         val picker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.Live("legacy-eu")))
         show(MigrateFromThreeState.ChooseSource, calls, picker = picker)
         onNodeWithTag("migrate3x-source-file").performSemanticsAction(SemanticsActions.RequestFocus)
-        onNodeWithTag("migrate3x-source-file").performKeyInput { pressKey(Key.Tab) }
+        val stops = mutableListOf<String>()
+        repeat(8) {
+            onNodeWithTag("migrate3x-source-file", useUnmergedTree = true).performKeyInput { pressKey(Key.Tab) }; waitForIdle()
+            val focused = onAllNodes(androidx.compose.ui.test.isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
+                .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }.firstOrNull()
+            if (focused != null) stops += focused
+        }
+        // M8-14a: every source option has a focusable tip, so Tab stops on the tips between the options. Whatever the exact order, all of them are reachable and the file option comes before the live one.
+        listOf("migrate3x-source-live", "help-tip-m3x-3", "help-tip-m3x-4", "migrate3x-choose-file", "howto-analyse-generate").forEach { assertTrue(it in stops, "Tab never reached $it; stops: $stops") }
+        assertTrue(stops.indexOf("help-tip-m3x-3") < stops.indexOf("migrate3x-source-live"), "the tip of the file option comes before the live option; stops: $stops")
+        assertTrue(stops.indexOf("migrate3x-source-live") < stops.indexOf("help-tip-m3x-4"), "the live option comes before its tip; stops: $stops")
+        assertTrue(stops.indexOf("help-tip-m3x-4") < stops.indexOf("migrate3x-choose-file"), "the tips come before the file button; stops: $stops")
+        onNodeWithTag("migrate3x-source-live").performSemanticsAction(SemanticsActions.RequestFocus)
         onNodeWithTag("migrate3x-source-live").performKeyInput { pressKey(Key.Spacebar) }
-        assertEquals(listOf("chooseSource:Live"), calls.events, "Tab moved the focus from the file option to the live option")
+        assertEquals(listOf("chooseSource:Live"), calls.events, "Space on the live option selects it")
     }
 }
