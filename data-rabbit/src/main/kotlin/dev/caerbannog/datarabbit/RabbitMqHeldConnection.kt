@@ -41,6 +41,7 @@ class RabbitMqHeldConnection(
     override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
     /** M8-09: the management shovel gateway of a 4.x connection; the unavailable one for a 3.x source. */
     override val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
+    override val shovelStatus: dev.caerbannog.core.forwarding.ShovelStatusReader = dev.caerbannog.core.forwarding.UnavailableShovelStatusReader,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 

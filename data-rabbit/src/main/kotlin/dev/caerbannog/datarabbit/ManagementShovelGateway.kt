@@ -51,7 +51,7 @@ internal class ManagementShovelGateway(
 
         val shovels = get(SHOVELS) as? ManagementReply.Response ?: return DryRunOutcome.DestinationUnreachable
         val plugins = shovels.status != 404
-        val existing = if (shovels.status == 200) entries(shovels.body).firstOrNull { it.matches(request.shovel) }?.let(::statusOf) else null
+        val existing = if (shovels.status == 200) ShovelStatusMapping.entries(shovels.body).firstOrNull { ShovelStatusMapping.matches(it, request.shovel) }?.let(ShovelStatusMapping::statusOf) else null
 
         val queue = get(queuePath(request.destinationVhost, request.destinationQueue)) as? ManagementReply.Response ?: return DryRunOutcome.DestinationUnreachable
         val destination = when (queue.status) {
@@ -99,7 +99,7 @@ internal class ManagementShovelGateway(
     override suspend fun status(shovel: ShovelRef): StatusOutcome {
         val reply = get(SHOVELS) as? ManagementReply.Response ?: return StatusOutcome.Unreachable
         return when (reply.status) {
-            200 -> entries(reply.body).firstOrNull { it.matches(shovel) }?.let { StatusOutcome.Listed(statusOf(it)) } ?: StatusOutcome.Absent
+            200 -> ShovelStatusMapping.entries(reply.body).firstOrNull { ShovelStatusMapping.matches(it, shovel) }?.let { StatusOutcome.Listed(ShovelStatusMapping.statusOf(it)) } ?: StatusOutcome.Absent
             401, 403 -> StatusOutcome.NotPermitted
             404 -> StatusOutcome.Failed("The shovel plugins are not enabled")
             else -> StatusOutcome.Failed("The broker did not list the shovels (HTTP ${reply.status})")
@@ -168,25 +168,6 @@ internal class ManagementShovelGateway(
         "stream" -> DestinationQueueType.STREAM
         "classic" -> DestinationQueueType.CLASSIC
         else -> DestinationQueueType.OTHER
-    }
-
-    private fun entries(body: String): List<JsonObject> = (parse(body) as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-
-    private fun JsonObject.matches(ref: ShovelRef): Boolean =
-        (get("name") as? JsonPrimitive)?.contentOrNull == ref.name && (get("vhost") as? JsonPrimitive)?.contentOrNull == ref.vhost
-
-    private fun statusOf(entry: JsonObject): ShovelStatus {
-        fun text(key: String) = (entry[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
-        val state = when (text("state")) {
-            "running" -> ShovelRunState.RUNNING
-            "starting" -> ShovelRunState.STARTING
-            "terminated" -> ShovelRunState.TERMINATED
-            else -> ShovelRunState.OTHER
-        }
-        // The broker sends the reason as an Erlang-quoted string ("\"failed...\""); broker text is scrubbed before it can be shown.
-        val reason = text("reason")?.removeSurrounding("\"")?.let { ShovelScrubber.scrub(it) }
-        val ref = ShovelRef(text("vhost").orEmpty(), text("name").orEmpty())
-        return ShovelStatus(ref, state, reason, (entry["forwarded"] as? JsonPrimitive)?.longOrNull, (entry["remaining"] as? JsonPrimitive)?.longOrNull)
     }
 
     private companion object {

@@ -7,6 +7,7 @@ import dev.caerbannog.core.connections.OpenResult
 import dev.caerbannog.core.connections.isMigrationSourceOnly
 import dev.caerbannog.core.connections.SecretStore
 import dev.caerbannog.core.forwarding.UnavailableShovelGateway
+import dev.caerbannog.core.forwarding.UnavailableShovelStatusReader
 import java.io.IOException
 import java.security.GeneralSecurityException
 import kotlin.coroutines.cancellation.CancellationException
@@ -75,6 +76,7 @@ class RabbitMqConnectionGateway(
                 threeXReads = access.version?.takeIf { isMigrationSourceOnly(it) }?.let { ManagementThreeXReads(http, requests) },
                 // A 3.x connection is a source only: it never gets a shovel gateway, so it can never be a shovel destination.
                 shovels = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelGateway else ManagementShovelGateway(http, requests, profiles, secretStore),
+                shovelStatus = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelStatusReader else ManagementShovelStatusReader(http, requests),
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),

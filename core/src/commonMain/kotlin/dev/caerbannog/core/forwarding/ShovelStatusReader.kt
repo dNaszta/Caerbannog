@@ -9,6 +9,11 @@ sealed interface ShovelListOutcome {
     data class Failed(val reason: String) : ShovelListOutcome
 }
 
+/** The status reader of a connection that is not a held 4.x one: refuses with a fixed text. */
+object UnavailableShovelStatusReader : ShovelStatusReader {
+    override suspend fun list(): ShovelListOutcome = ShovelListOutcome.Failed(ForwardingTexts.NO_DESTINATION)
+}
+
 /**
  * M8-10: read-only status of the shovels, `GET /api/shovels` only. A SEPARATE interface from [ShovelGateway] (create, remove): the MCP server gets this one and never the gateway.
  */

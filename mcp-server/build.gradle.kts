@@ -23,6 +23,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // The paging tests analyse a 60,000 queue export and encode the whole report to compare a slice.
+    maxHeapSize = "2g"
 }
 
 application {

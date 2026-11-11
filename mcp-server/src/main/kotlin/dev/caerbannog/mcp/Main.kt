@@ -4,13 +4,17 @@ import dev.caerbannog.core.connections.ConnectionGateway
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.HeldConnection
 import dev.caerbannog.core.connections.OpenResult
+import dev.caerbannog.core.migrate3x.LiveDefinitionsSource
+import dev.caerbannog.core.migrate3x.NoThreeXReads
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.topology.TopologyCatalog
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
+import dev.caerbannog.datarabbit.JvmDefinitionsFileLoader
 import dev.caerbannog.datarabbit.JsonFileConnectionProfileRepository
 import dev.caerbannog.datarabbit.RabbitMqConnectionGateway
 import dev.caerbannog.datarabbit.StreamAndManagementReachabilityChecker
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -51,6 +55,13 @@ fun main() {
         messagePublisherProvider = { profile, _ -> getHeldConnection(profile).publisher },
         mqttCatalogProvider = { profile, _ -> getHeldConnection(profile).mqtt },
         mqttMessagePublisherProvider = { profile, _ -> getHeldConnection(profile).mqttPublisher },
+        // Read only: the 3.x reads of the held connection behind the live source, the file loader of the screen, and the shovel STATUS reader.
+        definitionsSourceProvider = { profile ->
+            val held = getHeldConnection(profile)
+            LiveDefinitionsSource(profile.name, held.brokerVersion, held.threeXReads ?: NoThreeXReads) { delay(it) }
+        },
+        definitionsFileLoader = JvmDefinitionsFileLoader(),
+        shovelStatusProvider = { profile, _ -> getHeldConnection(profile).shovelStatus },
     )
 
     Runtime.getRuntime().addShutdownHook(Thread {

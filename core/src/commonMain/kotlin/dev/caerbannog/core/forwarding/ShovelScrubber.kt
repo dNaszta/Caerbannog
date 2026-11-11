@@ -1,6 +1,9 @@
 package dev.caerbannog.core.forwarding
 
-/** M8-10 STUB: the real code (moved from data-rabbit, same regex) is the developer's job; this one scrubs nothing. */
+/** Removes secrets and `scheme://user[:pw]@` from broker text before it becomes a reason; shared by the shovel gateway and the read-only MCP tool. */
 object ShovelScrubber {
-    fun scrub(text: String, secrets: List<String> = emptyList()): String = text
+    private val credentialsInUri = Regex("""[A-Za-z][A-Za-z0-9+.-]*://[^@\s]*@""")
+
+    fun scrub(text: String, secrets: List<String> = emptyList()): String =
+        secrets.filter { it.isNotEmpty() }.fold(text) { acc, secret -> acc.replace(secret, "***") }.replace(credentialsInUri, "***@")
 }

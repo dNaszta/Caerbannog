@@ -78,11 +78,11 @@ class McpServer(
     val messagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MessagePublisher)? = null,
     val mqttCatalogProvider: ((profile: ConnectionProfile, vhost: String) -> MqttCatalog)? = null,
     val mqttMessagePublisherProvider: ((profile: ConnectionProfile, vhost: String) -> MqttMessagePublisher)? = null,
-    /** M8-10 STUB: the read-only definitions of a 3.x profile (`caerbannog_analyze_3x_definitions`). Not used yet. */
+    /** The read-only definitions of a 3.x profile (`caerbannog_analyze_3x_definitions`); without it the tool says it is not available. */
     val definitionsSourceProvider: ((profile: ConnectionProfile) -> dev.caerbannog.core.migrate3x.DefinitionsSource)? = null,
-    /** M8-10 STUB: the loader of the `file` input of the same tool. */
+    /** The loader of the `file` input of the same tool (the same size cap as the screen). */
     val definitionsFileLoader: dev.caerbannog.core.migrate3x.DefinitionsFileLoader? = null,
-    /** M8-10 STUB: the read-only shovel status of a 4.x profile (`caerbannog_list_shovels`). Not used yet. */
+    /** The read-only shovel status of a 4.x profile (`caerbannog_list_shovels`); a separate interface, never the shovel gateway. */
     val shovelStatusProvider: ((profile: ConnectionProfile, vhost: String) -> dev.caerbannog.core.forwarding.ShovelStatusReader)? = null,
 ) {
     private val json = Json {
@@ -92,7 +92,9 @@ class McpServer(
         prettyPrint = false
     }
 
-    private val toolsList: List<McpTool> = listOf(
+    private val migrationTools = McpMigrationTools({ profileRepository.list() }, definitionsSourceProvider, definitionsFileLoader, shovelStatusProvider)
+
+    private val toolsList: List<McpTool> = migrationTools.tools + listOf(
         McpTool(
             name = "caerbannog_list_profiles",
             description = "List all configured RabbitMQ connection profiles without exposing passwords or secrets.",
@@ -467,6 +469,8 @@ class McpServer(
             "caerbannog_publish_test_message" -> publishTestMessage(args)
             "caerbannog_list_mqtt_clients" -> listMqttClients(args)
             "caerbannog_publish_mqtt" -> publishMqtt(args)
+            McpMigrationTools.ANALYZE -> migrationTools.analyze(args)
+            McpMigrationTools.LIST_SHOVELS -> migrationTools.listShovels(args)
             else -> McpCallToolResult(
                 content = listOf(McpContent(text = "Unknown tool: $name")),
                 isError = true
