@@ -215,14 +215,10 @@ class ManagementShovelGatewayTest {
     }
 
     @Test
-    fun `a shovel name longer than the limit is refused before any request, one of exactly the limit is sent`() {
-        val prefix = "caerbannog-migrate-".length
-        val tooLong = ShovelRig(destination = { _, _ -> 201 to "" })
-        val out = ShovelRig.run { tooLong.gateway().start(ShovelFx.request(queue = "q".repeat(MAX_SHOVEL_NAME_LENGTH - prefix + 1))) }
-        assertEquals(StartOutcome.Refused("The queue name is too long for a shovel name"), out)
-        assertTrue(tooLong.allSeen.isEmpty())
-        val fits = ShovelRig(destination = { _, _ -> 201 to "" })
-        assertEquals(StartOutcome.Submitted, ShovelRig.run { fits.gateway().start(ShovelFx.request(queue = "q".repeat(MAX_SHOVEL_NAME_LENGTH - prefix))) })
+    fun `a queue name of 255 characters is sent, there is no name-length rule`() {
+        val r = ShovelRig(destination = { _, _ -> 201 to "" })
+        assertEquals(StartOutcome.Submitted, ShovelRig.run { r.gateway().start(ShovelFx.request(queue = "q".repeat(255))) })
+        assertEquals(listOf("PUT"), r.allSeen.map { it.method }, "the PUT must be sent")
     }
 
     // ---- status ----

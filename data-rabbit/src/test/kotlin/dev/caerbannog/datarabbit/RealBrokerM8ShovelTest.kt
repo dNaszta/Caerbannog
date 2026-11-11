@@ -171,7 +171,7 @@ class RealBrokerM8ShovelTest {
 
     @Test
     fun `measurements - the shovel name limit, the absent grace, and a queue name with a space, a slash and a percent sign end to end`() {
-        // (a) the longest accepted parameter name; the constant MAX_SHOVEL_NAME_LENGTH must be exactly that
+        // (a) a long shovel name
         fun putNamed(length: Int): Int {
             val name = "n".repeat(length)
             val status = n.put(
@@ -181,11 +181,10 @@ class RealBrokerM8ShovelTest {
             n.delete("/api/parameters/shovel/%2F/$name")
             return status
         }
-        // a name of length 4096 is the search ceiling; the constant must not be higher than what the broker accepts
-        var lo = 1; var hi = 4096
-        if (putNamed(hi) in 200..299) lo = hi else { while (hi - lo > 1) { val mid = (lo + hi) / 2; if (putNamed(mid) in 200..299) lo = mid else hi = mid } }
-        println("M8-08 MEASURED longest accepted shovel name: $lo characters (search ceiling 4096)")
-        assertTrue(MAX_SHOVEL_NAME_LENGTH <= lo, "MAX_SHOVEL_NAME_LENGTH $MAX_SHOVEL_NAME_LENGTH is above the measured limit $lo")
+        // a 255-character queue gives a 274-character shovel name; the broker accepts it and the gateway has no name-length rule
+        val longQueue = "q".repeat(255)
+        assertEquals(274, ShovelNaming.nameFor(longQueue).length)
+        assertTrue(putNamed(274) in 200..299, "a shovel name of 274 characters was refused by the broker")
 
         // (b) the absent grace: polls that say Absent before the first Listed after a submitted PUT (never + empty source keeps it running)
         val grace = "m8-08-grace"
