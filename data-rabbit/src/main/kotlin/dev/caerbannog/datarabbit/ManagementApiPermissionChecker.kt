@@ -51,7 +51,7 @@ class ManagementApiPermissionChecker(
         try {
             val response = client.get(permissionsUrl(profile, transport)) { basicAuth(profile.username, password) }
             return when (response.status) {
-                HttpStatusCode.OK -> parse(response.bodyAsText())
+                HttpStatusCode.OK -> parse(response.bodyAsText()).withTags { readTags(client, profile, transport, password) }
                 HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden ->
                     unreadable(UnreadableCause.NOT_AUTHORIZED, "HTTP ${response.status.value}")
                 HttpStatusCode.NotFound -> unreadable(UnreadableCause.NOT_FOUND, "HTTP 404")
@@ -80,6 +80,35 @@ class ManagementApiPermissionChecker(
             client.close()
         }
     }
+
+    private suspend fun PermissionCheckResult.withTags(read: suspend () -> Set<String>): PermissionCheckResult =
+        if (this is PermissionCheckResult.Checked) copy(userTags = read()) else this
+
+    /**
+     * The tags of the connection's user from `GET /api/whoami`, asked AFTER the permissions in the same check (M8-12c; a JSON array on 3.9+ and 4.x, a
+     * comma string is accepted). Not a secret and only used to enable the access migration, so a failure here is not a failure of the check: an empty
+     * set, never a guess, and the administrator actions stay disabled.
+     */
+    private suspend fun readTags(client: io.ktor.client.HttpClient, profile: ConnectionProfile, transport: BrokerTransport, password: String): Set<String> =
+        try {
+            val url = "${transport.scheme}://${ManagementRequests.formatAuthority(profile.host, profile.managementPort)}/api/whoami"
+            val response = client.get(url) { basicAuth(profile.username, password) }
+            if (response.status != HttpStatusCode.OK) {
+                emptySet()
+            } else {
+                val obj = (parseUntrustedJson(response.bodyAsText(), MAX_BODY_DEPTH) as? UntrustedJson.Parsed)?.element as? JsonObject
+                when (val tags = obj?.get("tags")) {
+                    is kotlinx.serialization.json.JsonArray ->
+                        if (tags.all { it is JsonPrimitive && it.isString }) tags.map { (it as JsonPrimitive).content }.toSet() else emptySet()
+                    is JsonPrimitive -> if (tags.isString) tags.content.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet() else emptySet()
+                    else -> emptySet()
+                }
+            }
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptySet()
+        }
 
     private fun permissionsUrl(profile: ConnectionProfile, transport: BrokerTransport): String =
         "${transport.scheme}://${ManagementRequests.formatAuthority(profile.host, profile.managementPort)}/api/permissions/${encode(profile.virtualHost)}/${encode(profile.username)}"

@@ -32,8 +32,9 @@ internal object MigrationRequests {
         is MigrationAction.DeclareStream,
         is MigrationAction.DeleteStream,
         is MigrationAction.DeletePolicy,
-        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions, // M8-12a STUB: M8-12c
         -> null
+        is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions ->
+            AccessRequests.requestFor(action)
     }
 
     /** A path segment; one made only of dots is written as `%2E` per dot so no `.` or `..` segment can reach the URL. */

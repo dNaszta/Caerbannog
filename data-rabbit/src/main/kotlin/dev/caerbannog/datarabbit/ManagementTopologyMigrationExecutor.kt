@@ -26,10 +26,13 @@ class ManagementTopologyMigrationExecutor internal constructor(
     private val reader = ResourceReader(http, requests)
     private val readBack = ReadBack(reader, readBackDelay)
     private val bindingDelete = BindingDelete(reader, writer, readBack)
+    private val access = AccessActions(reader, writer)
 
     override suspend fun execute(action: MigrationAction): ActionResult = try {
         when (action) {
             is MigrationAction.DeclarePolicy, is MigrationAction.DeclareOperatorPolicy -> declarePolicy(action)
+            is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions ->
+                access.execute(action)
             is MigrationAction.DeleteBinding -> bindingDelete.delete(action)
             is MigrationAction.DeclareStream -> streamOutcome(streams.createStream(action.vhost, action.name), action)
             is MigrationAction.DeleteStream -> streamOutcome(streams.deleteStream(action.vhost, action.name), action)
