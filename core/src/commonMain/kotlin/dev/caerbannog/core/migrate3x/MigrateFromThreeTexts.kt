@@ -98,8 +98,6 @@ object MigrateFromThreeTexts {
         "Access: ${plural(summary.virtualHosts, "virtual host")}, ${plural(summary.users, "user")}, " +
             "${plural(summary.permissions, "permission")}, ${plural(summary.topicPermissions, "topic permission")}"
 
-    private fun plural(n: Int, noun: String): String = if (n == 1) "1 $noun" else "$n ${noun}s"
-
     const val GENERATE_HINT: String = "Generate is possible when every item is decided."
 
     /** "item 14 of 381": the place of the open item in the list of items that need a decision. */
