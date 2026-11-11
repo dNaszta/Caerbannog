@@ -85,6 +85,8 @@ fun MigrateFromThreeScreen(
     picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
     onChooseSource: (SourceKind) -> Unit = {},
     onAnalyseLive: () -> Unit = {},
+    /** M8-09: the "Forward messages" button of a live report (`migrate3x-forward`); null draws none. M8-09 STUB: not drawn yet. */
+    onForward: (() -> Unit)? = null,
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {

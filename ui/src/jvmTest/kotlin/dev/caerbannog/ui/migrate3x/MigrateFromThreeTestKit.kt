@@ -125,6 +125,8 @@ internal fun DesktopComposeUiTest.showWith(
     reportText: suspend () -> String = { "" },
     clipboard: RecordingClipboard = RecordingClipboard(),
     picker: SourcePicker = SourcePicker(SourceKind.File, listOf(SourceOption.File, SourceOption.LiveDisabled(MigrateFromThreeTexts.LIVE_NOT_AVAILABLE))),
+    /** M8-09: records the event "forward" when the report's Forward messages button is clicked. */
+    forward: Boolean = false,
 ) {
     setContent {
         CompositionLocalProvider(LocalClipboard provides clipboard) {
@@ -142,6 +144,7 @@ internal fun DesktopComposeUiTest.showWith(
                 picker = picker,
                 onChooseSource = { calls.events += "chooseSource:$it" },
                 onAnalyseLive = { calls.events += "analyseLive" },
+                onForward = if (forward) ({ calls.events += "forward" }) else null,
             )
         }
     }
