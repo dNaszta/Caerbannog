@@ -3,13 +3,38 @@ package dev.caerbannog.core.migrate3x
 /** The fixed words of the Migrate from 3.x screen (owner decision 5: as in `docs/ux/Migrate3x.dc.html`). Never built from file content. */
 object MigrateFromThreeTexts {
     /** M8-06c (owner decision 2026-11-10): one line for both sources. */
-    // M8-14 STUB: empty until the developer writes the texts pinned by MigrateHelpTextsTest.
-    const val ADVICE_TOP: String = ""
-    const val ADVICE_VHOST: String = ""
-    const val ADVICE_NEXT_STEP: String = ""
-    const val DELETE_THE_FILE: String = ""
-    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = emptyList()
-    val HELP_TIP_3X_PILL: String = ""
+    // ---- M8-14a: advice lines (always visible) and tips (icon, tooltip, accessible description) of this screen; the ids are the rows of the brief ----
+    const val ADVICE_TOP: String = "Analyse a RabbitMQ 3.x broker, decide what to change for 4.x, and generate the migration files. Nothing is ever written to the 3.x broker."
+    const val ADVICE_VHOST: String =
+        "The virtual host must already exist on the 4.x broker. Because this file has no users or permissions, no access migration can be generated from it."
+    const val ADVICE_NEXT_STEP: String = "Next: connect the 4.x broker and apply these files from the Migrations screen. Apply the access file first."
+    const val DELETE_THE_FILE: String = "Delete the file when you are done."
+    const val HELP_TIP_3X_PILL: String = "This broker is only read. To migrate, connect your 4.x broker too."
+
+    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = listOf(
+        dev.caerbannog.core.help.HelpText("m3x-3", "A definitions.json exported from the 3.x broker. Export the whole broker if you also want users and permissions; a one-virtual-host export has none."),
+        dev.caerbannog.core.help.HelpText("m3x-4", "Reads the connected 3.x broker with GET requests only. Its user needs the administrator tag to export definitions."),
+        dev.caerbannog.core.help.HelpText(
+            "m3x-6",
+            "Blocker: will not work on 4.x as it is. Warning: works, but behaves differently and you decide. Info: nothing to do, or a manual step. The numbers count the whole report, whatever the filter.",
+        ),
+        dev.caerbannog.core.help.HelpText(
+            "m3x-7",
+            "Classic queues with the old index (version 1) are silently emptied by an in-place upgrade to RabbitMQ 4.3 or later. Do not upgrade in place: build a new 4.x broker and move the messages with a Shovel.",
+        ),
+        dev.caerbannog.core.help.HelpText("m3x-8", "Open an item to accept the proposal, choose an alternative, skip it or replace it with your own actions. Generate migration unlocks when every item is decided."),
+        dev.caerbannog.core.help.HelpText("m3x-9", "Write the proposed 4.x declaration into the migration."),
+        dev.caerbannog.core.help.HelpText("m3x-10", "Leave this item out of the migration. It moves to Skipped by you and can be put back."),
+        dev.caerbannog.core.help.HelpText("m3x-11", "Write your own migration actions for this item. The app checks them and never writes a delete."),
+        dev.caerbannog.core.help.HelpText("m3x-12", "Ordering by priority may change. Quorum queues order messages by priority differently from classic queues."),
+        dev.caerbannog.core.help.HelpText("m3x-13", "Writes the files into your migrations folder. Nothing is sent to any broker."),
+        dev.caerbannog.core.help.HelpText("m3x-15", "Virtual hosts, users with their password hashes, and permissions. It is numbered first so it is applied first."),
+        dev.caerbannog.core.help.HelpText("m3x-16", "guest is never migrated. For a user whose hash 4.x does not accept, set a new password on the broker; the app has no password entry."),
+        dev.caerbannog.core.help.HelpText("m3x-17", "Their user is not migrated, so their permissions are not written."),
+    )
+
+    /** The text of tip [id] (`m3x-<row>`). */
+    fun tip(id: String): String = HELP_TIPS.first { it.id == id }.text
 
     const val INFO_LINE: String = "This screen only reads a file or the connected 3.x broker. It sends nothing that changes any broker."
     /** M8-10: what the MCP tool answers for a per-vhost export (it cannot ask for a vhost name). */

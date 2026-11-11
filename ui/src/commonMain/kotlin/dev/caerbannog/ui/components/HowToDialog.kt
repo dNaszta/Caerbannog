@@ -1,15 +1,60 @@
 package dev.caerbannog.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import dev.caerbannog.core.help.HowTo
 
-/** M8-14 STUB: draws nothing. The real one is a "How to" text button (tag `howto-<id>`) that opens [HowToDialog]. */
+/** The "How to" text button of a screen's top line (tag `howto-<id>`); it opens [HowToDialog]. */
 @Composable
 fun HowToLink(howTo: HowTo, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    TextButton(onClick = { open = true }, modifier = modifier.testTag("howto-${howTo.id}")) { Text("How to", maxLines = 1) }
+    if (open) HowToDialog(howTo) { open = false }
 }
 
-/** M8-14 STUB: draws nothing. Real tags: `howto-dialog-<id>`, `howto-step-<n>` (1-based), `howto-close`. */
+/** A modal list: the title, "You need", the numbered steps and "If it goes wrong". Tags: `howto-dialog-<id>`, `howto-step-<n>` (1-based), `howto-close`. */
 @Composable
 fun HowToDialog(howTo: HowTo, onClose: () -> Unit) {
+    Dialog(onDismissRequest = onClose) {
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, tonalElevation = 6.dp) {
+            Column(
+                Modifier.width(560.dp).padding(24.dp).verticalScroll(rememberScrollState()).testTag("howto-dialog-${howTo.id}"),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(howTo.title, style = MaterialTheme.typography.titleLarge)
+                Section("You need")
+                howTo.needs.forEach { Text("\u2022 $it", style = MaterialTheme.typography.bodyMedium) }
+                Section("Steps")
+                howTo.steps.forEachIndexed { index, step ->
+                    Row(Modifier.testTag("howto-step-${index + 1}")) { Text("${index + 1}. $step", style = MaterialTheme.typography.bodyMedium) }
+                }
+                Section("If it goes wrong")
+                howTo.ifWrong.forEach { Text("\u2022 $it", style = MaterialTheme.typography.bodyMedium) }
+                Button(onClick = onClose, modifier = Modifier.testTag("howto-close")) { Text("Close") }
+            }
+        }
+    }
 }
+
+@Composable
+private fun Section(title: String) = Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)

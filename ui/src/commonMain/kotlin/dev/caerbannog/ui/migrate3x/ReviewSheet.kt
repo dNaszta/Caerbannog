@@ -115,14 +115,17 @@ private fun ProposalButtons(sheet: ItemSheet, events: ReviewEvents) {
         ConnectionIcon(AppIcon.Check, SmallIconSize)
         Text("Accept", Modifier.padding(start = 8.dp), maxLines = 1)
     }
+    M3xTip(9)
     OutlinedButton(onClick = events::skip, modifier = Modifier.testTag("migrate3x-skip")) {
         ConnectionIcon(AppIcon.Block, SmallIconSize)
         Text("Skip", Modifier.padding(start = 8.dp), maxLines = 1)
     }
+    M3xTip(10)
     OutlinedButton(onClick = events::startReplace, modifier = Modifier.testTag("migrate3x-replace")) {
         ConnectionIcon(AppIcon.Edit, SmallIconSize)
         Text("Replace with my own actions", Modifier.padding(start = 8.dp), maxLines = 1)
     }
+    M3xTip(11)
 }
 
 @Composable
@@ -164,8 +167,9 @@ private fun ProposalPart(sheet: ItemSheet, events: ReviewEvents) {
         }
     }
     sheet.ticks.forEach { tick ->
+      Row(verticalAlignment = Alignment.CenterVertically) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            Modifier.weight(1f).heightIn(min = 48.dp)
                 .testTag("migrate3x-tick-${tick.acknowledgement.name}")
                 .toggleable(value = tick.ticked, role = Role.Checkbox) { events.setTick(tick.acknowledgement, it) },
             verticalAlignment = Alignment.CenterVertically,
@@ -174,6 +178,8 @@ private fun ProposalPart(sheet: ItemSheet, events: ReviewEvents) {
             Checkbox(checked = tick.ticked, onCheckedChange = null)
             Text(tick.text, style = MaterialTheme.typography.bodyMedium)
         }
+        M3xTip(12)
+      }
     }
     val lines = MigrateFromThreeTexts.acceptBlockLines(sheet.acceptBlock)
     if (lines.isNotEmpty()) {

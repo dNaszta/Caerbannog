@@ -18,8 +18,30 @@ data class HowTo(
 )
 
 object HowToTexts {
-    // M8-14 STUB: empty, the real wording is the developer's job (pinned by HowToTextsTest).
-    val ANALYSE_AND_GENERATE: HowTo = HowTo("analyse-generate", "", emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+    val ANALYSE_AND_GENERATE: HowTo = HowTo(
+        id = "analyse-generate",
+        title = "Analyse and generate",
+        docHeadings = listOf(
+            "1. Analyse a 3.x broker from a definitions file",
+            "2. Analyse a live 3.x broker",
+            "3. Review the report and generate migration files",
+        ),
+        needs = listOf(
+            "A definitions.json exported from the 3.x broker, or a connection to the 3.x broker whose user has the administrator tag",
+        ),
+        steps = listOf(
+            "Open Migrate from 3.x and choose the source: Definitions file, or Live connection (a connected 3.x broker).",
+            "Read the message-loss block at the top, if there is one, and then the report.",
+            "Open each item that needs a decision and accept it, skip it or replace it.",
+            "Click Generate migration. The first time, choose the folder for your migration files.",
+            "Click Open Migrations and apply the files on a 4.x connection.",
+        ),
+        ifWrong = listOf(
+            "\"The file is not a definitions file\": nothing was analysed; choose another Definitions file.",
+            "\"This user cannot export definitions\": use another user, or a Definitions file.",
+        ),
+        keyPhrases = listOf("Definitions file", "Live connection", "message-loss", "Generate migration", "Open Migrations", "administrator"),
+    )
 
     /** Every how-to of the app; M8-14b adds the other two. */
     val all: List<HowTo> = listOf(ANALYSE_AND_GENERATE)

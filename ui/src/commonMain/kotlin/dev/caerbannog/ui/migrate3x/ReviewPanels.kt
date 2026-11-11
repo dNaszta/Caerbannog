@@ -74,6 +74,7 @@ internal fun DecisionBar(review: ReviewState, events: ReviewEvents) {
                     val detail = review.decidedLine ?: MigrateFromThreeTexts.GENERATE_HINT.takeIf { !done }
                     detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
+                M3xTip(8)
             }
             if (!done) {
                 TextButton(onClick = events::showNextUndecided, modifier = Modifier.testTag("migrate3x-next-undecided")) {
@@ -84,6 +85,7 @@ internal fun DecisionBar(review: ReviewState, events: ReviewEvents) {
                 ConnectionIcon(AppIcon.Check, SmallIconSize)
                 Text("Generate migration", Modifier.padding(start = 8.dp), maxLines = 1)
             }
+            M3xTip(13)
         }
     }
 }
@@ -166,12 +168,16 @@ private fun ResultPanel(report: GenerationReport, events: ReviewEvents, onOpenMi
                 Text(report.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
             }
             if (report.how == How.Saved && report.files.isNotEmpty()) Text(MigrateFromThreeTexts.RESULT_NOTHING_SENT, style = MaterialTheme.typography.bodySmall)
+            if (report.files.isNotEmpty()) Advice(MigrateFromThreeTexts.ADVICE_NEXT_STEP, "migrate3x-advice-next-step")
             report.vhostHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             report.accessLine?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium)
                 Text(MigrateFromThreeTexts.ACCESS_NEEDS_ADMIN, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("migrate3x-access-needs-admin"))
             }
-            report.secretWarning?.let { AccessWarning(it) }
+            report.secretWarning?.let {
+                AccessWarning(it)
+                Advice(MigrateFromThreeTexts.DELETE_THE_FILE, "migrate3x-advice-delete-file")
+            }
             ResultList(report, Modifier.weight(1f, fill = false))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (report.how == How.Saved && report.files.isNotEmpty()) {
@@ -196,9 +202,12 @@ private fun AccessWarning(text: String) {
 }
 
 @Composable
-private fun LeftOutRows(title: String, rows: List<LeftOutRow>, tag: String) {
+private fun LeftOutRows(title: String, rows: List<LeftOutRow>, tag: String, tip: Int) {
     Column(Modifier.padding(top = 4.dp).testTag(tag), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("$title (${MigrateFromThreeTexts.count(rows.size)})", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$title (${MigrateFromThreeTexts.count(rows.size)})", style = MaterialTheme.typography.labelLarge)
+            M3xTip(tip)
+        }
         rows.forEach { Text("${it.label}: ${it.text}", style = MaterialTheme.typography.bodySmall) }
     }
 }
@@ -210,7 +219,8 @@ private fun ResultList(report: GenerationReport, modifier: Modifier) {
         LazyColumn(state = state, modifier = Modifier.fillMaxWidth().padding(end = 12.dp).testTag("migrate3x-result-left-out"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items(report.files.size, key = { "f:$it" }) { index ->
                 val file = report.files[index]
-                SelectionContainer {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                SelectionContainer(Modifier.weight(1f, fill = false)) {
                     Column {
                         Text("${file.version}  ${file.description}", style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
                         val isAccess = file.vhost == MigrateFromThreeTexts.ACCESS_FILE_LABEL
@@ -225,6 +235,8 @@ private fun ResultList(report: GenerationReport, modifier: Modifier) {
                         )
                     }
                 }
+                if (file.vhost == MigrateFromThreeTexts.ACCESS_FILE_LABEL && report.accessLine != null) M3xTip(15)
+                }
             }
             if (report.leftOut.isNotEmpty()) {
                 item(key = "left-out-title") { Text("Left out (${MigrateFromThreeTexts.count(report.leftOut.size)})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp)) }
@@ -234,10 +246,10 @@ private fun ResultList(report: GenerationReport, modifier: Modifier) {
                 }
             }
             if (report.usersNotMigrated.isNotEmpty()) {
-                item(key = "users-not-migrated") { LeftOutRows(MigrateFromThreeTexts.NOT_MIGRATED_TITLE, report.usersNotMigrated, "migrate3x-result-users-not-migrated") }
+                item(key = "users-not-migrated") { LeftOutRows(MigrateFromThreeTexts.NOT_MIGRATED_TITLE, report.usersNotMigrated, "migrate3x-result-users-not-migrated", 16) }
             }
             if (report.permissionsLeftOut.isNotEmpty()) {
-                item(key = "permissions-left-out") { LeftOutRows(MigrateFromThreeTexts.PERMISSIONS_LEFT_OUT_TITLE, report.permissionsLeftOut, "migrate3x-result-permissions-left-out") }
+                item(key = "permissions-left-out") { LeftOutRows(MigrateFromThreeTexts.PERMISSIONS_LEFT_OUT_TITLE, report.permissionsLeftOut, "migrate3x-result-permissions-left-out", 17) }
             }
             if (report.notes.isNotEmpty()) {
                 item(key = "notes-title") { Text("Notes", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp)) }

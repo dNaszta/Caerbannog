@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.forwarding.ForwardingScreenState
+import dev.caerbannog.core.help.HowToTexts
 import dev.caerbannog.core.migrate3x.MigrateFromThreeState
 import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
 import dev.caerbannog.core.migrate3x.SourceKind
@@ -46,6 +47,8 @@ import dev.caerbannog.core.migrate3x.SourceOption
 import dev.caerbannog.core.migrate3x.SourcePicker
 import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.ui.appframe.ReasonTooltip
+import dev.caerbannog.ui.components.HelpTip
+import dev.caerbannog.ui.components.HowToLink
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -93,13 +96,16 @@ fun MigrateFromThreeScreen(
     forwardingEvents: ForwardingEvents? = null,
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("migrate3x-info")) {
-            ConnectionIcon(AppIcon.Info, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                MigrateFromThreeTexts.INFO_LINE,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).testTag("migrate3x-info"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ConnectionIcon(AppIcon.Info, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    MigrateFromThreeTexts.INFO_LINE,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HowToLink(HowToTexts.ANALYSE_AND_GENERATE)
         }
         if (forwarding != ForwardingScreenState.Closed && forwardingEvents != null) {
             ForwardingView(forwarding, forwardingEvents)
@@ -121,6 +127,7 @@ fun MigrateFromThreeScreen(
 @Composable
 private fun ChooseSourceState(picker: SourcePicker, onChooseFile: () -> Unit, onChooseSource: (SourceKind) -> Unit, onAnalyseLive: () -> Unit) {
     Column(Modifier.testTag("migrate3x-state-choose-source"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Advice(MigrateFromThreeTexts.ADVICE_TOP, "migrate3x-advice-top")
         Text("Where does the 3.x topology come from?", style = MaterialTheme.typography.titleMedium)
         SourcePickerRow(picker, onChooseSource)
         val live = picker.options.filterIsInstance<SourceOption.Live>().firstOrNull()
@@ -187,7 +194,10 @@ private fun SourcePickerRow(picker: SourcePicker, onChooseSource: (SourceKind) -
                         }
                     }
                 }
-                if (reason == null) chip() else TooltipArea(tooltip = { ReasonTooltip(reason) }) { chip() }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (reason == null) chip() else TooltipArea(tooltip = { ReasonTooltip(reason) }) { chip() }
+                    M3xTip(if (kind == SourceKind.File) 3 else 4)
+                }
                 reason?.let {
                     Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("migrate3x-source-live-reason"))
                 }
@@ -285,6 +295,7 @@ private fun VirtualHostPrompt(state: MigrateFromThreeState.NeedsVirtualHost, onG
                 "The file has no users, virtual hosts or permissions, so there will be no access migration, and the virtual host must already exist on the 4.x broker.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        Advice(MigrateFromThreeTexts.ADVICE_VHOST, "migrate3x-advice-vhost")
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -308,4 +319,14 @@ private fun VirtualHostPrompt(state: MigrateFromThreeState.NeedsVirtualHost, onG
             OutlinedButton(onClick = onChooseFile, modifier = Modifier.testTag("migrate3x-choose-file")) { Text("Choose another file") }
         }
     }
+}
+
+/** The tip of row [n] of the brief for this screen; the text comes from core. */
+@Composable
+internal fun M3xTip(n: Int) = HelpTip("m3x-$n", MigrateFromThreeTexts.tip("m3x-$n"))
+
+/** An always visible advice line (owner decision D2): plain text, never only a tooltip. */
+@Composable
+internal fun Advice(text: String, tag: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier.testTag(tag))
 }
