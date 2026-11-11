@@ -1,35 +1,88 @@
 # Shovel forwarding: management API implementation and secret handling
 
-Milestone: M8    Depends on: M8-07, M8-00 (S-F)    Size: M
+Milestone: M8    Depends on: M8-07 (merged first), M8-00 (S-F, S-J)    Size: M (not split)
+
+LEAN (owner, 2026-11-11): only what the workflow and the safety rules need; the goal is a 3.x queue forwarded to a 4.x queue for real, soon. No extra polish, no speculative hardening.
 
 ## Goal
-`data-rabbit` implements `ShovelGateway` through the management API with the credentials never leaving memory, proven against real 3.13 and 4.x brokers.
+`data-rabbit` implements the M8-07 `ShovelGateway` (four operations) through the management API of the held 4.x connection, with the source password never leaving memory and never in any text, proven against real 3.13 and 4.x brokers.
 
 ## Why
-Spec safeguards 3, 4, 7, 8 and 10.
+Spec "Forwarding messages with a dynamic Shovel" safeguards 3, 4, 7, 8 and 10; spike S-F and S-J.
 
 ## Scope
-In: `ManagementShovelGateway` (`PUT`/`DELETE /api/parameters/shovel/{vhost}/{name}`, `GET /api/shovels`, GET-only source probe for counts, plugin detection per S-F, `GET /api/whoami` for the tag), URI builder (percent-encoding, `amqps` with the profile TLS settings, credential-free local destination if S-F proves it), password read from `SecretStore` at PUT time only, error scrubber (password and `//user:...@` removed from any broker text), a log guard test (capture all log output of a full forwarding and assert the password and URI are absent), `@broker-3x` tests on both images.
-Out: UI.
+In (module `data-rabbit`, package `dev.caerbannog.datarabbit`, all `internal`):
+
+### 1. `ManagementShovelGateway : ShovelGateway`
+Built over the existing pieces: the held 4.x connection's `ManagementHttp` and `ManagementRequests` (destination), a lookup `profiles: (String) -> ConnectionProfile?` and the `SecretStore` (source). No new HTTP client, no change to `ManagementHttp` itself.
+
+| Operation | Requests (all through `ShovelPathAllowList`, see 2) | Result mapping |
+| --- | --- | --- |
+| `dryRun` | 1 `GET /api/whoami` (tags); 2 `GET /api/shovels`; 3 `GET /api/queues/{dvhost}/{dqueue}`; 4 the source probe (below) | `userTags` from whoami; `/api/shovels` 200 = plugins on and `existingShovel` = the entry with the request's vhost and shovel name (or null); 404 = `shovelPluginsOn = false`; 401 (a policymaker without monitoring) = plugins assumed on, `existingShovel = null` (the planner blocks `CannotReadStatus` anyway); destination 404 = `Missing`, 200 = `Exists(type)` with `type` of the queue JSON: `quorum`, `stream`, `classic`, anything else `OTHER`; source counts `messages_ready` and `messages_unacknowledged` (null in JSON counts as 0). Any 401 or 403 on whoami or the destination = `DryRunOutcome.Failed("...")` with a fixed text; transport failure = `DestinationUnreachable`; the probe's failures = `SourceUnreachable(name)` or `SourceNotPermitted` |
+| `start` | one `PUT /api/parameters/shovel/{vhost}/{name}` | 201 or 204 = `Submitted`; 401 or 403 = `NotPermitted`; 400 = `Failed` with a FIXED text (never the body); transport = `Unreachable` |
+| `status` | `GET /api/shovels` | entry found = `Listed(ShovelStatus)`; not found = `Absent`; 401 = `NotPermitted`; 404 = `Failed("The shovel plugins are not enabled")`; transport = `Unreachable` |
+| `remove` | one `DELETE /api/parameters/shovel/{vhost}/{name}` | 204 = `Removed`; 404 = `NotFound`; 401 or 403 = `NotPermitted`; transport = `Unreachable` |
+
+- Path encoding: the vhost and the shovel name go through `ManagementRequests.encode` (`/` becomes `%2F`, a space `%20`); the shovel name is `request.shovel.name` (`caerbannog-migrate-<queue>`), so a queue name with a space, a slash or a percent sign is encoded in the path and stays literal in the name. One unit test with the name `a b/c%d`.
+- PUT body (the measured shape of S-F): `{"value":{"src-protocol":"amqp091","src-uri":<built>,"src-queue":<source queue>,"dest-protocol":"amqp091","dest-uri":"amqp://","dest-queue":<destination queue>,"src-delete-after":"queue-length"|"never","ack-mode":"on-confirm"}}`. `ack-mode` comes only from `request.ackMode.wireName`; `dest-uri` is the constant `amqp://` (credential-free local destination, S-F).
+- Status mapping: `state` `running` = RUNNING, `starting` = STARTING, `terminated` = TERMINATED, else OTHER; `reason` has its surrounding quotes removed (measured: the broker sends `"\"failed to connect to source\""`) and goes through the scrubber (2); `forwarded` a number or null; `remaining` `"unlimited"` = null, a number, else null.
+- Source probe (safeguard 10): a one-shot `ManagementHttp` for the source profile (`profiles(request.source.connectionName)`), password from `SecretStore.retrieve(profileName)`, ONE `GET /api/queues/{vhost}/{queue}`, closed at once (precedent: the Check connection button). GET only; it sends nothing to the 3.x broker that changes anything. A missing password or profile = `SourceNotPermitted`. The destination TLS rules (D9a) are those of the held connection's client; the probe's client is built from the source profile like the live source (`ManagementRequests.forProfile`).
+
+### 2. `ShovelPathAllowList` and the guard tests
+A pure function like `ExecutorPathAllowList`: allowed are exactly `GET /api/whoami`, `GET /api/shovels`, `GET /api/queues/{v}/{q}`, `PUT` and `DELETE /api/parameters/shovel/{v}/{n}`. Everything else is refused before a request is made: in particular `GET /api/parameters/...` (it returns the source password in clear, S-F), `GET /api/definitions`, `/get`, `/contents`, `/purge`, any `DELETE /api/queues/...`. Every request of the gateway passes it. Tests: a table of allowed and forbidden requests (scenario "The app never reads the shovel parameters"), and the existing guard `only the migration executor calls ManagementHttp put or delete` (`ManagementHttpWriteTest`) is EXTENDED to name `ManagementShovelGateway` as the second allowed caller (nothing else).
+
+### 3. Secrets
+- The source URI `<scheme>://<user>:<password>@<host>:<port>/<vhost>` is built in a local `val` inside `start`, user, password and vhost percent-encoded (a user `a@b:c` and a password with `/`, `?`, `#`, `%`, a space and non-ASCII must survive; one unit test), the scheme from `ShovelAddress.scheme` (`amqps` with TLS; no fallback to `amqp`). The password is `request.source.credentials?.passwordForRequest()` or else `SecretStore.retrieve(<source profile name>)`; a missing password = `StartOutcome.Failed("The password of <connection> is not stored")` and NO request. It is not kept in a field, a log line, an exception or the returned outcome.
+- `ShovelScrubber.scrub(text, secrets)`: removes every occurrence of each secret and the pattern `scheme://user[:pw]@` (regex `[A-Za-z][A-Za-z0-9+.-]*://[^@\\s/]*@` becomes `***@`) from any broker text before it becomes a reason. Used for the status `reason`. Texts of PUT and DELETE failures are fixed texts, never broker text.
+- The source password is the one extra short-lived read of a stored password besides the holder (decision P1, recorded in the spec).
+- Log guard test: a Ktor `MockEngine` double (the one `ManagementHttpWriteTest` uses) runs dry run, start, poll (terminated with a reason that contains the sentinel password) and remove with the sentinel password; the captured `java.util.logging` and System.out/err output, every returned outcome's `toString`, and every `StartOutcome`/`StatusOutcome` reason contain neither the sentinel nor `://user:`. HTTP logging stays off for this client.
+- Scenario "The shovel's credentials are never shown or logged" and "The destination of the shovel is the local broker without credentials" are bound by this task's unit tests (the request body captured by the engine has `"dest-uri":"amqp://"` and the source password only inside `src-uri`). They are `@m8-08`, not run by Cucumber (the acceptance module cannot see `internal` classes); README says so.
+
+### 4. TLS (carried-over item)
+`amqps` TLS options are NOT measured and stay out of v1: the URI carries only the scheme, no query options (`cacertfile`, `verify`), so the 4.x broker verifies the 3.x listener with its own trust. If it cannot, the shovel goes `terminated`, the status reason shows it and the M8-07 cleanup removes the shovel: the user sees "the start failed" with the reason; there is no pre-check. The `@m8-07` scenario "A TLS profile never falls back to plain" is already met in core. Live TLS between containers is NOT built in this task (needs certificates on both containers); recorded as an open point. The live test runs with the source profile `tls = false` (plain `amqp`, the "Use TLS" switch off, D9a), and asserts that `amqps` is never used for a plain profile.
+
+### 5. Carried-over unmeasured items, decided
+- Parameter name length limit: measured in the live test (a queue name of 255 characters gives a shovel name of 272): if the PUT is accepted, nothing to do; if it is refused (400), `start` returns `Refused("The queue name is too long for a shovel name")` before any request, with the measured limit as a constant `MAX_SHOVEL_NAME_LENGTH` and one unit test. The developer records the measured result in the Status.
+- Absent grace: the live test records how many polls after the PUT the shovel was absent before it was listed and asserts at most one (the M8-07 rule); if the measurement is two or more, the architect sets `Started.absentPolls < N` in `ForwardingProgress` (a one-constant change) and the unit test follows.
+- Percent-encoding of the queue name inside the shovel name: see 1 (path) and the live test (a queue named `m8 08/%x`).
+- `percentEncode` in core is `internal`: make it public in `core.forwarding` (one word) so the URI builder does not duplicate it, or use it through the `ShovelAddress` string; this is the only allowed change in `core`.
+
+### 6. Live tests (tag `broker`, new class `RealBrokerM8ShovelTest`, helper `M8SpikeSupport`; two containers on one network as `RealBrokerM8SpikeShovelTest`)
+Five tests, each cleans its shovels and queues:
+1. Happy path: 3 messages in a 3.13 classic queue, a quorum queue on 4.x; `dryRun` gives counts 3, `Exists(QUORUM)`, plugins on, the user's tags; `ForwardingService.start`; bounded polling (no sleep without a limit) until `Finished`; the destination holds 3 messages (checked with the test's own management peek, not the gateway), the source queue still exists, no shovel remains, the `calls`-style record of the transport shows no `/get`, no `/purge` and no parameter GET from the gateway.
+2. Wrong source password: `Submitted` (201), then `Failed(reason)` with `cleanedUp = true`, the parameter is gone, the sentinel password is nowhere in the reason.
+3. Missing destination queue: `dryRun` gives `Missing`, `start` is `Blocked`, no shovel exists.
+4. A user with `policymaker` but no `monitoring`: `prepare` blocks `CannotReadStatus` (the real 401 of S-F).
+5. Measurements: the long shovel name, the absent grace, and the queue name with a space, a slash and a percent sign end to end.
+Out: UI (M8-09), MCP status tool (M8-10), amqps live test.
 
 ## Acceptance
-- BDD: `17` / "The shovel's credentials are never shown or logged" (@security), "Starting creates one confirmed dynamic shovel...", "Progress is shown while the broker moves the messages", "Removing the shovel never deletes the source queue", "A TLS profile never falls back to plain for the shovel"; `16` / "Analysing a live 3.x broker sends only read requests" extended to the probe.
-- Live: on 3.13 source and 4.x destination, 3 messages move into a quorum queue, on-confirm, source queue still exists afterwards, the shovel removes itself with `queue-length` (if S-F confirms), and the app log contains no secret.
+- BDD (bound as `data-rabbit` unit tests named after the scenarios, tag `@m8-08 @fake-broker`): "The shovel's credentials are never shown or logged", "The app never reads the shovel parameters", "The destination of the shovel is the local broker without credentials". The `@m8-07` scenarios stay green and unedited (they run against the fake; this task adds no step).
+- Unit: allow-list table, path encoding, body shape, status mapping, scrubber, URI percent-encoding, log guard, extended put/delete caller guard.
+- Live: the five tests above.
+
+## Test plan limits
+- Steps 2 and 3: `./gradlew :data-rabbit:test --tests '*Shovel*' --tests '*ManagementHttpWrite*'` (fast, no container); `:core:jvmTest --tests '*Forwarding*'` only if the `percentEncode` visibility changed.
+- Live, once at step 4 and once after any fix: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8Shovel*'`. Not run: the other `brokerTest` classes, since `ManagementHttp` and the shared transport do not change; `RealBrokerM7GateTest` and `RealBrokerM8GateTest` are run only if a shared class changes (they are not expected to).
+- Full fast suite once at the end of the task.
 
 ## Design notes
-Never call `GET /api/parameters/shovel`. HTTP request and response logging stays off for this client. Exception messages are built from typed errors, not from broker text. Passwords never in `SessionState` (D6 stays: this is the one additional, short-lived read, recorded in the spec).
+- `ManagementShovelGateway` has no knowledge of the planner, the service or the UI; it maps requests to outcomes. The decisions are in M8-07.
+- Exception messages and outcome texts are fixed strings or scrubbed; never a URL, a body, a header or a password.
+- Wiring into the composition root (`desktopApp`) is M8-09, which needs the held connection; M8-08 delivers a factory function `shovelGatewayFor(connection holder, profiles, secrets)` only if M8-09 asks.
 
 ## UX
 None.
 
 ## MCP
-None here.
+None here. `ShovelGateway` is not given to `:mcp-server`; the read-only status tool is M8-10.
 
 ## Open points
-P1 decided 2026-11-09: the profile's user is reused, so its password is read from `SecretStore` at PUT time. P7 (Shovel on 4.x) and P8 decided 2026-11-09.
-
-## Spike findings (M8-00, 2026-11-09)
-Measured (S-F, S-J): never call `GET /api/parameters/shovel[...]`; `GET /api/definitions` of the 4.x broker returns the source URI password in clear, so any such read (only for the user hash comparison of `M8-12`) goes through the redacting parser and a test proves the password is dropped; the log guard also covers response bodies; `dest-uri` is `amqp://` (local, no credentials), so only the source password is built into a URI; PUT does not validate, so the implementation polls `GET /api/shovels` until `running`, `terminated` (read `reason`, delete the Shovel, scrub the text) or gone (finished); plugin detection is `GET /api/shovels` 404; the live test also checks the wrong-password case (201, then terminated) and that the parameter disappears after `queue-length`.
+- `amqps` between containers with real certificates and the `cacertfile`/`verify` options: not measured, out of v1 (see 4); the owner learns it from the confirmation (Not encrypted vs TLS) and from the failure reason.
+- P1 decided 2026-11-09 (the profile's user is reused; its password is read from `SecretStore` at PUT time) and P14 (another user for this Shovel); P7 and P8 decided.
 
 ## Definition of done
-Tests first and passing, live tests clean up shovels and queues, no secret in any output, spec updated with the measured field names.
+Tests first and passing (unit and the five live tests), live tests clean up shovels and queues, no secret in any output, the measured field values (name length limit, absent grace) written into the Status and the spec, no change outside `data-rabbit` except the `percentEncode` visibility.
+
+## Status
+- Step 1 (architect, 2026-11-11): made exact against the M8-07 core (`5c1c6ad`). Size M kept. Owner questions: none.
