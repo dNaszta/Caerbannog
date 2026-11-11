@@ -49,7 +49,16 @@ The short version:
 
 **The access file is a secret.** It holds password hashes. Anyone who has it can try to guess the passwords offline, so keep it out of git and shared or synced folders. The app writes it readable by its owner only and shows a warning when it is saved or exported.
 
-Everything, step by step, including what each screen shows and what the limits are: [`docs/MIGRATING_FROM_3X.md`](docs/MIGRATING_FROM_3X.md).
+Step-by-step how-tos (what you need, the steps, what you should see, what to do if it goes wrong) are in [`docs/MIGRATING_FROM_3X.md`](docs/MIGRATING_FROM_3X.md):
+
+1. [Analyse a 3.x broker from a definitions file](docs/MIGRATING_FROM_3X.md#1-analyse-a-3x-broker-from-a-definitions-file)
+2. [Analyse a live 3.x broker](docs/MIGRATING_FROM_3X.md#2-analyse-a-live-3x-broker)
+3. [Review the report and generate migration files](docs/MIGRATING_FROM_3X.md#3-review-the-report-and-generate-migration-files)
+4. [Apply the migration to a 4.x broker](docs/MIGRATING_FROM_3X.md#4-apply-the-migration-to-a-4x-broker)
+5. [Migrate users, virtual hosts and permissions](docs/MIGRATING_FROM_3X.md#5-migrate-users-virtual-hosts-and-permissions)
+6. [Move the messages of a queue with a Shovel](docs/MIGRATING_FROM_3X.md#6-move-the-messages-of-a-queue-with-a-shovel)
+7. [Check that a Shovel finished, or remove a failed one](docs/MIGRATING_FROM_3X.md#7-check-that-a-shovel-finished-or-remove-a-failed-one)
+8. [A suggested order for a blue-green move](docs/MIGRATING_FROM_3X.md#8-a-suggested-order-for-a-blue-green-move)
 
 ## Moving messages with a Shovel
 
