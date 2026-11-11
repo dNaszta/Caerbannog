@@ -190,8 +190,25 @@ Feature: Migrate virtual hosts, users and permissions from RabbitMQ 3.x
     Then the access migration has no permission action for "guest"
     And the result lists the left out permissions of "guest"
 
+  @negative @fake-broker @m8-12a
+  Scenario: A virtual host that exists with another description or tags is a conflict
+    Given the export gives the virtual host "/orders" the description "Orders" and the tag "prod"
+    And the virtual host "/orders" already exists on "new-eu" with the description "Something else"
+    When I apply the access migration
+    Then the apply stops with a conflict for the virtual host "/orders"
+    And the message names the description as what differs
+    And the virtual host "/orders" is unchanged
+
   @fake-broker @m8-12a
-  Scenario: A virtual host that already exists is left as it is
-    Given the virtual host "/orders" already exists on "new-eu" with another description
+  Scenario: Settings the export does not carry are not compared
+    Given the export gives the virtual host "/orders" no description, no tags and no default queue type
+    And the virtual host "/orders" already exists on "new-eu" with the description "Orders" and the tag "prod"
     When I apply the access migration
     Then the apply continues and the virtual host "/orders" is unchanged
+
+  @fake-broker @m8-12a
+  Scenario: The default virtual host is never created or compared
+    Given the export gives the virtual host "/" the description "Production"
+    And "new-eu" has the default virtual host "/" with its own description
+    When I apply the access migration
+    Then the apply continues and the virtual host "/" is unchanged
