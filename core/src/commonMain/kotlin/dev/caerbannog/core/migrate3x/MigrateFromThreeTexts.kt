@@ -4,6 +4,8 @@ package dev.caerbannog.core.migrate3x
 object MigrateFromThreeTexts {
     /** M8-06c (owner decision 2026-11-10): one line for both sources. */
     const val INFO_LINE: String = "This screen only reads a file or the connected 3.x broker. It sends nothing that changes any broker."
+    /** M8-10: what the MCP tool answers for a per-vhost export (it cannot ask for a vhost name). */
+    const val NEEDS_VHOST_NAME: String = "This file is an export of one virtual host; analyse it on the Migrate from 3.x screen, which asks for the virtual host name"
     const val LIVE_NOT_AVAILABLE: String = "Connect to a RabbitMQ 3.x broker to read it live"
     const val SOURCE_FILE: String = "Definitions file"
     const val LIVE_DISABLED: String = "Live connection"

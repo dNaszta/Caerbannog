@@ -27,6 +27,37 @@ object CompatibilityReportJson {
         return pretty.encodeToString(JsonElement.serializer(), root)
     }
 
+    /**
+     * One page of findings for the MCP tool: the same header and finding JSON as [encode] plus `"page": {"offset", "limit", "returned", "total"}`.
+     * A [limit] below 1 counts as 1 and a negative [offset] as 0; an offset at or past the end gives no findings and still the total.
+     */
+    fun encodePage(report: CompatibilityReport, limit: Int, offset: Int): String = encodePage(report, limit, offset, truncated = false, findingsOverride = null)
+
+    /** Like [encodePage] with only the first [keep] findings of the page and `"truncated": true` in `page` (the MCP tool cuts a page that is too large). */
+    fun encodePageCut(report: CompatibilityReport, limit: Int, offset: Int, keep: Int): String =
+        encodePage(report, limit, offset, truncated = true, findingsOverride = keep)
+
+    private fun encodePage(report: CompatibilityReport, limit: Int, offset: Int, truncated: Boolean, findingsOverride: Int?): String {
+        val size = limit.coerceAtLeast(1)
+        val start = offset.coerceAtLeast(0).coerceAtMost(report.findings.size)
+        var slice = report.findings.subList(start, minOf(report.findings.size, start + size))
+        if (findingsOverride != null) slice = slice.take(findingsOverride)
+        val root = buildJsonObject {
+            put("schema", SCHEMA)
+            put("source", sourceJson(report.source))
+            put("summary", summaryJson(report.summary))
+            put("findings", JsonArray(slice.map(::findingJson)))
+            put("page", buildJsonObject {
+                put("offset", offset.coerceAtLeast(0))
+                put("limit", size)
+                put("returned", slice.size)
+                put("total", report.findings.size)
+                if (truncated) put("truncated", true)
+            })
+        }
+        return pretty.encodeToString(JsonElement.serializer(), root)
+    }
+
     private fun sourceJson(source: ReportSource): JsonObject = buildJsonObject {
         put("name", source.name)
         put("sourceVersion", source.sourceVersion)
