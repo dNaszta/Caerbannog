@@ -48,6 +48,9 @@ import dev.caerbannog.core.migrate3x.LeftOutRow
 
 private const val PANEL_MAX_HEIGHT_DP = 360
 
+/** A result with an access section (line, a list or a note) needs room for both lists and the default virtual host note. */
+private const val ACCESS_PANEL_MAX_HEIGHT_DP = 560
+
 /**
  * The bar under the header: how many items need a decision, "Show next undecided item" and "Generate migration" (states 9 and 10).
  * The lines come ready from `core`; Generate is enabled only when `core` says so. Tags: `migrate3x-pending-count`, `migrate3x-next-undecided`,
@@ -155,14 +158,19 @@ private fun TroublePanel(trouble: GenerationState.Trouble, events: ReviewEvents)
 @Composable
 private fun ResultPanel(report: GenerationReport, events: ReviewEvents, onOpenMigrations: () -> Unit) {
     Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.fillMaxWidth().testTag("migrate3x-result")) {
-        Column(Modifier.padding(16.dp).heightIn(max = PANEL_MAX_HEIGHT_DP.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val hasAccessSection = report.accessLine != null || report.usersNotMigrated.isNotEmpty() || report.permissionsLeftOut.isNotEmpty() || report.notes.isNotEmpty()
+        val maxHeight = if (hasAccessSection) ACCESS_PANEL_MAX_HEIGHT_DP else PANEL_MAX_HEIGHT_DP
+        Column(Modifier.padding(16.dp).heightIn(max = maxHeight.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 ConnectionIcon(AppIcon.CheckCircle, IconSize)
                 Text(report.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
             }
             if (report.how == How.Saved && report.files.isNotEmpty()) Text(MigrateFromThreeTexts.RESULT_NOTHING_SENT, style = MaterialTheme.typography.bodySmall)
             report.vhostHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            report.accessLine?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            report.accessLine?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+                Text(MigrateFromThreeTexts.ACCESS_NEEDS_ADMIN, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("migrate3x-access-needs-admin"))
+            }
             report.secretWarning?.let { AccessWarning(it) }
             ResultList(report, Modifier.weight(1f, fill = false))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
