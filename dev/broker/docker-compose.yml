@@ -17,6 +17,10 @@ services:
       - "15672:15672"
       - "1883:1883"
       - "8883:8883"
+    # M8 hand trial: lets the Shovel plugin on this broker reach the 3.x dev broker (dev/broker-3x) through the host's
+    # published port as host.docker.internal:5673. Docker Desktop has the name already; on Linux this adds it.
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ../../data-rabbit/src/test/resources/tls/rabbitmq.conf:/etc/rabbitmq/conf.d/90-tls.conf:ro,z

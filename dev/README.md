@@ -85,3 +85,62 @@ without the app:
 ```
 curl -u admin:dev-password http://localhost:15672/api/queues/%2F
 ```
+
+## The 3.x broker (M8 hand trial)
+
+A RabbitMQ **3.13** broker (`rabbitmq:3.13-management`, plain listeners only) to use as the **source** of "Migrate from 3.x",
+with the 4.x dev broker above as the **destination**. Both run side by side: every host port differs.
+
+| Command | What it does |
+| --- | --- |
+| `task dev:up-3x` | Starts the 3.13 broker (compose project `caerbannog-dev-3x`), waits until healthy, loads `dev/broker-3x/definitions.json` and publishes a few persistent messages with `dev/broker-3x/seed.sh` (needs `curl`). |
+| `task dev:down-3x` | Removes the container and its volume. |
+| `task dev:reset-3x` | `down -v`, `up -d --wait`, seed again. Use it after a Shovel moved messages. Run it twice: same result. |
+
+Ports (host): AMQP **5673**, management API (HTTP) **15673**, stream **5553**. The 4.x broker keeps 5551, 5552, 15671, 15672, 5671, 1883, 8883.
+Same engine rules as above (`CONTAINER_ENGINE=podman|docker`).
+
+**The 4.x broker needs a restart once.** Its `enabled_plugins` now includes `rabbitmq_shovel` and `rabbitmq_shovel_management`, and its
+compose file maps `host.docker.internal` to the host, so the Shovel on 4.x can reach the 3.x broker at `host.docker.internal:5673`. If the
+4.x broker was started before this change, run `task dev:reset` (or `dev:up` after a `compose down`).
+
+Users (all passwords `dev-password`): `admin` (administrator, `/` and `legacy`), `app` (management; configure only `^app\..*`; a topic permission on
+`dev.events` for `orders.*`), `reader` (monitoring, read only), `worker` (no tag).
+
+What the seed gives the analysis to find:
+
+- **Version-1 classic queues** (the message-loss blocker for 4.3+): `orders` (declared without arguments, the 3.13 default), `invoices` (`x-queue-version: 1`),
+  also `priority-jobs` (`x-max-priority: 5`), `audit.lazy` (`x-queue-mode: lazy`), `dead-letters`, `ha.reports`, `scratch-transient` (non-durable, deprecated on 4.x).
+  `orders-v2` and `mail` (`x-queue-version: 2`, with dead-letter arguments) are the contrast: no blocker. `quorum-jobs` is a quorum queue.
+  The version shows in the management API after the queue's first statistics, a few seconds after boot.
+- **Mirrored (HA) policy** `ha-reports` on `^ha\.` (`ha-mode: all`), and a TTL policy `ttl-audit` on `^audit\.`.
+- **Messages to forward**: `orders` 5, `invoices` 3, `priority-jobs` 4 (priorities 1 to 5), `ha.reports` 2, `quorum-jobs` 3.
+- A second vhost `legacy` (queue `legacy-jobs`, fanout `legacy.events`), exchanges `dev.events` (topic), `dev.commands` (direct), `dev.dlx` (direct) with bindings.
+
+Seeding is done only by this dev tooling (the 3.x management API with `admin`); the app never writes to a 3.x broker.
+
+### Connection profiles for the trial
+
+| | 3.x source | 4.x destination |
+| --- | --- | --- |
+| Host | `localhost` | `localhost` |
+| Management port | `15673` | `15672` (plain) or `15671` (TLS, CA `data-rabbit/src/test/resources/tls/ca.pem`) |
+| Stream port | `5553` (not needed for the migration) | `5552` / `5551` |
+| Vhost, user, password | `/`, `admin`, `dev-password` | `/`, `admin`, `dev-password` |
+| Use TLS | **off** (the app shows "Not encrypted"; fine for this broker) | off for the plain profile (A2), on for A1 |
+| Level | read-only is enough: the app sends only GET requests to it | **Full control** / declare and edit (needed for apply and Shovel) |
+
+Check without the app: `curl -u admin:dev-password http://localhost:15673/api/overview` (`rabbitmq_version` 3.13.x).
+
+### Hand-trial checklist
+
+1. `task dev:up-3x` and `task dev:up` (or `dev:reset` once, for the Shovel plugins); create the two profiles above.
+2. Open the 3.x profile, **Migrate from 3.x**, live analysis: expect the message-loss block naming `orders`, `invoices`, `priority-jobs` and the other version-1 queues, the mirrored-queue finding for `ha.reports`, the transient queue finding.
+3. Review: accept or skip each proposal. Generate, then **Save** to a folder (the files hold password hashes: keep them out of git).
+4. Open the 4.x profile and apply the topology migration (dry run first), so `orders`, `invoices` and the others exist there. A Shovel needs the destination queue to exist with the same name.
+5. Forward one queue with the Shovel (for example `invoices`, 3 messages). The AMQP host prefilled for the 4.x broker to reach the 3.x one must be `host.docker.internal` and port `5673`; change it in the confirmation if the app proposes `localhost`. Expect "Moved about 3 of 3 messages"; the source queue stays.
+6. Apply the access migration (users with hashes, vhost `legacy`, permissions, the topic permission) to 4.x; then check on 4.x: `curl -u app:dev-password http://localhost:15672/api/whoami`.
+7. Start over: `task dev:reset-3x` (and `task dev:reset` for the 4.x broker).
+
+A Shovel from this setup was verified by hand on 2026-11-12 (`PUT /api/parameters/shovel` on the dev 4.x broker with
+`amqp://admin:dev-password@host.docker.internal:5673/%2F` as the source: 3 of 3 messages arrived and the Shovel removed itself).

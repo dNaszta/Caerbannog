@@ -117,3 +117,23 @@ tasks:
     cmds:
       - docker compose -f dev/broker/docker-compose.yml down -v
       - docker compose -f dev/broker/docker-compose.yml up -d --wait
+
+  # M8 hand trial: a RabbitMQ 3.13 broker (source of "Migrate from 3.x") next to the 4.x dev broker. Ports 5673/15673/5553,
+  # no clash with the 4.x ones. Developer tooling only; see dev/README.md ("The 3.x broker").
+  dev:up-3x:
+    desc: "Start the local RabbitMQ 3.13 dev broker (AMQP 5673, management 15673, plain) via {{.CONTAINER_ENGINE}} compose, wait until healthy, then seed it (dev/broker-3x/seed.sh)."
+    cmds:
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker-3x/docker-compose.yml up -d --wait'
+      - dev/broker-3x/seed.sh
+
+  dev:down-3x:
+    desc: "Stop and remove the 3.13 dev broker (its volume is removed too)."
+    cmds:
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker-3x/docker-compose.yml down -v'
+
+  dev:reset-3x:
+    desc: "Remove the 3.13 dev broker and its volume, start it again and seed it. Run it twice: same result."
+    cmds:
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker-3x/docker-compose.yml down -v'
+      - '{{.CONTAINER_ENGINE}} compose -f dev/broker-3x/docker-compose.yml up -d --wait'
+      - dev/broker-3x/seed.sh
