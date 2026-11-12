@@ -48,7 +48,6 @@ class MessageBrowserViewModel(
 
         scanJob = scope.launch {
             scanner.scan(vhost, stream, startOffset, criteria, scanLimit).collect { update ->
-                _scanProgress.value = update
                 val latest = _state.value as? MessageBrowserState.Loaded
                 if (latest != null) {
                     _state.value = latest.copy(
@@ -73,6 +72,9 @@ class MessageBrowserViewModel(
                         isFilterActive = true,
                     )
                 }
+                // Published last: observers that wait for isRunning = false then read a state that
+                // already carries this update's notice and matches.
+                _scanProgress.value = update
             }
         }
     }

@@ -6,6 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -239,5 +243,41 @@ class MessageBrowserViewModelTest {
         vm.selectMessage(null)
         val loaded2 = assertInstanceOf(MessageBrowserState.Loaded::class.java, vm.state.value)
         assertNull(loaded2.selectedMessage)
+    }
+
+    @Test
+    fun `state already carries the notice when a finished scan progress is published`() = runBlocking {
+        val noMatchReader = FakeStreamMessageReader()
+        noMatchReader.addMessages("/", "events", 300, 0L, 1700000000000L, 1000L)
+        // The VM runs on another thread; the collector is Unconfined so it reads the state on the
+        // publishing thread the moment the progress changes, like a UI observer would.
+        val ownScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val observerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = MessageBrowserViewModel(
+                reader = noMatchReader,
+                vhost = "/",
+                stream = "events",
+                scope = ownScope,
+                approximateTotalProvider = { _, _ -> 300L },
+            )
+            vm.browseFirst()
+            vm.state.first { it is MessageBrowserState.Loaded }
+            val seen = mutableListOf<Pair<ScanProgressUpdate, String?>>()
+            val collector = observerScope.launch {
+                vm.scanProgress.filterNotNull().collect { p ->
+                    seen += p to (vm.state.value as? MessageBrowserState.Loaded)?.filterNotice
+                }
+            }
+            vm.filter(MessageFilterCriteria.Text("needle"), scanLimit = 100)
+            vm.scanProgress.filterNotNull().first { !it.isRunning }
+            collector.cancel()
+            val finished = seen.filter { !it.first.isRunning }
+            assertTrue(finished.isNotEmpty())
+            finished.forEach { (progress, notice) -> assertEquals(progress.notice, notice) }
+        } finally {
+            ownScope.cancel()
+            observerScope.cancel()
+        }
     }
 }
