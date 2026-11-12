@@ -19,7 +19,7 @@ Step-by-step how-tos for a move from RabbitMQ 3.x to 4.x. The short version is i
 
 **It does not:** change anything on the 3.x broker (every request the app sends to it is a GET; a 3.x connection is a migration source only, so streams, publishing and topology editing are off for it); upgrade a broker in place; create, show or generate passwords (hashes are passed through and never displayed); do anything by itself (nothing is sent to a broker until you apply a migration or confirm a forward).
 
-Tested against RabbitMQ 3.13 as the source and 4.x as the destination. Other 3.x versions are not verified.
+Tested against RabbitMQ 3.13 as the source and 4.x as the destination. Other 3.x versions are not verified. To try it on your machine without a real 3.x broker, see "The 3.x broker (M8 hand trial)" in [`dev/README.md`](../dev/README.md).
 
 ---
 

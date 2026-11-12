@@ -1,0 +1,29 @@
+# M8 hand trial: a RabbitMQ 3.13 broker to use as the 3.x SOURCE of "Migrate from 3.x" (developer tooling, not part
+# of the product). Throwaway secrets only. Plain listeners only (a profile with "Use TLS" off; the app shows "Not encrypted").
+# It runs next to the 4.x dev broker (dev/broker/docker-compose.yml) because every host port differs:
+#   AMQP 5673, management HTTP 15673, stream 5553. The 4.x broker keeps 5551/5552/15671/15672/5671/1883/8883.
+# The definitions (users, vhosts, queues, policies, exchanges) are loaded at boot; the messages come from dev/broker-3x/seed.sh.
+# Reset: `task dev:reset-3x` (compose down -v, then up -d --wait, then the seed again).
+name: caerbannog-dev-3x
+services:
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3.13-management
+    container_name: caerbannog-dev-rabbitmq-3x
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+      - "5553:5552"
+    volumes:
+      - rabbitmq-3x-data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/91-definitions.conf:ro,z
+      - ./definitions.json:/etc/rabbitmq/definitions.json:ro,z
+      - ./enabled_plugins:/etc/rabbitmq/enabled_plugins:ro,z
+    healthcheck:
+      # Run as `rabbitmq` via `gosu` (same reason as the 4.x dev broker: no root-owned erlang cookie).
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 10s
+volumes:
+  rabbitmq-3x-data:

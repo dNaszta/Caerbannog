@@ -1,0 +1,57 @@
+{
+  "rabbit_version": "3.13.7",
+  "users": [
+    {"name": "admin", "password": "dev-password", "tags": "administrator"},
+    {"name": "app", "password": "dev-password", "tags": "management"},
+    {"name": "reader", "password": "dev-password", "tags": "monitoring"},
+    {"name": "worker", "password": "dev-password", "tags": ""}
+  ],
+  "vhosts": [{"name": "/"}, {"name": "legacy"}],
+  "permissions": [
+    {"user": "admin", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "admin", "vhost": "legacy", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "app", "vhost": "/", "configure": "^app\\..*", "write": ".*", "read": ".*"},
+    {"user": "reader", "vhost": "/", "configure": "", "write": "", "read": ".*"},
+    {"user": "worker", "vhost": "/", "configure": "", "write": "^dev\\..*", "read": "^(orders|invoices)$"},
+    {"user": "worker", "vhost": "legacy", "configure": ".*", "write": ".*", "read": ".*"}
+  ],
+  "topic_permissions": [
+    {"user": "app", "vhost": "/", "exchange": "dev.events", "write": "^orders\\..*", "read": "^orders\\..*"}
+  ],
+  "parameters": [],
+  "global_parameters": [{"name": "cluster_name", "value": "caerbannog-dev-3x"}],
+  "policies": [
+    {"vhost": "/", "name": "ha-reports", "pattern": "^ha\\.", "apply-to": "queues", "priority": 0,
+     "definition": {"ha-mode": "all", "ha-sync-mode": "automatic"}},
+    {"vhost": "/", "name": "ttl-audit", "pattern": "^audit\\.", "apply-to": "queues", "priority": 0,
+     "definition": {"message-ttl": 86400000}}
+  ],
+  "queues": [
+    {"name": "orders", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {}},
+    {"name": "invoices", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-version": 1}},
+    {"name": "orders-v2", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-version": 2}},
+    {"name": "priority-jobs", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-max-priority": 5}},
+    {"name": "audit.lazy", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-mode": "lazy"}},
+    {"name": "ha.reports", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {}},
+    {"name": "dead-letters", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-message-ttl": 600000}},
+    {"name": "mail", "vhost": "/", "durable": true, "auto_delete": false,
+     "arguments": {"x-dead-letter-exchange": "dev.dlx", "x-dead-letter-routing-key": "dead-letters", "x-queue-version": 2}},
+    {"name": "quorum-jobs", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "quorum"}},
+    {"name": "scratch-transient", "vhost": "/", "durable": false, "auto_delete": false, "arguments": {}},
+    {"name": "legacy-jobs", "vhost": "legacy", "durable": true, "auto_delete": false, "arguments": {}}
+  ],
+  "exchanges": [
+    {"name": "dev.events", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {}},
+    {"name": "dev.commands", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {}},
+    {"name": "dev.dlx", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {}},
+    {"name": "legacy.events", "vhost": "legacy", "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {}}
+  ],
+  "bindings": [
+    {"source": "dev.events", "vhost": "/", "destination": "orders", "destination_type": "queue", "routing_key": "orders.#", "arguments": {}},
+    {"source": "dev.events", "vhost": "/", "destination": "invoices", "destination_type": "queue", "routing_key": "invoices.*", "arguments": {}},
+    {"source": "dev.commands", "vhost": "/", "destination": "priority-jobs", "destination_type": "queue", "routing_key": "job", "arguments": {}},
+    {"source": "dev.commands", "vhost": "/", "destination": "mail", "destination_type": "queue", "routing_key": "mail", "arguments": {}},
+    {"source": "dev.dlx", "vhost": "/", "destination": "dead-letters", "destination_type": "queue", "routing_key": "dead-letters", "arguments": {}},
+    {"source": "legacy.events", "vhost": "legacy", "destination": "legacy-jobs", "destination_type": "queue", "routing_key": "", "arguments": {}}
+  ]
+}
