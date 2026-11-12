@@ -65,7 +65,21 @@ class Dev3xBrokerSetupTest {
     @Test
     fun `seed script is executable and uses only the dev password`() {
         assertTrue(Files.isExecutable(dir.resolve("seed.sh")), "seed.sh must be executable")
-        assertTrue("admin:dev-password" in Files.readString(dir.resolve("seed.sh")))
+        assertTrue("legacy-admin:dev-password" in Files.readString(dir.resolve("seed.sh")))
+    }
+
+    @Test
+    fun `no 3x dev user has the name of a 4x dev user`() {
+        // Same name with a different salted password hash is a conflict for the access migration (found in the hand trial).
+        val names4x = Files.list(root.resolve("dev/broker/definitions")).use { files ->
+            files.toList().flatMap { f ->
+                Json.parseToJsonElement(Files.readString(f)).jsonObject["users"]?.jsonArray.orEmpty()
+                    .map { it.jsonObject.getValue("name").jsonPrimitive.content }
+            }
+        }
+        val names3x = array("users").map { it.jsonObject.getValue("name").jsonPrimitive.content }
+        assertTrue(names4x.isNotEmpty(), "no 4.x dev users found")
+        assertTrue(names3x.none { it in names4x }, "clash between $names3x and $names4x")
     }
 
     @Test

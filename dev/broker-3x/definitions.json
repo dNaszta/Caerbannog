@@ -1,15 +1,15 @@
 {
   "rabbit_version": "3.13.7",
   "users": [
-    {"name": "admin", "password": "dev-password", "tags": "administrator"},
+    {"name": "legacy-admin", "password": "dev-password", "tags": "administrator"},
     {"name": "app", "password": "dev-password", "tags": "management"},
     {"name": "reader", "password": "dev-password", "tags": "monitoring"},
     {"name": "worker", "password": "dev-password", "tags": ""}
   ],
   "vhosts": [{"name": "/"}, {"name": "legacy"}],
   "permissions": [
-    {"user": "admin", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
-    {"user": "admin", "vhost": "legacy", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "legacy-admin", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "legacy-admin", "vhost": "legacy", "configure": ".*", "write": ".*", "read": ".*"},
     {"user": "app", "vhost": "/", "configure": "^app\\..*", "write": ".*", "read": ".*"},
     {"user": "reader", "vhost": "/", "configure": "", "write": "", "read": ".*"},
     {"user": "worker", "vhost": "/", "configure": "", "write": "^dev\\..*", "read": "^(orders|invoices)$"},

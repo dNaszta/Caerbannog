@@ -4,7 +4,7 @@
 # this twice does not double the counts. Throwaway password, same as the rest of dev/. Needs curl.
 set -euo pipefail
 BASE="${BROKER_3X_URL:-http://localhost:15673}"
-AUTH="admin:dev-password"
+AUTH="legacy-admin:dev-password"
 
 # The container is "healthy" before the boot-time definitions import has finished, so wait for the first queue.
 for _ in $(seq 1 30); do
