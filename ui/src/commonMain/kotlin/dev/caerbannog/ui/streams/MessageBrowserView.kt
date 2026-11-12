@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -666,7 +667,7 @@ private fun MessagesTable(
                         }
                         Spacer(Modifier.width(16.dp))
                         TooltipBox(
-                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                             tooltip = {
                                 PlainTooltip {
                                     Text(
@@ -857,7 +858,7 @@ private fun MessageDetailsSheet(
 @Composable
 private fun CopyIconButton(label: String, icon: AppIcon, tag: String, onClick: () -> Unit) {
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = { PlainTooltip { Text(label) } },
         state = rememberTooltipState(),
     ) {

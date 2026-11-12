@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.ChevronLeft
@@ -33,7 +33,7 @@ import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -51,7 +51,7 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Stream
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Send
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ArrowDropDown
@@ -62,7 +62,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CrueltyFree
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Help
+import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.LockPerson
@@ -146,7 +146,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.LockPerson -> Icons.Outlined.LockPerson
     AppIcon.TravelExplore -> Icons.Outlined.TravelExplore
     AppIcon.VerifiedUser -> Icons.Outlined.VerifiedUser
-    AppIcon.Help -> Icons.Outlined.Help
+    AppIcon.Help -> Icons.AutoMirrored.Outlined.Help
     AppIcon.CheckCircle -> Icons.Outlined.CheckCircle
     AppIcon.Delete -> Icons.Outlined.Delete
     AppIcon.WifiTethering -> Icons.Outlined.WifiTethering
@@ -164,7 +164,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Stream -> Icons.Outlined.Stream
     AppIcon.Hub -> Icons.Outlined.Hub
     AppIcon.AccountTree -> Icons.Outlined.AccountTree
-    AppIcon.ArrowBack -> Icons.Outlined.ArrowBack
+    AppIcon.ArrowBack -> Icons.AutoMirrored.Outlined.ArrowBack
     AppIcon.Info -> Icons.Outlined.Info
     AppIcon.ArrowUpward -> Icons.Outlined.ArrowUpward
     AppIcon.ArrowDownward -> Icons.Outlined.ArrowDownward
@@ -181,14 +181,14 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.ContentCopy -> Icons.Outlined.ContentCopy
     AppIcon.Tag -> Icons.Outlined.Tag
     AppIcon.Clear -> Icons.Outlined.Clear
-    AppIcon.Send -> Icons.Outlined.Send
+    AppIcon.Send -> Icons.AutoMirrored.Outlined.Send
     AppIcon.PlayArrow -> Icons.Outlined.PlayArrow
     AppIcon.Download -> Icons.Outlined.FileDownload
     AppIcon.Edit -> Icons.Outlined.Edit
     AppIcon.Rule -> Icons.Outlined.Check
     AppIcon.Folder -> Icons.Outlined.Folder
     AppIcon.FolderOpen -> Icons.Outlined.FolderOpen
-    AppIcon.DriveFileMove -> Icons.Outlined.DriveFileMove
+    AppIcon.DriveFileMove -> Icons.AutoMirrored.Outlined.DriveFileMove
     AppIcon.History -> Icons.Outlined.History
     AppIcon.RestartAlt -> Icons.Outlined.RestartAlt
     AppIcon.Person -> Icons.Outlined.Person

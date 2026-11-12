@@ -31,6 +31,7 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -207,7 +208,7 @@ private fun NameHeader(sort: StreamSort, onSort: (StreamSort) -> Unit, scale: Fl
 @Composable
 private fun SizeHeader(scale: Float) {
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = { PlainTooltip { Text(SIZE_TOOLTIP) } },
         state = rememberTooltipState(),
     ) { HeaderText(Column.Size, scale) }

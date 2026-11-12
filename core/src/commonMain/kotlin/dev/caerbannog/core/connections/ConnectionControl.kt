@@ -147,7 +147,7 @@ fun connectionControlState(
             val isCurrent = it.name == current?.name
             rowOf(it.name, isCurrent, if (isCurrent) currentLink else null).copy(
                 notEncrypted = !it.tls,
-                offersMigration = isCurrent && currentLink is LinkState.Connected && current?.status.isMigrationSource(),
+                offersMigration = isCurrent && currentLink is LinkState.Connected && current.status.isMigrationSource(),
             )
         },
         emptyText = ConnectionControlTexts.NO_SAVED_CONNECTIONS.takeIf { profiles.isEmpty() },
