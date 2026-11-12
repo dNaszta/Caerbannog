@@ -76,4 +76,19 @@ class HelpFocusOrderUiTest {
         assertEquals("howto-move-messages", stops.first(), "stops: $stops")
         assertTrue("forward-find" in stops, "Tab never reached the find field; stops: $stops")
     }
+
+    @Test
+    fun `full screen with forwarding open - both How to links are drawn, tab in order, and open their own dialogs`() = runDesktopComposeUiTest(1280, 900) {
+        setContent {
+            MigrateFromThreeScreen(
+                state = MigrateFromThreeState.ChooseSource, reportText = { "" }, onChooseFile = {}, onGiveVirtualHost = {}, onCancelPrompt = {},
+                onToggleSeverity = {}, onToggleGroup = {}, onExport = {}, onDismissNotice = {},
+                forwarding = ForwardingScreenState.Pick("", listOf(QueueRow("/", "orders")), null), forwardingEvents = NoForwardingEvents,
+            )
+        }
+        val tags = listOf("howto-analyse-generate", "howto-move-messages")
+        tags.forEach { assertEquals(1, onAllNodes(androidx.compose.ui.test.hasTestTag(it), useUnmergedTree = true).fetchSemanticsNodes().size, "$it is drawn once") }
+        val stops = stops(5)
+        assertEquals(tags, stops.filter { it in tags }, "the top How to link comes before the forwarding one; stops: $stops")
+    }
 }
