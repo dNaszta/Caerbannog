@@ -27,18 +27,27 @@ object ConversionReviews {
     }
 
     /** The ticks the DEFAULT proposals of [item]'s findings carry. */
-    fun defaultTicks(report: CompatibilityReport, item: ReviewItem): Set<Acknowledgement> =
-        report.findings.filter { it.kind == item.kind && it.vhost == item.vhost && it.name == item.name }
-            .mapNotNull { (it.proposal as? Proposal.ConvertQueueType)?.acknowledgement }.toSet()
+    fun defaultTicks(report: CompatibilityReport, item: ReviewItem): Set<Acknowledgement> = ticksByItem(report)[item].orEmpty()
+
+    /**
+     * Indexes the report once, so a review of N items costs O(findings) and not O(N x findings): scanning every finding per item took
+     * minutes at the 60,000 queues of `ConversionReviewScaleTest` on a CI runner and looked like a hang.
+     */
+    private fun ticksByItem(report: CompatibilityReport): Map<ReviewItem, Set<Acknowledgement>> =
+        report.findings.groupBy { ReviewItem(it.kind, it.vhost, it.name) }.mapValues { (_, findings) ->
+            findings.mapNotNull { (it.proposal as? Proposal.ConvertQueueType)?.acknowledgement }.toSet()
+        }
 
     /**
      * Accepts the default of every pending item with the ticks it needs. Returns the items the review refused (for example a non-durable
      * queue, which has no automatic fix); the caller decides what to do with them.
      */
-    fun acceptEveryDefault(review: ConversionReview, report: CompatibilityReport): List<ReviewItem> =
-        review.pending.filter { item ->
-            review.decide(item, ItemDecision.Accept(acknowledged = defaultTicks(report, item))) !is DecisionResult.Decided
+    fun acceptEveryDefault(review: ConversionReview, report: CompatibilityReport): List<ReviewItem> {
+        val ticks = ticksByItem(report)
+        return review.pending.filter { item ->
+            review.decide(item, ItemDecision.Accept(acknowledged = ticks[item].orEmpty())) !is DecisionResult.Decided
         }
+    }
 
     /** Accepts every default and skips what cannot be accepted, then generates. Fails loudly when the result is not generated. */
     fun generateAll(
