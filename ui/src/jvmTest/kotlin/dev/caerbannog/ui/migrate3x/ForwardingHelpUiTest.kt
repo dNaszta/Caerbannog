@@ -43,8 +43,9 @@ internal object NoForwardingEvents : ForwardingEvents {
 @OptIn(ExperimentalTestApi::class)
 class ForwardingHelpUiTest {
     private val facts = DryRunResult(QueueCounts(120, 0), DestinationQueue.Exists(DestinationQueueType.QUORUM), true, setOf("policymaker", "monitoring"), null)
+    // Like the real view model: a plain source puts NOT_ENCRYPTED into the lines and the NotEncrypted warning into the warnings.
     private fun confirm(warnings: List<ForwardingWarning> = emptyList()) =
-        ForwardingScreenState.Confirm("orders", "new-eu", listOf("From: legacy-eu, virtual host /, queue orders (amqp://svc-reader@legacy.example:5672/%2F)", ForwardingTexts.MOVED), warnings, facts, ForwardingForm("legacy.example", 5672), canConfirm = false)
+        ForwardingScreenState.Confirm("orders", "new-eu", listOf("From: legacy-eu, virtual host /, queue orders (amqp://svc-reader@legacy.example:5672/%2F)", ForwardingTexts.MOVED) + (if (warnings.any { it is ForwardingWarning.NotEncrypted }) listOf(ForwardingTexts.NOT_ENCRYPTED) else emptyList()), warnings, facts, ForwardingForm("legacy.example", 5672), canConfirm = false)
 
     private fun DesktopComposeUiTest.show(state: ForwardingScreenState) = setContent { ForwardingView(state, NoForwardingEvents) }
 
@@ -85,7 +86,8 @@ class ForwardingHelpUiTest {
     fun `the not encrypted line has its tip only for a plain source`() = runDesktopComposeUiTest(1280, 1000) {
         show(confirm(listOf(ForwardingWarning.NotEncrypted("legacy-eu"))))
         assertTip("fwd-36", ForwardingTexts.tip("fwd-36"))
-        assertTrue(textOf("forward-plan").contains(ForwardingTexts.NOT_ENCRYPTED) || nodes("forward-warning-0").isNotEmpty(), "the existing Not encrypted line stays")
+        assertEquals(1, nodes("help-tip-fwd-36").size, "one tip, the sentence is drawn once")
+        assertTrue(textOf("forward-plan").contains(ForwardingTexts.NOT_ENCRYPTED), "the existing Not encrypted line stays")
     }
 
     @Test

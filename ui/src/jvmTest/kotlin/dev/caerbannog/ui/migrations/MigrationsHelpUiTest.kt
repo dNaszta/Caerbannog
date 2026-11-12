@@ -106,7 +106,7 @@ class MigrationsHelpUiTest {
     fun `a conflict banner is followed by the conflict advice`() = runDesktopComposeUiTest(1280, 900) {
         val outcome = ApplyOutcome.Conflict("0003", 1, 1, "queue exists with other arguments", "orders")
         show(state { copy(applyOutcome = outcome) })
-        assertDrawn("migrations:errorBanner")
+        assertDrawn("migrations:conflictBanner")
         assertAdvice("migrations-advice-outcome", MigrationsWording.applyAdvice(outcome).orEmpty())
     }
 
