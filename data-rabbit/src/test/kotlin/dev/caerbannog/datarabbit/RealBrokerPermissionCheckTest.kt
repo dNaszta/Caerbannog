@@ -87,7 +87,7 @@ class RealBrokerPermissionCheckTest {
         val vh = vhost()
         val admin = user("administrator", "pw-admin")
         ctl("set_permissions", "-p", vh, admin, ".*", ".*", ".*")
-        assertEquals(PermissionCheckResult.Checked(true, true), check(profile(vh, admin), "pw-admin"))
+        assertEquals(PermissionCheckResult.Checked(true, true, userTags = setOf("administrator")), check(profile(vh, admin), "pw-admin"))
     }
 
     @Test
@@ -95,7 +95,7 @@ class RealBrokerPermissionCheckTest {
         val vh = vhost()
         val admin = user("administrator", "pw-admin")
         ctl("set_permissions", "-p", vh, admin, "", ".*", ".*")
-        assertEquals(PermissionCheckResult.Checked(false, true), check(profile(vh, admin), "pw-admin"))
+        assertEquals(PermissionCheckResult.Checked(false, true, userTags = setOf("administrator")), check(profile(vh, admin), "pw-admin"))
     }
 
     @Test
@@ -103,7 +103,7 @@ class RealBrokerPermissionCheckTest {
         val vh = vhost()
         val admin = user("administrator", "pw-admin")
         ctl("set_permissions", "-p", vh, admin, "^orders\\..*", "", ".*")
-        assertEquals(PermissionCheckResult.Checked(true, false), check(profile(vh, admin), "pw-admin"))
+        assertEquals(PermissionCheckResult.Checked(true, false, userTags = setOf("administrator")), check(profile(vh, admin), "pw-admin"))
     }
 
     @Test
