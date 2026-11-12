@@ -136,7 +136,7 @@ Check without the app: `curl -u legacy-admin:dev-password http://localhost:15673
 
 1. `task dev:up-3x` and `task dev:up` (or `dev:reset` once, for the Shovel plugins); create the two profiles above.
 2. Open the 3.x profile, **Migrate from 3.x**, live analysis: expect the message-loss block naming `orders`, `invoices`, `priority-jobs` and the other version-1 queues, the mirrored-queue finding for `ha.reports`, the transient queue finding.
-3. Review: accept or skip each proposal. Generate, then **Save** to a folder (the files hold password hashes: keep them out of git).
+3. Review: accept or skip each proposal. Generate, then **Save** to `dev/migrations-out/` (the app's migrations folder for the trial; everything in it except `.gitkeep` is gitignored, because the files hold password hashes: never commit them, and empty the folder between trials).
 4. Open the 4.x profile and apply the topology migration (dry run first), so `orders`, `invoices` and the others exist there. A Shovel needs the destination queue to exist with the same name.
 5. Forward one queue with the Shovel (for example `invoices`, 3 messages). The AMQP host prefilled for the 4.x broker to reach the 3.x one must be `host.docker.internal` and port `5673`; change it in the confirmation if the app proposes `localhost`. Expect "Moved about 3 of 3 messages"; the source queue stays.
 6. Apply the access migration (users with hashes, vhost `legacy`, permissions, the topic permission) to 4.x; then check on 4.x: `curl -u app:dev-password http://localhost:15672/api/whoami`.
