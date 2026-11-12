@@ -71,7 +71,7 @@ class RealBrokerPlainTest {
     @Test
     fun `the permission check over plain reads the administrator's permissions`() = runBlocking<Unit> {
         val result = ManagementApiPermissionChecker().check(plain(), rabbit.adminPassword)
-        assertEquals(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true), result)
+        assertEquals(PermissionCheckResult.Checked(topologyUnlocked = true, publishingEnabled = true, userTags = setOf("administrator")), result)
     }
 
     @Test
