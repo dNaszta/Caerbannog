@@ -40,7 +40,8 @@ fun HowToLink(howTo: HowTo, modifier: Modifier = Modifier) {
         onClick = { open = true }, modifier = modifier.height(24.dp).testTag("howto-${howTo.id}"),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
     ) { Text("How to", maxLines = 1) }
-    if (open) HowToDialog(howTo) { open = false }
+    // The link may sit in a right-to-left row (TopLineWithHowTo); the dialog must not be mirrored.
+    if (open) CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { HowToDialog(howTo) { open = false } }
 }
 
 /**

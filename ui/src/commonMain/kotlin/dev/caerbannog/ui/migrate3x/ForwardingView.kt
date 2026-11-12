@@ -202,9 +202,6 @@ private fun ConfirmView(state: ForwardingScreenState.Confirm, events: Forwarding
                     Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = emphasis)
                 }
             }
-            val plainWithoutLine = ForwardingTexts.NOT_ENCRYPTED !in state.lines && state.warnings.any { it is ForwardingWarning.NotEncrypted }
-            // The plan carries the warning even if the lines do not: the sentence and its tip are drawn either way.
-            if (plainWithoutLine) Row(verticalAlignment = Alignment.CenterVertically) { Text(ForwardingTexts.NOT_ENCRYPTED, style = MaterialTheme.typography.bodyMedium); FwdTip(36) }
             state.warnings.filterIsInstance<ForwardingWarning.DestinationNotQuorumOrStream>().forEachIndexed { i, w ->
                 WarningBanner(ForwardingTexts.warning(w), Modifier.testTag("forward-warning-$i"))
             }

@@ -145,7 +145,7 @@ fun MigrationsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 8.dp), // was 16: the guidance line of M8-14b needs the height at 1024x768
+                .padding(horizontal = 24.dp, vertical = 8.dp), // 8 dp: the guidance line needs the height at 1024x768
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Subheader Info
