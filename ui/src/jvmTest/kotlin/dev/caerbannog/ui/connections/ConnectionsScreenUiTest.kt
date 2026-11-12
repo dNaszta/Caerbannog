@@ -1335,14 +1335,15 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the two port fields are read-only and show 5551 and 15671`() = runDesktopComposeUiTest(1280, 880) {
+    fun `the two port fields are editable and show 5551 and 15671`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod)) }
         selectProfile(0)
 
+        // Changed on purpose (connection-editable-ports): these used to assert read-only (no set-text action).
         fun check(label: String, value: String) {
             val config = gridField(label).config
             assertEquals(value, config.getOrNull(SemanticsProperties.EditableText)?.text, "'$label' must show $value")
-            assertFalse(config.contains(SemanticsActions.SetText), "'$label' must be read-only (no set-text action)")
+            assertTrue(config.contains(SemanticsActions.SetText), "'$label' must be editable (set-text action)")
         }
         check("Stream port (TLS)", "5551")
         check("Management port (HTTPS)", "15671")
@@ -1352,23 +1353,23 @@ class ConnectionsScreenUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the port fields show the ports of a profile that has others and stay read-only`() = runDesktopComposeUiTest(1280, 880) {
+    fun `the port fields show the ports of a profile that has others and are editable`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel(prod.copy(streamPort = 6551, managementPort = 16671))) }
         selectProfile(0)
 
         assertEquals("6551", gridField("Stream port (TLS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
         assertEquals("16671", gridField("Management port (HTTPS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
-        assertFalse(gridField("Stream port (TLS)").config.contains(SemanticsActions.SetText))
+        assertTrue(gridField("Stream port (TLS)").config.contains(SemanticsActions.SetText))
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a new connection shows the standard ports, read-only`() = runDesktopComposeUiTest(1280, 880) {
+    fun `a new connection shows the standard ports, editable`() = runDesktopComposeUiTest(1280, 880) {
         setContent { ConnectionsScreen(permissionViewModel()) }
 
         assertEquals("5551", gridField("Stream port (TLS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
         assertEquals("15671", gridField("Management port (HTTPS)").config.getOrNull(SemanticsProperties.EditableText)?.text)
-        assertFalse(gridField("Management port (HTTPS)").config.contains(SemanticsActions.SetText))
+        assertTrue(gridField("Management port (HTTPS)").config.contains(SemanticsActions.SetText))
     }
 
     // --- M2-05b: the drawer Connection card and the edit-panel Connect button are GONE ------------------

@@ -67,6 +67,29 @@ class BrokerEndpointsTest {
     }
 
     @Test
+    fun `a single port follows the switch only while it is the default of the old mode`() {
+        assertEquals(5552, BrokerEndpoints.portAfterTlsSwitch(PortKind.STREAM, 5551, tlsNow = false))
+        assertEquals(5551, BrokerEndpoints.portAfterTlsSwitch(PortKind.STREAM, 5552, tlsNow = true))
+        assertEquals(15673, BrokerEndpoints.portAfterTlsSwitch(PortKind.MANAGEMENT, 15673, tlsNow = false))
+        assertEquals(5553, BrokerEndpoints.portAfterTlsSwitch(PortKind.STREAM, 5553, tlsNow = true))
+        assertEquals(1883, BrokerEndpoints.portAfterTlsSwitch(PortKind.MQTT, 8883, tlsNow = false))
+    }
+
+    @Test
+    fun `a port is valid when it is digits only from 1 to 65535`() {
+        listOf("1", "5551", "15673", "65535").forEach {
+            assertEquals(PortParseResult.Valid(it.toInt()), PortInput.parse(it), it)
+        }
+    }
+
+    @Test
+    fun `empty, zero, too large, signed, spaced or non-digit input is invalid`() {
+        listOf("", "0", "65536", "99999999999", "-1", "+5", " 5551", "5551 ", "55a1", "5.5", "٥").forEach {
+            assertEquals(PortParseResult.Invalid(PortInput.INVALID_MESSAGE), PortInput.parse(it), "'$it'")
+        }
+    }
+
+    @Test
     fun `an edited port survives a round trip of the switch`() {
         val edited = BrokerPorts(5600, 15700)
         val off = BrokerEndpoints.afterTlsSwitch(edited, tlsNow = false)

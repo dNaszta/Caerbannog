@@ -4,11 +4,14 @@ import dev.caerbannog.core.connections.BrokerPorts
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
+import dev.caerbannog.core.connections.PortInput
+import dev.caerbannog.core.connections.PortKind
 import dev.caerbannog.core.connections.TopologyControlLevel
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * M2-14e (R6), no Compose: the edit panel's field holder and its "which CA path do I send" rule.
@@ -27,6 +30,84 @@ class ConnectionFormStateTest {
     private val savedWithoutCa = saved.copy(caCertificatePath = null)
 
     private fun newForm() = ConnectionFormState(null).apply { name = "uat-eu"; host = "rabbit.example"; username = "svc" }
+
+    // --- editable ports (connection-editable-ports) ------------------------------------------------------------------------------
+
+    @Test
+    fun `a typed valid port is sent on Save and does not touch the TLS switch`() {
+        val form = newForm()
+        form.onPortTextChange(PortKind.STREAM, "5553")
+        form.onPortTextChange(PortKind.MANAGEMENT, "15673")
+
+        val input = form.toInput(null)
+        assertEquals(5553, input.streamPort)
+        assertEquals(15673, input.managementPort)
+        assertTrue(form.tls)
+        assertEquals(true, input.tls)
+    }
+
+    @Test
+    fun `an invalid or empty port has an error, blocks Save and is never replaced by a default`() {
+        val form = newForm()
+        form.onPortTextChange(PortKind.STREAM, "")
+        assertEquals(PortInput.INVALID_MESSAGE, form.portError(PortKind.STREAM))
+        assertFalse(form.portsValid)
+        assertEquals("", form.streamPortText)
+
+        form.onPortTextChange(PortKind.STREAM, "65536")
+        assertFalse(form.portsValid)
+        form.onPortTextChange(PortKind.STREAM, "5551")
+        assertNull(form.portError(PortKind.STREAM))
+        assertTrue(form.portsValid)
+    }
+
+    @Test
+    fun `an edited port stays when the TLS switch moves, an untouched one follows`() {
+        val form = newForm()
+        form.onPortTextChange(PortKind.MANAGEMENT, "15673")
+        form.switchTls(false)
+
+        assertEquals("5552", form.streamPortText)
+        assertEquals("15673", form.managementPortText)
+        assertEquals(BrokerPorts(5552, 15673), form.ports)
+        assertFalse(form.tls)
+
+        form.switchTls(true)
+        assertEquals(BrokerPorts(5551, 15673), form.ports)
+    }
+
+    @Test
+    fun `a TLS switch leaves a half-typed invalid port text alone`() {
+        val form = newForm()
+        form.onPortTextChange(PortKind.STREAM, "55x")
+        form.switchTls(false)
+
+        assertEquals("55x", form.streamPortText)
+        assertEquals(PortInput.INVALID_MESSAGE, form.portError(PortKind.STREAM))
+        assertEquals("15672", form.managementPortText)
+    }
+
+    @Test
+    fun `the MQTT port is only validated while MQTT is enabled`() {
+        val form = newForm()
+        assertTrue(form.portsValid)
+        form.toggleMqtt(true)
+        assertEquals("8883", form.mqttPortText)
+        form.onPortTextChange(PortKind.MQTT, "")
+        assertFalse(form.portsValid)
+        form.toggleMqtt(false)
+        assertTrue(form.portsValid)
+        assertNull(form.toInput(null).mqttPort)
+    }
+
+    @Test
+    fun `a saved profile keeps its own ports on save`() {
+        val form = ConnectionFormState(saved.copy(streamPort = 5553, managementPort = 15673))
+        assertEquals("5553", form.streamPortText)
+        val input = form.toInput(saved)
+        assertEquals(5553, input.streamPort)
+        assertEquals(15673, input.managementPort)
+    }
 
     private class Row(val label: String, val selected: ConnectionProfile?, val typed: String, val validated: String?, val tls: Boolean, val sent: String?)
 
