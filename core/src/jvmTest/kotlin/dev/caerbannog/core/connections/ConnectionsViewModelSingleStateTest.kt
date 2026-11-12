@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Test
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
@@ -108,7 +109,12 @@ class ConnectionsViewModelSingleStateTest {
         val done = AtomicBoolean(false)
         val readers = List(4) {
             async(Dispatchers.Default) {
-                while (!done.get()) vm.state.value.inconsistency()?.let { violations += it }
+                // yield() keeps the loop cooperative: Dispatchers.Default has one thread per core (2 on CI), and
+                // spinning readers would otherwise starve the writers and cannot be cancelled by the timeout.
+                while (!done.get()) {
+                    vm.state.value.inconsistency()?.let { violations += it }
+                    yield()
+                }
             }
         }
         val writers = profiles.map { profile ->
