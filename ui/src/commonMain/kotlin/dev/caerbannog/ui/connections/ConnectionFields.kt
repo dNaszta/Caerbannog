@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /** The mockup's `auto-fit minmax(220px,1fr)` grid, gap 24 by 16: two columns when two 220dp fields fit, else one. */
@@ -32,14 +33,16 @@ internal fun ConnectionFieldGrid(cells: List<@Composable () -> Unit>) {
     }
 }
 
-/** Read-only because M1 uses TLS and the standard ports; no set-text action, no onValueChange. */
+/** An editable numeric port field; [error] is the inline message (null = valid). Validation lives in the form state. */
 @Composable
-internal fun ReadOnlyPortField(label: String, port: Int) {
+internal fun PortField(label: String, text: String, error: String?, tag: String, onChange: (String) -> Unit) {
     OutlinedTextField(
-        value = port.toString(),
-        onValueChange = {},
-        readOnly = true,
+        value = text,
+        onValueChange = onChange,
+        singleLine = true,
+        isError = error != null,
+        supportingText = error?.let { message -> { Text(message) } },
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
     )
 }

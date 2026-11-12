@@ -9,6 +9,9 @@ import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionProfileInput
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
+import dev.caerbannog.core.connections.PortInput
+import dev.caerbannog.core.connections.PortKind
+import dev.caerbannog.core.connections.PortParseResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 
 /**
@@ -28,15 +31,78 @@ class ConnectionFormState(selected: ConnectionProfile?) {
 
     var enableMqtt: Boolean by mutableStateOf(selected?.mqttPort != null)
 
-    /** Follow the TLS switch; the ports themselves are read-only (see [BrokerEndpoints.afterTlsSwitch]). */
-    var ports: BrokerPorts by mutableStateOf(
+    /** The last valid port values; what [toInput] sends. */
+    private var validPorts: BrokerPorts by mutableStateOf(
         selected?.let { BrokerPorts(it.streamPort, it.managementPort, it.mqttPort) }
             ?: BrokerEndpoints.defaultsFor(tls = true, enableMqtt = false),
     )
 
+    /** What the user sees in the port fields; may be invalid while typing (see [portError]). */
+    var streamPortText: String by mutableStateOf(validPorts.stream.toString())
+        private set
+    var managementPortText: String by mutableStateOf(validPorts.management.toString())
+        private set
+    var mqttPortText: String by mutableStateOf(validPorts.mqtt?.toString().orEmpty())
+        private set
+
+    /** The ports that go into [toInput]. Setting them replaces the field texts; typing goes through [onPortTextChange]. */
+    var ports: BrokerPorts
+        get() = validPorts
+        set(value) {
+            validPorts = value
+            streamPortText = value.stream.toString()
+            managementPortText = value.management.toString()
+            mqttPortText = value.mqtt?.toString().orEmpty()
+        }
+
+    private fun textOf(kind: PortKind): String = when (kind) {
+        PortKind.STREAM -> streamPortText
+        PortKind.MANAGEMENT -> managementPortText
+        PortKind.MQTT -> mqttPortText
+    }
+
+    /** The inline error of one port field, or null when it is valid (or the MQTT field is not shown). */
+    fun portError(kind: PortKind): String? {
+        if (kind == PortKind.MQTT && !enableMqtt) return null
+        return (PortInput.parse(textOf(kind)) as? PortParseResult.Invalid)?.message
+    }
+
+    /** Save is blocked while any shown port field is invalid. */
+    val portsValid: Boolean
+        get() = PortKind.entries.all { portError(it) == null }
+
+    /** The user typed [text] into a port field; a valid value also becomes the port that is saved. */
+    fun onPortTextChange(kind: PortKind, text: String) {
+        when (kind) {
+            PortKind.STREAM -> streamPortText = text
+            PortKind.MANAGEMENT -> managementPortText = text
+            PortKind.MQTT -> mqttPortText = text
+        }
+        val valid = (PortInput.parse(text) as? PortParseResult.Valid)?.port ?: return
+        validPorts = when (kind) {
+            PortKind.STREAM -> validPorts.copy(stream = valid)
+            PortKind.MANAGEMENT -> validPorts.copy(management = valid)
+            PortKind.MQTT -> validPorts.copy(mqtt = valid)
+        }
+    }
+
+    /**
+     * The TLS switch alone decides TLS. A valid port that still equals the default of the old mode moves to the
+     * default of the new mode; an edited port, and any text that is not a valid port yet, is left alone.
+     */
+    fun switchTls(now: Boolean) {
+        tls = now
+        PortKind.entries.forEach { kind ->
+            if (kind == PortKind.MQTT && !enableMqtt) return@forEach
+            val valid = (PortInput.parse(textOf(kind)) as? PortParseResult.Valid)?.port ?: return@forEach
+            val moved = BrokerEndpoints.portAfterTlsSwitch(kind, valid, now)
+            if (moved != valid) onPortTextChange(kind, moved.toString())
+        }
+    }
+
     fun toggleMqtt(enabled: Boolean) {
         enableMqtt = enabled
-        ports = ports.copy(mqtt = if (enabled) (ports.mqtt ?: BrokerEndpoints.defaultMqttPort(tls)) else null)
+        ports = validPorts.copy(mqtt = if (enabled) (validPorts.mqtt ?: BrokerEndpoints.defaultMqttPort(tls)) else null)
     }
 
     /** The CA path is validated on focus loss or Save, and only if it changed since the last validation. */

@@ -23,6 +23,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
+import dev.caerbannog.core.connections.PortInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.connections.BrokerReachabilityChecker
 import dev.caerbannog.core.connections.CaCertificateValidationResult
@@ -49,7 +51,7 @@ import kotlin.test.assertTrue
  * Contract (test tags are the test developer's proposal, text and icon names come from the brief and `docs/ux/`):
  *   "tlsSwitch"            the switch of the row labelled "Use TLS" (a Material Switch: on by default for a new profile and for a saved one with tls on)
  *   "notEncryptedWarning"  the warning directly under the switch, only with TLS off: the text "Not encrypted" and `icon:lock_open` inside
- *   ports                  still read-only text fields. TLS on keeps the labels "Stream port (TLS)" / "Management port (HTTPS)";
+ *   ports                  text fields (editable since connection-editable-ports; tags streamPortField, managementPortField, mqttPortField). TLS on keeps the labels "Stream port (TLS)" / "Management port (HTTPS)";
  *                          TLS off labels them "Stream port" / "Management port" (the "(TLS)" and "(HTTPS)" would be wrong)
  *   CA field               label "CA certificate"; with TLS off it is disabled and its helper reads "Not used without TLS", the saved path stays in it
  *   no text "TLS is always on" and no lock line any more
@@ -290,8 +292,112 @@ class ConnectionsScreenTlsUiTest {
         assertEquals("15671", field("Management port (HTTPS)").text())
     }
 
+    // --- editable ports (connection-editable-ports) ---------------------------------------------------------------------------
+
+    private fun DesktopComposeUiTest.typePort(tag: String, text: String) {
+        onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
+        waitForIdle()
+    }
+
     @Test
-    fun `a saved plain profile shows the switch off and the warning, and another profile resets it`() = runDesktopComposeUiTest(1280, 880) {
+    fun `a typed stream and management port are saved with the new connection`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        fillNew()
+        typePort("streamPortField", "5553")
+        typePort("managementPortField", "15673")
+        save()
+
+        val saved = repository.list().single()
+        assertEquals(5553, saved.streamPort)
+        assertEquals(15673, saved.managementPort)
+        assertEquals(true, saved.tls, "typing a port never changes the TLS switch")
+    }
+
+    @Test
+    fun `a TLS switch does not overwrite an edited port but moves the untouched one`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        typePort("managementPortField", "15673")
+
+        tlsSwitch().performClick()
+        waitForIdle()
+        assertEquals("15673", field("Management port").text(), "the edited port stays")
+        assertEquals("5552", field("Stream port").text(), "the untouched port follows")
+
+        tlsSwitch().performClick()
+        waitForIdle()
+        assertEquals("15673", field("Management port (HTTPS)").text())
+        assertEquals("5551", field("Stream port (TLS)").text())
+    }
+
+    @Test
+    fun `an invalid port shows an inline error and blocks Save, a valid one clears it`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        fillNew()
+        typePort("streamPortField", "70000")
+
+        assertTrue(exists(PortInput.INVALID_MESSAGE), "the inline error is shown")
+        onNodeWithText("Save").performScrollTo().assertIsNotEnabled()
+        save()
+        assertEquals(emptyList(), repository.list(), "nothing is saved while a port is invalid")
+
+        typePort("streamPortField", "")
+        assertTrue(exists(PortInput.INVALID_MESSAGE), "an empty port is an error, not a default")
+        typePort("streamPortField", "55a1")
+        assertTrue(exists(PortInput.INVALID_MESSAGE), "non-digits are an error")
+
+        typePort("streamPortField", "5553")
+        assertFalse(exists(PortInput.INVALID_MESSAGE))
+        onNodeWithText("Save").performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun `editing a saved profile shows its ports, keeps them on save and an edit is stored`() = runDesktopComposeUiTest(1280, 880) {
+        show(uat.copy(streamPort = 5553, managementPort = 15673))
+        select("uat-eu")
+        assertEquals("5553", field("Stream port (TLS)").text())
+        assertEquals("15673", field("Management port (HTTPS)").text())
+
+        save()
+        assertEquals(5553, repository.list().single().streamPort)
+        assertEquals(15673, repository.list().single().managementPort)
+
+        typePort("streamPortField", "5560")
+        save()
+        assertEquals(5560, repository.list().single().streamPort)
+        assertEquals(15673, repository.list().single().managementPort)
+    }
+
+    @Test
+    fun `the MQTT port is editable and validated when MQTT is enabled`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        fillNew()
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().performClick()
+        waitForIdle()
+
+        typePort("mqttPortField", "0")
+        assertTrue(exists(PortInput.INVALID_MESSAGE))
+        onNodeWithText("Save").performScrollTo().assertIsNotEnabled()
+
+        typePort("mqttPortField", "8884")
+        save()
+        assertEquals(8884, repository.list().single().mqttPort)
+    }
+
+    @Test
+    fun `a saved profile with MQTT off stays saveable when the hidden MQTT port is not shown`() = runDesktopComposeUiTest(1280, 880) {
+        show()
+        fillNew()
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().performClick()
+        waitForIdle()
+        typePort("mqttPortField", "")
+        onNodeWithTag("mqttPluginSwitch").performScrollTo().performClick()
+        waitForIdle()
+
+        onNodeWithText("Save").performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun `a saved plain profile shows the switch off and the warning, and another profile resets it`()= runDesktopComposeUiTest(1280, 880) {
         show(dev, uat)
 
         select("dev-local")

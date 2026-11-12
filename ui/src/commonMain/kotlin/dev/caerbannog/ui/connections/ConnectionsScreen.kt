@@ -71,6 +71,7 @@ import dev.caerbannog.core.connections.ConnectionsViewModel
 import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.DeclaredPermissionsEdit
 import dev.caerbannog.core.connections.PermissionBanner
+import dev.caerbannog.core.connections.PortKind
 import dev.caerbannog.core.connections.SaveConnectionResult
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.permissionBanner
@@ -208,9 +209,25 @@ private fun EditPanel(
                     {
                         OutlinedTextField(value = form.username, onValueChange = { form.username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
                     },
-                    // Read-only: the ports follow the TLS switch (P1 of M2-14).
-                    { ReadOnlyPortField(if (form.tls) "Stream port (TLS)" else "Stream port", form.ports.stream) },
-                    { ReadOnlyPortField(if (form.tls) "Management port (HTTPS)" else "Management port", form.ports.management) },
+                    // Editable; an untouched port follows the TLS switch, an edited one stays (see ConnectionFormState.switchTls).
+                    {
+                        PortField(
+                            label = if (form.tls) "Stream port (TLS)" else "Stream port",
+                            text = form.streamPortText,
+                            error = form.portError(PortKind.STREAM),
+                            tag = "streamPortField",
+                            onChange = { form.onPortTextChange(PortKind.STREAM, it) },
+                        )
+                    },
+                    {
+                        PortField(
+                            label = if (form.tls) "Management port (HTTPS)" else "Management port",
+                            text = form.managementPortText,
+                            error = form.portError(PortKind.MANAGEMENT),
+                            tag = "managementPortField",
+                            onChange = { form.onPortTextChange(PortKind.MANAGEMENT, it) },
+                        )
+                    },
                     {
                         OutlinedTextField(
                             value = form.password,
@@ -306,10 +323,7 @@ private fun EditPanel(
             Spacer(modifier = Modifier.height(14.dp))
             TlsSwitchRow(
                 tls = form.tls,
-                onChange = { now ->
-                    form.tls = now
-                    form.ports = BrokerEndpoints.afterTlsSwitch(form.ports, now)
-                },
+                onChange = { now -> form.switchTls(now) },
             )
 
             if (form.tls) {
@@ -324,7 +338,9 @@ private fun EditPanel(
             MqttPluginSection(
                 enabled = form.enableMqtt,
                 tls = form.tls,
-                port = form.ports.mqtt,
+                portText = form.mqttPortText,
+                portError = form.portError(PortKind.MQTT),
+                onPortChange = { form.onPortTextChange(PortKind.MQTT, it) },
                 onToggle = { form.toggleMqtt(it) },
             )
 
@@ -366,7 +382,7 @@ private fun EditPanel(
                         Text("Check connection and permissions")
                     }
                 }
-                Button(onClick = {
+                Button(enabled = form.portsValid, onClick = {
                     // The typed CA path travels in the input: the view model validates it once and stores it only when Valid (R2),
                     // so there is no validate-then-save detour any more and no stale panel scope can save under an old name (R5).
                     form.caEdited = false
@@ -591,7 +607,9 @@ private fun VerifyHostNameRow(verifyHostName: Boolean, onChange: (Boolean) -> Un
 private fun MqttPluginSection(
     enabled: Boolean,
     tls: Boolean,
-    port: Int?,
+    portText: String,
+    portError: String?,
+    onPortChange: (String) -> Unit,
     onToggle: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -615,9 +633,12 @@ private fun MqttPluginSection(
             Switch(checked = enabled, onCheckedChange = null)
         }
         if (enabled) {
-            ReadOnlyPortField(
+            PortField(
                 label = if (tls) "MQTT port (TLS)" else "MQTT port",
-                port = port ?: BrokerEndpoints.defaultMqttPort(tls),
+                text = portText,
+                error = portError,
+                tag = "mqttPortField",
+                onChange = onPortChange,
             )
         }
     }
