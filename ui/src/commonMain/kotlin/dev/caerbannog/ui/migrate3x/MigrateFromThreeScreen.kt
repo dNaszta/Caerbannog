@@ -49,6 +49,7 @@ import dev.caerbannog.core.migrate3x.Severity
 import dev.caerbannog.ui.appframe.ReasonTooltip
 import dev.caerbannog.ui.components.HelpTip
 import dev.caerbannog.ui.components.HowToLink
+import dev.caerbannog.ui.components.TopLineWithHowTo
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -96,7 +97,7 @@ fun MigrateFromThreeScreen(
     forwardingEvents: ForwardingEvents? = null,
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        TopLineWithHowTo(link = { HowToLink(HowToTexts.ANALYSE_AND_GENERATE) }) {
             Row(Modifier.weight(1f).testTag("migrate3x-info"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ConnectionIcon(AppIcon.Info, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
@@ -105,7 +106,6 @@ fun MigrateFromThreeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            HowToLink(HowToTexts.ANALYSE_AND_GENERATE)
         }
         if (forwarding != ForwardingScreenState.Closed && forwardingEvents != null) {
             ForwardingView(forwarding, forwardingEvents)

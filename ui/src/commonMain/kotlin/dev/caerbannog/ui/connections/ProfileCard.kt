@@ -24,12 +24,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.caerbannog.core.connections.ConnectionNotes
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.PermissionPill
 import dev.caerbannog.core.connections.PillTone
 import dev.caerbannog.core.connections.cardPill
+import dev.caerbannog.core.migrate3x.MigrateFromThreeTexts
+import dev.caerbannog.ui.components.HelpTip
 
 @Composable
 internal fun SavedProfilesList(
@@ -81,7 +84,10 @@ private fun ProfileCard(profile: ConnectionProfile, selected: Boolean, status: P
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                cardPill(status, connected)?.let { PermissionPillView(it, Modifier.testTag("permissionPill:${profile.name}")) }
+                cardPill(status, connected)?.let {
+                    PermissionPillView(it, Modifier.testTag("permissionPill:${profile.name}"))
+                    if (it.text == ConnectionNotes.MIGRATION_SOURCE_PILL) HelpTip("conn-19", MigrateFromThreeTexts.HELP_TIP_3X_PILL)
+                }
             }
             Text(profile.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // No "Connected" status in this task's scope: there is no notion yet of an active broker

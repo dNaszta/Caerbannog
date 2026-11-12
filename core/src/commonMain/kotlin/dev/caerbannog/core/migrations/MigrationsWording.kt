@@ -1,16 +1,41 @@
 package dev.caerbannog.core.migrations
 
+import dev.caerbannog.core.help.HelpText
+
 /**
  * The words of the Migrations screen states, built from structured data (`index`, `total`, `reason`) in one place so a wording change touches
  * this file only. Every value is plain text; the screen never renders it as markup. No broker text, password or URL goes in here: the reasons
  * are the executor's fixed texts.
  */
 object MigrationsWording {
-    // M8-14b STUB: empty until the developer writes the texts pinned by MigrationsHelpTextsTest.
-    const val ADVICE_TOP: String = ""
-    val HELP_TIPS: List<dev.caerbannog.core.help.HelpText> = emptyList()
-    fun tip(id: String): String = HELP_TIPS.firstOrNull { it.id == id }?.text.orEmpty() // M8-14b STUB
-    fun applyAdvice(outcome: ApplyOutcome?): String? = null
+    /** M8-14 row 21. */
+    const val ADVICE_TOP: String =
+        "Apply migration files to the connected broker, one action at a time. Applying twice is safe: what already exists is left as it is."
+
+    /** M8-14 rows 23, 24, 26, 27, ids `mig-<row>`. */
+    val HELP_TIPS: List<HelpText> = listOf(
+        HelpText(
+            "mig-23",
+            "The folder with your migration files. It is remembered for this machine and may be a git repository. " +
+                "The applied history is kept in the app's own data, not here.",
+        ),
+        HelpText("mig-24", "Shows what each action would do and whether it is allowed. Nothing is sent."),
+        HelpText("mig-26", "The file changed after it was applied here."),
+        HelpText("mig-27", "The file holds the real hash; the app never shows it."),
+    )
+
+    fun tip(id: String): String = HELP_TIPS.first { it.id == id }.text
+
+    private const val ADVICE_CONFLICT: String =
+        "Something with that name already exists with other settings. Nothing was overwritten. Change it on the broker or in the migration, then apply again."
+    private const val ADVICE_FAILED: String = "The run stopped at this action. Fix the cause and apply again; the file is not marked applied."
+
+    /** M8-14 row 25: fixed advice under the outcome banner; null when the outcome explains itself (NotRecorded) or there is none. */
+    fun applyAdvice(outcome: ApplyOutcome?): String? = when (outcome) {
+        is ApplyOutcome.Conflict -> ADVICE_CONFLICT
+        is ApplyOutcome.Failed -> ADVICE_FAILED
+        is ApplyOutcome.NotRecorded, null -> null
+    }
 
     /** Stands in place of the Edit button of a file that holds a `declareUser`: the raw editor would show the password hash. */
     const val HASH_FILE_NO_EDIT = "This file holds password hashes. Edit it outside the app."

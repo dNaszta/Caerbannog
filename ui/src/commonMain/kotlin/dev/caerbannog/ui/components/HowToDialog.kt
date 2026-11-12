@@ -2,7 +2,10 @@ package dev.caerbannog.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -13,11 +16,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,8 +35,28 @@ import dev.caerbannog.core.help.HowTo
 @Composable
 fun HowToLink(howTo: HowTo, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
-    TextButton(onClick = { open = true }, modifier = modifier.testTag("howto-${howTo.id}")) { Text("How to", maxLines = 1) }
+    // Compact (24 dp, like the tips): the link must not make the top line taller than its text.
+    TextButton(
+        onClick = { open = true }, modifier = modifier.height(24.dp).testTag("howto-${howTo.id}"),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+    ) { Text("How to", maxLines = 1) }
     if (open) HowToDialog(howTo) { open = false }
+}
+
+/**
+ * The top line of a screen: [content] (weighted) and the "How to" [link] (a `HowToLink`) at the right. The link is composed FIRST and laid out at the right (a right-to-left
+ * row), so it is the first Tab stop of the screen (M8-14b) while still sitting top-right (owner decision D4).
+ */
+@Composable
+fun TopLineWithHowTo(link: @Composable () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+            link()
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) { content() }
+            }
+        }
+    }
 }
 
 /** A modal list: the title, "You need", the numbered steps and "If it goes wrong". Tags: `howto-dialog-<id>`, `howto-step-<n>` (1-based), `howto-close`. */

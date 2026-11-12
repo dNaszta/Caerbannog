@@ -47,6 +47,10 @@ import dev.caerbannog.core.forwarding.ForwardingViewModel
 import dev.caerbannog.core.forwarding.ForwardingWarning
 import dev.caerbannog.core.forwarding.QueueRow
 import dev.caerbannog.core.forwarding.RemoveButton
+import dev.caerbannog.core.help.HowToTexts
+import dev.caerbannog.ui.components.HelpTip
+import dev.caerbannog.ui.components.HowToLink
+import dev.caerbannog.ui.components.TopLineWithHowTo
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
@@ -116,6 +120,8 @@ private fun Working(text: String, modifier: Modifier) {
 private fun PickView(state: ForwardingScreenState.Pick, events: ForwardingEvents, modifier: Modifier) {
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         var query by remember { mutableStateOf(state.query) }
+        TopLineWithHowTo(link = { HowToLink(HowToTexts.MOVE_MESSAGES) }) { Advice(ForwardingTexts.ADVICE_TOP, "fwd-advice-top") }
+        Advice(ForwardingTexts.ADVICE_PICK, "fwd-advice-pick")
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
                 value = query, onValueChange = { query = it; events.setQuery(it) }, singleLine = true, label = { Text("Find a queue") },
@@ -155,7 +161,12 @@ private fun RemoveControl(remove: RemoveButton?, events: ForwardingEvents) {
     remove ?: return
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedButton(onClick = events::remove, enabled = remove.enabled, modifier = Modifier.testTag("forward-remove")) { Text("Remove shovel") }
-        remove.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("forward-remove-reason")) }
+        remove.reason?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("forward-remove-reason"))
+                FwdTip(41)
+            }
+        }
     }
 }
 
@@ -179,18 +190,29 @@ private fun ConfirmView(state: ForwardingScreenState.Confirm, events: Forwarding
     var portText by remember { mutableStateOf(state.form.amqpPort.toString()) }
     val form = state.form
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Advice(ForwardingTexts.ADVICE_MOVE, "fwd-advice-move")
         Column(Modifier.testTag("forward-plan"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Forward ${state.queue} to ${state.destination}", style = MaterialTheme.typography.titleMedium)
             // The two sentences the user must not miss: the messages are moved, and the source password is stored in clear text.
             state.lines.forEach {
                 val emphasis = if (it == ForwardingTexts.MOVED || it == ForwardingTexts.CLEAR_TEXT) FontWeight.Bold else null
-                Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = emphasis)
+                if (it == ForwardingTexts.NOT_ENCRYPTED) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text(it, style = MaterialTheme.typography.bodyMedium); FwdTip(36) }
+                } else {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = emphasis)
+                }
             }
+            val plainWithoutLine = ForwardingTexts.NOT_ENCRYPTED !in state.lines && state.warnings.any { it is ForwardingWarning.NotEncrypted }
+            // The plan carries the warning even if the lines do not: the sentence and its tip are drawn either way.
+            if (plainWithoutLine) Row(verticalAlignment = Alignment.CenterVertically) { Text(ForwardingTexts.NOT_ENCRYPTED, style = MaterialTheme.typography.bodyMedium); FwdTip(36) }
             state.warnings.filterIsInstance<ForwardingWarning.DestinationNotQuorumOrStream>().forEachIndexed { i, w ->
                 WarningBanner(ForwardingTexts.warning(w), Modifier.testTag("forward-warning-$i"))
             }
         }
-        Text(ForwardingTexts.amqpLabel(state.destination), style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(ForwardingTexts.amqpLabel(state.destination), style = MaterialTheme.typography.labelLarge)
+            FwdTip(33)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = form.amqpHost, onValueChange = events::setAmqpHost, singleLine = true, label = { Text("Host") },
@@ -202,7 +224,10 @@ private fun ConfirmView(state: ForwardingScreenState.Confirm, events: Forwarding
                 modifier = Modifier.width(120.dp).testTag("forward-amqp-port").semantics { contentDescription = "Port $portText" },
             )
         }
-        SwitchRow(ForwardingTexts.LABEL_ANOTHER_USER, form.anotherUser, "forward-other-user") { events.setAnotherUser(it, user, password) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SwitchRow(ForwardingTexts.LABEL_ANOTHER_USER, form.anotherUser, "forward-other-user") { events.setAnotherUser(it, user, password) }
+            FwdTip(34)
+        }
         if (form.anotherUser) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -216,10 +241,13 @@ private fun ConfirmView(state: ForwardingScreenState.Confirm, events: Forwarding
             }
         }
         SwitchRow(ForwardingTexts.LABEL_KEEP_RUNNING, form.keepRunning, "forward-keep-running", events::setKeepRunning)
-        OutlinedTextField(
-            value = form.typed, onValueChange = events::setTyped, singleLine = true, label = { Text(ForwardingTexts.LABEL_TYPED) },
-            modifier = Modifier.fillMaxWidth().testTag("forward-typed-name"),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = form.typed, onValueChange = events::setTyped, singleLine = true, label = { Text(ForwardingTexts.LABEL_TYPED) },
+                modifier = Modifier.weight(1f).testTag("forward-typed-name"),
+            )
+            FwdTip(37)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = events::confirm, enabled = state.canConfirm, modifier = Modifier.testTag("forward-confirm")) { Text(ForwardingTexts.BUTTON_FORWARD) }
             OutlinedButton(onClick = events::cancel, modifier = Modifier.testTag("forward-cancel")) { Text("Cancel") }
@@ -246,11 +274,21 @@ private fun ProgressView(state: ForwardingScreenState.Progress, events: Forwardi
             Text("Forwarding ${state.queue}", style = MaterialTheme.typography.titleMedium)
             if (!ended) CircularProgressIndicator(Modifier.size(IconSize))
             state.texts.forEachIndexed { i, text ->
-                if (i == 0 && state.state is ForwardingState.Failed) FailureBanner(AppIcon.Error, text) else Text(text, style = MaterialTheme.typography.bodyMedium)
+                when {
+                    i == 0 && state.state is ForwardingState.Failed -> FailureBanner(AppIcon.Error, text)
+                    text == ForwardingTexts.NOT_ENCRYPTED -> Row(verticalAlignment = Alignment.CenterVertically) { Text(text, style = MaterialTheme.typography.bodyMedium); FwdTip(36) }
+                    else -> Text(text, style = MaterialTheme.typography.bodyMedium)
+                }
             }
+            if (!ended) Advice(ForwardingTexts.ADVICE_LEAVE, "fwd-advice-leave")
+            (state.state as? ForwardingState.Failed)?.let { Advice(ForwardingTexts.failureAdvice(it.cleanedUp), "fwd-advice-failure") }
         }
         RemoveControl(state.remove, events)
         if (ended) OutlinedButton(onClick = events::cancel, modifier = Modifier.testTag("forward-cancel")) { Text("Back to the queues") }
         else OutlinedButton(onClick = events::close, modifier = Modifier.testTag("forward-close")) { Text("Back to the report") }
     }
 }
+
+/** The tip of row [n] of the brief for the forwarding view; the text comes from core. */
+@Composable
+private fun FwdTip(n: Int) = HelpTip("fwd-$n", ForwardingTexts.tip("fwd-$n"))
