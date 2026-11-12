@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
@@ -418,7 +419,7 @@ private fun RowScope.ClientsActions(
             button()
         } else {
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text(reason) } },
                 state = rememberTooltipState(),
             ) { button() }
@@ -453,7 +454,7 @@ private fun RowScope.ClientsActions(
             deleteBtn()
         } else {
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text(deleteReason) } },
                 state = rememberTooltipState(),
             ) { deleteBtn() }

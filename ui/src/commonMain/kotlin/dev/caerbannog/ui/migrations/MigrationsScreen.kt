@@ -35,10 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +46,7 @@ import dev.caerbannog.core.help.HowToTexts
 import dev.caerbannog.ui.components.HelpTip
 import dev.caerbannog.ui.components.HowToLink
 import dev.caerbannog.ui.components.TopLineWithHowTo
+import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.ui.migrate3x.Advice
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
@@ -416,7 +415,7 @@ private fun MigrationDetailPanel(
     onApply: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val clipboardManager = LocalClipboardManager.current
+    val copyToClipboard = rememberCopyToClipboard()
 
     Surface(
         modifier = modifier
@@ -455,7 +454,7 @@ private fun MigrationDetailPanel(
                 )
 
                 OutlinedButton(
-                    onClick = { clipboardManager.setText(AnnotatedString(redactedRaw(file.rawJson))) },
+                    onClick = { copyToClipboard(redactedRaw(file.rawJson)) },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .testTag("migrations:copyJsonBtn"),

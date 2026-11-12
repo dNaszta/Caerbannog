@@ -138,7 +138,7 @@ class MigrationsViewModel(
             // Every pending file must be allowed by its own dry run: an access file by tag and level, a topology file by the old rules.
             val canApplyPending = hasPending && canApply && pendingFiles.all { f -> belongsToConnection(f) && (f.up.none { it.isBrokerLevel } || runner.dryRun(f, hasConfigurePermission, controlLevel, vhost, userTags).canApply) }
             val canApplySingle = selected?.status is MigrationStatus.Pending && (dryRun?.canApply == true) &&
-                mayChangeTopology(forFile = selectedFile?.up?.any { it.isBrokerLevel } == true) && historyProblem == null
+                mayChangeTopology(forFile = selectedFile.up.any { it.isBrokerLevel } == true) && historyProblem == null
 
             val hasModified = entries.any { it.status is MigrationStatus.Modified }
             val warning = if (hasModified) {
@@ -214,7 +214,7 @@ class MigrationsViewModel(
             val dryRun = file?.let { runner.dryRun(it, hasConfigurePermission, controlLevel, vhost, userTags) }
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
-                mayChangeTopology(forFile = file?.up?.any { it.isBrokerLevel } == true)
+                mayChangeTopology(forFile = file.up.any { it.isBrokerLevel } == true)
 
             _state.update { current ->
                 current.copy(

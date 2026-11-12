@@ -17,6 +17,6 @@ fun rememberCopyToClipboard(): (String) -> Unit {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     return remember(clipboard, scope) {
-        { text: String -> scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }; Unit }
+        { text: String -> scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) } }
     }
 }

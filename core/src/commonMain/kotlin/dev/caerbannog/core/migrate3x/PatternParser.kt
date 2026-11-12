@@ -149,7 +149,7 @@ internal class PatternParser(private val pattern: String) {
         position++
         val highChar = pattern[position++]
         val high = if (highChar == '\\') classEscape() else ClassMember.Range(highChar, highChar)
-        if (high !is ClassMember.Range || (low as ClassMember.Range).low > high.low) throw PatternException(PatternProblem.Invalid)
+        if (high !is ClassMember.Range || low.low > high.low) throw PatternException(PatternProblem.Invalid)
         return ClassMember.Range(low.low, high.low)
     }
 

@@ -61,7 +61,9 @@ class ActiveConnection(
     // Runs [block] under the lock; the block must not suspend or call out.
     private fun <T> locked(block: () -> T): T {
         // Spin on tryLock like ConnectionSession: a few field writes, and this stays non-suspending.
-        while (!lock.tryLock()) Unit
+        while (!lock.tryLock()) {
+            // spin
+        }
         try {
             return block()
         } finally {

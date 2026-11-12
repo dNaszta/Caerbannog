@@ -65,7 +65,9 @@ class ConnectionSession(
     // Runs [transform] on the tokens and the public state as one step; null means no change.
     private fun change(transform: (Tokens, SessionState) -> Pair<Tokens, SessionState>?) {
         // Spin on tryLock: the critical section is a few map operations, and this stays non-suspending.
-        while (!lock.tryLock()) Unit
+        while (!lock.tryLock()) {
+            // spin
+        }
         try {
             val next = transform(tokens, _state.value) ?: return
             tokens = next.first
