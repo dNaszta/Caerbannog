@@ -57,7 +57,7 @@ class MigrationRequestsTest {
             w.body,
         )
         assertEquals(listOf("durable", "auto_delete", "arguments"), w.body!!.keys.toList())
-        assertEquals(listOf("x-queue-type", "x-delivery-limit"), (w.body!!["arguments"] as JsonObject).keys.toList())
+        assertEquals(listOf("x-queue-type", "x-delivery-limit"), (w.body["arguments"] as JsonObject).keys.toList())
     }
 
     @Test
@@ -153,8 +153,8 @@ class MigrationRequestsTest {
             w.body,
         )
         assertEquals(listOf("pattern", "definition", "priority", "apply-to"), w.body!!.keys.toList())
-        assertFalse((((w.body!!["definition"]) as JsonObject)["max-length"] as JsonPrimitive).isString)
-        assertFalse((w.body!!["priority"] as JsonPrimitive).isString)
+        assertFalse((((w.body["definition"]) as JsonObject)["max-length"] as JsonPrimitive).isString)
+        assertFalse((w.body["priority"] as JsonPrimitive).isString)
     }
 
     @Test
@@ -179,7 +179,7 @@ class MigrationRequestsTest {
     // ---- paths
 
     @Test
-    fun `the default vhost slash is %2F and other vhosts keep their name`() {
+    fun `the default vhost slash is percent-2F and other vhosts keep their name`() {
         assertEquals("/api/queues/%2F/q", write(MigrationAction.DeclareQueue("q", vhost = "/")).path)
         assertEquals("/api/queues/uat/q", write(MigrationAction.DeclareQueue("q", vhost = "uat")).path)
     }
@@ -239,7 +239,7 @@ class MigrationRequestsTest {
     }
 
     @Test
-    fun `a name made only of dots is encoded so no dot segment reaches the broker, and the default vhost stays %2F`() {
+    fun `a name made only of dots is encoded so no dot segment reaches the broker, and the default vhost stays percent-2F`() {
         assertEquals("/api/queues/%2F/%2E%2E", write(MigrationAction.DeclareQueue("..", vhost = "/")).path)
         assertEquals("/api/queues/%2F/%2E", write(MigrationAction.DeclareQueue(".", vhost = "/")).path)
         assertEquals("/api/queues/%2E%2E/q", write(MigrationAction.DeclareQueue("q", vhost = "..")).path)

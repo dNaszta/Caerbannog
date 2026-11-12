@@ -156,9 +156,9 @@ class MigrationTypedValuesTest {
             definition = mapOf("max-length" to ArgumentValue.Whole(1000), "overflow" to ArgumentValue.Text("reject-publish")),
             applyTo = "quorum_queues", priority = 7,
         ).detail
-        assertTrue(detail != null && "max-length=1000" in detail && "overflow=reject-publish" in detail, "detail was: $detail")
-        assertTrue("quorum_queues" in detail!! && "7" in detail, "detail was: $detail")
-        assertTrue(MigrationAction.DeclareOperatorPolicy("o", ".*", mapOf("max-length" to ArgumentValue.Whole(1)), applyTo = "queues").detail!!.contains("max-length=1"))
+        assertTrue("max-length=1000" in detail && "overflow=reject-publish" in detail, "detail was: $detail")
+        assertTrue("quorum_queues" in detail && "7" in detail, "detail was: $detail")
+        assertTrue(MigrationAction.DeclareOperatorPolicy("o", ".*", mapOf("max-length" to ArgumentValue.Whole(1)), applyTo = "queues").detail.contains("max-length=1"))
     }
 
     @Test
@@ -216,8 +216,8 @@ class MigrationTypedValuesTest {
         assertEquals(120, queue.detail!!.length)
         assertEquals("x-long=" + "v".repeat(112) + "…", queue.detail)
         val policy = MigrationAction.DeclarePolicy("p", ".*", mapOf("max" to ArgumentValue.Text("w".repeat(500))))
-        assertEquals(120, policy.detail!!.length)
-        assertTrue(policy.detail!!.startsWith("apply-to=all, priority=0; max=www") && policy.detail!!.endsWith("…"))
+        assertEquals(120, policy.detail.length)
+        assertTrue(policy.detail.startsWith("apply-to=all, priority=0; max=www") && policy.detail.endsWith("…"))
         val exactly120 = MigrationAction.DeclareQueue("q", "quorum", arguments = mapOf("k" to ArgumentValue.Text("v".repeat(118))))
         assertEquals(120, exactly120.detail!!.length)
         assertFalse(exactly120.detail!!.endsWith("…"), "120 characters fit and are not cut")

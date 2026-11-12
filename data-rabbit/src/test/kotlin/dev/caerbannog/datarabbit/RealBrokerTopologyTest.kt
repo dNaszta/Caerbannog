@@ -55,8 +55,7 @@ class RealBrokerTopologyTest {
         private const val MANY_VHOST = "m208-many"
         private val users = mapOf("m208-mon" to ("pw-mon" to "monitoring"), "m208-mgmt" to ("pw-mgmt" to "management"), "m208-plain" to ("pw-plain" to ""))
 
-        private val rabbit: RabbitMQContainer = RabbitMQContainer("rabbitmq:4-management")
-            .withPluginsEnabled("rabbitmq_stream", "rabbitmq_stream_management")
+        private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
             .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")

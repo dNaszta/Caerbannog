@@ -97,7 +97,7 @@ class MigrationWriterTest {
     }
 
     @Test
-    fun `names and the virtual host are encoded, a dot-only name is written with %2E and never as a dot segment`() {
+    fun `names and the virtual host are encoded, a dot-only name is written with percent-2E and never as a dot segment`() {
         assertEquals("/api/queues/team%20a%2Fb/my%20queue", sent(MigrationAction.DeclareQueue("my queue", vhost = "team a/b")).path)
         val dots = sent(MigrationAction.DeclareQueue(".."), 405).path
         assertTrue(dots.endsWith("/%2E%2E"), dots)

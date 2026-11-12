@@ -28,7 +28,7 @@ class PermissionCheckerNestingTest {
         val result = check(DeepJson.arrays())
         assertTrue(result is PermissionCheckResult.Unreadable, "got $result")
         assertEquals(UnreadableCause.BAD_RESPONSE, (result as PermissionCheckResult.Unreadable).cause)
-        assertEquals("malformed JSON", (result as PermissionCheckResult.Unreadable).detail)
+        assertEquals("malformed JSON", result.detail)
         assertFalse(result.topologyUnlocked)
         assertFalse(result.publishingEnabled)
     }

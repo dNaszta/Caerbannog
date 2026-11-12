@@ -50,8 +50,7 @@ import java.util.concurrent.TimeUnit
 class RealBrokerM7GateTest {
 
     companion object {
-        private val rabbit: RabbitMQContainer = RabbitMQContainer("rabbitmq:4-management")
-            .withPluginsEnabled("rabbitmq_stream", "rabbitmq_stream_management")
+        private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
             .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")

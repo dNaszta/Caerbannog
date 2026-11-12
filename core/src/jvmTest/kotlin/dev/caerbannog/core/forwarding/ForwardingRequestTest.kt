@@ -25,6 +25,6 @@ class ForwardingRequestTest {
     fun `a request holds one queue and the default is queue-length`() {
         assertEquals(SrcDeleteAfter.QUEUE_LENGTH, Fwd.request().srcDeleteAfter)
         assertEquals(SrcDeleteAfter.NEVER, Fwd.request(never = true).srcDeleteAfter)
-        assertFalse(ForwardingRequest::class.java.declaredFields.any { java.util.Collection::class.java.isAssignableFrom(it.type) }, "a list form of the request exists")
+        assertFalse(ForwardingRequest::class.java.declaredFields.any { kotlin.collections.Collection::class.java.isAssignableFrom(it.type) }, "a list form of the request exists")
     }
 }

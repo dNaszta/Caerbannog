@@ -69,8 +69,7 @@ class StreamManagementApiSpikeTest {
         private val pw = mapOf("spike-mon" to "pw-mon", "spike-mgmt" to "pw-mgmt", "spike-plain" to "pw-plain")
 
         private fun newContainer(vararg plugins: String): RabbitMQContainer =
-            RabbitMQContainer("rabbitmq:4-management")
-                .withPluginsEnabled(*plugins)
+            brokerWithPlugins("rabbitmq:4-management", *plugins)
                 .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
                 .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
                 .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")
