@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.util.Collections
@@ -97,9 +98,13 @@ class ConnectionSessionStateTest {
         val writersDone = java.util.concurrent.atomic.AtomicBoolean(false)
         val readers = List(4) {
             async(Dispatchers.Default) {
+                // yield() is what keeps this loop cooperative: Dispatchers.Default has one thread per core (2 on a
+                // CI runner), so busy readers that never suspend would occupy every thread, the writers would never
+                // be scheduled and this test would hang (it ran 15 minutes on CI) instead of failing.
                 while (!writersDone.get()) {
                     session.state.value.inconsistency()?.let { violations += it }
                     observed.incrementAndGet()
+                    yield()
                 }
             }
         }
@@ -117,8 +122,12 @@ class ConnectionSessionStateTest {
                 }
             }
         }
-        withTimeout(TIMEOUT_MS) { writers.awaitAll() }
-        writersDone.set(true)
+        try {
+            withTimeout(TIMEOUT_MS) { writers.awaitAll() }
+        } finally {
+            // Also on a timeout: otherwise runBlocking would wait for the readers for ever.
+            writersDone.set(true)
+        }
         withTimeout(TIMEOUT_MS) { readers.awaitAll() }
         collector.cancelAndJoin()
 
