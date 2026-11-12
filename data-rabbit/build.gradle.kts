@@ -70,6 +70,10 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
+    // M8-13 (S-O): AMQP 0-9-1 client for the spike that needs real consumers (exclusive consumers, redelivery, global QoS).
+    // TEST-ONLY, owner approved 2026-11-09. Licence: the POM offers AL 2.0 / MPL 2.0 / GPL v2; used under Apache-2.0.
+    // 5.37.0 (2026-10-01) is the newest release older than two weeks; 5.37.1 (2026-11-06) is not.
+    testImplementation("com.rabbitmq:amqp-client:5.37.0")
 
 }
 

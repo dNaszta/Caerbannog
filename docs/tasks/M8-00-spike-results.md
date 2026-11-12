@@ -172,3 +172,62 @@ Recommendations: (1) the report must contain this as a **blocker with severity "
 ### Not measured in S-N
 
 Release-note confirmation of the 4.3 change, `classic_queue.default_version` in `rabbitmq.conf`, a 3.12 -> 4.x jump, AMQP-published messages, a clustered upgrade, a volume copy (`docker cp`) instead of the same volume, the non-deterministic policy-without-restart conversion (timing), and x86_64 (aarch64 images only).
+
+## S-O: exclusive queues and consumers, redelivery and the delivery limit, global QoS
+
+Measured 2026-11-12 (M8-13a) on `rabbitmq:3.13-management` = 3.13.7 and `rabbitmq:4-management` = 4.4.0 (Docker, aarch64), with `com.rabbitmq:amqp-client` 5.37.0 (test-only; POM licences AL 2.0 / GPL v2 / MPL 2.0, used under Apache-2.0; 5.37.0 is from 2026-10-01, 5.37.1 from 2026-11-06 is too young). Living proof: `RealBrokerM8SpikeDeliveryTest` (9 tests, helper `M8SpikeAmqpSupport.kt`). Method: real consumers with manual acks and `basic.qos(1)`, one poison message requeued in a loop (a loop cap of 60 acks it to end the test), and connections dropped without an ack.
+
+### Exclusive queues and exclusive consumers
+
+- **An exclusive queue is never in a definitions export, on either version** (not in `GET /api/definitions`, so it never reaches a migration file or a scan through the export). The management API lists it (`exclusive: true`) with the owner connection, and **reports `durable: false` even when the client declared it durable**. It is deleted when its connection closes.
+- Another connection that consumes from or passively declares it gets `405 RESOURCE_LOCKED - cannot obtain exclusive access to locked queue`.
+- **A quorum queue cannot be exclusive:** `queue.declare` with `exclusive=true` and `x-queue-type: quorum` (durable or not) is refused on 3.13 and 4.4 alike with `406 PRECONDITION_FAILED - invalid property 'exclusive-owner'`; the same for a stream. The client gets a refusal, not a silent change.
+- **Exclusive consumer (`basic.consume` with `exclusive=true`):** on a classic queue a second consumer is refused (`403 ACCESS_REFUSED - queue ... in exclusive use`). **On a quorum queue the flag is accepted but not enforced:** the first consumer is listed with `exclusive: true`, and a second consumer from another connection is accepted too. Same on 3.13 and 4.4. (Measured: acceptance and listing, not message distribution.)
+- **Meaning:** an exclusive classic queue is transient by nature and invisible to a definitions export, so it is not a migration item. An application that relies on an exclusive consumer for ordering or failover keeps running against a quorum queue **without** the guarantee and gets no error. That is a semantic warning for classic to quorum conversion (the alternative is `x-single-active-consumer`, accepted by both types).
+
+### Redelivery and the delivery limit
+
+| Case | 3.13.7 | 4.4.0 |
+| --- | --- | --- |
+| classic, nack or reject with requeue, 60 times | no limit | no limit |
+| classic, connection dropped without ack, 30 times | no limit | no limit |
+| quorum, no `x-delivery-limit`, **reject** with requeue | no limit (60 deliveries) | **dropped after 21 deliveries (the default limit 20 is real: 1 + 20 redeliveries)** |
+| quorum, no limit, **nack** with requeue | no limit | **no limit (60 deliveries, never counted)** |
+| quorum, `x-delivery-limit` 5, reject | 6 deliveries, then gone | 6 deliveries, then gone |
+| quorum, `x-delivery-limit` 5, **nack** | 6 deliveries, then gone | **60 deliveries, the limit is never reached** |
+| quorum, connection dropped without ack | no limit (30 returns) | **21 deliveries, then gone** (same as reject) |
+| quorum, policy `delivery-limit: 3` | reject and nack both stop after 4 | reject stops after 4, **nack never** |
+
+- **Surprise: on 4.4 `basic.nack` with `requeue=true` on a quorum queue is not counted toward the delivery limit, not even an explicit `x-delivery-limit` or a policy one, while `basic.reject` with `requeue=true`, a closed channel and a closed connection all are.** On 3.13 nack and reject behave the same and count only when a limit is set. Redeliveries from nack carry no `x-delivery-count` header on 4.4; those from reject do (1 to 20). (Measured with single-message nacks, `multiple=false`, prefetch 1. Why 4.4 treats them differently was not investigated.)
+- **A message past the limit is dropped silently when the queue has no dead-letter exchange** (queue empty, no error, the consumer just stops getting it). With a dead-letter exchange it is routed there with `x-first-death-reason: delivery_limit` on both versions.
+- `GET /api/queues/{vhost}/{name}` on 4.4 reports the effective limit as `delivery_limit` (20 for a quorum queue without an explicit limit, 3 under the policy; also `effective_policy_definition: {"delivery-limit":3}` for a policy). **Correction of a first reading:** right after the queue is declared the field is absent or `null` (statistics not collected yet); a first exploratory run that read it too early concluded "not shown", and the second clean run of the test caught it. The field is absent on 3.13. A scan can therefore read the effective limit from a 4.x broker, but not from the 3.13 source (where no default exists anyway).
+- **Meaning for classic to quorum:** a classic queue redelivers forever; a 4.x quorum queue drops a message after 20 failed deliveries (reject, consumer crash or connection loss) unless the queue has a dead-letter exchange with a queue behind it, or `x-delivery-limit` is raised. A poison message that loops forever today becomes a lost message. Consumers that use nack+requeue are not affected on 4.4 (they still loop, which hides the problem).
+
+### Global QoS (`basic.qos` with `global=true`)
+
+- **3.13:** accepted with a classic queue (the limit is shared by the whole channel: two consumers on one channel with prefetch 3 got 3 and 0 unacked messages). With a **quorum queue it is refused**: global qos followed by `basic.consume` closes the whole connection with `540 NOT_IMPLEMENTED - queue ... does not support global qos`; consuming first and setting global qos afterwards is accepted. Per-consumer qos works for both.
+- **4.4: `global=true` is accepted everywhere without an error, for classic and quorum queues, and silently behaves per consumer** (two consumers on one channel with prefetch 3 got 3 and 3, six unacked messages instead of three). `GET /api/deprecated-features` marks `global_qos` `denied_by_default` on 4.4 (`permitted_by_default` on 3.13), yet the AMQP call is not refused. There is no refusal to react to: a client that relied on a channel-wide limit has more in flight after the migration, with no error.
+- **Meaning:** the "check your clients" item for global QoS is worth keeping, and its wording should be "not an error on 4.x: the limit silently applies per consumer", not "refused".
+
+### Not measured in S-O
+
+Single-active-consumer failover, `basic.nack` with `multiple=true`, why nack differs from reject on 4.4, a cluster, AMQP 1.0 clients, whether an exclusive queue declared durable survives a restart (the broker lists it as non-durable), x86_64.
+
+### Follow-up for the architect (S-O)
+
+- **The scenario "Classic to quorum differences the spike has not measured are shown as unverified" (`16_migrate_from_3x.feature`, around line 369) is now outdated.** No scenario carries the `@needs-spike` tag (only the feature headers mention it), and I did not edit feature files or step definitions (they assert the product output "unverified"). Suggested report warnings for a classic queue converted to quorum, severity "behaviour change", not blocker: (1) "a 4.x quorum queue drops a message after 20 failed deliveries (default `x-delivery-limit`); add a dead-letter exchange or raise the limit; a classic queue redelivers forever"; (2) "an exclusive consumer is not enforced on a quorum queue; use `x-single-active-consumer`"; (3) the priority warning stays. The global QoS "check your clients" item should say it is **not refused** on 4.x and silently becomes per consumer.
+- A live scan through `GET /api/queues` should skip `exclusive: true` entries (never exported, transient).
+
+## S-T: `x-max-in-memory-length` and `x-max-in-memory-bytes` on a quorum queue
+
+Measured 2026-11-12 (M8-13a), same brokers (3.13.7 and 4.4.0). Living proof: `RealBrokerM8SpikeInMemoryLimitTest` (3 tests).
+
+- **Declaration:** a quorum queue declared with `x-max-in-memory-length` and/or `x-max-in-memory-bytes` (AMQP `queue.declare` and a `POST /api/definitions` import) is **accepted on 3.13 and on 4.4**; 0 is accepted, a negative value is refused (`invalid arg ... {value_negative,-5}`), a string is refused (`expected integer, got longstr`). A classic queue refuses both (`invalid arg ... of queue type rabbit_classic_queue`). Adding the argument to an existing quorum queue by redeclaring is an `inequivalent arg` refusal, like any argument.
+- **What the management API shows:** the arguments are echoed in `arguments` and kept in `GET /api/definitions`. A policy with `max-in-memory-length` / `max-in-memory-bytes` is accepted (201), also as operator policy, on both versions; it is applied to a matching quorum queue (`policy` and `effective_policy_definition` show it) and does not rewrite `arguments`.
+- **Effect: none observable.** Four quorum queues with 2000 messages of 4 KiB each (two plain, two with `length=1, bytes=1`): `messages_ram` and `message_bytes_ram` are **0 for every queue on both versions**, the unlimited ones included, so the API cannot show an in-memory cap. The queue `memory` field differed between two identical plain queues by about 160 KB on 3.13 and 34 KB on 4.4, more than any difference between a limited and an unlimited queue: noise. No broker log line mentions the arguments. **Conclusion: accepted and echoed; no effect this spike can measure, on either version.** That does not prove the broker ignores them internally (the statistics for quorum queues do not report in-memory messages); it means neither the app nor the user can tell.
+- **Meaning for the report:** a classic queue refuses these arguments, so a 3.x classic queue never has them. They matter only for a **3.x quorum queue** that already carries them: 4.4 accepts them unchanged, so the generator may keep them. Severity: information, not a warning. Do not state that 4.x ignores them (not measured).
+- **Not measured:** the broker's internal memory behaviour (needs an Erlang-side memory breakdown), behaviour under memory pressure, other 4.x versions.
+
+### Follow-up for the architect (S-T)
+
+- The spec text "accepted (effect unverified, warn)" can become "accepted and echoed, no effect observable through the management API; information, keep the argument". The product change, if wanted, is only the severity (warning to information).
