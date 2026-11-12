@@ -231,3 +231,90 @@ Measured 2026-11-12 (M8-13a), same brokers (3.13.7 and 4.4.0). Living proof: `Re
 ### Follow-up for the architect (S-T)
 
 - The spec text "accepted (effect unverified, warn)" can become "accepted and echoed, no effect observable through the management API; information, keep the argument". The product change, if wanted, is only the severity (warning to information).
+
+## S-Q: Shovel over `amqps`, other ack modes, integer `src-delete-after`
+
+Measured 2026-11-12 (M8-13b). Living proof: `RealBrokerM8SpikeAmqpsShovelTest` (4 tests, green). Brokers: Shovel on `rabbitmq:4-management` (4.4.0) with `rabbitmq_shovel` and `rabbitmq_shovel_management`, source `rabbitmq:3.13-management` (3.13.7) on a Docker network under the alias `tlsold`, listening for AMQP over TLS on 5671 (`data-rabbit/src/test/resources/tls/amqps-only.conf`, the throwaway fixtures: CA `Caerbannog Test CA`, server certificate CN and SAN `localhost`, so the host name used by the Shovel does NOT match the certificate). The destination is the local `amqp://`. Fixture credentials only (`guest:guest`).
+
+### TLS: what the URI the product builds today does, and which options change it
+
+The product builds `amqps://user:pw@host:5671/vhost` with no query string (`ManagementShovelGateway.start`). Outcomes on 4.4:
+
+| Source URI (after `amqps://guest:guest@tlsold:5671/%2F`) | Result |
+| --- | --- |
+| nothing (what the product builds) | **terminated**, `reason: "failed to connect to source"`; the 4.4 log says `{tls_alert,{unknown_ca,"TLS client: ... Fatal - Unknown CA"}}` |
+| `?verify=verify_none` | works, 5 of 5 moved (encrypted, certificate NOT checked) |
+| `?verify=verify_peer` (no CA file) | terminated (unknown CA) |
+| `?verify=verify_peer&cacertfile=/etc/rabbitmq/tls/ca.pem` | terminated: the CA is trusted but the host name `tlsold` is not in the certificate |
+| `?cacertfile=...` alone | terminated (same host name check) |
+| `?verify=verify_peer&cacertfile=...&server_name_indication=localhost` | **works**, 5 of 5 moved (verified, host name checked against `localhost`) |
+| `?verify=verify_peer&cacertfile=...&server_name_indication=disable` | works (CA verified, host name check skipped) |
+| `amqp://` to the TLS port 5671, or `amqps://` to the plain port 5672 | terminated |
+
+Findings:
+
+1. **A plain `amqps://` URI verifies the server certificate by default on 4.4.** That is the right default for D9a, but against a broker with a private CA (the owner's usual case, and our fixtures) the Shovel simply fails. It never falls back to `amqp` and never silently turns verification off.
+2. **`cacertfile` (and `certfile`, `keyfile`) name a path on the machine that runs the Shovel, the 4.x broker, not on the app's machine.** The profile's CA field in the app is a file on the user's computer and cannot be used for this. The file has to exist on the 4.x broker (or its CA must be in that broker's trust store).
+3. **The host name must match the certificate, or `server_name_indication` must name a name that does.** The AMQP host the Shovel uses is the one asked in the dialog (decision P8), which can differ from the certificate name: `server_name_indication=<certificate name>` handles that; `disable` skips the host name check only.
+4. **The Shovel status gives no reason for any of this.** A TLS failure, a wrong password (S-F) and a protocol/port mix-up all show `state: terminated`, `reason: "failed to connect to source"`. The TLS detail (`unknown_ca`) is only in the 4.x broker log. The app cannot tell the user which one it was.
+5. **The broker log line of the failed attempt redacts the credentials**: `Shovel 's5' failed to connect (URI: amqps://tlsold:5671/%2F)`. The test asserts that `guest:guest` does not appear in the 4.4 log.
+6. The query options are carried in the URI as plain `key=value` pairs, so the product's URI builder CAN carry them (append a query string after the percent-encoded vhost). It does not today.
+
+**Follow-up for the architect (S-Q, no product code changed):** with TLS on, the forwarding start will fail for every source whose certificate is not trusted by the 4.x broker, and the screen can only say "terminated: failed to connect to source". Decide (a) whether the dialog offers `cacertfile` (a path ON THE 4.X BROKER) and `server_name_indication` as optional advanced fields, with a warning that `verify=verify_none` encrypts without verifying and must never be applied silently (D9a); (b) the wording of the terminated state for `amqps` ("the 4.x broker may not trust this source's certificate, or its host name does not match"; there is no machine-readable reason); (c) that the dry run cannot detect any of this (it does not open the source over AMQP).
+
+### `ack-mode` other than `on-confirm` (documentation only; the product stays on `on-confirm`)
+
+- Accepted values: `no-ack`, `on-publish`, `on-confirm`; anything else is refused at PUT with 400 `ack-mode should be one of [no-ack, on-publish, on-confirm]`.
+- On a healthy path all three move everything the same way (5 of 5, source empty, shovel removed with `queue-length`).
+- **Against a destination that refuses publishes** (classic queue, `x-max-length: 2`, `x-overflow: reject-publish`; 5 messages; `src-delete-after: never`): **`on-confirm` keeps the 3 refused messages** (the Shovel retries them, the `forwarded` counter climbed past 3000 in seconds, and when the Shovel was removed the 3 messages were back on the source queue: source 3, destination 2). **`on-publish` and `no-ack` lost the 3 refused messages for good** (source 0, destination 2, no error anywhere). That is the measured reason for decision P9.
+- Side observation: the `forwarded` counter of a Shovel under `on-confirm` counts attempts, not delivered messages, when the destination refuses.
+- The same limit on a QUORUM destination (`x-max-length` + `reject-publish` declared as a quorum queue) did not limit it in an earlier exploratory run (5 of 5 arrived); not investigated and not recorded as a result.
+
+### Integer `src-delete-after`
+
+- A JSON number is accepted (`>= 0`); the string `"3"` is refused at PUT (400 `src-delete-after should be a number greater than or equal to 0, "never" or "queue-length"`).
+- `3` with 10 messages: exactly 3 moved (source 7, destination 3), then the Shovel removed itself (its parameter and the stored password are gone). The count is exact, no approximation as with `queue-length`.
+- `50` with 10 messages: 10 moved, the Shovel stays `running` waiting for the rest (a count larger than the queue behaves like `never`).
+- `0`: accepted, moves nothing and removes itself at once (10 messages stay on the source).
+- The `forwarded` figure of a Shovel that has already removed itself is no longer available; judge the result from the queues.
+
+## S-P: the `guest` loopback restriction on a plain 4.x install
+
+Measured 2026-11-12 (M8-13b). Living proof: `RealBrokerM8SpikeGuestLoopbackTest` (2 tests, green). Broker `rabbitmq:4-management` (4.4.0). The image ships `loopback_users.guest = false` in `/etc/rabbitmq/conf.d/10-defaults.conf`; the test replaces that file with one that does not contain the line, so the broker runs with its built-in default. The host connects through the mapped Docker port, which reaches the broker from the Docker bridge gateway, not from 127.0.0.1 inside the container.
+
+- **Management API:** `guest:guest` answers **401** `{"error":"not_authorised","reason":"User can only log in via localhost"}` (broker log: `HTTP access denied: user 'guest' - User can only log in via localhost`).
+- **AMQP 0-9-1:** after the client's `start-ok` with PLAIN `guest`/`guest` the broker **closes the TCP connection without a `connection.close` frame**; a client library sees a dropped socket, not an "access refused" text. The broker log has the reason: `PLAIN login refused: user 'guest' can only connect via localhost`.
+- A user created with `rabbitmqctl add_user` (administrator, full permissions) logs in the same way from the same place: management 200, AMQP handshake to `connection.tune`. The restriction is the `loopback_users` list, whose default is exactly `guest`.
+- Control: with the stock image configuration `guest` logs in from outside (200 and `connection.tune`).
+- Not measured: the stream protocol and MQTT with `guest` (same user check, but only management and AMQP were exercised), and a real (non-container) install.
+
+**Wording for the report's `guest` finding (suggested):** "`guest` is the publicly known default account. On a standard RabbitMQ 4.x installation it can only log in from the broker's own host (`loopback_users`), so a migrated `guest` would be refused over the network ('User can only log in via localhost'); where it IS allowed from outside (the official container image does this) it is a publicly known password. The app does not migrate it (M8-12, D2); create a named user for each client instead." Keep the broker's own text visible, as the rule says.
+
+## S-R: a clustered 3.13 export
+
+Measured 2026-11-12 (M8-13b). Living proof: `RealBrokerM8SpikeClusterTest` (2 tests, green). A real two-node cluster of `rabbitmq:3.13-management` (3.13.7), nodes `rabbit@rabbit1` and `rabbit@rabbit2` on a Docker network with a shared Erlang cookie, joined with `rabbitmqctl stop_app; join_cluster rabbit@rabbit1; start_app`; it started and joined reliably here in about 25 s (a third node was not tried). Three HA policies (`ha-mode` `all`, `exactly` with `ha-params: 2`, `nodes` with `ha-params: [rabbit@rabbit1, rabbit@rabbit2]`), classic queues matching them (3 messages each, a real mirror, `synchronised_slave_nodes` filled), a plain classic queue, a classic queue created on node 2 (`"node":"rabbit@rabbit2"` in the declare), and a quorum queue.
+
+**`GET /api/queues` carries the mirror and node fields, `GET /api/definitions` carries none of them.**
+
+- `GET /api/queues/{vhost}` per classic queue: `node` (`"rabbit@rabbit1"`), `policy` (`"ha-all"` or null), `effective_policy_definition` (the applied definition), **`slave_nodes`** (`["rabbit@rabbit2"]`, null when not mirrored), **`synchronised_slave_nodes`**, `recoverable_slaves`, `storage_version` (1 on all of them), `state`. `mirror_pids` is not present. A quorum queue shows `members`, `online`, `leader` instead, and no `storage_version`. A queue created on node 2 shows `node: rabbit@rabbit2` and no mirror fields (no policy).
+- `GET /api/definitions`: top-level keys identical to a single node (`bindings, exchanges, global_parameters, parameters, permissions, policies, product_name, product_version, queues, rabbit_version, rabbitmq_version, topic_permissions, users, vhosts`). Every queue entry is exactly `{name, vhost, durable, auto_delete, arguments}`: **no `node`, no mirror list, no policy name** (the node of `pinned-on-2` is lost). The words `slave` and `mirror` do not appear anywhere in the export. The only node names in it are inside the `ha-params` list of the `nodes` policy. `global_parameters` holds `internal_cluster_id`. `rabbit_version` and `rabbitmq_version` are `3.13.7`.
+- So for a cluster the export looks like a single node's export, and which queues are mirrored can only come from the policies (`ha-mode`), which is what `MirroringIndex` already does.
+- **The product copes.** `DefinitionsParser.parse` reads the clustered export (all queues, all three policies). The live analysis (`ManagementThreeXReads` + `analyseLive`, through the app's own gateway against node 1) reads `storage_version` for every classic queue (`classic-index-v1` findings), flags the mirrored queue with `classic-not-replicated`, lists the `ha-*` policy (`ha-policy-key`) and gives the global `mirroring-in-use` finding from the deprecated-features list. Nothing failed on a cluster.
+- Not measured: a three-node cluster, a node that is down during the export, an `ha-params` list naming a node that has left, a clustered in-place upgrade.
+
+**Follow-up for the architect (S-R):** none needed for correctness. Optional: say in the report that on a cluster only the policies tell which queues are mirrored, and that a queue's node and mirror list are not in the export.
+
+## S-N follow-ups (M8-13b)
+
+Measured 2026-11-12. Living proof: `RealBrokerM8SpikeUpgradeFollowUpTest` (3 tests, green); same method as `RealBrokerM8SpikeUpgradeTest` (one volume, fixed host name, graceful stop). Images: 3.13.7, 4.0 (4.0.9), 4 (4.4.0).
+
+- **`classic_queue.default_version = 2`:** on **3.13.7** a new classic queue declared without arguments is version 2 (default without the setting: 1), and a queue declared with `x-queue-version: 1` stays version 1. So it changes the default for NEW queues only, not existing ones, and an explicit argument still wins. **On 4.4.0** the default is version 2 with or without the setting, and **`x-queue-version: 1` is refused at declare time** (400 `unsupported queue version '1'`), so version 1 queues cannot be created on 4.4 at all (consistent with the 4.3 release notes, below).
+- **MQTT-published messages in a version-1 classic queue** (3.13.7 with `rabbitmq_mqtt`, QoS 1 to `amq.topic`, queue bound with the routing key; the messages arrive as `delivery_mode: 2`; queue `storage_version` 1): after the direct upgrade **4.0.9 keeps 3 of 3 and 4.4.0 has 0 of 3**, the same as management-published messages. The way a message was published does not matter. **AMQP 1.0 was NOT tested** (no AMQP 1.0 client on the test class path; a persistent message sits in the same index, so no difference is expected, but that is not measured).
+- **Timing of the policy-without-restart conversion:** policy `queue-version: 2` on a running 3.13.7 node, then a graceful stop after 0, 3 and 10 s (each twice), then a start of 4.4.0: **3 of 3 messages survived in all six runs, including the one stopped immediately after the policy**. The management API's `storage_version` is NOT immediate: it still said 1 right after the policy and 3 s later, and said 2 only after the 10 s pause (statistics lag). **This differs from the earlier S-N note** ("the API reports version 2 immediately") and the single loss seen then (a stop 3 s after the policy) did **not reproduce**. What can be said: the conversion on disk was in time in six of six runs here, the API value lags and is no proof, and the earlier loss is unexplained. Keep the advice "verify after the restart" and do not claim a timing guarantee.
+- **4.3 release notes (documentation lookup: the GitHub release body of v4.3.0, fetched 2026-11-12; not measured, but the measured result agrees):** "Classic Queues v1 Storage (CQv1) is Removed ... attempts to declare a queue using ... `x-queue-version` set to `1` ... will fail ... Existing classic queues upgraded to CQv2 during an earlier upgrade to `4.2.x` will continue operating as usual." and "This release series supports upgrades from `4.2.x`. Upgrades from earlier series are **not** supported: users must upgrade to the latest available `4.2.x` patch release before upgrading to `4.3.0`." So the in-place 3.13 to 4.3+ jump that loses the messages is also an unsupported upgrade path by the project's own statement, and CQv2 became the default in 4.2.0 per those notes. The same notes move `global_qos`, `queue_master_locator`, `transient_nonexcl_queues`, `amqp_address_v1` and `amqp_filter_set_bug` to `denied_by_default` and make Khepri the only metadata store (documentation only, not measured here).
+
+**Follow-up for the architect (S-N):** the report's message-loss blocker may add "RabbitMQ 4.3 documents in-place upgrades only from 4.2.x" as a second reason for the blue-green recommendation. The sentence about the policy ("an API value of 2 right after the policy is not proof, it lags by seconds") is now more accurate than "the policy applies immediately"; the spec Facts row says it. Check the 4.3 `denied_by_default` list against the existing `clients-*` rules (they already exist for global QoS, transient queues, AMQP address v1).
+
+### Not measured in M8-13b
+
+AMQP 1.0 publishing; a 3.12 to 4.x jump; a clustered upgrade and a volume copy (`docker cp`) instead of the same volume (heavy, out of this task); **S-S (x86_64, Windows, Podman) cannot be run here** (aarch64 images on Docker Desktop only); a Shovel with `src-protocol` other than `amqp091`; a three-node cluster; a quorum destination refusing publishes.
