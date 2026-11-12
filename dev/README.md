@@ -104,7 +104,7 @@ Same engine rules as above (`CONTAINER_ENGINE=podman|docker`).
 compose file maps `host.docker.internal` to the host, so the Shovel on 4.x can reach the 3.x broker at `host.docker.internal:5673`. If the
 4.x broker was started before this change, run `task dev:reset` (or `dev:up` after a `compose down`).
 
-Users (all passwords `dev-password`): `admin` (administrator, `/` and `legacy`), `app` (management; configure only `^app\..*`; a topic permission on
+Users (all passwords `dev-password`): `legacy-admin` (administrator, `/` and `legacy`; not `admin`, which the 4.x dev broker already has with another password hash), `app` (management; configure only `^app\..*`; a topic permission on
 `dev.events` for `orders.*`), `reader` (monitoring, read only), `worker` (no tag).
 
 What the seed gives the analysis to find:
@@ -117,7 +117,7 @@ What the seed gives the analysis to find:
 - **Messages to forward**: `orders` 5, `invoices` 3, `priority-jobs` 4 (priorities 1 to 5), `ha.reports` 2, `quorum-jobs` 3.
 - A second vhost `legacy` (queue `legacy-jobs`, fanout `legacy.events`), exchanges `dev.events` (topic), `dev.commands` (direct), `dev.dlx` (direct) with bindings.
 
-Seeding is done only by this dev tooling (the 3.x management API with `admin`); the app never writes to a 3.x broker.
+Seeding is done only by this dev tooling (the 3.x management API with `legacy-admin`); the app never writes to a 3.x broker.
 
 ### Connection profiles for the trial
 
@@ -126,11 +126,11 @@ Seeding is done only by this dev tooling (the 3.x management API with `admin`); 
 | Host | `localhost` | `localhost` |
 | Management port | `15673` | `15672` (plain) or `15671` (TLS, CA `data-rabbit/src/test/resources/tls/ca.pem`) |
 | Stream port | `5553` (not needed for the migration) | `5552` / `5551` |
-| Vhost, user, password | `/`, `admin`, `dev-password` | `/`, `admin`, `dev-password` |
+| Vhost, user, password | `/`, `legacy-admin`, `dev-password` | `/`, `admin`, `dev-password` |
 | Use TLS | **off** (the app shows "Not encrypted"; fine for this broker) | off for the plain profile (A2), on for A1 |
 | Level | read-only is enough: the app sends only GET requests to it | **Full control** / declare and edit (needed for apply and Shovel) |
 
-Check without the app: `curl -u admin:dev-password http://localhost:15673/api/overview` (`rabbitmq_version` 3.13.x).
+Check without the app: `curl -u legacy-admin:dev-password http://localhost:15673/api/overview` (`rabbitmq_version` 3.13.x).
 
 ### Hand-trial checklist
 
@@ -143,4 +143,4 @@ Check without the app: `curl -u admin:dev-password http://localhost:15673/api/ov
 7. Start over: `task dev:reset-3x` (and `task dev:reset` for the 4.x broker).
 
 A Shovel from this setup was verified by hand on 2026-11-12 (`PUT /api/parameters/shovel` on the dev 4.x broker with
-`amqp://admin:dev-password@host.docker.internal:5673/%2F` as the source: 3 of 3 messages arrived and the Shovel removed itself).
+`amqp://legacy-admin:dev-password@host.docker.internal:5673/%2F` as the source: 3 of 3 messages arrived and the Shovel removed itself).
