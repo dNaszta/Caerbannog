@@ -13,11 +13,11 @@ In, in order:
 
 | Item | Question | Why now |
 | --- | --- | --- |
-| S-N | DONE 2026-11-09 (`M8-00-spike-results.md`, `RealBrokerM8SpikeUpgradeTest`): the loss is the classic queue index version 1, unrecoverable on 4.3+; 4.0 to 4.2 convert it. Remaining follow-ups: the 4.3 release notes, `classic_queue.default_version`, a 3.12 to 4.x jump, AMQP-published messages, a clustered upgrade, a volume copy, the timing of the policy-without-restart conversion, x86_64 | Decides report wording; done |
+| S-N | DONE 2026-11-09 (`M8-00-spike-results.md`, `RealBrokerM8SpikeUpgradeTest`): the loss is the classic queue index version 1, unrecoverable on 4.3+; 4.0 to 4.2 convert it. Remaining follow-ups: a 3.12 to 4.x jump, AMQP 1.0 published messages, a clustered upgrade, a volume copy, x86_64. Done 2026-11-12 (M8-13b, `RealBrokerM8SpikeUpgradeFollowUpTest`): the 4.3 release notes (documentation), `classic_queue.default_version`, MQTT-published messages, the timing of the policy-without-restart conversion | Decides report wording; done |
 | S-O | Exclusive queues and exclusive consumers, redelivery and the delivery limit (default 20 per the owner, 4.x) with real consumers, global QoS refusal. Needs an AMQP 0-9-1 client in test dependencies (`com.rabbitmq:amqp-client`, approved 2026-11-09, test-only) | Semantic warnings of the classic to quorum conversion |
-| S-Q | Shovel over `amqps` with the TLS fixtures (URI options), `ack-mode` other than `on-confirm` (documentation only, v1 is on-confirm), integer `src-delete-after` | TLS rule D9a for the Shovel; today only the unit test covers it |
-| S-P | `guest` loopback restriction on a plain (non-container) 4.x install | `guest` finding wording |
-| S-R | Clustered 3.x export shape (mirrored queues with real mirrors, node fields) | Several of the owner's brokers may be clusters |
+| S-Q | DONE 2026-11-12 (M8-13b, `RealBrokerM8SpikeAmqpsShovelTest`, results in `M8-00-spike-results.md`): Shovel over `amqps` with the TLS fixtures (URI options), `ack-mode` other than `on-confirm` (documentation only, v1 is on-confirm), integer `src-delete-after` | TLS rule D9a for the Shovel; today only the unit test covers it |
+| S-P | DONE 2026-11-12 (M8-13b, `RealBrokerM8SpikeGuestLoopbackTest`; measured with a container whose image config is not relaxed, management and AMQP only; a real non-container install was not run): `guest` loopback restriction on a plain 4.x install | `guest` finding wording |
+| S-R | DONE 2026-11-12 (M8-13b, `RealBrokerM8SpikeClusterTest`, two-node 3.13 cluster): clustered 3.x export shape (mirrored queues with real mirrors, node fields) | Several of the owner's brokers may be clusters |
 | S-T | Effect of `x-max-in-memory-length/-bytes` on a 4.x quorum queue | Warning wording |
 | S-S | x86_64, Windows, Podman runs of the spike tests | Platform risk |
 
