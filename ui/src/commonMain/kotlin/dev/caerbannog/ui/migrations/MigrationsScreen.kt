@@ -44,6 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import dev.caerbannog.core.help.HowToTexts
+import dev.caerbannog.ui.components.HelpTip
+import dev.caerbannog.ui.components.HowToLink
+import dev.caerbannog.ui.components.TopLineWithHowTo
+import dev.caerbannog.ui.migrate3x.Advice
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.migrations.ActionDryRun
@@ -140,21 +145,27 @@ fun MigrationsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp), // 8 dp: the guidance line needs the height at 1024x768
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Subheader Info
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.testTag("migrations:title"),
-            ) {
-                ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // The info line takes the full width (one line); the advice and the "How to" link share the next line, so the added guidance costs little height.
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.testTag("migrations:title"),
+                ) {
+                    ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TopLineWithHowTo(link = { HowToLink(HowToTexts.APPLY_MIGRATIONS) }) {
+                    Advice(MigrationsWording.ADVICE_TOP, "migrations-advice-top", Modifier.weight(1f))
+                }
             }
 
             FolderRow(state, onShowFolder, onChangeFolder)
@@ -163,7 +174,10 @@ fun MigrationsScreen(
             state.unavailableReason?.let { UnavailableBanner(it) }
             FolderAndHistoryBanners(state, onRetry, onChangeFolder, onShowFolder, onStartWithEmptyHistory)
             state.applyProgress?.let { ApplyingBanner(it) }
-            state.applyOutcome?.let { OutcomeBanner(it, onDismissOutcome) }
+            state.applyOutcome?.let {
+                OutcomeBanner(it, onDismissOutcome)
+                MigrationsWording.applyAdvice(it)?.let { advice -> Advice(advice, "migrations-advice-outcome") }
+            }
 
             // Error Banner
             val errorMessage = state.errorMessage
@@ -338,7 +352,10 @@ private fun MigrationFileCard(
                     text = entry.file.version,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
-                StatusPill(entry.status)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusPill(entry.status)
+                    if (entry.status is MigrationStatus.Modified) MigTip(26)
+                }
             }
             Text(
                 text = entry.file.description.ifEmpty { "No description" },
@@ -448,11 +465,14 @@ private fun MigrationDetailPanel(
             }
 
             // Dry Run Title
-            Text(
-                text = "Dry run on ${state.profileName}",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Dry run on ${state.profileName}",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                MigTip(24)
+            }
 
             // Dry run action items
             val dryRun = state.dryRun
@@ -492,11 +512,14 @@ private fun MigrationDetailPanel(
             // The raw editor would draw the real hash (decision B of M8-12a): no Edit button, a fixed text instead.
             val holdsHash = state.selectedFile?.up?.any { it is MigrationAction.DeclareUser } == true
             if (holdsHash) {
-                Text(
-                    text = MigrationsWording.HASH_FILE_NO_EDIT,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.testTag("migrations:hashFileNoEdit"),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = MigrationsWording.HASH_FILE_NO_EDIT,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag("migrations:hashFileNoEdit"),
+                    )
+                    MigTip(27)
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -707,3 +730,7 @@ private fun EditMigrationDialog(
         }
     }
 }
+
+/** The tip of row [n] of the brief for the Migrations screen; the text comes from core. */
+@Composable
+internal fun MigTip(n: Int) = HelpTip("mig-$n", MigrationsWording.tip("mig-$n"))

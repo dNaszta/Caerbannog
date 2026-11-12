@@ -1,7 +1,31 @@
 package dev.caerbannog.core.forwarding
 
+import dev.caerbannog.core.help.HelpText
+
 /** The sentences of the confirmation (spec "Forwarding messages with a dynamic Shovel", safeguards 1, 5, 7, 8). Never a password. */
 object ForwardingTexts {
+    /** M8-14 rows 29, 31, 32, 38: always visible (owner decision D2). */
+    const val ADVICE_TOP: String = "Move the messages of one queue into the same queue on the 4.x broker. The broker moves them; the app only sets it up."
+    const val ADVICE_PICK: String = "One queue at a time. The destination queue must already exist on the 4.x broker: apply the migration first."
+    const val ADVICE_MOVE: String = "Read this before you continue: this moves messages and cannot be undone by the app."
+    const val ADVICE_LEAVE: String = "Leaving this screen stops the progress display, not the shovel. Open the queue again to see it."
+
+    /** M8-14 rows 33, 34, 36, 37, 41, ids `fwd-<row>`. Row 36 is the architect's safe wording (spec D9a does not say the password travels in clear). */
+    val HELP_TIPS: List<HelpText> = listOf(
+        HelpText("fwd-33", "How the 4.x broker reaches the 3.x broker. It can differ from the address you use here."),
+        HelpText("fwd-34", "Typed for this run, kept in memory only, never saved. Use a read-only user if you made one."),
+        HelpText("fwd-36", "The shovel reaches the 3.x broker over a plain connection: anything sent on it, including the password, can be read on the network."),
+        HelpText("fwd-37", "Nothing is sent until the name matches exactly."),
+        HelpText("fwd-41", "It deletes only the shovel, never a queue."),
+    )
+
+    fun tip(id: String): String = HELP_TIPS.first { it.id == id }.text
+
+    /** M8-14 rows 39 and 40: what to do after a failure, by whether the shovel was removed. */
+    fun failureAdvice(cleanedUp: Boolean): String =
+        if (cleanedUp) "Check the AMQP host, port and password of the 3.x broker, then forward again."
+        else "What to do: use a connection with the level Full control and click Remove shovel; the broker still holds the source password until then."
+
     /** The reason of a terminated shovel that gave none. */
     const val NO_REASON: String = "The shovel stopped without giving a reason"
 

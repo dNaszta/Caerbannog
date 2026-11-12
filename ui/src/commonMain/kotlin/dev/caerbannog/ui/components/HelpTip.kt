@@ -38,7 +38,7 @@ fun HelpTip(id: String, text: String, modifier: Modifier = Modifier) {
     Column(modifier) {
         TooltipArea(tooltip = { ReasonTooltip(text) }) {
             Box(
-                Modifier.size(28.dp).testTag("help-tip-$id")
+                Modifier.size(24.dp).testTag("help-tip-$id")
                     .semantics { contentDescription = text }
                     .clickable(role = Role.Button) { open = !open },
                 contentAlignment = Alignment.Center,

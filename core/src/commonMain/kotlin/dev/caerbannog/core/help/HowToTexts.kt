@@ -43,6 +43,53 @@ object HowToTexts {
         keyPhrases = listOf("Definitions file", "Live connection", "message-loss", "Generate migration", "Open Migrations", "administrator"),
     )
 
-    /** Every how-to of the app; M8-14b adds the other two. */
-    val all: List<HowTo> = listOf(ANALYSE_AND_GENERATE)
+    val APPLY_MIGRATIONS: HowTo = HowTo(
+        id = "apply-migrations",
+        title = "Apply a migration",
+        docHeadings = listOf("4. Apply the migration to a 4.x broker", "5. Migrate users, virtual hosts and permissions"),
+        needs = listOf(
+            "A connection to the 4.x broker.",
+            "For topology files: the configure permission, the level Declare and edit, and the same virtual host as the file.",
+            "For the access file: the administrator tag and the level Full control.",
+        ),
+        steps = listOf(
+            "Connect the 4.x broker.",
+            "Choose the folder with your migration files.",
+            "Select a file and read the dry run: each action, allowed or blocked with its reason.",
+            "Click Apply pending.",
+            "Check that each file shows applied.",
+        ),
+        ifWrong = listOf(
+            "The run stops at the failing action and does not mark the file applied; fix the cause and apply again.",
+            "A conflict means something with that name exists with other settings; the app does not overwrite it.",
+        ),
+        keyPhrases = listOf("Apply pending", "Full control", "administrator", "dry run", "conflict"),
+    )
+
+    val MOVE_MESSAGES: HowTo = HowTo(
+        id = "move-messages",
+        title = "Move the messages of a queue",
+        docHeadings = listOf("6. Move the messages of a queue with a Shovel", "7. Check that a Shovel finished, or remove a failed one"),
+        needs = listOf(
+            "A live analysis of the 3.x broker and a connection to the 4.x broker.",
+            "The destination queue already on the 4.x broker: apply the migration first.",
+            "The Shovel plugins enabled on the 4.x broker.",
+            "The policymaker and monitoring tags (or administrator) and the level Declare and edit with the configure permission.",
+        ),
+        steps = listOf(
+            "Click Forward messages in the report and pick the queue on its row.",
+            "Read the plan; if something is blocked, fix the cause and pick the queue again.",
+            "Read the confirmation: the messages are moved and the app cannot undo it. Check the AMQP host and port.",
+            "Type the queue name.",
+            "Click Forward messages and watch the progress.",
+        ),
+        ifWrong = listOf(
+            "Read the reason shown.",
+            "If the shovel could not be removed, use a connection with Full control and click Remove shovel.",
+        ),
+        keyPhrases = listOf("Forward messages", "Remove shovel", "Full control", "plugins", "confirm", "destination", "moved"),
+    )
+
+    /** Every how-to of the app. */
+    val all: List<HowTo> = listOf(ANALYSE_AND_GENERATE, APPLY_MIGRATIONS, MOVE_MESSAGES)
 }

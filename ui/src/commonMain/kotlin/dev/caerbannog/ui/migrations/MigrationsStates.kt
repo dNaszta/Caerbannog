@@ -112,6 +112,7 @@ internal fun FolderRow(state: MigrationsScreenState, onShowFolder: (String) -> U
         ConnectionIcon(AppIcon.Folder, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Migration files in", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         PathText(path, MaterialTheme.colorScheme.onSurface, Modifier.weight(1f, fill = false).testTag("migrations:folderPath"))
+        MigTip(23)
         Spacer(modifier = Modifier.weight(1f))
         if (state.canShowFolder) {
             TextButton(onClick = { onShowFolder(path) }, modifier = Modifier.testTag("migrations:showFolderBtn")) {
