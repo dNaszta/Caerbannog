@@ -65,8 +65,7 @@ class RealBrokerClientsTest {
         private const val OTHER_VHOST = "m206-other"
         private val users = mapOf("m206-mgmt" to "pw-mgmt", "m206-plain" to "pw-plain", "m206-mon" to "pw-mon")
 
-        private val rabbit: RabbitMQContainer = RabbitMQContainer("rabbitmq:4-management")
-            .withPluginsEnabled("rabbitmq_stream", "rabbitmq_stream_management")
+        private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
             .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")

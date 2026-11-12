@@ -34,8 +34,7 @@ class RabbitMqContainerSpikeTest {
     companion object {
         // RabbitMQ 4.x per docs/spec.md "Broker requirements"; stream + stream_management plugins
         // enabled so the real stream client / management client can be spiked here in M1-02+.
-        private val rabbit: RabbitMQContainer = RabbitMQContainer("rabbitmq:4-management")
-            .withPluginsEnabled("rabbitmq_stream", "rabbitmq_stream_management")
+        private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
 
         @JvmStatic
         @BeforeAll

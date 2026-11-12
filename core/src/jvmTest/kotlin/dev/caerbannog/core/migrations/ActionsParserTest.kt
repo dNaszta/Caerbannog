@@ -62,7 +62,7 @@ class ActionsParserTest {
     }
 
     @Test
-    fun `actionsToJson is a pretty JSON array that omits the vhost "slash" like exportToJson and writes any other vhost`() {
+    fun `actionsToJson is a pretty JSON array that omits the vhost slash like exportToJson and writes any other vhost`() {
         val text = MigrationParser.actionsToJson(listOf(MigrationAction.DeclareQueue("a"), MigrationAction.DeclareQueue("b", vhost = "other")))
         assertTrue(text.trimStart().startsWith("["), text)
         assertTrue(text.contains("\n"), "pretty printed: $text")

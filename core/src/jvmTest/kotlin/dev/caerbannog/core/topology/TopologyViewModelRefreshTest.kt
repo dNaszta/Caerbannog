@@ -163,7 +163,7 @@ class TopologyViewModelRefreshTest {
 
         s.topology.clearFailures()
         s.pass(5)
-        assertTrue(s.vm.updatedAtMillis.value!! > first!!)
+        assertTrue(s.vm.updatedAtMillis.value!! > first)
     }
 
     @Test

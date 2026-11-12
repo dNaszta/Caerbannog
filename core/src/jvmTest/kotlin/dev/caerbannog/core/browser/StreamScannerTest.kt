@@ -119,7 +119,7 @@ class StreamScannerTest {
         assertEquals(0, final.matches.size)
         assertTrue(final.limitReached)
         assertNotNull(final.notice)
-        assertTrue(final.notice!!.contains("limit", ignoreCase = true))
+        assertTrue(final.notice.contains("limit", ignoreCase = true))
     }
 
     @Test
