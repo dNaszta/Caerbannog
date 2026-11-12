@@ -4,7 +4,10 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.migrations.ActionDryRun
 import dev.caerbannog.core.migrations.ApplyOutcome
@@ -25,7 +28,7 @@ import javax.imageio.ImageIO
 class MigrationsHelpScreenshotTest {
     private val outDir = File(System.getProperty("user.dir"), "build/screenshots")
 
-    private fun DesktopComposeUiTest.shot(name: String, outcome: ApplyOutcome?) {
+    private fun DesktopComposeUiTest.shot(name: String, outcome: ApplyOutcome?, openHowTo: Boolean = false) {
         val f = MigrationFile("0003", "Desc", listOf(MigrationAction.DeclareQueue("orders", "quorum")), """{ "version": "0003" }""", "abc")
         val state = MigrationsScreenState(
             entries = listOf(MigrationEntry(f, MigrationStatus.Pending), MigrationEntry(f.copy(version = "0002"), MigrationStatus.Modified("a", "b"))),
@@ -37,9 +40,14 @@ class MigrationsHelpScreenshotTest {
             MigrationsScreen(state = state, onSelectVersion = {}, onApplyPending = {}, onApplySingle = {}, onImportJson = {}, onExportTopology = {}, onUpdateFile = { _, _ -> }, onValidateAgain = {}, onDismissError = {})
         }
         waitForIdle()
-        val image = onRoot().captureToImage().toAwtImage()
+        if (openHowTo) { onNodeWithTag("howto-apply-migrations", useUnmergedTree = true).performClick(); waitForIdle() }
+        val image = (if (openHowTo) onAllNodes(isRoot())[1] else onRoot()).captureToImage().toAwtImage()
         outDir.mkdirs()
         check(ImageIO.write(image, "png", File(outDir, "migrations-help-$name.png")))
+    }
+
+    @Test fun `screenshot - dialog opened from the How to link`() = runDesktopComposeUiTest(1280, 900) {
+        shot("dialog-open-1280x900", null, openHowTo = true)
     }
 
     @Test fun `screenshot - 1024x768`() = runDesktopComposeUiTest(1024, 768) { shot("1024x768", null) }

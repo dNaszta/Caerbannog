@@ -20,12 +20,12 @@ import kotlin.test.assertTrue
 class HowToDialogScreenshotTest {
     private val outDir = File(System.getProperty("user.dir"), "build/screenshots")
 
-    private fun DesktopComposeUiTest.shot(howTo: HowTo) {
+    private fun DesktopComposeUiTest.shot(howTo: HowTo, name: String = howTo.id) {
         setContent { HowToDialog(howTo, onClose = {}) }
         waitForIdle()
         val image = onNodeWithTag("howto-dialog-${howTo.id}", useUnmergedTree = true).captureToImage().toAwtImage()
         outDir.mkdirs()
-        val file = File(outDir, "howto-${howTo.id}.png")
+        val file = File(outDir, "howto-$name.png")
         check(ImageIO.write(image, "png", file)) { "no PNG writer for ${file.name}" }
         assertTrue(file.exists() && file.length() > 0, "expected ${file.path}")
     }
@@ -33,5 +33,5 @@ class HowToDialogScreenshotTest {
     @Test fun `screenshot - analyse and generate`() = runDesktopComposeUiTest(1280, 900) { shot(HowToTexts.ANALYSE_AND_GENERATE) }
     @Test fun `screenshot - apply a migration`() = runDesktopComposeUiTest(1280, 900) { shot(HowToTexts.APPLY_MIGRATIONS) }
     @Test fun `screenshot - move the messages of a queue`() = runDesktopComposeUiTest(1280, 900) { shot(HowToTexts.MOVE_MESSAGES) }
-    @Test fun `screenshot - narrow window`() = runDesktopComposeUiTest(480, 700) { shot(HowToTexts.MOVE_MESSAGES) }
+    @Test fun `screenshot - narrow window`() = runDesktopComposeUiTest(480, 700) { shot(HowToTexts.MOVE_MESSAGES, "move-messages-narrow") }
 }
