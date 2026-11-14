@@ -191,6 +191,14 @@ class RealBrokerClientsTest {
         return last
     }
 
+    /**
+     * D2: a screen that saw the broker unreachable keeps its rows, marked stale with a banner, and polls no more until the user reconnects, so
+     * waiting on is hopeless. Fail at once and say so, instead of timing out after the bound with a value that never changes.
+     */
+    private fun failIfLinkLost(screen: String, banner: String?, state: Any) {
+        check(banner == null) { "$screen reported the link lost ('$banner') while the test waited; it polls no more (D2). State: $state" }
+    }
+
     private fun <T> success(result: CatalogResult<T>): T {
         assertInstanceOf(CatalogResult.Success::class.java, result, "expected a value, got $result")
         @Suppress("UNCHECKED_CAST")
@@ -346,17 +354,23 @@ class RealBrokerClientsTest {
                     streamPort = rabbit.getMappedPort(STREAM_TLS_PORT), managementPort = rabbit.httpsPort, caCertificatePath = caPath,
                 ),
             )
+            // One screen at a time, as in the app (a hidden screen calls nothing): the tab first, then the list. Both polling at once puts two
+            // concurrent callers on the shared management client, and the broker closes their idle connections together after 5 s (see
+            // ManagementHttpClosedConnectionTest, finding of 2026-11-14): a lost link, and this test timed out in CI. The assertions are unchanged.
             tab.show(stream)
-            list.setShown(true)
-            // settled by value, bounded: both counts, no settling row left (rows with an empty connection name read "unknown")
+            // Settled by value, bounded: both counts, no settling row left (rows with an empty connection name read "unknown"). A fresh client shows
+            // such rows until the broker's statistics catch up (interval 5 s, measured 0.8 to 4.7 s in the spec) and the tab's next tick (5 s) reads
+            // them: about 10 s at worst, so the 40 s of awaitUntil is four times that, for a loaded runner. A longer bound would not help a lost link.
             val settled = awaitUntil(
                 "the tab shows 2 publishers and 3 settled consumers of $stream",
-                fetch = { tab.state.value },
+                fetch = { tab.state.value.also { failIfLinkLost("the tab", it.banner, it) } },
                 done = { it.screen == StreamClientsScreen.Content && it.publishers.size == 2 && it.consumers.size == 3 && it.publishers.none { p -> p.settling } && it.consumers.none { c -> c.connection == "unknown" } && it.lastOffset == "3" },
             )
+            tab.hide()
+            list.setShown(true)
             val row = awaitUntil(
                 "the list row of $stream shows 2 publishers and 3 consumers",
-                fetch = { list.state.value.rows.firstOrNull { it.name == stream } },
+                fetch = { list.state.value.also { failIfLinkLost("the list", it.banner, it) }.rows.firstOrNull { it.name == stream } },
                 done = { it != null && it.publishers == "2" && it.consumers == "3" },
             )
             assertEquals(row!!.publishers, settled.publishers.size.toString(), "publishers: tab vs list column")
