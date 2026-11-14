@@ -3,7 +3,7 @@
 Milestone: M2    Depends on: M2-17 (the facts), **the owner's confirmation of the wording**    Size: S
 
 ## Goal
-The tooltip of the "N behind" status says what the broker's number means for every consumer, not only for one that stores its offset. Nothing else on the screen changes: the number, "Caught up only at 0", the neutral style and the accessible description keep the rules of the lag ruling.
+The tooltip of the "N behind" status says what the broker's number means for every consumer, not only for one that stores its offset. Nothing else on the screen changes: the number, "Caught up only at 0", the neutral style and the accessible description keep the rules of the lag ruling. (Addendum, owner 2026-11-15, F1: the footnote under the consumers table gets the same correction; see "Addendum" below. The tooltip scope in this brief is unchanged.)
 
 ## Why
 The M2-17 finding (`docs/tasks/M2-17-s-a-lag-steady-state.md`, table, and the corrected Consumers row in `docs/spec.md`): once the broker's second statistics refresh has run, every consumer that has read to the end of a stream shows the same lag, whether it stores offsets or not (0 where nobody stored, 2 or 4 in the measured cases). The text built in M2-06, "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.", is true but suggests that a consumer that never stores is exempt. A user who reads "2 behind" on their own non-storing consumer and then the tooltip would look for a store that is not there.
@@ -33,7 +33,7 @@ In:
 - Tests first (red on the old text): the literals in `core/src/jvmTest/.../StreamClientsTextsTest.kt` (line 21) and `ui/src/jvmTest/.../StreamClientsTestKit.kt` (`HINT_TEXT`, line 102). `ClientsSteps.kt` (acceptance, lines 271 to 272) compares with the constant and with the fragment "Stored offsets count", which option A keeps (checked 2026-11-15: both lines pass unchanged, no other sentence in the repo starts with the fragment). Every other test that shows the text reads `HINT_TEXT` or the constant (`StreamClientsLazyUiTest`, `StreamClientsStatusUiTest`, `StreamScreenUiTest`, `StreamClientsViewModelRowsTest`, `StreamClientsTextsTest` line 31), so they go red and green with the two literals.
 - The mockup `docs/ux/Clients.dc.html`: the two pill titles (lines 94 and 101) and the note (line 119).
 - `docs/spec.md`: the tab paragraph says "Wording open (M2-17b ...)": replace it with the confirmed text and the owner's decision (date).
-Out: the rule (Caught up only at 0, the broker's number, neutral style), the status types, the `04` scenarios (the `@fake-broker` scenario "A consumer that stored its offsets can read a few behind without being behind" stays true and keeps its steps), any layout change.
+Out: the rule (Caught up only at 0, the broker's number, neutral style), the status types, the `04` scenarios (the `@fake-broker` scenario "A consumer that stored its offsets can read a few behind without being behind" stays true and keeps its steps), any layout change. (The footnote was out of this scope; the owner added it on 2026-11-15, see "Addendum".)
 
 ## Acceptance
 - BDD: `04_publishers_consumers.feature` / "A consumer that stored its offsets can read a few behind without being behind" and the lag outline stay green and unedited (`@fake-broker`).
@@ -52,10 +52,41 @@ None. The MCP tools return the number, not the tooltip.
 ## Open points
 Answered 2026-11-15 (option A, sentence in "Owner decision"); the spec and the mockup carry the confirmed text, the code and tests follow in steps 2 to 4.
 
-Found on the re-check, NOT in scope until the owner answers: the footnote under the consumers table (`StreamClientsTexts.FOOTNOTE`, `core/.../StreamClientsState.kt` lines 131 and 132; mockup line 107) says the broker's number "can be higher than the real distance for a consumer that stores its offset (each stored offset counts)". That has the same flaw as the old tooltip and now sits next to a tooltip that says "any consumer of a stream where offsets are stored". No test pins it. Options and the architect's recommendation are with the coordinator; if the owner changes it, it becomes a second constant, a new pinning test and one mockup line, still one small task. Until then the footnote stays as it is.
+Footnote question: ANSWERED 2026-11-15 (owner, "F1"), now in scope as the "Addendum" below. Record of the finding, kept as history: the footnote under the consumers table (`StreamClientsTexts.FOOTNOTE`, `core/.../StreamClientsState.kt` lines 131 and 132; mockup line 107) said the broker's number "can be higher than the real distance for a consumer that stores its offset (each stored offset counts)". That had the same flaw as the old tooltip and sat next to a tooltip that says "any consumer of a stream where offsets are stored". (The original note here said "no test pins it"; the re-check for the addendum found that `StreamScreenUiTest` line 206 pins the start and the end of the footnote, not the middle with the changed fragment; see the occurrence list in the Addendum.)
+
+Nothing else is open in this task.
+
+## Addendum (owner decision 2026-11-15, F1)
+
+**Decision.** The owner answered "F1" (relayed by the coordinator, 2026-11-15): in the footnote, the fragment "for a consumer that stores its offset" becomes "on a stream where offsets are stored". Nothing else in the footnote changes. The exact final text of `StreamClientsTexts.FOOTNOTE` (one paragraph, one string):
+
+> Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher than the real distance on a stream where offsets are stored (each stored offset counts). Caught up only at 0.
+
+The first sentence ("Read from the management API (rabbitmq_stream_management).") is the footnote's existing first sentence; it is not part of the change, and `StreamScreenUiTest` (line 214) pins it. The owner's relayed sentence began at "Messages behind"; it was read as the part that carries the change, not as a request to drop the first sentence.
+
+**Why.** Same finding as the tooltip (M2-17): once the broker's second statistics refresh has run, every consumer of a stream where any application stored offsets reads the same small lag. "For a consumer that stores its offset" points the reader at the wrong cause for a consumer that never stores, and it now stands under a tooltip that says "any consumer of a stream where offsets are stored".
+
+**Scope.**
+In:
+- The constant `StreamClientsTexts.FOOTNOTE` (`core/src/commonMain/kotlin/dev/caerbannog/core/streams/StreamClientsState.kt`, lines 131 and 132): replace only the fragment; keep the two-part string concatenation and every other word and mark.
+- One new pinning test, written first and seen red: a new test method in `core/src/jvmTest/kotlin/dev/caerbannog/core/streams/StreamClientsTextsTest.kt` that asserts the whole `StreamClientsTexts.FOOTNOTE` against the literal above. A new method, not a line added to "the texts are the words of the brief", so that no existing test is edited. It fails on the old constant with an assertion mismatch (old text against new text), which is the right reason. Why core: the class already pins the other texts of this tab as literals, it is the fast module, and the screen reads the same constant (`StreamScreen.kt` line 595), so one literal in core covers what the user sees.
+- Mockup `docs/ux/Clients.dc.html`, line 107, the footnote (done by the architect, same commit as this addendum).
+- `docs/spec.md`: one sentence in the "Publishers and consumers tab" paragraph (done by the architect, same commit).
+Out: the tooltip sentence (`STORED_OFFSETS_HINT`), the lag rule, the status types, the `04` scenarios (no feature file or step mentions the footnote), the layout, any other text of the tab, `RealBrokerClientsTest`, `ManagementHttp`, `TlsSupport`, the M2-17d brief.
+
+**Acceptance.**
+- The new test is red on the old constant and green on the new one; it is the only test added.
+- Every other test is unedited and green. Tests that read the footnote and must stay green without an edit: `StreamScreenUiTest` line 206 (starts with "Read from the management API (rabbitmq_stream_management)." and ends with "Caught up only at 0.", both still true) and `StreamClientsLazyUiTest` line 134 (the footnote exists at the end of the list). Do not expect them to go red.
+- The tooltip change is untouched: the diff of the build commit shows no change to `STORED_OFFSETS_HINT` and no change to the tooltip literals in `StreamClientsTextsTest` (line 21) and `StreamClientsTestKit` (`HINT_TEXT`).
+- Screenshots: run `./gradlew :ui:screenshotTest --tests '*StreamClientsScreenshotTest*'` once after the build and look at two files. `clients-01-rows.png` draws the footnote itself (today on two lines, the first wraps after "for a"; the new fragment is one character shorter, 36 against 37, so the wrap barely moves): the text must still fit on its lines and not be clipped. `clients-02c-hint-last.png` (popup of the last row): it must still cover only what was accepted in the M2-17b review (its own row's status text and part of the first footnote line, nothing beyond). The pictures in `ui/build/screenshots` from the M2-17b step 4 run show the old text; do not use them as the result.
+- Fast set once before the merge, as in step 4 of the tooltip change: `:core:jvmTest :ui:jvmTest :acceptance-tests:test` and `verifyTestDiscovery`. No `tests/bdd` change.
+
+**Steps.** Step 2a (test developer): the new test only, seen red. Step 3a (senior developer): the constant only, the new test green. Step 4a (test developer): screenshot class once and the two pictures, fast set once. Step 5a (architect): review. One commit per step on the branch.
+
+**MCP.** None: the MCP tools return the numbers, not the screen's footnote (no occurrence of `FOOTNOTE` or the text in `:mcp-server`, checked 2026-11-15).
 
 ## Definition of done
-Owner's decision recorded here and in the spec, tests red then green, mockup and spec text in line, no unrelated change.
+Owner's decision recorded here and in the spec, tests red then green, mockup and spec text in line, no unrelated change. Addendum: the new footnote test red then green, every other test unedited, the screenshot class run once and the two pictures looked at.
 
 ## Status
 - Branch: `m2-17b-lag-hint-wording` (worktree `.claude/worktrees/m2-17b`, from main 286c44f). Round: 0.
