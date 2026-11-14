@@ -30,7 +30,7 @@ Question for the owner (one): confirm option A, or give the sentence you want (o
 ## Scope (after the owner's answer; shown for option A)
 In:
 - Change the constant `StreamClientsTexts.STORED_OFFSETS_HINT` (`core/src/commonMain/kotlin/dev/caerbannog/core/streams/StreamClientsState.kt`, line 103) to the confirmed sentence.
-- Tests first (red on the old text): the literals in `core/src/jvmTest/.../StreamClientsTextsTest.kt` (line 21) and `ui/src/jvmTest/.../StreamClientsTestKit.kt` (`HINT_TEXT`, line 102). `ClientsSteps.kt` (acceptance, lines 271 to 272) compares with the constant and with the fragment "Stored offsets count", which option A keeps; check the fragment for any other sentence.
+- Tests first (red on the old text): the literals in `core/src/jvmTest/.../StreamClientsTextsTest.kt` (line 21) and `ui/src/jvmTest/.../StreamClientsTestKit.kt` (`HINT_TEXT`, line 102). `ClientsSteps.kt` (acceptance, lines 271 to 272) compares with the constant and with the fragment "Stored offsets count", which option A keeps (checked 2026-11-15: both lines pass unchanged, no other sentence in the repo starts with the fragment). Every other test that shows the text reads `HINT_TEXT` or the constant (`StreamClientsLazyUiTest`, `StreamClientsStatusUiTest`, `StreamScreenUiTest`, `StreamClientsViewModelRowsTest`, `StreamClientsTextsTest` line 31), so they go red and green with the two literals.
 - The mockup `docs/ux/Clients.dc.html`: the two pill titles (lines 94 and 101) and the note (line 119).
 - `docs/spec.md`: the tab paragraph says "Wording open (M2-17b ...)": replace it with the confirmed text and the owner's decision (date).
 Out: the rule (Caught up only at 0, the broker's number, neutral style), the status types, the `04` scenarios (the `@fake-broker` scenario "A consumer that stored its offsets can read a few behind without being behind" stays true and keeps its steps), any layout change.
@@ -38,7 +38,7 @@ Out: the rule (Caught up only at 0, the broker's number, neutral style), the sta
 ## Acceptance
 - BDD: `04_publishers_consumers.feature` / "A consumer that stored its offsets can read a few behind without being behind" and the lag outline stay green and unedited (`@fake-broker`).
 - Unit and UI: the three literals above, red first, then green; every other test unedited.
-- Screenshots: run `task test:screenshots` once if a screenshot test shows the tooltip (check first; the hint is a hover text, so probably not).
+- Screenshots: checked 2026-11-15, one does show it. `StreamClientsScreenshotTest` (`hintShot`, files `clients-02a-hint-first.png`, `clients-02b-hint-middle.png`, `clients-02c-hint-last.png`) opens the keyboard hint popup of a real `ConsumerStatus.Behind`, so it draws the new sentence (137 characters instead of 121, popup width capped at 320 dp, so it may take one more line). After the build run `./gradlew :ui:screenshotTest --tests '*StreamClientsScreenshotTest*'` once and look at the three files, the last row first. The geometry (inside the window and the table, off the header) is already pinned by `StreamClientsHintPopupUiTest` in the normal `ui:jvmTest`.
 
 ## Design notes
 Core text constant only; no new type, no new state. The text travels in `ConsumerStatus.Behind.hint` and is shown as a tooltip and as an accessible description (M2-06b), so no `ui` change.
@@ -50,7 +50,9 @@ Core text constant only; no new type, no new state. The text travels in `Consume
 None. The MCP tools return the number, not the tooltip.
 
 ## Open points
-The owner's answer. Until then nothing in the code changes and the spec carries the open marker.
+Answered 2026-11-15 (option A, sentence in "Owner decision"); the spec and the mockup carry the confirmed text, the code and tests follow in steps 2 to 4.
+
+Found on the re-check, NOT in scope until the owner answers: the footnote under the consumers table (`StreamClientsTexts.FOOTNOTE`, `core/.../StreamClientsState.kt` lines 131 and 132; mockup line 107) says the broker's number "can be higher than the real distance for a consumer that stores its offset (each stored offset counts)". That has the same flaw as the old tooltip and now sits next to a tooltip that says "any consumer of a stream where offsets are stored". No test pins it. Options and the architect's recommendation are with the coordinator; if the owner changes it, it becomes a second constant, a new pinning test and one mockup line, still one small task. Until then the footnote stays as it is.
 
 ## Definition of done
 Owner's decision recorded here and in the spec, tests red then green, mockup and spec text in line, no unrelated change.
