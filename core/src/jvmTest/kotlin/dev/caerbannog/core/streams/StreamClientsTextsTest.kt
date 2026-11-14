@@ -18,7 +18,7 @@ class StreamClientsTextsTest {
         assertEquals("Publishers and consumers could not be loaded.", StreamClientsTexts.LOAD_FAILED)
         assertEquals("This stream no longer exists.", StreamClientsTexts.STREAM_GONE)
         assertEquals(
-            "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.",
+            "Stored offsets count as messages, so any consumer of a stream where offsets are stored can read a few behind when it has read everything.",
             StreamClientsTexts.STORED_OFFSETS_HINT,
         )
     }

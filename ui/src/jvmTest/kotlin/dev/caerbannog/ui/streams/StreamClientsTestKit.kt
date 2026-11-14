@@ -99,7 +99,7 @@ internal const val PLUGIN_TEXT = "The stream management plugin is not enabled. E
 internal const val GONE_TEXT = "This stream no longer exists."
 internal const val FAILED_TEXT = "Publishers and consumers could not be loaded."
 internal const val DENIED_CLIENTS_TEXT = "This user cannot read stream statistics. Ask for the monitoring tag."
-internal const val HINT_TEXT = "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything."
+internal const val HINT_TEXT = "Stored offsets count as messages, so any consumer of a stream where offsets are stored can read a few behind when it has read everything."
 
 /** What the screen is showing now; assign to change it in a running test (then `waitForIdle()`). */
 internal class ShownClients(state: StreamClientsState, now: Long, val events: RecordedClientsEvents) {
