@@ -2,10 +2,18 @@ name: Package installers
 
 # Builds the desktop installers on their native OS (jpackage cannot cross-build).
 # Run it by hand (Actions tab), or push a tag like v1.0.0 to also attach the installers to a GitHub release.
+# It also runs on pushes to main that touch packaging inputs (the path filter does not apply to tags).
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
+    branches: [main]
+    paths:
+      - 'desktopApp/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - '.github/workflows/package.yml'
 
 permissions:
   contents: read
