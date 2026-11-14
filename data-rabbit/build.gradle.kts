@@ -66,7 +66,7 @@ dependencies {
     // plain JUnit test via runBlocking.
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
