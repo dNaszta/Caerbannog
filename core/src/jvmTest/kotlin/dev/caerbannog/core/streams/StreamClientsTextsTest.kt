@@ -24,6 +24,15 @@ class StreamClientsTextsTest {
     }
 
     @Test
+    fun `the footnote under the consumers table says offsets are stored on a stream, not by a consumer`() {
+        assertEquals(
+            "Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher than the real distance " +
+                "on a stream where offsets are stored (each stored offset counts). Caught up only at 0.",
+            StreamClientsTexts.FOOTNOTE,
+        )
+    }
+
+    @Test
     fun `Behind reads the lag with grouped digits and carries the stored offsets hint, Caught up carries none`() {
         assertEquals("3 behind", ConsumerStatus.Behind(3).text)
         assertEquals("349 behind", ConsumerStatus.Behind(349).text)
