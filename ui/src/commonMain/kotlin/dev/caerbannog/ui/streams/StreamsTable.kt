@@ -98,7 +98,7 @@ private enum class Column(val header: String, val width: Dp, val numeric: Boolea
     FirstOffset("First offset", 83.dp, true),
     LastOffset("Last offset", 81.dp, true),
     Size("Size", 38.dp, true),
-    Publishers("Publishers", 86.dp, true),
+    Publishers("Publishers", 100.dp, true),
     Consumers("Consumers", 86.dp, true),
     ;
 
