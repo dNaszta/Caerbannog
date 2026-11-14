@@ -58,4 +58,9 @@ Found on the re-check, NOT in scope until the owner answers: the footnote under 
 Owner's decision recorded here and in the spec, tests red then green, mockup and spec text in line, no unrelated change.
 
 ## Status
-- Step 1 (architect, 2026-11-15): written and BLOCKED on the owner's confirmation of the wording (option A recommended). Not started.
+- Branch: `m2-17b-lag-hint-wording` (worktree `.claude/worktrees/m2-17b`, from main 286c44f). Round: 0.
+- Step 1 (architect, 2026-11-15): DONE, commit 6042a8e. Brief confirmed ready (owner chose option A on 2026-11-15); spec tab paragraph and mockup (two pill titles and the note) carry the confirmed sentence. Two test literals (`StreamClientsTextsTest:21`, `StreamClientsTestKit.HINT_TEXT:102`) plus the constant; `ClientsSteps` needs no change.
+- Step 2 (test developer): next. Last verdict: none yet.
+- Open findings: none.
+- Open question for the owner (not in scope, not built): the footnote `StreamClientsTexts.FOOTNOTE` ("... for a consumer that stores its offset ...") has the same flaw as the old tooltip. F1 (recommended): change that fragment to "on a stream where offsets are stored" with one pinning test and mockup line 107; F2: leave it. Goes into the final report to the owner.
+- Screenshot: `StreamClientsScreenshotTest` (`hintShot`) draws the hint popup; run it once after the build and look at the three `clients-02*-hint-*.png` files.
