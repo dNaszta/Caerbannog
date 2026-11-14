@@ -100,7 +100,7 @@ object StreamClientsTexts {
     /** Shown for a row whose broker user is not known (an em dash). */
     const val NO_USER: String = "\u2014"
     const val CAUGHT_UP: String = "Caught up"
-    const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything."
+    const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so any consumer of a stream where offsets are stored can read a few behind when it has read everything."
     const val NOT_ACTIVE: String = "Not active"
     const val OWN_CONNECTIONS_NOTICE: String = "Showing only your own connections. The monitoring tag shows all."
     const val PLUGIN_MISSING: String = "The stream management plugin is not enabled. Enable rabbitmq_stream_management on the broker."
