@@ -100,7 +100,7 @@ object StreamClientsTexts {
     /** Shown for a row whose broker user is not known (an em dash). */
     const val NO_USER: String = "\u2014"
     const val CAUGHT_UP: String = "Caught up"
-    const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything."
+    const val STORED_OFFSETS_HINT: String = "Stored offsets count as messages, so any consumer of a stream where offsets are stored can read a few behind when it has read everything."
     const val NOT_ACTIVE: String = "Not active"
     const val OWN_CONNECTIONS_NOTICE: String = "Showing only your own connections. The monitoring tag shows all."
     const val PLUGIN_MISSING: String = "The stream management plugin is not enabled. Enable rabbitmq_stream_management on the broker."
@@ -129,7 +129,7 @@ object StreamClientsTexts {
     const val HINT_CONTROL_LABEL: String = "About stored offsets"
     const val BACK_TO_STREAMS: String = "Back to streams"
     const val FOOTNOTE: String = "Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher " +
-        "than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0."
+        "than the real distance on a stream where offsets are stored (each stored offset counts). Caught up only at 0."
 }
 
 /** Something the connection control can refresh and age: the shown screen's view model (M2-06 brief item 6). */
