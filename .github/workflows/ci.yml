@@ -25,7 +25,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
       # Compose UI tests need a display; xvfb provides one on the headless runner.
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
@@ -58,7 +58,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
       # Some gate tests (RealBrokerM5GateTest, RealBrokerMqttIntegrationTest) talk to the local dev broker on localhost,
       # as `task dev:up` starts it; the other broker tests start their own Testcontainers broker.
       - name: Start the dev broker
