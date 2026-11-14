@@ -10,7 +10,9 @@ import org.junit.platform.suite.api.Suite
 /**
  * M2-03 part 1: runs tests/bdd/features/13_connection_lifecycle.feature against FakeConnectionGateway.
  * M2-05b: the lost-connection scenario and the three app bar scenarios run now (their `@needs-M2` is gone). Left out by tag:
- * `@needs-M2` (none now, kept in the filter), `@needs-decision` (none) and `@broker` (none yet).
+ * `@needs-M2` (none now, kept in the filter), `@needs-decision` (none) and `@broker` (one scenario, M2-16 "A refresh that meets a connection the
+ * broker just closed is not a lost connection": it has no steps and is bound by name to `RealBrokerClientsTest` and
+ * `ManagementHttpClosedConnectionTest` in `data-rabbit`).
  */
 @Suite
 @IncludeEngines("cucumber")

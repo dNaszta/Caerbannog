@@ -23,6 +23,10 @@ import javax.net.ssl.X509TrustManager
  */
 internal object TlsSupport {
 
+    // red-phase stub, the senior developer implements it: null when [existing] is already set (any value, even the empty string), else "2".
+    // The deliberately wrong value keeps the module compiling so TlsSupportKeepAliveTest is red by assertion, not by a compile error.
+    internal fun keepAliveTimeoutToApply(existing: String?): String? = existing
+
     /** The HTTP client for [transport]: TLS with the profile trust, or plain HTTP with no TLS settings at all. */
     fun buildHttpClient(
         transport: BrokerTransport,
