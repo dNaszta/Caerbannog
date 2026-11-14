@@ -61,7 +61,8 @@ class MigrationsActionDetailUiTest {
     }
 
     @Test
-    fun `a policy with two definition keys shows them`(): Unit = runDesktopComposeUiTest {
+    // Taller than the default window: Linux fonts make the rows taller and the third detail line fell outside it on CI.
+    fun `a policy with two definition keys shows them`(): Unit = runDesktopComposeUiTest(1280, 1000) {
         show(state(queue, plainBinding, policy))
         onNodeWithTag("actionDetail:2").assertIsDisplayed()
         onNodeWithTag("actionDetail:2").assertTextContains("max-length=1000", substring = true)
