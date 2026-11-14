@@ -17,14 +17,14 @@ kotlin {
         // docs/spec.md tech-stack table) - this is a pure-Kotlin multiplatform artifact, no JVM-only
         // or network code, so it stays within core's "zero RabbitMQ/network imports" rule.
         commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
         }
         jvmTest.dependencies {
             implementation(project(":core-testing"))
             implementation(kotlin("test"))
             // M2-04: virtual time for the refresh timer tests (no sleeps).
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             implementation("org.junit.jupiter:junit-jupiter:5.11.4")
             runtimeOnly("org.junit.platform:junit-platform-launcher")
         }
