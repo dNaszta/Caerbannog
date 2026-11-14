@@ -8,7 +8,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.BufferedInputStream
@@ -35,11 +34,10 @@ import javax.net.ssl.SSLContext
  * reconnects). With `-Djdk.httpclient.keepalive.timeout=2` the live test passed 30 of 30 (without it 10 of 30 failed).
  *
  * No Docker: a hand-rolled keep-alive HTTP/1.1 server (over TLS like the broker's management port, and plain) drops the request that arrives on a
- * connection it has already served once, without a word, which is what the client saw. The first test is RED today and disabled until the
- * architect picks the fix (a bounded retry of the GET in [ManagementHttp], a client idle timeout below the broker's, or both); a fix by idle
- * timeout alone cannot satisfy it as written, because the server here drops regardless of idle time, so the architect may ask for the case to be
- * reshaped. The other two pass today and stay true for any fix: a broker that is really gone is still Unreachable (bounded attempts), and a
- * write (POST, PUT, DELETE) is never sent twice.
+ * connection it has already served once, without a word, which is what the client saw. The first test is the regression test for the fix chosen
+ * in M2-16 (a bounded retry of the GET in [ManagementHttp] plus a client idle timeout below the broker's); the server here drops regardless of
+ * idle time, so only the retry turns it green, the idle timeout is proven elsewhere (`TlsSupportKeepAliveTest`). The other two stay true for any
+ * fix: a broker that is really gone is still Unreachable (bounded attempts), and a write (POST, PUT, DELETE) is never sent twice.
  */
 class ManagementHttpClosedConnectionTest {
 
@@ -142,8 +140,6 @@ class ManagementHttpClosedConnectionTest {
 
     private fun url(server: KeepAliveServer, path: String = "/api/whoami") = "${if (server.tls) "https" else "http"}://127.0.0.1:${server.port}$path"
 
-    // RED until the product fix (see the class comment): disabled so the suite stays green, enable it as the first step of the fix.
-    @Disabled("RED, finding of 2026-11-14: ManagementHttp reports Unreachable when two or more idle pooled connections were closed by the broker; remove this line when fixing")
     @Test
     fun `a GET is answered when the broker has closed every idle pooled connection, with one, two or three of them`() {
         // The broker closes all idle connections in the same second (5 s), and a client holds more than one when two callers overlapped (a screen's
