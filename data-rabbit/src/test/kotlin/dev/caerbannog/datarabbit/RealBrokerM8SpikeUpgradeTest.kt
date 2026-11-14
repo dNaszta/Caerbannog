@@ -2,6 +2,8 @@ package dev.caerbannog.datarabbit
 
 import com.github.dockerjava.api.model.Bind
 import com.github.dockerjava.api.model.Volume
+import com.rabbitmq.client.MessageProperties
+import com.rabbitmq.client.ReturnListener
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -11,6 +13,7 @@ import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * M8-13 spike S-N (docs/tasks/M8-00-spike-results.md, section "S-N"): why classic queues came back empty after an in-place
@@ -27,6 +30,8 @@ class RealBrokerM8SpikeUpgradeTest {
     private companion object {
         const val OLD = "rabbitmq:3.13-management"
         const val HOST = "upg-host"
+        /** Bound for the broker's confirms of one batch of messages; a slow runner may need seconds, a missing confirm must fail. */
+        const val CONFIRM_TIMEOUT_MS = 60_000L
     }
 
     private val docker = DockerClientFactory.instance().client()
@@ -77,9 +82,80 @@ class RealBrokerM8SpikeUpgradeTest {
         repeat(count) { i -> assertTrue(api.publish(queue, "$queue-$i$pad", """{"delivery_mode":$deliveryMode}""").ok, "publish $queue") }
     }
 
+    /**
+     * Seeds [queues] (name to arguments, 3 persistent messages each) on a node the test is about to `docker kill`, and returns
+     * only when the broker holds all of it on disk. [seed] is not enough for that, because the management API answers before
+     * the broker has finished writing:
+     *
+     * - The queue itself. A declaration is a Mnesia transaction (the 3.13 metadata store) that the management API reports before
+     *   Mnesia has settled it on disk (it logs through asynchronous `disk_log` appends), so a kill soon after a declare can take
+     *   the queue with it: after the restart the log says "Recovering 1 queues" and the queue answers 404 while its sibling is
+     *   intact. This is the CI failure; it reproduced on a CPU-starved node, once with the queue's name already in
+     *   `LATEST.LOG` at the kill, so the log file alone is no proof. [dumpQueueDefinitions] is the barrier.
+     * - The messages. A version-2 queue keeps new index entries and small bodies in a write buffer in the node's memory until its
+     *   process goes idle or a confirm is due (read from the 3.13.7 beam files; never seen to lose messages here). A publisher
+     *   confirm is sent only after that flush ([publishConfirmed]).
+     *
+     * Neither is an fsync: `docker kill` leaves what the node has already handed to the OS, which is the state this test needs.
+     */
+    private fun seedBeforeKill(node: RabbitMQContainer, api: MgmtApi, queues: Map<String, String>) {
+        for ((queue, arguments) in queues) {
+            assertTrue(api.declareQueue(queue, arguments).ok, "declare $queue")
+            publishConfirmed(node, queue, List(3) { "$queue-$it" })
+        }
+        dumpQueueDefinitions(node, queues.keys)
+    }
+
+    /** Publishes [bodies] to [queue] over AMQP with publisher confirms and returns only when the broker has confirmed every one. */
+    private fun publishConfirmed(node: RabbitMQContainer, queue: String, bodies: List<String>) {
+        val unroutable = AtomicInteger()
+        withAmqp(node, "m8-sn-seed") { connection ->
+            connection.createChannel().use { channel ->
+                channel.confirmSelect()
+                // Mandatory, to the default exchange: a missing queue comes back as basic.return, before the confirm.
+                channel.addReturnListener(ReturnListener { _, _, _, _, _, _ -> unroutable.incrementAndGet() })
+                bodies.forEach { channel.basicPublish("", queue, true, MessageProperties.PERSISTENT_BASIC, it.toByteArray()) }
+                channel.waitForConfirmsOrDie(CONFIRM_TIMEOUT_MS)
+            }
+        }
+        assertEquals(0, unroutable.get(), "publish to $queue was returned as unroutable")
+    }
+
+    /**
+     * Moves Mnesia's transaction log into the table files (`mnesia:dump_log()`, which answers `dumped`) and returns when the
+     * names of [queues] are in the durable-queue table files `rabbit_durable_queue.DCD` or `.DCL`, which recovery reads first.
+     * That is observed, not assumed: a declaration whose transaction was still being committed when the dump ran is not in the
+     * files yet, so the dump is repeated, within the bound of [awaitUntil].
+     */
+    private fun dumpQueueDefinitions(node: RabbitMQContainer, queues: Collection<String>) {
+        var seen = "no dump yet"
+        try {
+            awaitUntil("the Mnesia table files to hold the definitions of $queues") {
+                val dump = node.execInContainer("rabbitmqctl", "eval", "mnesia:dump_log().")
+                val missing = queues.filter { queue ->
+                    node.execInContainer("sh", "-c", "grep -a -l -F '$queue' /var/lib/rabbitmq/mnesia/rabbit@$HOST/rabbit_durable_queue.DC*").exitCode != 0
+                }
+                seen = "dump_log answered '${dump.stdout.trim()}' (exit ${dump.exitCode}), not yet in the table files: $missing"
+                dump.exitCode == 0 && missing.isEmpty()
+            }
+        } catch (e: IllegalStateException) {
+            throw IllegalStateException("${e.message}; the last attempt: $seen", e)
+        }
+    }
+
     private fun waitForCount(api: MgmtApi, queue: String, expected: Int) {
         // The peek is exact, but a freshly started node may need a moment before the queue answers.
-        awaitUntil("$queue to hold $expected messages") { runCatching { api.peek(queue).size }.getOrDefault(-1) == expected }
+        var seen = "no answer yet"
+        try {
+            awaitUntil("$queue to hold $expected messages") {
+                runCatching { api.peek(queue).size }
+                    .onSuccess { seen = "$it messages" }
+                    .onFailure { seen = "no peek answer ($it)" }
+                    .getOrDefault(-1) == expected
+            }
+        } catch (e: IllegalStateException) {
+            throw IllegalStateException("${e.message}; the last peek saw $seen", e)
+        }
     }
 
     private fun count(api: MgmtApi, queue: String): Int = api.peek(queue).size
@@ -231,8 +307,8 @@ class RealBrokerM8SpikeUpgradeTest {
     fun `a forced kill of the 3_13 node does not change the outcome, it is the index version and not the way the node stopped`() {
         val volume = newVolume()
         val (old, oldApi) = start(OLD, volume)
-        seed(oldApi, "k-v1", """{"x-queue-version":1}""")
-        seed(oldApi, "k-v2", """{"x-queue-version":2}""")
+        // Not seed(): the kill below must meet a seed that is on disk, or the control measures the timing of the kill.
+        seedBeforeKill(old, oldApi, mapOf("k-v1" to """{"x-queue-version":1}""", "k-v2" to """{"x-queue-version":2}"""))
         kill(old)
 
         // Control: the same 3.13 image recovers both queues after the kill.
