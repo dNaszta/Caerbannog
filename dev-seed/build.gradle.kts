@@ -15,7 +15,7 @@ dependencies {
     implementation("com.rabbitmq:stream-client:1.12.0")
 
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // Tests parse the generated definitions body; same version the project already uses.
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
