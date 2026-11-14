@@ -1,6 +1,7 @@
 package dev.caerbannog.datarabbit
 
 import io.ktor.client.HttpClient
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.basicAuth
@@ -15,8 +16,12 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.URLParserException
 import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.URISyntaxException
+import java.net.UnknownHostException
 import java.net.http.HttpTimeoutException
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLException
@@ -52,8 +57,20 @@ internal class ManagementHttp(
     @Volatile
     private var closed = false
 
-    suspend fun get(url: String): ManagementReply = send { secret ->
-        client.get(url) { basicAuth(username, secret) }
+    private val unreachable = Attempt.Answered(ManagementReply.Unreachable)
+
+    /**
+     * A GET changes nothing on the broker, so one that met a dropped connection is sent once more (M2-16): RabbitMQ closes an idle keep-alive
+     * connection after 5 s, and the JDK client's own single retry can land on a second dead pooled connection. At most two attempts, no loop, no
+     * delay; the second outcome is final. Every other failure, and every write, keeps exactly one attempt, so [ManagementReply.Unreachable] still
+     * means the broker did not answer a fresh attempt.
+     */
+    suspend fun get(url: String): ManagementReply {
+        val call: suspend (secret: String) -> HttpResponse = { secret -> client.get(url) { basicAuth(username, secret) } }
+        return when (val first = attempt(call)) {
+            is Attempt.Answered -> first.reply
+            Attempt.Dropped -> attempt(call).asReply()
+        }
     }
 
     suspend fun post(url: String, body: String): ManagementReply = send { secret ->
@@ -76,41 +93,73 @@ internal class ManagementHttp(
         setBody(body)
     }
 
+    /** Exactly one attempt: the rule for every write, which must never be sent twice (a lost answer may hide an applied change). */
+    private suspend fun send(call: suspend (secret: String) -> HttpResponse): ManagementReply = attempt(call).asReply()
+
     /**
-     * The one place for the transport rules of every verb: nothing is sent once the holder is closed (so no credential leaves
-     * before or after the connection's life), every failure becomes a [ManagementReply] value, and no exception text or body
-     * is kept. The TLS or plain choice is the client's, made from the profile (D9a).
+     * The one place for the transport rules of every verb, and the one catch ladder: nothing is sent once the holder is closed (so no
+     * credential leaves before or after the connection's life), every failure becomes a value, and no exception text or body is kept.
+     * [closed] and the password are read here, so a second attempt of a GET checks them again. The TLS or plain choice is the client's,
+     * made from the profile (D9a).
+     *
+     * [Attempt.Dropped] is only the last `IOException` catch: the connection was lost without an answer. Every type that is an
+     * `IOException` but not that (a TLS failure, a timeout, an interruption, a refused connection, an unknown host, no route) is caught
+     * before it, in an answered branch, because retrying those would repeat a wait or a failure that cannot change. `ConnectException`
+     * and `NoRouteToHostException` are `SocketException`s, so a bare `SocketException` (reset, broken pipe) is a dropped connection and
+     * they are not.
      */
-    private suspend fun send(call: suspend (secret: String) -> HttpResponse): ManagementReply {
+    private suspend fun attempt(call: suspend (secret: String) -> HttpResponse): Attempt {
         val secret = password
-        if (closed || secret == null) return ManagementReply.Unreachable
+        if (closed || secret == null) return unreachable
         return try {
             val response = call(secret)
-            ManagementReply.Response(response.status.value, response.bodyAsText())
+            Attempt.Answered(ManagementReply.Response(response.status.value, response.bodyAsText()))
         } catch (e: CancellationException) {
             // A client closed under a running call reports cancellation; that is a lost connection, not the caller leaving.
-            if (closed) ManagementReply.Unreachable else throw e
+            if (closed) unreachable else throw e
         } catch (e: SSLException) {
-            classify(e)
+            Attempt.Answered(classify(e))
         } catch (e: HttpRequestTimeoutException) {
-            ManagementReply.Unreachable
+            unreachable
+        } catch (e: ConnectTimeoutException) {
+            unreachable
         } catch (e: HttpTimeoutException) {
-            ManagementReply.Unreachable
+            unreachable
         } catch (e: SocketTimeoutException) {
-            ManagementReply.Unreachable
+            unreachable
+        } catch (e: InterruptedIOException) {
+            unreachable
+        } catch (e: ConnectException) {
+            unreachable
+        } catch (e: NoRouteToHostException) {
+            unreachable
+        } catch (e: UnknownHostException) {
+            unreachable
         } catch (e: IOException) {
-            ManagementReply.Unreachable
+            Attempt.Dropped
         } catch (e: URISyntaxException) {
-            ManagementReply.Unreachable
+            unreachable
         } catch (e: URLParserException) {
-            ManagementReply.Unreachable
+            unreachable
         } catch (e: IllegalArgumentException) {
-            ManagementReply.Unreachable
+            unreachable
         } catch (e: RuntimeException) {
             // The transport boundary: its contract is that every failure becomes a reply value and no exception text is kept (it could carry
             // a URL or a secret), so a broad catch is justified here and only here. An Error is never caught.
-            ManagementReply.Unreachable
+            unreachable
         }
+    }
+
+    private fun Attempt.asReply(): ManagementReply = when (this) {
+        is Attempt.Answered -> reply
+        Attempt.Dropped -> ManagementReply.Unreachable
+    }
+
+    /** What one attempt came to: a reply, or a connection lost without an answer, which a GET may try once more. Never leaves this class. */
+    private sealed interface Attempt {
+        data class Answered(val reply: ManagementReply) : Attempt
+
+        data object Dropped : Attempt
     }
 
     override fun close() {
