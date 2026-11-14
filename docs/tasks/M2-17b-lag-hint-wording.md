@@ -8,7 +8,10 @@ The tooltip of the "N behind" status says what the broker's number means for eve
 ## Why
 The M2-17 finding (`docs/tasks/M2-17-s-a-lag-steady-state.md`, table, and the corrected Consumers row in `docs/spec.md`): once the broker's second statistics refresh has run, every consumer that has read to the end of a stream shows the same lag, whether it stores offsets or not (0 where nobody stored, 2 or 4 in the measured cases). The text built in M2-06, "Stored offsets count as messages, so a consumer that stores its offset can read a few behind when it has read everything.", is true but suggests that a consumer that never stores is exempt. A user who reads "2 behind" on their own non-storing consumer and then the tooltip would look for a store that is not there.
 
-## Needs the owner (status: blocked until answered)
+## Owner decision (2026-11-15): option A confirmed. Status: ready to build.
+The owner confirmed option A: "Stored offsets count as messages, so any consumer of a stream where offsets are stored can read a few behind when it has read everything." The text below is kept as the record of the question and the options.
+
+## Needs the owner (answered above; was: blocked until answered)
 This is wording on a screen, which the lag ruling kept open for the owner ("the owner may veto the wording at the review"), and the finding also shows a consequence the owner may want to weigh:
 
 - **What changes for the user:** only the hover text and the screen-reader description of "N behind" (`ConsumerStatus.Behind.hint`).
