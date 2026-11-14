@@ -1,9 +1,13 @@
-# Cooldown: a new release waits 14 days before Dependabot proposes it, the same two-week rule the build files already
-# follow for hand-picked versions (a brand-new release can be pulled or fixed again; security updates ignore the cooldown).
-# Weekly update pull requests for the Gradle dependencies and the GitHub Actions. CI runs on every pull request, so an
-# update that breaks the build or the tests shows up before it is merged. Minor and patch updates arrive together in one
-# pull request per ecosystem; major updates arrive one at a time. Kotlin and the Compose plugin are tied together, so a
-# bump of one that the other does not support will fail CI and can be closed.
+# Dependabot: monthly update pull requests for the Gradle dependencies and the GitHub Actions. Security updates are
+# separate and arrive immediately. CI runs on every pull request, so an update that breaks the build shows up before it
+# is merged.
+#
+# Cooldown: a new release waits 14 days before Dependabot proposes it, the same two-week rule the build files follow for
+# hand-picked versions (security updates ignore the cooldown).
+#
+# Groups: related libraries move together; everything else (the Gradle wrapper, single libraries) gets its own pull
+# request. The ignore entries below are deliberate and each names the work that has to happen first; remove an entry
+# when that task is taken.
 version: 2
 updates:
   - package-ecosystem: gradle
@@ -11,20 +15,36 @@ updates:
     cooldown:
       default-days: 14
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 3
     groups:
-      gradle-minor-and-patch:
-        update-types: [minor, patch]
+      kotlinx:
+        patterns: ["org.jetbrains.kotlinx:*"]
+      test-stack:
+        patterns: ["org.junit*", "io.cucumber*", "org.testcontainers*"]
+    ignore:
+      # Compose 1.12 marks the clipboard API used in :ui as experimental (three call sites need an opt-in or a change).
+      - dependency-name: "org.jetbrains.compose"
+      # Ktor 3.6 changes how a redirect without a Location header ends on the read-only 3.x path
+      # (ManagementThreeXReadsTest); patches are fine, minor and major wait for that to be looked at.
+      - dependency-name: "io.ktor:*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Testcontainers 2 renamed its modules; JUnit 6 and Cucumber 8 are major jumps. They are one planned test-stack
+      # upgrade, not three pull requests.
+      - dependency-name: "org.testcontainers*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.junit*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "io.cucumber*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     cooldown:
       default-days: 14
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-    groups:
-      actions-minor-and-patch:
-        update-types: [minor, patch]
+      interval: monthly
+    open-pull-requests-limit: 2
+    ignore:
+      # gradle/actions v6 moves caching into a proprietary component under separate terms; this MIT project stays on v5.
+      - dependency-name: "gradle/actions"
+        update-types: ["version-update:semver-major"]
