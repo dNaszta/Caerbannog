@@ -10,7 +10,7 @@ plugins {
     kotlin("jvm") version "2.4.21" apply false
     kotlin("plugin.serialization") version "2.4.21" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
-    id("org.jetbrains.compose") version "1.9.3" apply false
+    id("org.jetbrains.compose") version "1.12.2" apply false
 }
 
 // M2-TESTHYGIENE-01: tests that JUnit never discovers fail the build (verifyTestDiscovery, wired into test and check).

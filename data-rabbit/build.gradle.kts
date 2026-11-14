@@ -24,7 +24,7 @@ dependencies {
     // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
     // docs/tasks/M1-02-connection-profiles.md's Design notes ("core holds ... repository interfaces").
     implementation(project(":core"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // Connection-profile JSON file storage (JsonFileConnectionProfileRepository): kotlinx-serialization
     // is already the project's chosen JSON library (docs/spec.md tech-stack table, "Management API:
@@ -32,14 +32,14 @@ dependencies {
     // second JSON library. A private DTO in this module carries the @Serializable annotation, not
     // core's ConnectionProfile itself, so core's domain model stays free of any serialization-library
     // import (see JsonFileConnectionProfileRepository's own header comment).
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     // Management API reachability probe (StreamAndManagementReachabilityChecker): Ktor client per
     // docs/spec.md's tech-stack table ("Management API: Ktor client ..."), using the Java engine
     // (wraps java.net.http.HttpClient) because it is the simplest way to plug in a custom SSLContext
     // built from an optional per-profile CA certificate.
-    implementation("io.ktor:ktor-client-core:3.0.3")
-    implementation("io.ktor:ktor-client-java:3.0.3")
+    implementation("io.ktor:ktor-client-core:3.6.1")
+    implementation("io.ktor:ktor-client-java:3.6.1")
 
     // Password storage (JavaKeyringSecretStore): was test-only in the M1-01 spike, now a real
     // production dependency.
@@ -59,12 +59,12 @@ dependencies {
     // RealBrokerMqttIntegrationTest subscribes with the MQTT 3.1.1 client (a v3 subscriber also receives v5 publishes).
     testImplementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
     // M2-14c: ManagementHttp classification tests throw constructed SSL exceptions from a mock engine (no server can produce a cause loop).
-    testImplementation("io.ktor:ktor-client-mock:3.0.3")
+    testImplementation("io.ktor:ktor-client-mock:3.6.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
     // plain JUnit test via runBlocking.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:testcontainers")
