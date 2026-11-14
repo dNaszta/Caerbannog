@@ -29,13 +29,16 @@ jobs:
       # Compose UI tests need a display; xvfb provides one on the headless runner.
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
-      # Two steps with their own timeouts: if something hangs, the log shows which half.
+      # Two steps with their own timeouts: if something hangs, the log shows which half. The first step names the
+      # module test tasks (not `test -x :ui:jvmTest`): the root `test` also runs verifyTestDiscovery, which fails
+      # when the UI results are missing. The second step runs root `test`: the modules above are up to date, the UI
+      # tests run under xvfb and the discovery guard then checks every module.
       - name: Run tests except the Compose UI tests (no containers, no keychain)
         timeout-minutes: 25
-        run: ./gradlew test -x :ui:jvmTest --console=plain
-      - name: Run the Compose UI tests
+        run: ./gradlew :core:test :core-testing:test :data-rabbit:test :mcp-server:test :desktopApp:test :acceptance-tests:test :dev-seed:test --console=plain
+      - name: Run the Compose UI tests and the test discovery guard
         timeout-minutes: 25
-        run: xvfb-run -a ./gradlew :ui:jvmTest --console=plain
+        run: xvfb-run -a ./gradlew test --console=plain
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
