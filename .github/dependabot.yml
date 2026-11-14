@@ -1,0 +1,24 @@
+# Weekly update pull requests for the Gradle dependencies and the GitHub Actions. CI runs on every pull request, so an
+# update that breaks the build or the tests shows up before it is merged. Minor and patch updates arrive together in one
+# pull request per ecosystem; major updates arrive one at a time. Kotlin and the Compose plugin are tied together, so a
+# bump of one that the other does not support will fail CI and can be closed.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]
