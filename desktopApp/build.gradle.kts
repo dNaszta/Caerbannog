@@ -67,7 +67,7 @@ compose.desktop {
                 "--add-opens", "java.base/sun.security.ssl=ALL-UNNAMED",
                 "--add-opens", "java.base/sun.net.www.protocol.http=ALL-UNNAMED"
             )
-            // Rabbit icon for the application (RabbitMQ logo)
+            // Application icon: original artwork for this project (source: desktopApp/icon/Icon.java), not the RabbitMQ logo
             macOS.iconFile.set(file("src/main/resources/rabbit.icns"))
             // Linux (Fedora .rpm, Debian/Ubuntu .deb): jpackage cannot cross-build, so these run on a Linux host.
             // The .rpm needs `rpm-build` installed (`sudo dnf install rpm-build`); the .deb needs `dpkg-dev` and `fakeroot`.

@@ -108,7 +108,7 @@ To connect this MCP server to Antigravity CLI or Claude Code, add the following 
     "caerbannog": {
       "command": "./gradlew",
       "args": [":mcp-server:run", "--quiet"],
-      "cwd": "/Users/dnaszta/Projects/Caerbannog"
+      "cwd": "/path/to/Caerbannog"
     }
   }
 }

@@ -159,3 +159,7 @@ Design and decisions live in [`docs/spec.md`](docs/spec.md); task briefs in `doc
 ## License
 
 [MIT](LICENSE). Third-party components and their licenses are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+## Trademarks
+
+Caerbannog is an independent project. It is not affiliated with, endorsed by or sponsored by Broadcom Inc., VMware or the RabbitMQ project. RabbitMQ is a trademark of Broadcom Inc. and/or its subsidiaries; the name is used here only to say which broker the app works with. The application icon is original artwork for this project (see `desktopApp/icon/`).
