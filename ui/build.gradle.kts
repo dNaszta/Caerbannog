@@ -33,7 +33,7 @@ kotlin {
             // M8-06a: definitions file text builders and fixtures for the Migrate from 3.x screen tests (test scope only; core-testing depends on core alone).
             implementation(project(":core-testing"))
             implementation(kotlin("test"))
-            implementation("org.junit.jupiter:junit-jupiter:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter:5.14.4")
             implementation(compose.desktop.uiTestJUnit4)
             implementation(compose.desktop.currentOs)
             runtimeOnly("org.junit.platform:junit-platform-launcher")

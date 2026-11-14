@@ -60,13 +60,13 @@ dependencies {
     testImplementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
     // M2-14c: ManagementHttp classification tests throw constructed SSL exceptions from a mock engine (no server can produce a cause loop).
     testImplementation("io.ktor:ktor-client-mock:3.0.3")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
     // plain JUnit test via runBlocking.
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:rabbitmq")
