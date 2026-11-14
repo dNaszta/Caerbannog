@@ -56,7 +56,7 @@ dependencies {
     testImplementation("io.ktor:ktor-client-mock:3.0.3")
     testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
     testImplementation("io.cucumber:cucumber-junit-platform-engine:$cucumberVersion")
-    testImplementation("org.junit.platform:junit-platform-suite:1.11.4")
+    testImplementation("org.junit.platform:junit-platform-suite:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
