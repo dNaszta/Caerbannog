@@ -24,7 +24,7 @@ dependencies {
     // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
     // docs/tasks/M1-02-connection-profiles.md's Design notes ("core holds ... repository interfaces").
     implementation(project(":core"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // Connection-profile JSON file storage (JsonFileConnectionProfileRepository): kotlinx-serialization
     // is already the project's chosen JSON library (docs/spec.md tech-stack table, "Management API:
@@ -64,7 +64,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
     // plain JUnit test via runBlocking.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:testcontainers")
