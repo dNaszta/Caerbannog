@@ -129,7 +129,7 @@ object StreamClientsTexts {
     const val HINT_CONTROL_LABEL: String = "About stored offsets"
     const val BACK_TO_STREAMS: String = "Back to streams"
     const val FOOTNOTE: String = "Read from the management API (rabbitmq_stream_management). Messages behind comes from the broker and can be higher " +
-        "than the real distance for a consumer that stores its offset (each stored offset counts). Caught up only at 0."
+        "than the real distance on a stream where offsets are stored (each stored offset counts). Caught up only at 0."
 }
 
 /** Something the connection control can refresh and age: the shown screen's view model (M2-06 brief item 6). */
