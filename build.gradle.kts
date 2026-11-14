@@ -54,3 +54,26 @@ subprojects {
         timeout.set(java.time.Duration.ofMinutes(if (name in slowTaskNames) 40 else 15))
     }
 }
+
+// Security pins for TEST classpaths only (nothing here reaches the installers: guava and commons-compress are not on the
+// runtime classpath of desktopApp or mcp-server). Dependabot raised alerts for both, but cannot fix them because they are
+// transitive: guava 28.1-android arrives with Compose's ui-test (through Truth), commons-compress 1.24.0 with Testcontainers.
+// Remove a pin once the library that brings the dependency ships a fixed version itself.
+subprojects {
+    configurations.configureEach {
+        if (name.contains("test", ignoreCase = true)) {
+            resolutionStrategy.eachDependency {
+                when ("${requested.group}:${requested.name}") {
+                    "com.google.guava:guava" -> {
+                        useVersion("33.8.0-android")
+                        because("security alerts for guava before 33.7.2 (transitive via Compose ui-test and Truth, tests only)")
+                    }
+                    "org.apache.commons:commons-compress" -> {
+                        useVersion("1.28.0")
+                        because("security alerts for commons-compress before 1.26.0 (transitive via Testcontainers, tests only)")
+                    }
+                }
+            }
+        }
+    }
+}
