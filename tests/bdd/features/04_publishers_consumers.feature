@@ -8,8 +8,11 @@ Feature: Publishers and consumers of a stream
   Fields confirmed on a real RabbitMQ 4.4.0 broker (M2-02 spike, docs/spec.md "Management API facts"):
   publisher reference, published, confirmed, errored (shown as "errors"), connection; consumer offset,
   offset_lag, active, connection. A consumer's lag can be higher than the number of user messages
-  behind, because every stored offset (offset tracking entry) occupies an offset (real broker, M2-06 spike S-A:
-  2 and 3 for a consumer that stored 3 times, varying between runs, not derivable from the API). M2-06 decided:
+  behind, because every stored offset (offset tracking entry) of any application occupies an offset (real broker,
+  M2-06 spike S-A: 2 and 3 for a consumer that stored 3 times, varying between runs, not derivable from the API).
+  Corrected by M2-17 (2026-11-15): that was the broker's first statistics window. After the second refresh every
+  consumer that has read to the end of a stream shows the same lag, whether it stores offsets or not (0 on a stream
+  where nobody stored, 2 or 4 where offsets were stored). M2-06 decided:
   "Caught up" only at lag 0; above 0 the status reads "N behind" with the broker's number, in a neutral style,
   and a tooltip says stored offsets count (docs/tasks/M2-06-publishers-consumers.md).
   Users with only the management tag see only their own connections' rows, and users with no management
@@ -90,6 +93,23 @@ Feature: Publishers and consumers of a stream
     When I open the stream list
     And I open the "Publishers and consumers" tab of "orders-events"
     Then the tab lists 2 publishers and 3 consumers
+
+  # M2-17 (2026-11-15). Live twins of the lag rule, bound to RealBrokerClientsTest "S-A ...". The broker's lag is read in its steady state
+  # (after the second statistics refresh, about 5 s after a consumer attaches), not only in the first window, which reads 0 for everyone.
+  @broker
+  Scenario: A consumer that has read everything on a stream where nobody stored an offset is caught up
+    Given a real broker where nobody has stored an offset on "orders-events"
+    And an unnamed consumer and a named consumer that have read every message
+    When I open the "Publishers and consumers" tab of "orders-events" and keep it open for two refreshes
+    Then each of them shows 0 messages behind
+    And each status is "Caught up"
+
+  @broker
+  Scenario: The number of messages behind is the number the broker reports
+    Given a real broker where applications stored offsets on "orders-events"
+    And all consumers have read every message
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then each consumer shows the lag that the management API reports for it, nothing added and nothing taken away
 
   @fake-broker
   Scenario: Opening a stream from the list shows its publishers and consumers
