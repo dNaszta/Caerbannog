@@ -153,6 +153,19 @@ Feature: Connect and disconnect
     And I retry
     Then the state of "uat-eu" is "Connected" once the broker answers
 
+  # M2-16 (2026-11-15). RabbitMQ 4 closes an idle management connection after 5 seconds and the default refresh interval is 5 seconds,
+  # so a refresh can land on a connection the broker is just closing. The app asks again at once; that is not a lost connection.
+  # A broker that really stops answering is still reported (scenario above), and a change (create, delete, apply a migration)
+  # is never sent twice. Live twin: RealBrokerClientsTest "the tab view model on a real broker ..."; deterministic proof without
+  # Docker: ManagementHttpClosedConnectionTest.
+  @broker @negative
+  Scenario: A refresh that meets a connection the broker just closed is not a lost connection
+    Given a real broker that closes idle management connections after 5 seconds
+    And I am connected to it with the refresh interval at 5 seconds
+    When the screen has refreshed several times, each refresh landing as the broker closes the idle connection
+    Then the state stays "Connected" and the rows stay live, not stale
+    And no refresh reports "Connection lost"
+
   @fake-broker
   Scenario Outline: The password is never shown, with TLS on or off
     Given the connection "<name>" has TLS <tls>
