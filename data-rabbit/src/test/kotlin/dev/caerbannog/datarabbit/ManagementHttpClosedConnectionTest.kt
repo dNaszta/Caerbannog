@@ -168,7 +168,11 @@ class ManagementHttpClosedConnectionTest {
             KeepAliveServer(tls = tls, dropOnReuse = false, dropEverything = true).use { server ->
                 withHttp(server) { http ->
                     assertEquals(ManagementReply.Unreachable, http.get(url(server)), "tls=$tls")
-                    assertTrue(server.seen.size in 1..2, "tls=$tls: a GET may be tried once more on a fresh connection, never in a loop; server saw: ${server.seen}")
+                    // M2-16 (architect's ruling): ManagementHttp makes at most two attempts and the JDK client retries a failed GET once inside
+                    // each, so a broker that drops every request sees at most 2 x 2 = 4 requests (it was at most 2 when there was one attempt).
+                    // A third attempt or a loop puts 6 or more on the wire. The exact number of attempts is pinned without the JDK in
+                    // ManagementHttpGetRetryTest (the same failure twice: exactly 2 engine calls); this is the end-to-end bound.
+                    assertTrue(server.seen.size in 1..4, "tls=$tls: a GET is attempted at most twice, each time with the JDK client's own single retry (4 requests at most), never in a loop; server saw: ${server.seen}")
                 }
             }
         }
