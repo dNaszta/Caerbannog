@@ -1,5 +1,6 @@
 package dev.caerbannog.core.streams
 
+import dev.caerbannog.core.assertReadableWhileRecording
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -42,5 +43,15 @@ class FakeStreamOffsetsTest {
     fun `a silent stream port makes every stream Unavailable`() = runBlocking<Unit> {
         val offsets = FakeStreamOffsets().also { it.setFirst("/", "s", 5); it.silent = true }
         assertEquals(FirstOffset.Unavailable, offsets.firstOffset("/", "s"))
+    }
+
+    @Test
+    fun `calls can be counted while another thread records calls`() {
+        val offsets = FakeStreamOffsets()
+        assertReadableWhileRecording(
+            what = "FakeStreamOffsets.calls",
+            record = { appends -> runBlocking { repeat(appends) { offsets.firstOffset("/", "s") } } },
+            count = { offsets.calls.count { it == "//s" } },
+        )
     }
 }
