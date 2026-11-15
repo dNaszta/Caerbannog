@@ -46,7 +46,7 @@ None (owner decision 2026-11-15).
 
 ## Open points
 - Q2 (decided 2026-11-15): the on-screen word is "Response stream (DLN)".
-- Q3 (revised, O13): without an MQTT tick the pair is two streams and no routing, which is what this task builds; the ticks are `M9-07b`, which waits for the owner's confirmation of the revised Q3 and for the MQTT route step (`M9-10`), so this task does not.
+- Q3 (revised, O13): without an MQTT tick the pair is two streams and no routing, which is what this task builds; the ticks are `M9-07b` (the owner confirmed the revised Q3 on 2026-11-15, O14), which waits for the MQTT route step (`M9-10`), so this task does not.
 - Q6 (decided 2026-11-15): the suffix word is fixed, `dln`.
 - S-D: the sentence "RabbitMQ does not move messages into it by itself: your applications write to it." is used only if the spike confirms it; otherwise the architect rewords it before step 2.
 

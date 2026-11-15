@@ -1,6 +1,6 @@
 # M9-07b: The optional MQTT routes of a stream pair (the owner's request and answer flow)
 
-Milestone: M9    Depends on: M9-07 (the plain pair), M9-10 (the MQTT route form and its translation), M9-00a (S-A5 to S-A8, for the texts and the note), M9-12 (for the "recognised again" scenario only), and the owner's confirmation of the revised Q3    Size: S
+Milestone: M9    Depends on: M9-07 (the plain pair), M9-10 (the MQTT route form and its translation), M9-00a (S-A5 to S-A8, for the texts and the note), M9-12 (for the "recognised again" scenario only)    Size: S
 
 PLANNED 2026-11-15. Not started. Cut out of `M9-07` on 2026-11-15 so that the plain stream pair can be built without the MQTT route step; this task adds two ticks that call the form of `M9-10`, and one note in the graph.
 
@@ -20,18 +20,18 @@ In:
 Out: any bridge from a stream to an MQTT message; reading or writing a correlation id (the test message of `M9-10` is the only place the planner pre-fills one); retention (`M9-08`); an exchange or a routing key of the owner's own choice for the pair; MQTT 5 settings of a route.
 
 ## Acceptance
-- BDD: `21_topology_planner_recipes.feature` / "The MQTT ticks are offered only with the response stream and are off until I tick them" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "Answers arrive over MQTT adds one route into the response stream" (@fake-broker @smoke @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "Requests are also recorded from an MQTT topic adds one route into the request stream" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "Both ticks add two routes, the answers route first" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "The wizard says what it does not plan" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "The routes of a pair are ordinary steps" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "The topic filter of a tick is checked like an MQTT route" (@fake-broker @negative @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "Without the response stream the MQTT ticks go away" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "The review graph shows a note where the owner's service sits" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "No note without an MQTT route into a response stream" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "A saved pair with its answers route is recognised again" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it" (@broker @needs-decision @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "The MQTT ticks are offered only with the response stream and are off until I tick them" (@fake-broker)
+- BDD: `21_topology_planner_recipes.feature` / "Answers arrive over MQTT adds one route into the response stream" (@fake-broker @smoke @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "Requests are also recorded from an MQTT topic adds one route into the request stream" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "Both ticks add two routes, the answers route first" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "The wizard says what it does not plan" (@fake-broker)
+- BDD: `21_topology_planner_recipes.feature` / "The routes of a pair are ordinary steps" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "The topic filter of a tick is checked like an MQTT route" (@fake-broker @negative)
+- BDD: `21_topology_planner_recipes.feature` / "Without the response stream the MQTT ticks go away" (@fake-broker)
+- BDD: `21_topology_planner_recipes.feature` / "The review graph shows a note where the owner's service sits" (@fake-broker)
+- BDD: `21_topology_planner_recipes.feature` / "No note without an MQTT route into a response stream" (@fake-broker)
+- BDD: `21_topology_planner_recipes.feature` / "A saved pair with its answers route is recognised again" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it" (@broker @needs-spike)
 - Unit tests, written first: `StreamFormMqttTicksTest` (actions and their order for each combination of ticks; the ticks are offered only with the pair and cleared when it is unticked; filter errors are the ones of the route form), `PlanGraphNotesTest` (one note for a pair with an answers route; none without a route; none for a route into a stream that is not a response stream; one note for two routes into the same pair; a hand-typed pair; a reopened pair), `PlanPreviewDeviceFlowTest` (the edge from `amq.topic` to the response stream is labelled with the filter, the note sits between the two nodes). Compose: `StreamFormMqttTicksUiTest`, `PlanReviewGraphNoteUiTest` (the note is drawn and read; it has no click action that reaches a planner event, with a sensitivity check that the test would see one).
 - Live: `RealBrokerPlannerIotRouteTest` (tag `broker`) binds the `@broker` scenario by name: the saved plan is applied by the real runner; a publish over MQTT to `devices/d42/answer` with a correlation id as user property arrives in the response stream and not in the request stream (positive control, bounded polling, counts only); where the correlation id appears on the stream message is asserted as S-A6 measured it, and the assertion is written after the spike.
 
@@ -45,8 +45,8 @@ Everything here is built from parts that exist after `M9-07` and `M9-10`: two `d
 None (owner decision 2026-11-15, "no MCP"). The existing tool `caerbannog_publish_mqtt` is unchanged and is not connected to plans.
 
 ## Open points
-- Q3 (revised, decided by the architect from the owner's description, to be confirmed by the owner at the mockup review): this task does not start before the confirmation. Every scenario of this task carries `@needs-decision` until then.
-- The two tick texts, "Answers arrive over MQTT" and "Requests are also recorded from an MQTT topic", and the sentence of the note are the architect's wording; the owner sees them in the mockup.
+- Q3 (revised by the architect from the owner's description, CONFIRMED by the owner on 2026-11-15, O14): this task no longer waits for the owner, only for `M9-07`, `M9-10` and the spike items it names. No scenario of this task carries `@needs-decision` any more.
+- The two tick texts, "Answers arrive over MQTT" and "Requests are also recorded from an MQTT topic", were part of the question the owner confirmed; the sentence of the note is the architect's wording and is in the mockup.
 - S-A5 (nothing feeds an MQTT subscription from a stream, UNVERIFIED): if the spike finds a way, the owner is asked whether the planner should plan it; the revised Q3 plans no bridge.
 - S-A6 and S-A7 (where the correlation id lands): they change the explaining sentence of the test message in `M9-10` and the last assertion of the live scenario, not the plan this task writes.
 - S-A1 must show `devices/+/answer` as `devices.*.answer`; until then the scenarios that name the key are `@needs-spike`.

@@ -5,7 +5,7 @@ Milestone: M9    Depends on: M9-00c (S-F1, S-F2), M9-03, M9-05 (for the note in 
 PLANNED 2026-11-15. Not started.
 
 ## Goal
-The wizard has a Policy kind: name, pattern, what it applies to, priority, and settings chosen from a list that holds only keys measured to work for that target, each with a typed value. The form shows which names the pattern matches, and the plan and the check point out a policy that would hide another one. If the owner confirms Q4, the stream form offers retention, saved as such a policy.
+The wizard has a Policy kind: name, pattern, what it applies to, priority, and settings chosen from a list that holds only keys measured to work for that target, each with a typed value. The form shows which names the pattern matches, and the plan and the check point out a policy that would hide another one. Per Q4 (decided 2026-11-15), the stream form offers retention, saved as such a policy, once the spike confirms the keys (S-F1).
 
 ## Why
 Owner decision O7 ("yes policies"). Spec "Topology planner (M9)": A4, A5, "Step kinds", "Check against the broker" (notes).
