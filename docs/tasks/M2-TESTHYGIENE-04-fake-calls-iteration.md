@@ -1,0 +1,48 @@
+# A test that counts a fake's recorded calls while another thread records them must not throw
+
+Milestone: M2 (test hygiene)    Depends on: none (independent of M2-17b, where it was found; may land before or after it)    Size: S
+
+## Goal
+Reading the `calls` list of `FakeStreamCatalog`, `FakeStreamOffsets` and `FakeStreamMessageReader` (count, filter, loop) while the code under test appends to it on another thread never throws `ConcurrentModificationException`. `StreamClientsViewModelThreadTest` "refreshNow and retry from a plain thread load on the scope thread only" no longer fails under load. Test-side only: no production file changes.
+
+## Why
+Found by the M2-17b addendum step 4a (test developer, 2026-11-15): in the first of two full `:core:jvmTest` runs the test failed once with `ConcurrentModificationException` at `StreamClientsViewModelThreadTest.kt:183`; it passed in the second full run and 10 of 10 alone. The file was last changed in M2-06a (e66cb0e); the M2-17b branch did not touch it.
+
+Cause (architect, read in the code, the flake itself was not reproduced by the architect): `FakeStreamCatalog.calls` (`core-testing/src/main/kotlin/dev/caerbannog/core/connections/fakes/FakeStreamCatalog.kt`, line 61) is `Collections.synchronizedList(ArrayList())`. Its `add` and `size` are locked, but iteration is not: `calls.count { ... }` walks the plain `ArrayList` iterator, and the view model's scope thread ("ui-sim") appends in between. The Javadoc of `Collections.synchronizedList` requires the caller to hold the list's lock while iterating. Lines 181 and 183 of the thread test do not; the established pattern elsewhere does (`ClientsHarness.count`, `StreamListHarness.count`, `ClientsSteps.clientCalls`, `StreamListSteps.listCalls`: `synchronized(catalog.calls) { ... }`). `FakeStreamOffsets.calls` (line 21) and `FakeStreamMessageReader.calls` (line 23) have the same shape. The test rule: a flaky test is a bug (`.claude/agents/test-developer.md`, "Test principles").
+
+## Ruling on how (architect)
+Fix the fakes, not each reader. Make the three `calls` lists `CopyOnWriteArrayList<String>()` (the declared type stays `MutableList<String>`): iteration is then a snapshot and cannot throw, whichever thread appends, and no test needs an edit. Reasons: the trap is in a shared fake that many tests read in many ways (`calls.count`, `calls.filter`, `calls.toList()`, `calls.size`), and a fix at two call sites leaves every future reader exposed; the lists hold a handful of entries, so the copy on write costs nothing. The existing `synchronized(...) { ... }` blocks stay as they are (harmless; do not touch them).
+
+Option rejected: `synchronized(r.catalog.calls)` at lines 181 and 183 only. It works, but it fixes one reader and the next `calls.count` on a thread test flakes the same way.
+
+## Scope
+In:
+- Test first, seen red: for each of the three fakes, one test in the class that already tests that fake (`FakeStreamCatalogTest`, `FakeStreamOffsetsTest`; for the reader fake `core/src/jvmTest/.../browser/StreamMessageReaderContractTest.kt` or the smallest new test class next to it) that has one thread record calls through the fake's own public methods in a loop while another thread counts `calls` in a loop until the writer is done. Bounded: a start latch, a fixed number of appends (tens of thousands), a join with a timeout and a message that names what was expected; no sleep. Red on the current code is `ConcurrentModificationException` (probabilistic, so show it red 3 of 3 runs and say so in the Status); green after the change, and it cannot fail afterwards (a `CopyOnWriteArrayList` iterator never throws it).
+- The change: three one-line edits in `core-testing`, plus one sentence in the KDoc of each `calls` ("safe to read while calls are being recorded") so the contract is written where the next reader looks.
+Out:
+- Editing `StreamClientsViewModelThreadTest` or any other test that reads `calls` (they stay unedited and must stay green).
+- Other recording lists in the fakes (`FakeConnectionGateway.log`, `FakeStreamManager.createdStreams`, `FakeMessagePublisher.publishedMessages`, ...): same hazard in principle, no observed failure; do not widen. If the test developer finds one that is read across threads in a test, say so in the Status; the architect decides.
+- Any production file, any `tests/bdd` file, `:data-rabbit`.
+
+## Acceptance
+- BDD: none (no user-visible behaviour); unit tests as above.
+- The three new tests red on the old fakes (3 of 3 runs each), green on the new.
+- `StreamClientsViewModelThreadTest` green 10 of 10 alone and 10 of 10 while the machine is loaded (as in M2-TESTHYGIENE-03: run it under CPU load before and after; the "before" run may not reproduce, say so).
+- Fast set once before the merge: `task test` (the fakes are test-scope dependencies of `:core`, `:ui`, `:acceptance-tests`, `:data-rabbit`, `:desktopApp` and `:mcp-server`) and `verifyTestDiscovery`.
+
+## Design notes
+`core-testing` is test support (a `testImplementation` or test-scope dependency of the six modules above, checked in the `build.gradle.kts` files; the test developer owns it). Nothing in `core`, `data-rabbit`, `ui`, `desktopApp` or `mcp-server` changes. Steps: 2 (test developer) the three tests, red; 3 (test developer, the change is one line each in test support, so the builder step is folded into the same role) the fakes; 4 verify (fast set, load runs); 5 architect review. One commit per step.
+
+While there, one observation for the test developer to check and report, not to fix unless it proves a real problem: `Rig.await` in the thread test evaluates its condition only when the view model's state emits (`vm.state.first(condition)`), so a condition about `calls` that becomes true without a later state emission would wait for the 20 s timeout instead of failing at once. If it is real, write it in the Status as a finding with the line; the architect decides the follow-up.
+
+## UX
+None.
+
+## MCP
+None (test support only; no product capability).
+
+## Open points
+None. The flake itself was seen once, under the load of a full parallel run, and is explained by the code; if the "before" runs never reproduce it, the red stress tests are the evidence.
+
+## Definition of done
+Three tests red then green, `StreamClientsViewModelThreadTest` unedited and stable under load, no production file changed, no other edit in tests that read `calls`, README row added (coordinator).

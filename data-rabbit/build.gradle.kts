@@ -24,7 +24,7 @@ dependencies {
     // SecretStore, CaCertificateValidator) implement interfaces declared in `core` - see
     // docs/tasks/M1-02-connection-profiles.md's Design notes ("core holds ... repository interfaces").
     implementation(project(":core"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // Connection-profile JSON file storage (JsonFileConnectionProfileRepository): kotlinx-serialization
     // is already the project's chosen JSON library (docs/spec.md tech-stack table, "Management API:
@@ -32,7 +32,7 @@ dependencies {
     // second JSON library. A private DTO in this module carries the @Serializable annotation, not
     // core's ConnectionProfile itself, so core's domain model stays free of any serialization-library
     // import (see JsonFileConnectionProfileRepository's own header comment).
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     // Management API reachability probe (StreamAndManagementReachabilityChecker): Ktor client per
     // docs/spec.md's tech-stack table ("Management API: Ktor client ..."), using the Java engine
@@ -64,7 +64,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // M1-02: RealBrokerReachabilityTest calls the (suspend) BrokerReachabilityChecker.check() from a
     // plain JUnit test via runBlocking.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:testcontainers")
