@@ -9,8 +9,9 @@ Feature: Topology planner
   "Save as migration" and it is applied only by the existing Apply of the Migrations screen. Nothing the
   planner does changes the broker.
 
-  PLANNED 2026-11-15, not built; the owner's review is pending. Scenarios tagged @needs-decision state the
-  recommended answer of an open owner question (docs/spec.md, "Topology planner (M9)", Q1 to Q16).
+  PLANNED 2026-11-15, not built. The owner answered the open questions Q1 to Q16 on 2026-11-15 (docs/spec.md,
+  "Topology planner (M9)", "Owner answers to the questions"), so no scenario here carries @needs-decision any
+  more; @needs-spike marks what still waits for a broker fact.
   Sub-tags: @m9-01 plan core (forms, plain words, validation, naming), @m9-02 draft, save and dismiss,
   @m9-03 the screen and its states, @m9-04 the review graph, @m9-12 a pending file opened as steps.
   The check against the broker is in 20, streams, policies, dead-lettering and MQTT routes are in 21.
@@ -69,7 +70,7 @@ Feature: Topology planner
       | fanout |
       | direct |
 
-  @m9-01 @needs-decision @fake-broker
+  @m9-01 @fake-broker
   Scenario Outline: A topic or a headers exchange
     Given a new plan
     When I add a <type> exchange "ex-1" with the wizard
@@ -177,7 +178,7 @@ Feature: Topology planner
       | camelCase     | orders-eu  | the hint "This name does not follow camelCase, for example ordersEu"      |
       | No convention | Orders_EU  | no hint                                                                 |
 
-  @m9-01 @needs-decision @fake-broker
+  @m9-01 @fake-broker
   Scenario: Names that already exist on the broker are never flagged
     Given the broker has the direct exchange "Legacy_Events"
     And a plan with the naming style "kebab-case" that declares the quorum queue "orders"
@@ -190,13 +191,13 @@ Feature: Topology planner
     When I choose the naming style "snake_case"
     Then the plan still lists "Declare quorum queue orders-eu"
 
-  @m9-02 @needs-decision @fake-broker
+  @m9-02 @fake-broker
   Scenario: The naming style is remembered on this machine
     Given I chose the naming style "snake_case" in the planner
     When the app is restarted and I start a new plan
     Then the naming style is "snake_case"
 
-  @m9-02 @needs-decision @fake-broker
+  @m9-02 @fake-broker
   Scenario: The naming style is kebab-case until I choose another
     Given no naming style was ever chosen on this machine
     When I start a new plan
@@ -266,7 +267,7 @@ Feature: Topology planner
     When I choose "Dismiss"
     Then there is no draft any more and no question was asked
 
-  @m9-02 @needs-decision @fake-broker
+  @m9-02 @fake-broker
   Scenario: A draft survives a restart
     Given a plan described as "Add orders" that declares the quorum queue "orders"
     When the app is restarted
@@ -274,7 +275,7 @@ Feature: Topology planner
     When I choose "Continue plan"
     Then the plan is described as "Add orders" and lists "Declare quorum queue orders"
 
-  @m9-02 @needs-decision @fake-broker
+  @m9-02 @fake-broker
   Scenario: There is one draft at a time
     Given a plan with 3 steps
     When I open the Migrations screen
@@ -341,7 +342,7 @@ Feature: Topology planner
 
   # ---- M9-03: the screen, where it is opened, and its limited states ----
 
-  @m9-03 @needs-decision @fake-broker
+  @m9-03 @fake-broker
   Scenario: The planner is opened from the Migrations screen
     When I open the Migrations screen
     Then I can choose "New plan"
@@ -349,7 +350,7 @@ Feature: Topology planner
     Then the planner opens with an empty plan and the text "No steps yet"
     And "Check", "Save as migration" and "Dismiss" are disabled
 
-  @m9-03 @needs-decision @fake-broker
+  @m9-03 @fake-broker
   Scenario: After saving, Apply is pressed on the Migrations screen
     Given a plan that declares the quorum queue "orders"
     When I choose "Save as migration"
@@ -523,7 +524,7 @@ Feature: Topology planner
     Then I am told "0005.json changed on disk since it was opened" and that it was not overwritten
     And "0005.json" holds the other person's content
 
-  @m9-12 @needs-decision @fake-broker
+  @m9-12 @fake-broker
   Scenario: The raw JSON editor stays beside "Edit steps"
     Given a pending migration "0005"
     When I select "0005" on the Migrations screen

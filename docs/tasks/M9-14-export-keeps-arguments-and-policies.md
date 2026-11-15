@@ -1,8 +1,8 @@
 # M9-14: The topology export keeps arguments and policies
 
-Milestone: M9 (recommended follow-up; not part of the planner's first version)    Depends on: none of the planner tasks; best after M9-00c    Size: M
+Milestone: M9 (recommended follow-up; not part of the planner's first version; NOT ORDERED by the owner, an idea until he decides)    Depends on: none of the planner tasks; best after M9-00c    Size: M
 
-PLANNED 2026-11-15. Not started. Found while planning M9 (spec "Topology planner (M9)", "Disagreements found while planning", item 2). The owner decides its place in the order.
+PLANNED 2026-11-15. Not started. Found while planning M9 (spec "Topology planner (M9)", "Disagreements found while planning", item 2). The owner has not ordered it (2026-11-15) and has not been asked yet; its place in the order is his call.
 
 ## Goal
 "Export current topology" writes a migration that declares what the virtual host really has: queues with their durable flag and arguments, exchanges and bindings with their typed arguments, and the policies. Applying the exported file to an empty broker gives the same topology.

@@ -1,6 +1,6 @@
 # M9-00c: Spike on a live 4.x broker: policy keys per target, one policy per queue, declare equivalence, names
 
-Milestone: M9    Depends on: the owner's review of the M9 plan (nothing else)    Size: M
+Milestone: M9    Depends on: none (the owner answered the open questions on 2026-11-15)    Size: M
 
 PLANNED 2026-11-15. Not started. Runs in parallel with `M9-00a` and `M9-00b`.
 

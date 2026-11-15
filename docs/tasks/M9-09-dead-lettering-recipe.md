@@ -28,9 +28,9 @@ Out: a direct dead-letter exchange with a dead-letter routing key (later); dead-
 - BDD: `21_topology_planner_recipes.feature` / "The policy matches exactly the chosen queue" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "The dead-letter names are suggested with suffixes in the naming style" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "Dead-lettering for a queue of the same plan comes after the queue" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "Dead letters can go to a stream" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "At least once needs my tick and says what it changes" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "At most once is the default and adds no strategy setting" (@fake-broker @needs-decision @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "Dead letters can go to a stream" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "At least once needs my tick and says what it changes" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "At most once is the default and adds no strategy setting" (@fake-broker @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "At least once is not offered for a classic queue" (@fake-broker @negative @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "A queue that already has a policy is pointed out before the recipe is added" (@fake-broker @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "The review graph shows the dead-letter path" (@fake-broker)
@@ -48,7 +48,7 @@ The recipe is a form that returns actions; after "Add to plan" nothing remembers
 None (owner decision 2026-11-15).
 
 ## Open points
-- Q12: the stream target and "At least once" are built only if S-C7 and S-C3 confirm them; the default is always at most once. If S-C3 fails, the "How sure" block is not drawn and three scenarios are removed by the architect.
+- Q12 (decided 2026-11-15: fanout exchange and quorum dead-letter queue by default; a stream target and at-least-once only if the spike confirms them; at-least-once never the default and only with an explicit tick): the stream target and "At least once" are built only if S-C7 and S-C3 confirm them; the default is always at most once. If S-C3 fails, the "How sure" block is not drawn and three scenarios are removed by the architect.
 - S-C1 decides the summary sentence; until then it is not final wording.
 - S-F2 decides the policy warning.
 
