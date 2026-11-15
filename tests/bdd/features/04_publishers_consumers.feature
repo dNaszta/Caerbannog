@@ -127,6 +127,13 @@ Feature: Publishers and consumers of a stream
     Then its connection reads "unknown"
     And its offset, messages behind and status read "updating"
 
+  # M2-17c: a broker row without a messages-behind number is a settling row, never 0 and never "Caught up" (not seen on RabbitMQ 4; a robustness rule).
+  @fake-broker
+  Scenario: A consumer without a messages-behind number from the broker is not shown as caught up
+    Given a consumer on "orders-events" for which the broker sent no messages-behind number
+    When I open the "Publishers and consumers" tab of "orders-events"
+    Then its offset, messages behind and status read "updating"
+
   @fake-broker
   Scenario: A row settles on the next refresh
     Given a consumer on "orders-events" whose connection name is not known yet
