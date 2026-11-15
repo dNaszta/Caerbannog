@@ -63,7 +63,7 @@ data class ConsumerRow(
     val consumed: Long,
     val credits: Int,
     val offset: Long,
-    val offsetLag: Long,
+    val offsetLag: Long?,
 )
 
 /** What the broker and the user allow. */

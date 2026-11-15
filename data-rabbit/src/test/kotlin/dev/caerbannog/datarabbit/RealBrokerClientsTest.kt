@@ -317,7 +317,7 @@ class RealBrokerClientsTest {
         // as soon as one row reads 1 or more, which can already be the first window (the other application's consumer reads 1 there) or only the
         // steady state (every consumer reads the same number there).
         val later = runCatching {
-            awaitUntil("a consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { it.offsetLag >= 1 } })
+            awaitUntil("a consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { row -> row.offsetLag.let { lag -> lag != null && lag >= 1 } } })
         }.getOrElse { consumersOf(held, stream) }
         for (r in later.sortedBy { it.name.orEmpty() }) {
             println("SPIKE-A later name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
@@ -346,7 +346,7 @@ class RealBrokerClientsTest {
         // non-zero value is required.
         val steadyReads = awaitCatalogAgreesWithRaw("rows after the ${OBSERVATION_MS / 1000} s observation", held, raw, stream, samples)
         println("SPIKE-A raw rows after the observation (raw offset 99 = steady state): ${steadyReads.raw}")
-        println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
+        println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().mapNotNull { it.offsetLag }.maxOrNull()}")
 
         // Number of offset stores each application did (auto tracking: one per 10 of the 100 messages; the other application: 3). Every one of them is
         // an entry in the stream, so the broker counts them after the last message for EVERY consumer, also for one that never stores (steady state).

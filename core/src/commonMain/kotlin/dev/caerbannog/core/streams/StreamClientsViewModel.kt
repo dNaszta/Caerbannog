@@ -343,11 +343,12 @@ private fun publisherState(key: String, row: PublisherRow): PublisherRowState {
 
 private fun consumerState(key: String, row: ConsumerRow): ConsumerRowState {
     val settling = row.isSettling()
+    val lag = row.offsetLag ?: 0L // TEMP: step 3 replaces this
     val status = when {
         settling -> ConsumerStatus.Updating
         !row.active -> ConsumerStatus.NotActive
-        row.offsetLag <= 0L -> ConsumerStatus.CaughtUp
-        else -> ConsumerStatus.Behind(row.offsetLag)
+        lag <= 0L -> ConsumerStatus.CaughtUp
+        else -> ConsumerStatus.Behind(lag)
     }
     return ConsumerRowState(
         key = key,
@@ -355,7 +356,7 @@ private fun consumerState(key: String, row: ConsumerRow): ConsumerRowState {
         connection = if (settling) StreamClientsTexts.UNKNOWN else row.connectionName,
         user = row.user ?: StreamClientsTexts.NO_USER,
         offset = if (settling) StreamClientsTexts.UPDATING else row.offset.toString(),
-        behind = if (settling) StreamClientsTexts.UPDATING else groupDigits(row.offsetLag),
+        behind = if (settling) StreamClientsTexts.UPDATING else groupDigits(lag),
         status = status,
         browseFromOffset = if (settling) null else row.offset,
     )
