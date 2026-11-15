@@ -156,6 +156,13 @@ class ClientsSteps {
         setConsumers()
     }
 
+    @Given("a consumer on {string} for which the broker sent no messages-behind number")
+    fun aConsumerWithoutALag(stream: String) {
+        // the connection name is present, so the missing lag is the only reason the row can not be settled
+        consumerRows += consumer("billing", lastOffset, lastOffset, offsetLag = null, subscriptionId = consumerRows.size)
+        setConsumers()
+    }
+
     @Given("{string} has no publishers and no consumers")
     fun hasNoClients(stream: String) {
         catalog.setPublishers("/", stream, emptyList())

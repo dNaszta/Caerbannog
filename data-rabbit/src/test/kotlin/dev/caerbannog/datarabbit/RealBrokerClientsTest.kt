@@ -35,6 +35,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -60,6 +61,8 @@ import java.util.concurrent.TimeUnit
  * after attach) and S-C (a second vhost) of docs/tasks/M2-06-publishers-consumers.md, kept as assertions, plus the counts check of
  * scenario "Counts on the tab match counts in the stream list" with the three tag levels (administrator FULL, management OWN, no tag NONE).
  * The tab's view model is exercised against fakes in `core`; here the real catalog answers the same questions the tab asks.
+ * S-D (M2-17c) probes the raw consumers endpoint: does every row carry a whole-number `offset_lag` right after attach, on an empty stream and for a standby
+ * consumer (the rule "a row with no lag number is a settling row" assumes it), and is `offset` there too (printed, not asserted).
  * Spike output lines start with "SPIKE-" (printed once, for the Status record). Stats lag up to 5 s: bounded polling on the value.
  * Run with `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerClientsTest*'`.
  */
@@ -81,6 +84,10 @@ class RealBrokerClientsTest {
 
         /** The key of a consumer in the lag comparison: its name, and one fixed key for an unnamed one (absent, null or empty on either side). */
         private fun lagKey(name: String?) = name?.takeIf { it.isNotEmpty() } ?: UNNAMED_KEY
+
+        /** The name of the queue (stream) a raw consumer row belongs to. */
+        private fun queueNameOf(row: JsonObject): String? = ((row["queue"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull
+
         private val users = mapOf("m206-mgmt" to "pw-mgmt", "m206-plain" to "pw-plain", "m206-mon" to "pw-mon")
 
         private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
@@ -244,13 +251,17 @@ class RealBrokerClientsTest {
      * straight from the body and NOT through `ManagementJson`, so that the comparison with the catalog can see what the mapper adds or takes away.
      */
     private class RawConsumerReader(private val http: ManagementHttp, private val requests: ManagementRequests) {
-        fun read(stream: String): Map<String, Lag> {
+        /** Every row of the endpoint as the broker sent it (all queues and streams of the vhost), in the broker's order. */
+        fun rows(): List<JsonObject> {
             val reply = runBlocking { http.get(requests.consumers("/")) }
             assertInstanceOf(ManagementReply.Response::class.java, reply, "the raw consumers read expected a response, got $reply")
             val response = reply as ManagementReply.Response
-            assertEquals(200, response.status, "the raw consumers read of $stream expected status 200, got ${response.status}")
-            val rows = Json.parseToJsonElement(response.body).jsonArray.map { it.jsonObject }
-                .filter { ((it["queue"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull == stream }
+            assertEquals(200, response.status, "the raw consumers read expected status 200, got ${response.status}")
+            return Json.parseToJsonElement(response.body).jsonArray.map { it.jsonObject }
+        }
+
+        fun read(stream: String): Map<String, Lag> {
+            val rows = rows().filter { queueNameOf(it) == stream }
             // absent, JSON null and empty are one key; contentOrNull because `.content` of a JSON null reads the text "null"
             val byName = rows.associate { row ->
                 val name = ((row["properties"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull
@@ -317,7 +328,7 @@ class RealBrokerClientsTest {
         // as soon as one row reads 1 or more, which can already be the first window (the other application's consumer reads 1 there) or only the
         // steady state (every consumer reads the same number there).
         val later = runCatching {
-            awaitUntil("a consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { it.offsetLag >= 1 } })
+            awaitUntil("a consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { row -> row.offsetLag.let { lag -> lag != null && lag >= 1 } } })
         }.getOrElse { consumersOf(held, stream) }
         for (r in later.sortedBy { it.name.orEmpty() }) {
             println("SPIKE-A later name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
@@ -346,7 +357,7 @@ class RealBrokerClientsTest {
         // non-zero value is required.
         val steadyReads = awaitCatalogAgreesWithRaw("rows after the ${OBSERVATION_MS / 1000} s observation", held, raw, stream, samples)
         println("SPIKE-A raw rows after the observation (raw offset 99 = steady state): ${steadyReads.raw}")
-        println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
+        println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().mapNotNull { it.offsetLag }.maxOrNull()}")
 
         // Number of offset stores each application did (auto tracking: one per 10 of the 100 messages; the other application: 3). Every one of them is
         // an entry in the stream, so the broker counts them after the last message for EVERY consumer, also for one that never stores (steady state).
@@ -409,6 +420,93 @@ class RealBrokerClientsTest {
             n++
         }
         return samples
+    }
+
+    // ---- S-D (M2-17c) ----
+
+    /** [key] of a raw row as a JSON whole number, or null for anything else (absent, JSON null, text even "7", a decimal, a boolean, an object, an array): the rule of `ManagementJson.long`, written again here on purpose. */
+    private fun wholeNumber(row: JsonObject, key: String): Long? = (row[key] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull
+
+    private fun connectionNameOf(row: JsonObject): String? = ((row["connection_details"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull
+
+    /** The raw JSON of one field, or ABSENT; a text value keeps its quotes, so "7" and 7 can be told apart in the print. */
+    private fun rawField(row: JsonObject, key: String): String = row[key]?.toString() ?: "ABSENT"
+
+    private fun describeRow(row: JsonObject): String =
+        "[conn=${if (connectionNameOf(row).isNullOrEmpty()) "EMPTY" else "set"} offset=${rawField(row, "offset")} offset_lag=${rawField(row, "offset_lag")} active=${rawField(row, "active")} activity_status=${rawField(row, "activity_status")}]"
+
+    /** One of the three states of S-D: [rows] is how many consumer rows a sample must hold at least once, or the probe measured nothing. */
+    private class ProbeCase(val label: String, val stream: String, val rows: Int, val standby: Boolean = false)
+
+    /**
+     * Attaches a consumer and returns at once (the caller reads the endpoint from this moment; [consume] would first wait for messages). No tracking
+     * unless [defaultTracking]: a named consumer with the client's default tracking is the shape of most applications.
+     */
+    private fun attach(e: Environment, stream: String, name: String?, singleActive: Boolean = false, defaultTracking: Boolean = false): Consumer {
+        val b = e.consumerBuilder().stream(stream).offset(OffsetSpecification.first()).messageHandler { _, _ -> }
+        if (name != null) b.name(name)
+        if (singleActive) b.singleActiveConsumer()
+        if (!defaultTracking) b.noTrackingStrategy()
+        return b.build().also { closeables += it }
+    }
+
+    @Test
+    fun `S-D every consumer row carries a whole-number offset_lag, right after attach, on an empty stream and for a standby consumer`() = runBlocking<Unit> {
+        val full = unique("m217c-full-")
+        val empty = unique("m217c-empty-")
+        val group = unique("m217c-sac-")
+        val fullEnv = createStream(full)
+        publish(fullEnv, full, 100, reference = "pub-$full")
+        val emptyEnv = createStream(empty)
+        val groupEnv = createStream(group)
+        publish(groupEnv, group, 100, reference = "pub-$group")
+        val raw = rawConsumerReader()
+
+        // All consumers attach in one burst and the raw read starts at once, so the first samples are the rows of clients that have just attached.
+        // (1) a stream with 100 messages, an unnamed and a named consumer; (2) an empty stream, one named consumer with the client's default tracking;
+        // (3) one single-active group of two consumers (own connection each): one is the standby (`active` false).
+        attach(fullEnv, full, null)
+        attach(fullEnv, full, "named-$full")
+        attach(emptyEnv, empty, "named-$empty", defaultTracking = true)
+        attach(env(), group, "group-$group", singleActive = true)
+        attach(env(), group, "group-$group", singleActive = true)
+        val cases = listOf(
+            ProbeCase("100 messages, unnamed + named consumer", full, rows = 2),
+            ProbeCase("empty stream, one named consumer", empty, rows = 1),
+            ProbeCase("single active group of 2, one standby", group, rows = 2, standby = true),
+        )
+
+        // A fixed observation, as in S-A: every sample is printed first and asserted after, so one bad row does not hide the other two states.
+        val observation = observe(OBSERVATION_MS, OBSERVATION_EVERY_MS) { raw.rows() }
+        fun List<JsonObject>.of(case: ProbeCase) = filter { queueNameOf(it) == case.stream }
+        for ((atMs, rows) in observation) {
+            for (case in cases) println("SPIKE-D +${atMs}ms ${case.label}: ${rows.of(case).joinToString(" ") { describeRow(it) }.ifEmpty { "NO ROWS" }}")
+        }
+        for (case in cases) {
+            val seen = observation.flatMap { (_, rows) -> rows.of(case) }
+            val attached = seen.filter { connectionNameOf(it).isNullOrEmpty() }
+            println(
+                "SPIKE-D ${case.label}: ${seen.size} row reads in ${observation.size} samples; offset_lag a whole number in ${seen.count { wholeNumber(it, "offset_lag") != null }}; " +
+                    "offset a whole number in ${seen.count { wholeNumber(it, "offset") != null }}; rows with an empty connection_details: ${attached.size} " +
+                    "(offset a whole number in ${attached.count { wholeNumber(it, "offset") != null }}, offset_lag in ${attached.count { wholeNumber(it, "offset_lag") != null }})",
+            )
+            println("SPIKE-D ${case.label} raw first sample: ${observation.first().second.of(case).joinToString(" ")}")
+            println("SPIKE-D ${case.label} raw last sample: ${observation.last().second.of(case).joinToString(" ")}")
+        }
+
+        val lagless = observation.flatMap { (atMs, rows) ->
+            cases.flatMap { case -> rows.of(case).filter { wholeNumber(it, "offset_lag") == null }.map { "+${atMs}ms ${case.label}: no whole-number offset_lag in $it" } }
+        }
+        assertTrue(lagless.isEmpty(), "a consumer row without a whole-number offset_lag (stop condition of M2-17c):\n${lagless.joinToString("\n")}")
+        // A probe that saw no rows proves nothing: every state must have been seen with all its rows at least once.
+        for (case in cases) {
+            assertTrue(observation.any { (_, rows) -> rows.of(case).size >= case.rows }, "S-D measured nothing for '${case.label}': no sample held ${case.rows} rows")
+        }
+        val standby = cases.single { it.standby }
+        assertTrue(
+            observation.any { (_, rows) -> rows.of(standby).count { (it["active"] as? JsonPrimitive)?.booleanOrNull == false } == 1 },
+            "S-D did not measure a standby consumer: no sample held exactly one row with active=false for '${standby.label}'",
+        )
     }
 
     // ---- S-B ----

@@ -252,7 +252,7 @@ class FakeStreamCatalog : StreamCatalog {
             name: String?,
             offset: Long,
             lastOffset: Long,
-            offsetLag: Long = lastOffset - offset,
+            offsetLag: Long? = lastOffset - offset,
             connectionName: String = "10.0.5.14:38812 -> 10.0.0.1:5552",
             user: String? = "svc",
             subscriptionId: Int = 0,

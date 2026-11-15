@@ -39,7 +39,7 @@ sealed interface ConsumerStatus {
     /** Single-active-consumer standby (brief Open point 3). */
     data object NotActive : ConsumerStatus { override val text: String = StreamClientsTexts.NOT_ACTIVE }
 
-    /** A row whose connection name is not known yet (just attached). */
+    /** A row whose connection name is not known yet, or for which the broker sent no lag. */
     data object Updating : ConsumerStatus { override val text: String = StreamClientsTexts.UPDATING }
 }
 

@@ -199,6 +199,74 @@ class StreamClientsViewModelRowsTest {
         assertEquals(48299L, row.browseFromOffset)
     }
 
+    // --- a row for which the broker sent no lag number (M2-17c): the same state as a client that has just attached ---
+
+    @Test
+    fun `a consumer row without a lag number reads updating in every cell, never 0 or Caught up, and cannot be browsed`() = runTest {
+        val s = ClientsHarness(this)
+        s.consumers(s.consumerAt("billing", 48299, lag = null))
+        s.open()
+
+        val row = s.state.consumers.single()
+        assertEquals("updating", row.status.text, "a lag the broker did not send must not read Caught up or 0")
+        assertEquals(ConsumerStatus.Updating, row.status)
+        assertEquals("updating", row.offset)
+        assertEquals("updating", row.behind)
+        assertNull(row.status.hint)
+        assertNull(row.browseFromOffset, "a row in this state cannot be browsed")
+        assertEquals("unknown", row.connection, "the state is all-or-nothing: the same as an empty connection name (ruling 3)")
+    }
+
+    @Test
+    fun `a settled row on each side of one without a lag number keeps its own state`() = runTest {
+        val s = ClientsHarness(this)
+        s.consumers(
+            s.consumerAt("first", 48299, lag = 0, id = 0),
+            s.consumerAt("middle", 48299, lag = null, id = 1),
+            s.consumerAt("last", 47950, lag = 349, id = 2),
+        )
+        s.open()
+
+        assertEquals(
+            listOf(Triple("first", "0", "Caught up"), Triple("middle", "updating", "updating"), Triple("last", "349", "349 behind")),
+            s.state.consumers.map { Triple(it.name, it.behind, it.status.text) },
+        )
+    }
+
+    @Test
+    fun `a row settles when its lag number arrives`() = runTest {
+        val s = ClientsHarness(this)
+        s.consumers(s.consumerAt("billing", 48299, lag = null))
+        s.open()
+        assertEquals("updating", s.state.consumers.single().status.text, "no lag number yet")
+
+        s.consumers(s.consumerAt("billing", 48299, lag = 0))
+        s.pass(5)
+
+        val row = s.state.consumers.single()
+        assertEquals(ConsumerStatus.CaughtUp, row.status)
+        assertEquals("0", row.behind)
+        assertEquals(48299L, row.browseFromOffset)
+    }
+
+    @Test
+    fun `the lag trend of a consumer gets no point while its lag number is missing`() = runTest {
+        val s = ClientsHarness(this)
+        val key = "10.0.5.14:38812 -> 10.0.0.1:5552#0"
+        s.consumers(s.consumerAt("worker", 100, lag = 5))
+        s.open()
+        repeat(3) {
+            s.consumers(s.consumerAt("worker", 100, lag = null))
+            s.pass(5)
+        }
+        assertTrue(s.state.consumerLagSparklines.isEmpty(), "one real point is no trend yet; a 0 recorded for a missing lag would already make one")
+
+        s.consumers(s.consumerAt("worker", 100, lag = 5))
+        s.pass(5)
+
+        assertEquals(listOf(5L, 5L), s.state.consumerLagSparklines.getValue(key).samples, "never a 0 between the two real points")
+    }
+
     // --- unnamed ------------------------------------------------------------------------------------
 
     @Test

@@ -82,7 +82,7 @@ internal class ClientsHarness(val test: TestScope, refresh: RefreshInterval = DE
     fun consumers(vararg rows: dev.caerbannog.core.streams.ConsumerRow) = catalog.setConsumers("/", STREAM, rows.toList())
     fun publishers(vararg rows: dev.caerbannog.core.streams.PublisherRow) = catalog.setPublishers("/", STREAM, rows.toList())
 
-    fun consumerAt(name: String?, offset: Long, lag: Long = LAST - offset, connection: String = "10.0.5.14:38812 -> 10.0.0.1:5552", id: Int = 0, active: Boolean = true) =
+    fun consumerAt(name: String?, offset: Long, lag: Long? = LAST - offset, connection: String = "10.0.5.14:38812 -> 10.0.0.1:5552", id: Int = 0, active: Boolean = true) =
         consumer(name, offset, LAST, lag, connection, subscriptionId = id, active = active)
 
     fun count(call: String): Int = synchronized(catalog.calls) { catalog.calls.count { it == call } }

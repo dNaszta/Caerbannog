@@ -309,7 +309,11 @@ class StreamClientsViewModel(
 // A broker row whose connection details are still `{}` (a client that has just attached): nothing in it can be trusted yet.
 private fun PublisherRow.isSettling(): Boolean = connectionName.isEmpty()
 
-private fun ConsumerRow.isSettling(): Boolean = connectionName.isEmpty()
+// Also a row for which the broker sent no lag: a number nobody reported is never shown as 0 or as Caught up (M2-17c).
+private fun ConsumerRow.isSettling(): Boolean = connectionName.isEmpty() || offsetLag == null
+
+// The lag of a settled row; `null` exactly when [isSettling], so a missing number cannot reach a status or a text.
+private fun ConsumerRow.settledLag(): Long? = if (isSettling()) null else offsetLag
 
 private fun nameOrUnnamed(name: String?): String = if (name.isNullOrBlank()) StreamClientsTexts.UNNAMED else name
 
@@ -342,12 +346,13 @@ private fun publisherState(key: String, row: PublisherRow): PublisherRowState {
 }
 
 private fun consumerState(key: String, row: ConsumerRow): ConsumerRowState {
-    val settling = row.isSettling()
+    val lag = row.settledLag()
+    val settling = lag == null
     val status = when {
-        settling -> ConsumerStatus.Updating
+        lag == null -> ConsumerStatus.Updating
         !row.active -> ConsumerStatus.NotActive
-        row.offsetLag <= 0L -> ConsumerStatus.CaughtUp
-        else -> ConsumerStatus.Behind(row.offsetLag)
+        lag <= 0L -> ConsumerStatus.CaughtUp
+        else -> ConsumerStatus.Behind(lag)
     }
     return ConsumerRowState(
         key = key,
@@ -355,7 +360,7 @@ private fun consumerState(key: String, row: ConsumerRow): ConsumerRowState {
         connection = if (settling) StreamClientsTexts.UNKNOWN else row.connectionName,
         user = row.user ?: StreamClientsTexts.NO_USER,
         offset = if (settling) StreamClientsTexts.UPDATING else row.offset.toString(),
-        behind = if (settling) StreamClientsTexts.UPDATING else groupDigits(row.offsetLag),
+        behind = if (lag == null) StreamClientsTexts.UPDATING else groupDigits(lag),
         status = status,
         browseFromOffset = if (settling) null else row.offset,
     )

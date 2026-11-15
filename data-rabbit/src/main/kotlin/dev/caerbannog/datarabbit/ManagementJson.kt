@@ -168,7 +168,10 @@ internal object ManagementJson {
         )
     }
 
-    /** The broker has no per-stream consumers path, so the rows are kept by the exact name of their queue. */
+    /**
+     * The broker has no per-stream consumers path, so the rows are kept by the exact name of their queue. A lag that is missing or not a
+     * whole number stays `null`; `core` shows such a row as updating.
+     */
     fun parseConsumers(body: String, stream: String): CatalogResult<List<ConsumerRow>> = guarded(body) { root ->
         val rows = root.asArray().map { it.asObject() }
             .filter { it["queue"].asObject().requiredString("name") == stream }
@@ -184,7 +187,7 @@ internal object ManagementJson {
                     consumed = row.long("consumed") ?: 0,
                     credits = (row.long("credits") ?: 0).toInt(),
                     offset = row.long("offset") ?: 0,
-                    offsetLag = row.long("offset_lag") ?: 0,
+                    offsetLag = row.long("offset_lag"),
                 )
             }
         CatalogResult.Success(rows)

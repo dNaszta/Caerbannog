@@ -228,6 +228,65 @@ class ManagementJsonTest {
         assertNull(success(ManagementJson.parseConsumers(body, "s")).single().name)
     }
 
+    // --- a consumer row without a lag number (M2-17c): the parser reports null, core decides what it looks like ---
+
+    /**
+     * One consumer row of stream "s". [lag] is the raw JSON of the `offset_lag` value, so "null" is the JSON null and `"7"` (quotes included) is text;
+     * a Kotlin null leaves the key out. [connection] is the raw JSON of `connection_details`.
+     */
+    private fun consumerRowJson(lag: String?, id: Int = 0, connection: String = """{"name":"c1","user":"u"}"""): String {
+        val lagField = if (lag == null) "" else "\"offset_lag\":$lag,"
+        return """{"subscription_id":$id,"consumed":10,"credits":10,"offset":9,$lagField"active":true,"activity_status":"up","properties":{"name":"c"},"queue":{"name":"s","vhost":"/"},"connection_details":$connection}"""
+    }
+
+    private fun consumersOf(vararg rows: String): List<ConsumerRow> = success(ManagementJson.parseConsumers("[" + rows.joinToString(",") + "]", "s"))
+
+    @Test
+    fun `a consumer row without the offset_lag key keeps a null lag and every other field as sent, and is still listed`() {
+        val rows = consumersOf(consumerRowJson(lag = null))
+        assertEquals(
+            listOf(
+                ConsumerRow(
+                    connectionName = "c1", user = "u", subscriptionId = 0, name = "c", active = true, activityStatus = "up",
+                    consumed = 10, credits = 10, offset = 9, offsetLag = null,
+                ),
+            ),
+            rows,
+        )
+    }
+
+    @Test
+    fun `an offset_lag that is not a number is a null lag, one listed row and a Success, never 0`() {
+        // every body is tried before the assertion, so a failure names all the values that were turned into a number and not only the first
+        val notNumbers = listOf("null", "\"7\"", "\"abc\"", "true", "{}", "[]")
+        val invented = notNumbers.mapNotNull { lag ->
+            val rows = consumersOf(consumerRowJson(lag = lag))
+            assertEquals(1, rows.size, "offset_lag $lag: the row is still listed")
+            rows.single().offsetLag?.let { "offset_lag $lag was read as $it" }
+        }
+        assertEquals(emptyList<String>(), invented, "an offset_lag that is not a number is not a number the broker sent: the lag must be null, never invented")
+    }
+
+    @Test
+    fun `an offset_lag of 0 stays 0 and a large one stays as sent, null is not 0`() {
+        assertEquals(0L, consumersOf(consumerRowJson(lag = "0")).single().offsetLag, "a lag of 0 is the broker's number")
+        assertEquals(123456789012L, consumersOf(consumerRowJson(lag = "123456789012")).single().offsetLag, "a large lag is not narrowed or capped")
+    }
+
+    @Test
+    fun `of two rows the one without a lag is null and the one with 0 stays 0, in the broker's order`() {
+        val rows = consumersOf(consumerRowJson(lag = "0", id = 0), consumerRowJson(lag = null, id = 1))
+        assertEquals(listOf(0L, null), rows.map { it.offsetLag })
+        assertEquals(listOf(0, 1), rows.map { it.subscriptionId })
+    }
+
+    @Test
+    fun `an empty connection_details with a lag of 0 is an empty connection name and lag 0, the parser leaves the settling signal to core`() {
+        val row = consumersOf(consumerRowJson(lag = "0", connection = "{}")).single()
+        assertEquals("", row.connectionName)
+        assertEquals(0L, row.offsetLag)
+    }
+
     // --- whoami (shape of RabbitMQ 4: {"name": ..., "tags": [...]}; confirmed against a real broker by RealBrokerCatalogTest) ---
 
     @Test
