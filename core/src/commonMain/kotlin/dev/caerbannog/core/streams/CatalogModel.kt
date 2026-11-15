@@ -53,6 +53,7 @@ data class PublisherRow(
     val errored: Long,
 )
 
+/** [offsetLag] is `null` when the broker sent no whole number; the screen then shows the row as updating, never as 0. */
 data class ConsumerRow(
     val connectionName: String,
     val user: String?,
