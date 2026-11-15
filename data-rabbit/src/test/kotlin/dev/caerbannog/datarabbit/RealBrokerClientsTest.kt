@@ -72,6 +72,13 @@ class RealBrokerClientsTest {
         private const val OTHER_VHOST = "m206-other"
         private const val UNNAMED_KEY = "<unnamed>"
 
+        /**
+         * The catalog observation of S-A and S-A2 (a fixed schedule, not a wait for a state): 12 s = two statistics intervals of 5 s plus margin,
+         * sampled every 500 ms (25 samples), so it covers the first statistics window and reaches the steady state.
+         */
+        private const val OBSERVATION_MS = 12_000L
+        private const val OBSERVATION_EVERY_MS = 500L
+
         /** The key of a consumer in the lag comparison: its name, and one fixed key for an unnamed one (absent, null or empty on either side). */
         private fun lagKey(name: String?) = name?.takeIf { it.isNotEmpty() } ?: UNNAMED_KEY
         private val users = mapOf("m206-mgmt" to "pw-mgmt", "m206-plain" to "pw-plain", "m206-mon" to "pw-mon")
@@ -227,7 +234,7 @@ class RealBrokerClientsTest {
     }
 
     /** One catalog read and one raw read of the same endpoint, both keyed by consumer name. [toString] is what `awaitUntil` prints on a time-out. */
-    private class LagReads(val catalogRows: List<ConsumerRow>, val catalog: Map<String, Lag>, val raw: Map<String, Lag>) {
+    private class LagReads(val catalog: Map<String, Lag>, val raw: Map<String, Lag>) {
         val agree get() = catalog == raw
         override fun toString() = "catalog $catalog, raw $raw"
     }
@@ -273,7 +280,7 @@ class RealBrokerClientsTest {
                 val rows = consumersOf(held, stream).also { samples += it }
                 val catalog = rows.associate { lagKey(it.name) to Lag(it.offset, it.offsetLag) }
                 check(catalog.size == rows.size) { "two consumers of $stream share a name in the catalog rows, the comparison by name would collapse them: $rows" }
-                LagReads(rows, catalog.toSortedMap(), raw.read(stream).toSortedMap())
+                LagReads(catalog.toSortedMap(), raw.read(stream).toSortedMap())
             },
             done = { it.agree },
         )
@@ -319,6 +326,26 @@ class RealBrokerClientsTest {
         // added to the lag would not agree. Not guaranteed to be the steady state, so it is not called that.
         val laterReads = awaitCatalogAgreesWithRaw("rows after the bounded wait for a lag of 1 or more", held, raw, stream, samples)
         println("SPIKE-A later raw rows (raw offset 100 = first statistics window, 99 = steady state): ${laterReads.raw}")
+
+        // The steady state, observed: the wait above can end inside the first statistics window (the other application's consumer reads lag 1 or more
+        // there at once), so on its own it need not reach the second statistics refresh. Observe the catalog on a fixed schedule for two statistics
+        // intervals and keep every sample for the stream-wide bound below. A bounded observation, not a wait for a state; no per-sample pass-through,
+        // because two GETs can straddle a refresh (offset and lag flip there) and a wait for agreement per sample would not be an observation.
+        // Every sample is printed first and asserted after, so the print shows the whole run when one sample fails: four rows, none vanished.
+        val observation = observe(OBSERVATION_MS, OBSERVATION_EVERY_MS) { consumersOf(held, stream) }
+        for ((atMs, rows) in observation) {
+            println("SPIKE-A +${atMs}ms ${rows.sortedBy { it.name.orEmpty() }.joinToString { "${lagKey(it.name)}=${it.offset}/${it.offsetLag}" }}")
+            samples += rows
+        }
+        for ((atMs, rows) in observation) {
+            assertEquals(4, rows.size, "+${atMs}ms: expected the four consumers of $stream, got $rows")
+        }
+        // Pass-through, third time: two statistics intervals have passed, so this is the steady-state check; it is sharp because the broker sends the
+        // same number for every consumer there. Its bounded wait handles a straddle of a refresh (the raw reader sat idle for the observation; the
+        // retry of a dropped GET and the short keep-alive cover that). Nothing is asserted about the value (99 and the lag are the broker's), and no
+        // non-zero value is required.
+        val steadyReads = awaitCatalogAgreesWithRaw("rows after the ${OBSERVATION_MS / 1000} s observation", held, raw, stream, samples)
+        println("SPIKE-A raw rows after the observation (raw offset 99 = steady state): ${steadyReads.raw}")
         println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
 
         // Number of offset stores each application did (auto tracking: one per 10 of the 100 messages; the other application: 3). Every one of them is
@@ -352,9 +379,9 @@ class RealBrokerClientsTest {
         )
         println("SPIKE-A2 settled ${settled.sortedBy { it.name.orEmpty() }.joinToString { "name=${it.name} offset=${it.offset} offset_lag=${it.offsetLag}" }}")
 
-        // 12 s = two statistics intervals of 5 s plus margin, so the sampling covers the first window and the steady state. Every sample is asserted:
-        // two rows (a vanished row must not pass as "nothing is behind") and lag 0 for both, which is what makes "Caught up" reachable on a real broker.
-        val samples = observe(durationMs = 12_000, everyMs = 500) { consumersOf(held, stream) }
+        // The observation covers the first window and the steady state. Every sample is asserted: two rows (a vanished row must not pass as
+        // "nothing is behind") and lag 0 for both, which is what makes "Caught up" reachable on a real broker.
+        val samples = observe(OBSERVATION_MS, OBSERVATION_EVERY_MS) { consumersOf(held, stream) }
         for ((atMs, rows) in samples) {
             println("SPIKE-A2 +${atMs}ms ${rows.sortedBy { it.name.orEmpty() }.joinToString { "${lagKey(it.name)}=${it.offset}/${it.offsetLag}" }}")
         }
