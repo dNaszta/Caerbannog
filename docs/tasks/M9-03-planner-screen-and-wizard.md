@@ -46,7 +46,7 @@ None (UI of a capability that has no tool by owner decision 2026-11-15).
 - Q11 (decided 2026-11-15): the entry is "New plan" on the Migrations screen and Apply stays on the Migrations screen after a save. A drawer item or Apply inside the planner would be a new decision.
 - Q15 (decided 2026-11-15): the Topology screen stays read-only; the `@m9-03` outline in `09` ("Topology is changed with a plan, not on the Topology screen") is bound by this task's suite, which also selects feature `09` for `@M9` scenarios.
 - Q16 ("Edit steps" beside "Edit file", decided) belongs to `M9-12`.
-- The owner reviews the mockup before step 2 of this task (the owner also confirms the revised Q3 there).
+- The owner reviews the mockup before step 2 of this task (the revised Q3 and the sample-value test message are already confirmed, O14).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

@@ -9,9 +9,9 @@ Feature: Topology planner
   "Save as migration" and it is applied only by the existing Apply of the Migrations screen. Nothing the
   planner does changes the broker.
 
-  PLANNED 2026-11-15, not built. The owner answered the open questions Q1 to Q16 on 2026-11-15 (docs/spec.md,
-  "Topology planner (M9)", "Owner answers to the questions"), so no scenario here carries @needs-decision any
-  more; @needs-spike marks what still waits for a broker fact.
+  PLANNED 2026-11-15, not built. The owner answered every open question on 2026-11-15 (docs/spec.md,
+  "Topology planner (M9)", "Owner answers to the questions", O12 to O14); @needs-spike marks what still waits
+  for a broker fact.
   Sub-tags: @m9-01 plan core (forms, plain words, validation, naming), @m9-02 draft, save and dismiss,
   @m9-03 the screen and its states, @m9-04 the review graph, @m9-12 a pending file opened as steps.
   The check against the broker is in 20, streams, policies, dead-lettering and MQTT routes are in 21.

@@ -51,7 +51,7 @@ None (spike, no product capability).
 - If S-B1 finds no way to read the MQTT exchange, the planner keeps the assumption `amq.topic` and says so in the wizard (already the plan). If it finds one, `M9-10` reads it and the architect updates A10.
 - If S-A3 shows that a level with a `.` cannot be expressed as a binding key at all, the form keeps refusing it; that is the default until measured.
 - If S-A6 and S-A7 show that the correlation id does not reach the stream message (neither as a user property nor as correlation data), the test message keeps its header (the existing dialog can do nothing else) and the architect tells the owner, because his processing then cannot match answers to requests that way; the planner is unaffected (it plans streams and routes only).
-- If S-A5 finds a way to feed an MQTT subscription from a stream, the owner is asked whether the planner should plan it: that would be a new decision, because the revised Q3 plans no bridge (O13).
+- If S-A5 finds a way to feed an MQTT subscription from a stream, the owner is asked whether the planner should plan it: that would be a new decision, because the confirmed Q3 plans no bridge (O13, O14).
 - The spike grows by about half a day with S-A5 to S-A8; it stays one task of size M.
 
 ## Definition of done

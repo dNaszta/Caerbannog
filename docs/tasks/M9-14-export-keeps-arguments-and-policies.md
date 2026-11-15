@@ -1,8 +1,8 @@
 # M9-14: The topology export keeps arguments and policies
 
-Milestone: M9 (recommended follow-up; not part of the planner's first version; NOT ORDERED by the owner, an idea until he decides)    Depends on: none of the planner tasks; best after M9-00c    Size: M
+Milestone: M9 (a follow-up outside the planner's first version, ORDERED by the owner on 2026-11-15, O14)    Depends on: none of the planner tasks (it needs its own small live spike first, below); STARTS right after M9-03, the last task of the first slice (M9-01 to M9-03)    Size: M
 
-PLANNED 2026-11-15. Not started. Found while planning M9 (spec "Topology planner (M9)", "Disagreements found while planning", item 2). The owner has not ordered it (2026-11-15) and has not been asked yet; its place in the order is his call.
+PLANNED 2026-11-15. Not started. Found while planning M9 (spec "Topology planner (M9)", "Disagreements found while planning", item 2). The owner ordered it on 2026-11-15 ("1 - y, 2 - y, 3 - y, 4 - y", answering the architect's list; item 4 was this task) to be built right after the first slice, as the architect recommended: a check or a plan made from an incomplete export misleads.
 
 ## Goal
 "Export current topology" writes a migration that declares what the virtual host really has: queues with their durable flag and arguments, exchanges and bindings with their typed arguments, and the policies. Applying the exported file to an empty broker gives the same topology.
@@ -26,7 +26,7 @@ Out: users, virtual hosts and permissions (never exported; the access migration 
 - Unit tests first: `MigrationsViewModelExportTest` (the pinned "no arguments" test is replaced by typed-arguments tests; the byte-for-byte test stays), parser tests for the new reads, the catalog guard test extended.
 
 ## Design notes
-Arguments are `ArgumentValue` end to end (numbers stay numbers); nothing is guessed from display text (`ExchangeRow.arguments` and `BindingRow.arguments` are display text today and stay so). Until this task is built, the Migrations screen should say what an export leaves out; that one sentence can be added with `M9-03` if the owner wants it sooner.
+Arguments are `ArgumentValue` end to end (numbers stay numbers); nothing is guessed from display text (`ExchangeRow.arguments` and `BindingRow.arguments` are display text today and stay so). The task is ordered to start right after `M9-03`, so no interim sentence about what an export leaves out is added to the Migrations screen; the one line under the export result (UX below) comes with this task.
 
 ## UX
 `docs/ux/Migrations.dc.html`: no new control; one line under the export result when something was left out.
@@ -36,7 +36,7 @@ None new. The existing read-only tools list and dry-run an exported file as befo
 
 ## Open points
 - Whether an exported policy keeps its priority and name exactly (yes, proposed) and whether policies the app's user cannot read make the export fail loudly (yes, proposed: the existing rule "an export that cannot read the broker writes no file").
-- Order: the owner's call. Recommended right after the planner's first slice, because a check or a plan made from an incomplete export misleads.
+- Order (decided by the owner, O14): it starts right after `M9-03` and can run next to `M9-04` onwards, because it touches the topology catalog and the export, not the planner. The two proposals above (an exported policy keeps its name and priority exactly; a policy the user cannot read makes the export fail loudly, as an unreadable broker already does) are the architect's technical decisions, not owner questions.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

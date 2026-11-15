@@ -8,9 +8,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   declareExchange, declareQueue, declareBinding). What a pattern does on the broker is measured by the spikes
   M9-00a, M9-00b and M9-00c before its form is built; scenarios tagged @needs-spike state the expected
   behaviour and are corrected to the measured one. The owner answered the open questions Q1 to Q16 on
-  2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"). The one tag
-  @needs-decision that remains is on the scenarios of Q3 revised (@m9-07b, the owner's IoT flow, to be confirmed
-  at the review of the mockup) and on the one scenario of Q17 (the key of the correlation-id header).
+  2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"), confirmed the
+  revised Q3 (his IoT flow, @m9-07b) and answered Q17 (the key of the correlation-id header) the same day
+  (O14), so no scenario carries @needs-decision any more.
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
@@ -113,16 +113,16 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   # with its id in it (devices/<id>/answer); the answer lands in the response stream and is processed from there;
   # request and answer are matched by a correlation id in the message, which the planner never touches.
   # The planner plans the two streams and the routes. It plans no bridge from a stream to an MQTT message.
-  # DECIDED (revised) by the architect from the owner's description; the owner confirms it at the mockup review.
+  # Decided (revised) by the architect from the owner's description and confirmed by the owner on 2026-11-15 (O14).
 
-  @m9-07b @needs-decision @fake-broker
+  @m9-07b @fake-broker
   Scenario: The MQTT ticks are offered only with the response stream and are off until I tick them
     When I open the stream form
     Then "Answers arrive over MQTT" and "Requests are also recorded from an MQTT topic" are not offered
     When I tick "Also create its response stream (DLN)"
     Then both are offered and neither is ticked
 
-  @m9-07b @smoke @needs-decision @needs-spike @fake-broker
+  @m9-07b @smoke @needs-spike @fake-broker
   Scenario: Answers arrive over MQTT adds one route into the response stream
     When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
     Then the summary says "This adds 3 steps"
@@ -132,7 +132,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | MQTT route devices/+/answer to stream device-commands-dln |
     And the route is the action "declareBinding" from "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
 
-  @m9-07b @needs-decision @needs-spike @fake-broker
+  @m9-07b @needs-spike @fake-broker
   Scenario: Requests are also recorded from an MQTT topic adds one route into the request stream
     When I add a stream "device-commands" with its response stream and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
     Then the plan lists these steps in this order
@@ -140,7 +140,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Declare stream device-commands-dln              |
       | MQTT route commands/# to stream device-commands |
 
-  @m9-07b @needs-decision @needs-spike @fake-broker
+  @m9-07b @needs-spike @fake-broker
   Scenario: Both ticks add two routes, the answers route first
     When I add a stream "device-commands" with its response stream, tick "Answers arrive over MQTT" with the topic filter "devices/+/answer" and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
     Then the summary says "This adds 4 steps"
@@ -150,19 +150,19 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | MQTT route devices/+/answer to stream device-commands-dln |
       | MQTT route commands/# to stream device-commands           |
 
-  @m9-07b @needs-decision @fake-broker
+  @m9-07b @fake-broker
   Scenario: The wizard says what it does not plan
     When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
     Then the summary says "Your own service turns a request into an MQTT message; the planner does not plan that."
 
-  @m9-07b @needs-decision @needs-spike @fake-broker
+  @m9-07b @needs-spike @fake-broker
   Scenario: The routes of a pair are ordinary steps
     Given a plan with the stream pair "device-commands" and the answers route "devices/+/answer" added by the wizard
     When I remove the step "MQTT route devices/+/answer to stream device-commands-dln"
     Then the plan lists "Declare stream device-commands" and "Declare stream device-commands-dln"
     And the plan has no problem
 
-  @m9-07b @negative @needs-decision @fake-broker
+  @m9-07b @negative @fake-broker
   Scenario Outline: The topic filter of a tick is checked like an MQTT route
     When I tick "<tick>" in the stream form and enter the topic filter "<filter>"
     Then the form says "<message>"
@@ -174,21 +174,21 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Answers arrive over MQTT                      | devices/#/answer | # must be the last level       |
       | Requests are also recorded from an MQTT topic | sens+/x          | + must stand for a whole level |
 
-  @m9-07b @needs-decision @fake-broker
+  @m9-07b @fake-broker
   Scenario: Without the response stream the MQTT ticks go away
     Given the stream form with the response stream and "Answers arrive over MQTT" ticked
     When I untick "Also create its response stream (DLN)"
     Then the MQTT ticks are not offered any more
     And the summary holds the stream only
 
-  @m9-07b @needs-decision @fake-broker
+  @m9-07b @fake-broker
   Scenario: The review graph shows a note where the owner's service sits
     When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
     Then the review graph shows an edge from "amq.topic" to "device-commands-dln" labelled "devices/+/answer" and "MQTT route"
     And it shows the note "Your own service turns a request into an MQTT message; the planner does not plan that." between "device-commands" and "amq.topic"
     And the note is not a step and cannot be changed
 
-  @m9-07b @needs-decision @fake-broker
+  @m9-07b @fake-broker
   Scenario: No note without an MQTT route into a response stream
     Given a plan that declares the stream "telemetry"
     When I add a stream "device-commands" with its response stream
@@ -196,7 +196,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add an MQTT route from "sensors/#" to the stream "telemetry" with the wizard
     Then the review graph still shows no note about a service
 
-  @m9-07b @needs-decision @needs-spike @fake-broker
+  @m9-07b @needs-spike @fake-broker
   Scenario: A saved pair with its answers route is recognised again
     Given a pending migration "0005" that declares the streams "device-commands" and "device-commands-dln" and binds "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
     When I choose "Edit steps" for "0005"
@@ -204,7 +204,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And the planner lists "MQTT route devices/+/answer to stream device-commands-dln"
     And the review graph shows the note about the owner's service
 
-  @m9-07b @broker @needs-decision @needs-spike
+  @m9-07b @broker @needs-spike
   Scenario: A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it
     Given a real RabbitMQ 4 broker with the MQTT plugin
     And a plan with the stream "device-commands", its response stream and the answers route "devices/+/answer"
@@ -499,7 +499,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add an MQTT route from "sensors/+/temp" to the stream "telemetry" with the wizard
     Then the review graph shows an edge from "amq.topic" to "telemetry" labelled "sensors/+/temp" and "MQTT route"
 
-  # A15 (architect addition, the owner sees it at the mockup review): the test message asks for a sample value
+  # A15 (proposed by the architect, wanted by the owner, O14): the test message asks for a sample value
   # for every wildcard of the filter, then opens the existing Publish MQTT dialog, which accepts no wildcards.
   @m9-10 @smoke @fake-broker
   Scenario: After applying, a test message asks for a sample value and opens the dialog with a concrete topic
@@ -542,7 +542,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | d+42  | No + or # in a value     |
       | d#42  | No + or # in a value     |
 
-  @m9-10 @needs-decision @needs-spike @fake-broker
+  @m9-10 @needs-spike @fake-broker
   Scenario: The dialog opens with a correlation-id header that is generated and can be changed
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
