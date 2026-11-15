@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topology planner</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="m3.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;family=Roboto+Mono&amp;family=Material+Symbols+Outlined">
+<style>
+body{margin:0}
+.list{border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface);overflow:hidden}
+.step{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 8px 8px 16px;border-bottom:1px solid var(--outline-variant)}
+.step:last-child{border-bottom:0}
+.step.sub{padding-left:48px;background:var(--sc-low)}
+.step .no{flex:none;width:24px;text-align:right;font:500 12px/16px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)}
+.step .tx{flex:1 1 auto;min-width:0}
+.step .note{font:400 12px/16px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)}
+.step .note.warn{color:var(--on-warn-container)}
+.pill.info{background:var(--primary-container);color:var(--on-primary-container)}
+.frame{position:relative;border-radius:12px;overflow:hidden;background:var(--sc-low);min-height:200px}
+.wiz{width:520px;max-width:100%;background:var(--sc-high);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.wizgrid{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.stepper{display:flex;align-items:center;gap:8px;font:500 12px/16px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)}
+.stepper .dot{width:24px;height:24px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--sc-highest)}
+.stepper .on{color:var(--primary)}
+.stepper .on .dot{background:var(--primary);color:var(--on-primary)}
+.stepper .ln{flex:1 1 16px;height:1px;background:var(--outline-variant)}
+.kind{flex:1 1 150px;display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface)}
+.kind.on{border-color:var(--primary);background:var(--secondary-container)}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface)}
+.opt.on{border-color:var(--primary);background:var(--secondary-container)}
+.radio{width:20px;height:20px;border:2px solid var(--on-surface-variant);border-radius:10px;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.radio.on{border-color:var(--primary)}
+.radio.on::after{content:"";width:10px;height:10px;border-radius:5px;background:var(--primary)}
+.chk{display:flex;align-items:flex-start;gap:12px}
+.chk .box{width:18px;height:18px;border:2px solid var(--on-surface-variant);border-radius:2px;flex:none;margin:1px;display:inline-flex;align-items:center;justify-content:center}
+.chk .box.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.hint{display:flex;gap:6px;align-items:center;font:400 12px/16px Roboto,system-ui,sans-serif;color:var(--on-surface-variant);margin:-8px 0 0 16px}
+.errtxt{color:var(--error);font:400 12px/16px Roboto,system-ui,sans-serif;margin:-8px 0 0 16px}
+.tf.err .v{border:2px solid var(--error);padding:0 15px}
+.tf.err .l{color:var(--error)}
+.gnode{fill:var(--surface);stroke:var(--outline);stroke-width:1}
+.gnode.new{stroke:var(--primary);stroke-width:2}
+.gname{font:500 13px 'Roboto Mono',monospace;fill:var(--on-surface)}
+.gsub{font:400 11px Roboto,system-ui,sans-serif;fill:var(--on-surface-variant)}
+.gnew{font:500 10px Roboto,system-ui,sans-serif;fill:var(--on-primary)}
+.gedge{fill:none;stroke:var(--outline);stroke-width:1.5}
+.gedge.new{stroke:var(--primary);stroke-width:2}
+.gedge.dl{stroke-dasharray:6 4}
+.gedge.pair{stroke-dasharray:2 4}
+.glabel{font:400 11px 'Roboto Mono',monospace;fill:var(--on-surface)}
+</style>
+</helmet>
+<div class="app">
+<aside class="drawer">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 16px"><span class="ms" aria-hidden="true" style="color: var(--primary)">cruelty_free</span><div><div class="t-tl">Caerbannog</div><div class="t-bs dim">behind the rabbit</div></div></div>
+<div class="search" style="height:40px;flex:none;margin-bottom:12px;padding:0 12px"><span class="ms sm" aria-hidden="true">search</span><span class="t-bs">Search streams, queues, exchanges</span></div>
+<div class="nav-item"><span class="ms" aria-hidden="true">power</span>Connections</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">stream</span>Streams</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">hub</span>Topology</div>
+<div class="nav-item on"><span class="ms" aria-hidden="true">account_tree</span>Migrations</div>
+<div class="nav-item"><span class="ms" aria-hidden="true">move_up</span>Migrate from 3.x</div>
+</aside>
+<main class="main">
+<header class="appbar">
+<button class="iconbtn" type="button" aria-label="Back to Migrations"><span class="ms" aria-hidden="true">arrow_back</span></button>
+<h1>Topology planner</h1>
+<button class="btn text danger lead" type="button"><span class="ms sm" aria-hidden="true">delete_sweep</span>Dismiss</button>
+<button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">fact_check</span>Check against uat-eu</button>
+<button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">save</span>Save as migration</button>
+<button class="connchip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Connection uat-eu, Connected, can change topology. Open connection menu"><span class="ms sm" aria-hidden="true" style="color:var(--ok,#386A20)">link</span><span class="nm">uat-eu</span><span class="pill ok"><span class="ms sm" aria-hidden="true">lock_open</span>Can change topology</span><span class="ms" aria-hidden="true">arrow_drop_down</span></button>
+</header>
+<div class="content">
+<div style="display:flex;align-items:center;gap:8px;color:var(--on-surface-variant)"><span class="ms sm" aria-hidden="true">info</span><span class="t-bs">A plan is a draft. Nothing on this screen changes the broker: saving writes a migration file, and the file is applied from the Migrations screen.</span></div>
+
+<section id="plan-header" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<label class="tf" style="flex:1 1 360px;--tf-bg:var(--surface)"><span class="l">Description</span><span class="v"><span>Orders with dead-lettering and a telemetry route</span></span></label>
+<span class="pill"><span class="ms sm" aria-hidden="true">dns</span>Virtual host /</span>
+<button class="chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Naming style kebab-case. Choose a naming style"><span class="ms sm" aria-hidden="true">label</span>Naming&nbsp;<b>kebab-case</b><span class="ms sm" aria-hidden="true">arrow_drop_down</span></button>
+<span class="pill warn">Draft, not saved as a migration</span>
+</section>
+
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:24px">
+<section id="plan-steps" style="flex:1 1 460px;min-width:0;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span class="t-lm dim" style="padding:0 4px;flex:1">Steps, applied from top to bottom</span><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add step</button></div>
+<div class="banner ok" style="padding:8px 16px"><span class="ms sm" aria-hidden="true">fact_check</span><div class="t-bs" style="flex:1">Checked against uat-eu at 14:02: 9 will be created, 1 already there. Only reads were sent.</div></div>
+<div class="list" role="list">
+<div class="step" role="listitem"><span class="no">1</span><span class="ms sm" aria-hidden="true">swap_horiz</span><div class="tx">Declare direct exchange <span class="mono">events</span></div><span class="pill">Already there</span><button class="iconbtn" type="button" aria-label="Step 1: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">2</span><span class="ms sm" aria-hidden="true">queue</span><div class="tx">Declare quorum queue <span class="mono">orders</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 2: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">3</span><span class="ms sm" aria-hidden="true">link</span><div class="tx">Bind <span class="mono">events</span> to <span class="mono">orders</span> with <span class="mono">order.created</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 3: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">4</span><span class="ms sm" aria-hidden="true">swap_horiz</span><div class="tx">Declare fanout exchange <span class="mono">orders-dlx</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 4: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">5</span><span class="ms sm" aria-hidden="true">queue</span><div class="tx">Declare quorum queue <span class="mono">orders-dlq</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 5: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">6</span><span class="ms sm" aria-hidden="true">link</span><div class="tx">Bind <span class="mono">orders-dlx</span> to <span class="mono">orders-dlq</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 6: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">7</span><span class="ms sm" aria-hidden="true">policy</span><div class="tx">Declare policy <span class="mono">orders-dlx</span><div class="note">apply-to=quorum_queues, priority=0; dead-letter-exchange=orders-dlx · matches the queue orders</div></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 7: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">8</span><span class="ms sm" aria-hidden="true">stream</span><div class="tx">Declare stream <span class="mono">telemetry</span></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 8: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step sub" role="listitem"><span class="no">9</span><span class="ms sm" aria-hidden="true">subdirectory_arrow_right</span><div class="tx">Declare stream <span class="mono">telemetry-dln</span><div class="note">Response stream (DLN) of telemetry</div></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 9: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step" role="listitem"><span class="no">10</span><span class="ms sm" aria-hidden="true">sensors</span><div class="tx">MQTT route <span class="mono">sensors/+/temp</span> to stream <span class="mono">telemetry</span><div class="note">Binding on amq.topic with the key sensors.*.temp</div></div><span class="pill info">Will be created</span><button class="iconbtn" type="button" aria-label="Step 10: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+</div>
+<div class="t-bs dim">A step is one action of the migration, in the words of the Migrations dry run. The row menu holds Edit, Move up, Move down and Remove; Up and Down arrows with Alt move the focused step. The second line of a step is its detail (arguments, policy settings) or what the planner recognised (a response stream, an MQTT route). The pill appears only after a check.</div>
+</section>
+
+<section id="plan-review" class="card" style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="t-ts" style="flex:1">Review: what the broker will have</span><div class="seg" role="radiogroup" aria-label="Review view"><span class="on" role="radio" aria-checked="true"><span class="ms sm" aria-hidden="true">hub</span>Graph</span><span role="radio" aria-checked="false"><span class="ms sm" aria-hidden="true">data_object</span>JSON</span></div></div>
+<svg viewBox="0 0 960 380" role="img" aria-label="Review graph: exchange events bound to new queue orders with order.created; new queue orders sends dead letters to new exchange orders-dlx, bound to new queue orders-dlq; exchange amq.topic routes sensors/+/temp to new stream telemetry; new stream telemetry-dln is the response stream of telemetry" style="width:100%;height:auto;background:var(--surface);border:1px solid var(--outline-variant);border-radius:12px">
+<path class="gedge new" d="M170 62 L270 62"/><text class="glabel" x="220" y="52" text-anchor="middle">order.created</text>
+<path class="gedge new dl" d="M430 62 L530 62"/><text class="glabel" x="480" y="52" text-anchor="middle">dead letters</text>
+<path class="gedge new" d="M690 62 L790 62"/>
+<path class="gedge new" d="M170 252 L270 252"/><text class="glabel" x="220" y="242" text-anchor="middle">sensors/+/temp</text><text class="gsub" x="220" y="270" text-anchor="middle">MQTT route</text>
+<path class="gedge new pair" d="M350 274 L350 310"/><text class="gsub" x="358" y="296">response (DLN)</text>
+<rect class="gnode" x="10" y="40" width="160" height="44" rx="8"/><text class="gname" x="22" y="60">events</text><text class="gsub" x="22" y="76">exchange, direct</text>
+<rect class="gnode" x="10" y="230" width="160" height="44" rx="8"/><text class="gname" x="22" y="250">amq.topic</text><text class="gsub" x="22" y="266">exchange, topic</text>
+<rect class="gnode new" x="270" y="40" width="160" height="44" rx="8"/><text class="gname" x="282" y="60">orders</text><text class="gsub" x="282" y="76">queue, quorum</text><rect x="392" y="32" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="409" y="44" text-anchor="middle">new</text>
+<rect class="gnode new" x="530" y="40" width="160" height="44" rx="8"/><text class="gname" x="542" y="60">orders-dlx</text><text class="gsub" x="542" y="76">exchange, fanout</text><rect x="652" y="32" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="669" y="44" text-anchor="middle">new</text>
+<rect class="gnode new" x="790" y="40" width="160" height="44" rx="8"/><text class="gname" x="802" y="60">orders-dlq</text><text class="gsub" x="802" y="76">queue, quorum</text><rect x="912" y="32" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="929" y="44" text-anchor="middle">new</text>
+<rect class="gnode new" x="270" y="230" width="160" height="44" rx="8"/><text class="gname" x="282" y="250">telemetry</text><text class="gsub" x="282" y="266">stream</text><rect x="392" y="222" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="409" y="234" text-anchor="middle">new</text>
+<rect class="gnode new" x="270" y="310" width="160" height="44" rx="8"/><text class="gname" x="282" y="330">telemetry-dln</text><text class="gsub" x="282" y="346">stream</text><rect x="392" y="302" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="409" y="314" text-anchor="middle">new</text>
+</svg>
+<div style="display:flex;flex-wrap:wrap;gap:16px" class="t-bs dim"><span><b style="color:var(--primary)">Thick outline, "new"</b>: added by this plan</span><span>Thin outline: already on the broker</span><span>Dashed: dead letters (from a policy)</span><span>Dotted: response stream (DLN)</span></div>
+<div class="t-bs dim">Read only (owner decision O4): nothing can be added, moved or changed on the graph; a node can be focused with Tab and reads its name, kind and "new" to a screen reader. Same layout and node cards as the Bindings graph of the Topology screen. Existing items are drawn only when connected, and only those a step of the plan touches. The "JSON" view shows the migration text the plan would be saved as, read only, with Copy.</div>
+</section>
+</div>
+
+<section id="states-m9" style="display:flex;flex-direction:column;gap:24px;margin-top:16px">
+<div class="t-tl">Other states (M9)</div>
+<div class="t-bs dim">The block above is a checked plan on a connection that may change topology. Everything below is drawn only in its state. Texts are fixed texts of the planner (core); names from a plan, a file or the broker are plain text, never markup. Items marked "pending Q.." follow the recommended answer of an open owner question in docs/spec.md, "Topology planner (M9)"; items marked "pending S-.." wait for a spike.</div>
+
+<section id="state-entry" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">1. Entry: the Migrations screen (pending Q11, Q16)</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>New plan</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export current topology</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
+<div class="pcard" style="max-width:340px;border-style:dashed"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">Draft plan</span><span class="pill warn">Not saved</span></div><div class="t-bs">Orders with dead-lettering and a telemetry route</div><div class="t-bs dim">10 steps · not a migration yet</div><div style="display:flex;gap:8px;margin-top:4px"><button class="btn tonal lead" type="button" style="height:32px"><span class="ms sm" aria-hidden="true">edit</span>Continue plan</button><button class="btn text danger" type="button" style="height:32px">Dismiss</button></div></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;max-width:640px"><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">format_list_numbered</span>Edit steps</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">data_object</span>Edit file</button><span style="flex-grow:1"></span><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">rule</span>Validate again</button><button class="btn filled" type="button">Apply 0005</button></div>
+<div class="t-bs dim">"New plan" is the first button of the Migrations app bar; with a draft it reads "Continue plan". The draft card stands above the migration files and is not a file of the folder. The second row is the action row of a selected pending file: "Edit steps" opens it in the planner (state 13), "Edit file" stays the raw JSON editor. After "Save as migration" this screen opens with the new file selected and the banner "Plan saved as 0005. Nothing was sent to the broker. Apply it when you are ready."</div>
+</section>
+
+<section id="state-empty" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">2. Empty plan (a new plan)</div>
+<div class="card" style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;max-width:640px"><span class="ms" aria-hidden="true" style="color:var(--primary);font-size:40px">account_tree</span><div class="t-tl">No steps yet</div><div class="t-bs dim" style="font-size:14px;line-height:20px">Add the first step with the wizard: a queue, an exchange, a binding, a stream, a policy, dead-lettering for a queue or an MQTT route. You do not write JSON; the plan is saved as a migration file when you are done.</div><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add step</button></div>
+<div class="t-bs dim">Check, Save as migration and Dismiss are disabled (a disabled Save reports "Add a step first"). The review card says "Nothing to review yet".</div>
+</section>
+
+<section id="state-wizard-kind" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">3. Wizard, page 1 of 3: what to add</div>
+<div class="frame" style="padding:24px"><div class="wiz" style="width:640px">
+<div class="stepper"><span class="on" style="display:inline-flex;align-items:center;gap:8px"><span class="dot">1</span>Kind</span><span class="ln"></span><span style="display:inline-flex;align-items:center;gap:8px"><span class="dot">2</span>Details</span><span class="ln"></span><span style="display:inline-flex;align-items:center;gap:8px"><span class="dot">3</span>Summary</span></div>
+<div class="t-tl">What do you want to add?</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px" role="radiogroup" aria-label="Kind of step">
+<div class="kind on" role="radio" aria-checked="true" tabindex="0"><span class="ms" aria-hidden="true">queue</span><b>Queue</b><span class="t-bs dim">A quorum or classic queue</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">swap_horiz</span><b>Exchange</b><span class="t-bs dim">Fanout, direct, topic or headers</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">link</span><b>Binding</b><span class="t-bs dim">From an exchange to a queue, stream or exchange</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">stream</span><b>Stream</b><span class="t-bs dim">Optionally with its response stream (DLN)</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">policy</span><b>Policy</b><span class="t-bs dim">Limits and other settings by name pattern</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">call_split</span><b>Dead-lettering for a queue</b><span class="t-bs dim">Exchange, dead-letter queue, binding and policy</span></div>
+<div class="kind" role="radio" aria-checked="false" tabindex="-1"><span class="ms" aria-hidden="true">sensors</span><b>MQTT route</b><span class="t-bs dim">A topic filter to a queue or stream</span></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn filled" type="button">Next</button></div>
+</div></div>
+<div class="t-bs dim">A dialog over the planner. Arrow keys move between the kinds, Enter is Next, Esc is Cancel (nothing is added). There is no kind that deletes, none for users, virtual hosts or permissions, and none that touches messages. "Topic or headers" is pending Q1.</div>
+</section>
+
+<section id="state-wizard-forms" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">4. Wizard, page 2 of 3: the form of each kind</div>
+<div class="wizgrid">
+
+<div class="wiz" id="form-queue"><div class="t-tm">Queue</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>Orders_EU</span></span></label>
+<div class="hint"><span class="ms sm" aria-hidden="true">lightbulb</span>This name does not follow kebab-case, for example orders-eu</div>
+<div class="opt on"><span class="radio on" aria-hidden="true"></span><div><b>Quorum queue</b> <span class="pill ok">default</span><div class="t-bs">Replicated, durable.</div></div></div>
+<div class="opt"><span class="radio" aria-hidden="true"></span><div><b>Classic queue</b><div class="t-bs">One copy on one node.</div></div></div>
+<div class="t-bs dim">Limits and dead-lettering are set with a policy step, so they can be changed later without deleting the queue.</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: the hint (O11) is advice: the field keeps its normal outline and Next stays enabled. An empty name, "." or ".." is an error: red outline, the reason under the field ("Give the queue a name", the parser's text for "." and ".."), Next disabled. Name and type only (pending Q13).</div></div>
+
+<div class="wiz" id="form-exchange"><div class="t-tm">Exchange</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>events</span></span></label>
+<div class="seg" role="radiogroup" aria-label="Exchange type"><span role="radio" aria-checked="false">fanout</span><span class="on" role="radio" aria-checked="true">direct</span><span role="radio" aria-checked="false">topic</span><span role="radio" aria-checked="false">headers</span></div>
+<div class="t-bs dim">Direct: a message goes to the queues bound with exactly its routing key. (One sentence per type: fanout "to every bound queue", topic "by a pattern with * and #", headers "by message headers, not by the routing key".)</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: durable; auto-delete, internal and arguments are not offered (kept when a file has them).</div></div>
+
+<div class="wiz" id="form-binding"><div class="t-tm">Binding</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">From exchange</span><span class="v"><span>events</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<div class="seg" role="radiogroup" aria-label="Destination kind"><span class="on" role="radio" aria-checked="true">Queue</span><span role="radio" aria-checked="false">Stream</span><span role="radio" aria-checked="false">Exchange</span></div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">To</span><span class="v"><span>orders</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Routing key</span><span class="v"><span>order.created</span></span></label>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: both fields are a text field with suggestions: first the items this plan declares ("in this plan"), then, when connected, those on the broker. A typed name that is in neither list is allowed and gets the note "Not in this plan and not seen on the broker". The routing key field is hidden for a fanout or headers exchange when its type is known.</div></div>
+
+<div class="wiz" id="form-binding-headers"><div class="t-tm">Binding on a headers exchange (pending Q1, S-E)</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">From exchange</span><span class="v"><span>documents</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">To queue</span><span class="v"><span>pdf-reports</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<div class="t-ts">A message matches when</div>
+<div class="seg" role="radiogroup" aria-label="Match rule"><span class="on" role="radio" aria-checked="true">all headers match</span><span role="radio" aria-checked="false">any header matches</span></div>
+<div style="display:flex;gap:8px;align-items:center"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Header</span><span class="v"><span>format</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Value</span><span class="v"><span>pdf</span></span></label><button class="chip" type="button" aria-label="Value type text">text<span class="ms sm" aria-hidden="true">arrow_drop_down</span></button><button class="iconbtn" type="button" aria-label="Remove header format"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div style="display:flex;gap:8px;align-items:center"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Header</span><span class="v"><span>type</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Value</span><span class="v"><span>report</span></span></label><button class="chip" type="button" aria-label="Value type text">text<span class="ms sm" aria-hidden="true">arrow_drop_down</span></button><button class="iconbtn" type="button" aria-label="Remove header type"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<button class="btn text lead" type="button" style="align-self:flex-start"><span class="ms sm" aria-hidden="true">add</span>Add header</button>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: written as binding arguments with x-match "all" or "any"; value types text, number, true or false. Which x-match values the broker accepts and what a binding without a header matches is measured first (S-E).</div></div>
+
+<div class="wiz" id="form-stream"><div class="t-tm">Stream</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>telemetry</span></span></label>
+<div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div><b>Also create its response stream (DLN)</b><div class="t-bs dim">Optional. The pair of this stream, for the messages that would be dead-lettered on a queue.</div></div></div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Response stream name</span><span class="v"><span>telemetry-dln</span></span></label>
+<div class="banner info" style="padding:8px 12px"><span class="ms sm" aria-hidden="true">info</span><div class="t-bs">A response stream is an ordinary stream. RabbitMQ does not move messages into it by itself: your applications write to it.</div></div>
+<div class="t-ts">Retention</div>
+<div style="display:flex;gap:8px"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Keep messages for</span><span class="v"><span>7D</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Keep at most</span><span class="v"><span>not set</span></span></label></div>
+<div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div>Same retention for the response stream</div></div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: the tick is off by default (O10); the name is suggested from the stream name, the suffix dln and the naming style (O11) and follows the stream name until it is edited by hand. The info text is pending S-D, the word "Response stream (DLN)" pending Q2. The Retention block is pending Q4 and S-F1: it is saved as one policy step (telemetry-retention, applies to streams); without it the form is name and tick only.</div></div>
+
+<div class="wiz" id="form-policy"><div class="t-tm">Policy</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>orders-limits</span></span></label>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Applies to names matching (pattern)</span><span class="v"><span class="mono">^orders</span></span></label>
+<div class="t-bs dim" style="margin:-8px 0 0 16px">Matches in this plan: orders, orders-dlq. On uat-eu: orders-archive.</div>
+<div style="display:flex;gap:8px"><label class="tf" style="flex:2;--tf-bg:var(--sc-high)"><span class="l">Applies to</span><span class="v"><span>Quorum queues</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Priority</span><span class="v"><span>0</span></span></label></div>
+<div class="t-ts">Settings</div>
+<div style="display:flex;gap:8px;align-items:center"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Setting</span><span class="v"><span>Maximum number of messages</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label><label class="tf" style="flex:0 0 120px;--tf-bg:var(--sc-high)"><span class="l">Value</span><span class="v"><span>1000</span></span></label><button class="iconbtn" type="button" aria-label="Remove setting"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div style="display:flex;gap:8px;align-items:center"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Setting</span><span class="v"><span>When the queue is full</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label><label class="tf" style="flex:0 0 120px;--tf-bg:var(--sc-high)"><span class="l">Value</span><span class="v"><span>refuse new</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label><button class="iconbtn" type="button" aria-label="Remove setting"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<button class="btn text lead" type="button" style="align-self:flex-start"><span class="ms sm" aria-hidden="true">add</span>Add setting</button>
+<div class="banner warn" style="padding:8px 12px"><span class="ms sm" aria-hidden="true">warning</span><div class="t-bs">The policy orders-dlx of this plan also matches orders. RabbitMQ applies only one policy to a queue: put both settings into one policy.</div></div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: the Setting list holds only keys measured for the chosen target (S-F1), each with its broker key under the plain name (max-length, overflow) and a typed value field; a number field refuses text ("Enter a whole number"). The overlap warning does not block (pending S-F2). A pattern the app cannot evaluate says "The app cannot tell which names this pattern matches" instead of the match line.</div></div>
+
+<div class="wiz" id="form-dead-letter"><div class="t-tm">Dead-lettering for a queue (pending S-C, S-F)</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Queue</span><span class="v"><span>orders</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<div class="t-ts">Dead letters go to</div>
+<div class="opt on"><span class="radio on" aria-hidden="true"></span><div><b>A dead-letter queue</b> <span class="pill ok">default</span><div class="t-bs">Quorum queue <span class="mono">orders-dlq</span></div></div></div>
+<div class="opt"><span class="radio" aria-hidden="true"></span><div><b>A stream</b><div class="t-bs">Stream <span class="mono">orders-dlq</span>: dead letters are kept and can be browsed.</div></div></div>
+<div style="display:flex;gap:8px"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Dead-letter exchange</span><span class="v"><span>orders-dlx</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Dead-letter queue</span><span class="v"><span>orders-dlq</span></span></label></div>
+<div class="t-ts">How sure</div>
+<div class="opt on"><span class="radio on" aria-hidden="true"></span><div><b>At most once</b> <span class="pill ok">default</span><div class="t-bs">The broker's default. A dead letter can be lost if the dead-letter queue cannot take it.</div></div></div>
+<div class="opt"><span class="radio" aria-hidden="true"></span><div><b>At least once</b><div class="t-bs">Dead letters are kept until the dead-letter queue has them. Needs "refuse new messages when the queue is full".</div></div></div>
+<div class="chk"><span class="box" role="checkbox" aria-checked="false" tabindex="0"></span><div><b>Publishers are refused when the queue is full</b><div class="t-bs dim">Required for "At least once". It changes what your publishers see.</div></div></div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: the queue is picked from this plan or the broker; it is not declared or changed by this recipe. Names are suggested with the suffixes dlx and dlq (O11). The stream target is pending Q12 and S-C; "At least once" and its tick are drawn only if S-C confirms it works by policy, and only for a quorum queue. A queue that already has a policy on the broker gets the warning of the Policy form.</div></div>
+
+<div class="wiz" id="form-mqtt"><div class="t-tm">MQTT route (pending S-A, S-B)</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Topic filter</span><span class="v"><span class="mono">sensors/+/temp</span></span></label>
+<div class="t-bs dim" style="margin:-8px 0 0 16px">+ stands for one level, # for all the rest. Matches for example sensors/item/temp.</div>
+<div class="seg" role="radiogroup" aria-label="Destination kind"><span role="radio" aria-checked="false">Queue</span><span class="on" role="radio" aria-checked="true">Stream</span></div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">To</span><span class="v"><span>telemetry</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
+<div class="banner info" style="padding:8px 12px"><span class="ms sm" aria-hidden="true">info</span><div class="t-bs">Saved as a binding on amq.topic with the key <span class="mono">sensors.*.temp</span>. Uses the broker's default MQTT exchange amq.topic.</div></div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
+<div class="t-bs dim">Build note: errors under the field, each a fixed text: "Enter a topic filter", "# must be the last level", "+ must stand for a whole level", and, until S-A is measured, "This filter cannot be translated safely" for a level that holds a dot or a star or is empty.</div></div>
+
+</div>
+</section>
+
+<section id="state-wizard-summary" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">5. Wizard, page 3 of 3: the summary (here: dead-lettering for orders)</div>
+<div class="frame" style="padding:24px"><div class="wiz">
+<div class="stepper"><span style="display:inline-flex;align-items:center;gap:8px"><span class="dot"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span>Kind</span><span class="ln"></span><span style="display:inline-flex;align-items:center;gap:8px"><span class="dot"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span>Details</span><span class="ln"></span><span class="on" style="display:inline-flex;align-items:center;gap:8px"><span class="dot">3</span>Summary</span></div>
+<div class="t-tl">This adds 4 steps</div>
+<div class="list"><div class="step"><span class="no">1</span><div class="tx">Declare fanout exchange <span class="mono">orders-dlx</span></div></div><div class="step"><span class="no">2</span><div class="tx">Declare quorum queue <span class="mono">orders-dlq</span></div></div><div class="step"><span class="no">3</span><div class="tx">Bind <span class="mono">orders-dlx</span> to <span class="mono">orders-dlq</span></div></div><div class="step"><span class="no">4</span><div class="tx">Declare policy <span class="mono">orders-dlx</span><div class="note">apply-to=quorum_queues, priority=0; dead-letter-exchange=orders-dlx</div></div></div></div>
+<div class="t-bs">Messages that orders rejects, expires or drops will go to orders-dlq. The queue orders itself is not changed.</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add to plan</button></div>
+</div></div>
+<div class="t-bs dim">A single-step kind shows "This adds 1 step". "Add to plan" appends the steps at the end, closes the wizard and puts the focus on the first new step. Nothing is sent to the broker and no file is written. The sentence under the list exists only for a recipe; its wording is pending S-C.</div>
+</section>
+
+<section id="state-naming" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">6. Naming style (O10, O11; default and where it is kept pending Q5, Q8)</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+<div style="background:var(--sc-high);border-radius:12px;padding:8px 0;width:340px;box-shadow:0 2px 6px 2px rgba(0,0,0,.15)" role="menu" aria-label="Naming style">
+<div class="step" role="menuitemradio" aria-checked="true" style="border:0"><span class="radio on" aria-hidden="true"></span><div class="tx"><b>kebab-case</b><div class="note mono">orders-dln</div></div></div>
+<div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>snake_case</b><div class="note mono">orders_dln</div></div></div>
+<div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>dot.separated</b><div class="note mono">orders.dln</div></div></div>
+<div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>camelCase</b><div class="note mono">ordersDln</div></div></div>
+<div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>No convention</b><div class="note">No hints; derived names as in kebab-case</div></div></div>
+</div>
+<div class="t-bs dim" style="flex:1 1 320px">The chip in the plan header opens this menu. The style decides two things only: the names the wizard suggests for derived things (suffixes dln, dlq, dlx, retention; fixed words pending Q6) and the hint under a name field. Changing the style renames nothing; existing steps get their hint from the new style. The hint is advice (O11): it never blocks Next, Add to plan or Save. It covers new names of queues, exchanges, streams and policies (pending Q7), never routing keys, topic filters, header names or names that exist on the broker.</div>
+</div>
+</section>
+
+<section id="state-steps-detail" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">7. Step list: problems, notes and steps the wizard cannot build</div>
+<div class="list" style="max-width:720px">
+<div class="step"><span class="no">1</span><span class="ms sm" aria-hidden="true">link</span><div class="tx">Bind <span class="mono">events</span> to <span class="mono">invoices</span> with <span class="mono">invoice.created</span><div class="note" style="color:var(--error)">The queue invoices is declared later, in step 2. Move this step below it.</div></div><span class="pill bad"><span class="ms sm" aria-hidden="true">error</span>Problem</span><button class="iconbtn" type="button" aria-label="Step 1: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step"><span class="no">2</span><span class="ms sm" aria-hidden="true">queue</span><div class="tx">Declare quorum queue <span class="mono">invoices</span></div><button class="iconbtn" type="button" aria-label="Step 2: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step"><span class="no">3</span><span class="ms sm" aria-hidden="true">queue</span><div class="tx">Declare quorum queue <span class="mono">jobs</span><div class="note">x-single-active-consumer=true · kept as written; the wizard does not edit queue arguments</div></div><span class="pill">Read only</span><button class="iconbtn" type="button" aria-label="Step 3: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+<div class="step"><span class="no">4</span><span class="ms sm" aria-hidden="true" style="color:var(--error)">delete</span><div class="tx">Delete queue <span class="mono">legacy-orders</span><div class="note">Kept as written; the wizard does not build deletes. Applying it needs the level Full control.</div></div><span class="pill">Read only</span><button class="iconbtn" type="button" aria-label="Step 4: more actions"><span class="ms sm" aria-hidden="true">more_vert</span></button></div>
+</div>
+<div class="t-bs dim">A problem (red) blocks Save as migration ("Fix the 1 problem in the plan first"): a step that needs something declared later in the plan, the same thing declared twice with other settings, a queue and a stream of one name, or anything the migration parser would refuse (its fixed reason is shown). A read-only step comes from an opened file (state 13): it can be moved and removed, not edited, and is written back unchanged.</div>
+</section>
+
+<section id="state-graph-detail" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">8. Review graph: other cases</div>
+<div class="banner info"><span class="ms" aria-hidden="true">hub</span><div style="flex:1"><b>This plan is too large to draw</b><div class="t-bs" style="margin-top:4px">The graph shows at most 60 items. The step list is the review.</div></div></div>
+<div class="banner info"><span class="ms" aria-hidden="true">link_off</span><div style="flex:1"><b>Only the plan is drawn</b><div class="t-bs" style="margin-top:4px">Not connected: what already exists on a broker is not shown.</div></div></div>
+<div class="t-bs dim">The first replaces the graph (the rule of the Bindings graph). The second is a line above the graph when there is no connection, or the broker could not be read: every node then comes from the plan, and an exchange or queue that a binding refers to and the plan does not declare is drawn with a dotted outline and "not in this plan".</div>
+</section>
+
+<section id="state-check" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">9. Check against the broker: every result (wording pending Q14)</div>
+<div class="list" style="max-width:820px">
+<div class="step"><span class="no">1</span><div class="tx">Declare quorum queue <span class="mono">invoices</span></div><span class="pill info">Will be created</span></div>
+<div class="step"><span class="no">2</span><div class="tx">Declare direct exchange <span class="mono">events</span></div><span class="pill">Already there</span></div>
+<div class="step"><span class="no">3</span><div class="tx">Declare quorum queue <span class="mono">orders</span><div class="note" style="color:var(--error)">The broker has orders with other settings. Applying would stop here; nothing would be overwritten.</div></div><span class="pill bad"><span class="ms sm" aria-hidden="true">difference</span>Exists with different settings</span></div>
+<div class="step"><span class="no">4</span><div class="tx">Bind <span class="mono">evnts</span> to <span class="mono">invoices</span> with <span class="mono">invoice.created</span><div class="note" style="color:var(--error)">The exchange evnts is not on the broker and is not declared earlier in this plan.</div></div><span class="pill bad"><span class="ms sm" aria-hidden="true">link_off</span>Needs something that is missing</span></div>
+<div class="step"><span class="no">5</span><div class="tx">Declare policy <span class="mono">orders-dlx</span><div class="note warn">The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place.</div></div><span class="pill info">Will be created</span></div>
+<div class="step"><span class="no">6</span><div class="tx">Declare stream <span class="mono">telemetry</span><div class="note">The broker did not answer.</div></div><span class="pill warn"><span class="ms sm" aria-hidden="true">help</span>Could not be checked</span></div>
+<div class="step"><span class="no">7</span><div class="tx">Delete queue <span class="mono">legacy-orders</span><div class="note" style="color:var(--error)">Destructive actions require Full control level</div></div><span class="pill">Will be deleted</span><span class="pill bad"><span class="ms sm" aria-hidden="true">block</span>Blocked</span></div>
+</div>
+<div class="banner warn" style="padding:8px 16px"><span class="ms sm" aria-hidden="true">update</span><div class="t-bs" style="flex:1">The plan changed since the check. Check again.</div><button class="btn text" type="button" style="height:32px">Check again</button></div>
+<div class="banner info" style="padding:8px 16px"><span class="ms sm" aria-hidden="true">sync</span><div class="t-bs" style="flex:1">Checking step 4 of 10 against uat-eu ... Only reads are sent.</div></div>
+<div class="t-bs dim">One pill for what the broker has; "Blocked" stands beside it with the dry run's reason (level, configure permission, another virtual host). A note in the warning colour does not block. The summary line above the list counts the results ("Checked against uat-eu at 14:02: 5 will be created, 1 already there, 1 exists with different settings, 1 needs something that is missing, 1 could not be checked, 1 blocked"). After any change to the plan the pills stay, dimmed, under the stale line. The check never changes the broker and never enables or disables Save; it is advice before Apply. A delete step (only from an opened file) reads "Will be deleted" when the item exists and "Already gone" when it does not.</div>
+</section>
+
+<section id="state-save" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">10. Save as migration</div>
+<div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div style="flex:1"><b>Plan saved as 0005</b><div class="t-bs" style="margin-top:4px">Nothing was sent to the broker. Apply it when you are ready.</div><div class="mono">/Users/dana/work/migrations/0005.json</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div style="flex:1"><b>The file could not be written</b><div class="t-bs" style="margin-top:4px">The plan is still here as a draft. Nothing was changed.</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
+<div class="t-bs dim">The first banner is drawn on the Migrations screen, which opens with 0005 selected (pending Q11): the file is an ordinary pending migration, with its dry run and the existing "Apply 0005". The version is the next free number in the folder; a file is never overwritten. The draft is gone after a successful save. The second banner stays in the planner. A disabled Save reports its reason: "Add a step first", "Fix the 1 problem in the plan first", "Choose a migrations folder first", "The folder is read-only".</div>
+</section>
+
+<section id="state-dismiss" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">11. Dismiss (O5; the question pending Q9)</div>
+<div class="frame" style="min-height:240px"><div class="scrim"><div class="dialog"><div class="t-tl">Dismiss this plan?</div><div style="font:400 14px/20px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)">Its 10 steps are discarded. Nothing was sent to the broker.</div><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Keep the plan</button><button class="btn text danger" type="button">Dismiss</button></div></div></div></div>
+<div class="t-bs dim">Asked only when the plan has a step. "Keep the plan", Esc or a click outside change nothing. "Dismiss" discards the draft and goes back to the Migrations screen; no migration file is touched.</div>
+</section>
+
+<section id="state-blocked" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">12. Blocked and limited states (one banner under the info line; the first that applies, in this order)</div>
+<div class="banner info"><span class="ms" aria-hidden="true">lock</span><div style="flex:1"><b>The planner is not offered on this connection</b><div class="t-bs" style="margin-top:4px">This broker runs RabbitMQ 3.x: it is a migration source only</div></div></div>
+<div class="t-bs dim">12a. A RabbitMQ 3.x connection (or a broker whose version could not be read: "The broker version could not be read, so migrations are not offered"). No step list, no wizard, no check: the planner sends this broker nothing, not even a read. A draft that exists is kept untouched. In practice the Migrations item of the drawer is disabled on a 3.x connection; this state is what the screen shows if the connection changes while the planner is open.</div>
+<div class="banner err"><span class="ms" aria-hidden="true">history_toggle_off</span><div style="flex:1"><b>The saved draft cannot be read</b><div class="mono">/Users/dana/.caerbannog/planner-draft.json</div><div class="t-bs" style="margin-top:4px">The file is not a valid plan. It was not changed.</div></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px"><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">refresh</span>Try again</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Show folder</button><button class="btn outlined danger lead" type="button"><span class="ms sm" aria-hidden="true">restart_alt</span>Start a new plan</button></div>
+<div class="t-bs dim">12b. "Start a new plan" asks first: "Move planner-draft.json to planner-draft.json.unreadable-20261115-140210 and start a new plan? The old file is kept." (the rule of the unreadable history file).</div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div>This connection is set to Read-only. You can plan, check and save; applying needs the level Declare and edit.</div></div>
+<div class="t-bs dim">12c. Read-only level. Everything in the planner works; every checked step shows "Blocked" with "Topology control level is Read-only".</div>
+<div class="banner err"><span class="ms" aria-hidden="true">lock</span><div>The permission check found that svc-explorer cannot change topology on prod-eu. You can plan, check and save, then apply the migration on a connection that allows it.</div></div>
+<div class="t-bs dim">12d. No configure permission (read from the broker or declared). Same as 12c with the dry run's reason "User has no configure permission on this virtual host".</div>
+<div class="banner info"><span class="ms" aria-hidden="true">link_off</span><div>Not connected. You can plan and save; connect to a RabbitMQ 4 broker to check the plan.</div></div>
+<div class="t-bs dim">12e. No connection: the Check button is disabled and reads "Check", the destination lists of the wizard hold only the items of the plan, the virtual host is "/" and can be changed in the plan header.</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">folder_off</span><div style="flex:1">Choose a migrations folder to save this plan. Until then it stays a draft on this machine.</div><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">folder_open</span>Choose folder</button></div>
+<div class="t-bs dim">12f. No folder chosen, a folder that is missing or unreadable (its fixed reason and path as on the Migrations screen), or a read-only folder ("The folder is read-only"): planning and checking work, Save as migration is disabled with the reason.</div>
+<div class="banner warn"><span class="ms" aria-hidden="true">dns</span><div>This plan is for the virtual host /orders; uat-eu is connected to /. It can be saved here and applied on a connection for /orders.</div></div>
+<div class="t-bs dim">12g. The plan's virtual host is not the connection's (V1): every checked step shows "Blocked" with the dry run's reason; nothing is read from the other virtual host.</div>
+</section>
+
+<section id="state-edit-file" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">13. A pending migration file opened as steps ("Edit steps")</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><span class="t-tl" style="flex:1">Topology planner · 0005</span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">close</span>Discard changes</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">fact_check</span>Check against uat-eu</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">save</span>Save 0005</button></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><span class="pill"><span class="ms sm" aria-hidden="true">description</span>Editing 0005.json</span><span class="pill warn">Unsaved changes</span></div>
+<div class="banner info"><span class="ms" aria-hidden="true">info</span><div style="flex:1"><b>0002 is applied on prod-eu, so it is not edited</b><div class="t-bs" style="margin-top:4px">Changing an applied file would mark it as modified there. Copy its steps into a new plan instead.</div></div><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">content_copy</span>Copy into a new plan</button></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="t-bs">This file holds password hashes. Edit it outside the app.</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="t-bs">This file holds virtual hosts, users or permissions. The planner works on topology only.</span></div>
+<div class="banner err"><span class="ms" aria-hidden="true">error</span><div style="flex:1"><b>0005.json changed on disk since it was opened</b><div class="t-bs" style="margin-top:4px">It was not overwritten. Open it again to edit the new content.</div></div></div>
+<div class="t-bs dim">The same planner with the file's steps: a binding on amq.topic that is a plain MQTT route reads "MQTT route ...", a stream named as the response stream of another reads as its pair, everything the wizard cannot build is a read-only step. "Save 0005" writes the same file and is enabled only after a change; leaving with unsaved changes asks "Discard the changes to 0005?". Closing without a change leaves the file as it is. The second block is the text in place of "Edit steps" for a file that is applied on any connection of this machine; the two plain lines stand in place of the button for a file with a declareUser (the fixed text of M8-12a) and for a file with other access actions. Editing a file does not use or change the draft of a new plan.</div>
+</section>
+
+<section id="state-mqtt-test" style="display:flex;flex-direction:column;gap:8px">
+<div class="t-ts">14. After applying: an MQTT route of an applied migration (Migrations screen)</div>
+<div style="display:flex;align-items:center;gap:12px;max-width:820px"><span class="ms" aria-hidden="true" style="color:var(--ok,#386A20)">check_circle</span><span style="flex-grow:1">MQTT route <span class="mono">sensors/+/temp</span> to stream <span class="mono">telemetry</span></span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Send a test message</button></div>
+<div class="t-bs dim">The action row of an applied file names an MQTT route as in the planner and offers "Send a test message": it opens the existing Publish MQTT dialog with the topic sensors/item/temp (a concrete topic that matches the filter). Nothing is published until Publish is pressed. The button is disabled with its reason when the connection has no MQTT port ("This connection has no MQTT port") or the user may not publish.</div>
+</section>
+
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
