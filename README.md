@@ -10,6 +10,7 @@ Built with Kotlin and Compose Multiplatform (JVM desktop). Supports RabbitMQ 4.x
 - **Streams:** list with first/last offset, approximate message count, publishers and consumers; super streams appear as one entry with their partitions; create and delete streams where your permissions allow.
 - **Message browser:** start from the first message, the last page, an offset or a timestamp; next, previous and jump; filter inside a bounded scan.
 - **Message details:** offset, timestamp, exchange and routing key (when the broker records them), properties and application properties; the body as text, pretty JSON or hex; copy body, offset or metadata.
+- **Publishers and consumers:** a tab on each stream with the clients connected right now: their connections, offsets and how many messages each consumer is behind. The number is the broker's own and shows as "Caught up" only at 0; on a stream where offsets are stored it can read a few behind even when everything was read. Jump the browser to a consumer's offset.
 - **Monitoring views:** a log tape of a stream's offsets and retention, sparklines and lag trends for publishers and consumers, a pipeline graph from inbound routes to consumers, and partition balance for super streams.
 - **Publish:** send a test message to a stream, exchange or queue, or over MQTT with QoS, retain flag and headers (MQTT 5 user properties).
 - **MQTT:** the broker's MQTT client sessions and subscriptions (needs the `rabbitmq_mqtt` plugin).
@@ -99,13 +100,14 @@ There is no MCP tool that creates or removes a Shovel, applies a migration or re
 - The access migration needs a full definitions export (the live broker, or a whole-broker file). A per-virtual-host export holds no users or permissions.
 - "Readable by its owner only" for the access file is best effort: POSIX permissions where the system has them; on Windows it is not verified.
 - There is no in-place upgrade support, and no way to choose single users in the access migration.
-- The Windows installer (`.msi`) has not been built or run yet.
+- The installers are not code-signed or notarized, so macOS and Windows may warn you the first time you open the app.
+- The Windows installer (`.msi`) is built by CI but has not been run on a Windows machine yet.
 
 ## Install
 
-Installers are built by the [Package installers](.github/workflows/package.yml) workflow: macOS `.dmg`, Windows `.msi`, Ubuntu/Debian `.deb` and Fedora `.rpm`. Download them from the workflow run's artifacts, or from the release page once a `v*` tag is published.
+Download the installer for your system from the [latest release](https://github.com/dNaszta/Caerbannog/releases/latest): macOS `.dmg`, Windows `.msi`, Ubuntu/Debian `.deb` or Fedora `.rpm`.
 
-The `.deb` and `.rpm` were verified as built in clean containers; the `.msi` has not been built or run yet.
+They are built by the [Package installers](.github/workflows/package.yml) workflow, one native runner per system, on every change to the desktop app and on every `v*` tag (a tag also attaches them to a release). You can run the workflow by hand from the Actions tab and take the files from the run's artifacts. The `.deb` and `.rpm` were also verified in clean `ubuntu:24.04` and `fedora:42` containers.
 
 ## Run from source
 
@@ -142,7 +144,9 @@ task test           # fast suite, no containers
 task test:broker    # live-broker tests (Docker or rootless Podman)
 ```
 
-The project is built test-first: unit tests with fakes, BDD scenarios in `tests/bdd/features`, Compose UI tests, and Testcontainers tests for real broker behaviour.
+The project is built test-first: unit tests with fakes, BDD scenarios in `tests/bdd/features`, Compose UI tests, and Testcontainers tests for real broker behaviour. `task test:keychain` (touches the real OS keychain) and `task test:screenshots` are opt-in.
+
+[CI](.github/workflows/ci.yml) runs the fast suite on every push and pull request, and the live-broker tests on `main`.
 
 ## Project layout
 
@@ -153,8 +157,14 @@ The project is built test-first: unit tests with fakes, BDD scenarios in `tests/
 | `ui` | Compose screens |
 | `desktopApp` | `main()`, wiring, packaging |
 | `mcp-server` | MCP server over stdio |
+| `core-testing`, `acceptance-tests` | fakes behind the `core` interfaces; Cucumber step definitions for the BDD scenarios |
+| `dev-seed` | seed tool for the local dev broker (not part of the product or the installers) |
 
 Design and decisions live in [`docs/spec.md`](docs/spec.md); task briefs in `docs/tasks/`; UX mockups in `docs/ux/`. Platform guides: [macOS](docs/DEVELOPING_ON_MACOS.md), [Fedora](docs/DEVELOPING_ON_FEDORA.md), [Windows](docs/DEVELOPING_ON_WINDOWS.md). Contributor and agent conventions are in [`CLAUDE.md`](CLAUDE.md).
+
+## Security
+
+Please report vulnerabilities privately, as described in [`SECURITY.md`](SECURITY.md).
 
 ## License
 
