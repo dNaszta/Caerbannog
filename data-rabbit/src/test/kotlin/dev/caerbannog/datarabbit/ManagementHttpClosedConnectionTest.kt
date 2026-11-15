@@ -8,7 +8,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.BufferedInputStream
@@ -32,14 +31,14 @@ import javax.net.ssl.SSLContext
  * `java.io.IOException: HTTP/1.1 header parser received no bytes`. The JDK retries a failed GET exactly once, on the next pooled connection; a
  * client that holds two or more idle connections (two screens polling, a click next to a tick) meets a second dead one, [ManagementHttp] answers
  * [ManagementReply.Unreachable], and the view models turn that into D2 "Connection lost" for good (no retry, the rows go stale until the user
- * reconnects). With `-Djdk.httpclient.keepalive.timeout=2` the live test passed 30 of 30 (without it 10 of 30 failed).
+ * reconnects). The 10 of 30 above was not reproduced in the M2-16 verification (the same shape passed 12 of 12 on the code before the fix), so this
+ * class, on real sockets, is the proof of the retry.
  *
  * No Docker: a hand-rolled keep-alive HTTP/1.1 server (over TLS like the broker's management port, and plain) drops the request that arrives on a
- * connection it has already served once, without a word, which is what the client saw. The first test is RED today and disabled until the
- * architect picks the fix (a bounded retry of the GET in [ManagementHttp], a client idle timeout below the broker's, or both); a fix by idle
- * timeout alone cannot satisfy it as written, because the server here drops regardless of idle time, so the architect may ask for the case to be
- * reshaped. The other two pass today and stay true for any fix: a broker that is really gone is still Unreachable (bounded attempts), and a
- * write (POST, PUT, DELETE) is never sent twice.
+ * connection it has already served once, without a word, which is what the client saw. The first test is the regression test for the fix chosen
+ * in M2-16 (a bounded retry of the GET in [ManagementHttp] plus a client idle timeout below the broker's); the server here drops regardless of
+ * idle time, so only the retry turns it green, the idle timeout is proven elsewhere (`TlsSupportKeepAliveTest`). The other two stay true for any
+ * fix: a broker that is really gone is still Unreachable (bounded attempts), and a write (POST, PUT, DELETE) is never sent twice.
  */
 class ManagementHttpClosedConnectionTest {
 
@@ -142,8 +141,6 @@ class ManagementHttpClosedConnectionTest {
 
     private fun url(server: KeepAliveServer, path: String = "/api/whoami") = "${if (server.tls) "https" else "http"}://127.0.0.1:${server.port}$path"
 
-    // RED until the product fix (see the class comment): disabled so the suite stays green, enable it as the first step of the fix.
-    @Disabled("RED, finding of 2026-11-14: ManagementHttp reports Unreachable when two or more idle pooled connections were closed by the broker; remove this line when fixing")
     @Test
     fun `a GET is answered when the broker has closed every idle pooled connection, with one, two or three of them`() {
         // The broker closes all idle connections in the same second (5 s), and a client holds more than one when two callers overlapped (a screen's
@@ -172,7 +169,11 @@ class ManagementHttpClosedConnectionTest {
             KeepAliveServer(tls = tls, dropOnReuse = false, dropEverything = true).use { server ->
                 withHttp(server) { http ->
                     assertEquals(ManagementReply.Unreachable, http.get(url(server)), "tls=$tls")
-                    assertTrue(server.seen.size in 1..2, "tls=$tls: a GET may be tried once more on a fresh connection, never in a loop; server saw: ${server.seen}")
+                    // M2-16 (architect's ruling): ManagementHttp makes at most two attempts and the JDK client retries a failed GET once inside
+                    // each, so a broker that drops every request sees at most 2 x 2 = 4 requests (it was at most 2 when there was one attempt).
+                    // A third attempt or a loop puts 6 or more on the wire. The exact number of attempts is pinned without the JDK in
+                    // ManagementHttpGetRetryTest (the same failure twice: exactly 2 engine calls); this is the end-to-end bound.
+                    assertTrue(server.seen.size in 1..4, "tls=$tls: a GET is attempted at most twice, each time with the JDK client's own single retry (4 requests at most), never in a loop; server saw: ${server.seen}")
                 }
             }
         }

@@ -23,6 +23,24 @@ import javax.net.ssl.X509TrustManager
  */
 internal object TlsSupport {
 
+    private const val KEEP_ALIVE_PROPERTY = "jdk.httpclient.keepalive.timeout"
+
+    init {
+        // RabbitMQ closes an idle management connection after 5 s, and the default refresh interval is also 5 s, so a refresh could land on a
+        // connection the broker is just closing. The JDK keeps an idle connection for 30 s by default; 2 s makes it drop its own well before that:
+        // the pool truncates the expiry to whole seconds (1 to 2 s) and purges on its selector loop, which wakes at least every 3 s, and it never
+        // checks a connection's age on reuse, so the limit is about 1 to 3 s (JDK 21). The property is JVM-global and the JDK reads it once, so it
+        // only works before the first JDK HttpClient exists. That is why production code creates a JDK client in [buildHttpClient] and nowhere
+        // else (JdkHttpClientCreationGuardTest), and why this runs in the initialiser.
+        keepAliveTimeoutToApply(System.getProperty(KEEP_ALIVE_PROPERTY))?.let { System.setProperty(KEEP_ALIVE_PROPERTY, it) }
+    }
+
+    /**
+     * The idle timeout in seconds to set for the JDK HTTP client, or null when one is already set (an explicit `-D` wins, even an empty one).
+     * Always below the broker's 5 s.
+     */
+    internal fun keepAliveTimeoutToApply(existing: String?): String? = if (existing == null) "2" else null
+
     /** The HTTP client for [transport]: TLS with the profile trust, or plain HTTP with no TLS settings at all. */
     fun buildHttpClient(
         transport: BrokerTransport,
