@@ -4,6 +4,7 @@ import dev.caerbannog.core.streams.FirstOffset
 import dev.caerbannog.core.streams.StreamOffsets
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * M2-03 part 2 test double for [StreamOffsets] (same sharing as [FakeStreamCatalog]). Three outcomes, as the
@@ -17,8 +18,8 @@ class FakeStreamOffsets : StreamOffsets {
     /** True: the stream port does not answer, every call is Unavailable (the connection itself stays usable). */
     @Volatile var silent: Boolean = false
 
-    /** "vhost/stream" of every call, in order. */
-    val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
+    /** "vhost/stream" of every call, in order. Safe to read while calls are being recorded: iterating it works on a snapshot and never throws. */
+    val calls: MutableList<String> = CopyOnWriteArrayList()
 
     private val holds = ConcurrentHashMap<String, CallGate>()
 

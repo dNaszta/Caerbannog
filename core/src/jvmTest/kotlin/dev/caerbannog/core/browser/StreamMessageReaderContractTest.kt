@@ -1,5 +1,6 @@
 package dev.caerbannog.core.browser
 
+import dev.caerbannog.core.assertReadableWhileRecording
 import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -117,5 +118,14 @@ class StreamMessageReaderContractTest {
         val success = assertInstanceOf(BrowseResult.Success::class.java, result)
         assertEquals(150L, success.streamFirstOffset)
         assertEquals(150L, success.messages.first().offset)
+    }
+
+    @Test
+    fun `calls can be counted while another thread records calls`() {
+        assertReadableWhileRecording(
+            what = "FakeStreamMessageReader.calls",
+            record = { appends -> runBlocking { repeat(appends) { reader.readPage("/", "s", BrowseStart.First, pageSize = 10) } } },
+            count = { reader.calls.count { it == "//s:First:10" } },
+        )
     }
 }

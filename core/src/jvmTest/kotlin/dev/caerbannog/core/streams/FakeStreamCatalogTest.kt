@@ -1,5 +1,6 @@
 package dev.caerbannog.core.streams
 
+import dev.caerbannog.core.assertReadableWhileRecording
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
 import kotlinx.coroutines.async
@@ -244,5 +245,15 @@ class FakeStreamCatalogTest {
         assertEquals(listOf("a"), (late.await() as CatalogResult.Success<StreamPage>).value.rows.map { it.name })
         // one-shot: the next call is not held
         assertEquals(2, page(catalog, StreamListRequest(vhost = "/")).rows.size)
+    }
+
+    @Test
+    fun `calls can be counted while another thread records calls`() {
+        val catalog = FakeStreamCatalog()
+        assertReadableWhileRecording(
+            what = "FakeStreamCatalog.calls",
+            record = { appends -> runBlocking { repeat(appends) { catalog.capabilities() } } },
+            count = { catalog.calls.count { it == "capabilities" } },
+        )
     }
 }
