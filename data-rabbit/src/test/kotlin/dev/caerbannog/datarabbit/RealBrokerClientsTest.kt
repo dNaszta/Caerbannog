@@ -32,6 +32,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -63,6 +70,17 @@ class RealBrokerClientsTest {
     companion object {
         private const val STREAM_TLS_PORT = 5551
         private const val OTHER_VHOST = "m206-other"
+        private const val UNNAMED_KEY = "<unnamed>"
+
+        /**
+         * The catalog observation of S-A and S-A2 (a fixed schedule, not a wait for a state): 12 s = two statistics intervals of 5 s plus margin,
+         * sampled every 500 ms (25 samples), so it covers the first statistics window and reaches the steady state.
+         */
+        private const val OBSERVATION_MS = 12_000L
+        private const val OBSERVATION_EVERY_MS = 500L
+
+        /** The key of a consumer in the lag comparison: its name, and one fixed key for an unnamed one (absent, null or empty on either side). */
+        private fun lagKey(name: String?) = name?.takeIf { it.isNotEmpty() } ?: UNNAMED_KEY
         private val users = mapOf("m206-mgmt" to "pw-mgmt", "m206-plain" to "pw-plain", "m206-mon" to "pw-mon")
 
         private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
@@ -210,8 +228,65 @@ class RealBrokerClientsTest {
 
     // ---- S-A ----
 
+    /** One consumer as the lag comparison sees it: `Long?` with no default, so a missing field is a difference and not a quiet 0. */
+    private data class Lag(val offset: Long?, val offsetLag: Long?) {
+        override fun toString() = "offset=$offset offset_lag=$offsetLag"
+    }
+
+    /** One catalog read and one raw read of the same endpoint, both keyed by consumer name. [toString] is what `awaitUntil` prints on a time-out. */
+    private class LagReads(val catalog: Map<String, Lag>, val raw: Map<String, Lag>) {
+        val agree get() = catalog == raw
+        override fun toString() = "catalog $catalog, raw $raw"
+    }
+
+    /**
+     * The consumers endpoint read a second way (S-A pass-through): a second `ManagementHttp` of its own, GET only, TLS, parsed with kotlinx.serialization
+     * straight from the body and NOT through `ManagementJson`, so that the comparison with the catalog can see what the mapper adds or takes away.
+     */
+    private class RawConsumerReader(private val http: ManagementHttp, private val requests: ManagementRequests) {
+        fun read(stream: String): Map<String, Lag> {
+            val reply = runBlocking { http.get(requests.consumers("/")) }
+            assertInstanceOf(ManagementReply.Response::class.java, reply, "the raw consumers read expected a response, got $reply")
+            val response = reply as ManagementReply.Response
+            assertEquals(200, response.status, "the raw consumers read of $stream expected status 200, got ${response.status}")
+            val rows = Json.parseToJsonElement(response.body).jsonArray.map { it.jsonObject }
+                .filter { ((it["queue"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull == stream }
+            // absent, JSON null and empty are one key; contentOrNull because `.content` of a JSON null reads the text "null"
+            val byName = rows.associate { row ->
+                val name = ((row["properties"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull
+                lagKey(name) to Lag((row["offset"] as? JsonPrimitive)?.longOrNull, (row["offset_lag"] as? JsonPrimitive)?.longOrNull)
+            }
+            check(byName.size == rows.size) { "two consumers of $stream share a name in the raw rows, the comparison by name would collapse them: $rows" }
+            return byName
+        }
+    }
+
+    private fun rawConsumerReader(): RawConsumerReader {
+        val transport = BrokerTransport.Tls(TlsSupport.trustManagerFactory(caPath))
+        val http = ManagementHttp(TlsSupport.buildHttpClient(transport, 15_000), rabbit.adminUsername, rabbit.adminPassword)
+        closeables += http
+        return RawConsumerReader(http, ManagementRequests("https://${rabbit.host}:${rabbit.httpsPort}", transport))
+    }
+
+    /**
+     * S-A pass-through: waits by value until a catalog read and a raw read of the consumers endpoint agree on `offset` and `offset_lag` of every
+     * consumer. The two GETs can straddle a statistics refresh (`offset` flips from 100 to 99 there), so one disagreement is not yet a finding;
+     * a mapper that adds, subtracts or invents a lag never agrees and times out with both maps printed. The catalog reads join [samples].
+     */
+    private fun awaitCatalogAgreesWithRaw(what: String, held: HeldConnection, raw: RawConsumerReader, stream: String, samples: MutableList<List<ConsumerRow>>): LagReads =
+        awaitUntil(
+            "the catalog and the raw read agree on offset and offset_lag of every consumer of $stream ($what)",
+            fetch = {
+                val rows = consumersOf(held, stream).also { samples += it }
+                val catalog = rows.associate { lagKey(it.name) to Lag(it.offset, it.offsetLag) }
+                check(catalog.size == rows.size) { "two consumers of $stream share a name in the catalog rows, the comparison by name would collapse them: $rows" }
+                LagReads(catalog.toSortedMap(), raw.read(stream).toSortedMap())
+            },
+            done = { it.agree },
+        )
+
     @Test
-    fun `S-A unnamed and non-storing consumers settle at lag 0, every lag is within 0 and stores plus 1, nobody borrows another applications lag`() = runBlocking<Unit> {
+    fun `S-A the lag is the brokers number, within 0 and the stores of the whole stream plus 1 where offsets are stored, and the catalog adds and subtracts nothing`() = runBlocking<Unit> {
         val stream = unique("m206-lag-")
         val e = createStream(stream)
         publish(e, stream, 100, reference = "pub-$stream")
@@ -221,43 +296,119 @@ class RealBrokerClientsTest {
         // a second application: its own environment (own connection), its own storing consumer on the same stream
         consume(env(), stream, "other-app-$stream", Tracking.StoresThreeTimes, 100)
         val held = connection()
+        val raw = rawConsumerReader()
 
-        // Settled = every row has a connection name and an offset at or beyond the last delivered one (99); sampled for the Status record.
+        // Settled = every row has a connection name and an offset at or beyond the last delivered one (99, true in the first statistics window
+        // where the broker reads 100 and in the steady state where it reads 99); sampled for the Status record.
         val samples = mutableListOf<List<ConsumerRow>>()
         val settled = awaitUntil(
             "four consumer rows of $stream with settled offsets",
             fetch = { consumersOf(held, stream).also { samples += it } },
             done = { rows -> rows.size == 4 && rows.all { it.connectionName.isNotEmpty() && it.offset >= 99 } },
         )
-        // Stores are asynchronous and the stats lag: give the storing consumers a bounded chance to show a lag above 0 (recorded, not required).
-        val later = runCatching {
-            awaitUntil("a storing consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { it.offsetLag >= 1 } })
-        }.getOrElse { consumersOf(held, stream) }
-        for ((label, rows) in listOf("settled" to settled, "later" to later)) {
-            for (r in rows.sortedBy { it.name.orEmpty() }) {
-                println("SPIKE-A $label name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
-            }
+        // Pass-through, first time: what the tab reads is what the broker sends (nothing added, nothing taken away, no invented 0).
+        val settledReads = awaitCatalogAgreesWithRaw("settled rows", held, raw, stream, samples)
+        for (r in settled.sortedBy { it.name.orEmpty() }) {
+            println("SPIKE-A settled name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
         }
-        println("SPIKE-A max lag seen across ${samples.size} polls: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
+        println("SPIKE-A settled raw rows (read with the agreement check): ${settledReads.raw}")
 
-        // Number of offset stores each consumer did (auto tracking: one per 10 of the 100 messages; the other application: 3).
+        // Stores are asynchronous and the stats lag: give the consumers a bounded chance to show a lag above 0 (recorded, not required). The wait ends
+        // as soon as one row reads 1 or more, which can already be the first window (the other application's consumer reads 1 there) or only the
+        // steady state (every consumer reads the same number there).
+        val later = runCatching {
+            awaitUntil("a consumer reading lag >= 1", timeoutMs = 20_000, fetch = { consumersOf(held, stream).also { samples += it } }, done = { rows -> rows.size == 4 && rows.any { it.offsetLag >= 1 } })
+        }.getOrElse { consumersOf(held, stream) }
+        for (r in later.sortedBy { it.name.orEmpty() }) {
+            println("SPIKE-A later name=${r.name} offset=${r.offset} offset_lag=${r.offsetLag} active=${r.active} consumed=${r.consumed}")
+        }
+        // Pass-through, second time: by now a raw row has a lag of 1 or more (unless the wait ran out), so a mapper that returned 0, subtracted or
+        // added to the lag would not agree. Not guaranteed to be the steady state, so it is not called that.
+        val laterReads = awaitCatalogAgreesWithRaw("rows after the bounded wait for a lag of 1 or more", held, raw, stream, samples)
+        println("SPIKE-A later raw rows (raw offset 100 = first statistics window, 99 = steady state): ${laterReads.raw}")
+
+        // The steady state, observed: the wait above can end inside the first statistics window (the other application's consumer reads lag 1 or more
+        // there at once), so on its own it need not reach the second statistics refresh. Observe the catalog on a fixed schedule for two statistics
+        // intervals and keep every sample for the stream-wide bound below. A bounded observation, not a wait for a state; no per-sample pass-through,
+        // because two GETs can straddle a refresh (offset and lag flip there) and a wait for agreement per sample would not be an observation.
+        // Every sample is printed first and asserted after, so the print shows the whole run when one sample fails: four rows, none vanished.
+        val observation = observe(OBSERVATION_MS, OBSERVATION_EVERY_MS) { consumersOf(held, stream) }
+        for ((atMs, rows) in observation) {
+            println("SPIKE-A +${atMs}ms ${rows.sortedBy { it.name.orEmpty() }.joinToString { "${lagKey(it.name)}=${it.offset}/${it.offsetLag}" }}")
+            samples += rows
+        }
+        for ((atMs, rows) in observation) {
+            assertEquals(4, rows.size, "+${atMs}ms: expected the four consumers of $stream, got $rows")
+        }
+        // Pass-through, third time: two statistics intervals have passed, so this is the steady-state check; it is sharp because the broker sends the
+        // same number for every consumer there. Its bounded wait handles a straddle of a refresh (the raw reader sat idle for the observation; the
+        // retry of a dropped GET and the short keep-alive cover that). Nothing is asserted about the value (99 and the lag are the broker's), and no
+        // non-zero value is required.
+        val steadyReads = awaitCatalogAgreesWithRaw("rows after the ${OBSERVATION_MS / 1000} s observation", held, raw, stream, samples)
+        println("SPIKE-A raw rows after the observation (raw offset 99 = steady state): ${steadyReads.raw}")
+        println("SPIKE-A max lag seen across ${samples.size} reads: ${samples.flatten().maxOfOrNull { it.offsetLag }}")
+
+        // Number of offset stores each application did (auto tracking: one per 10 of the 100 messages; the other application: 3). Every one of them is
+        // an entry in the stream, so the broker counts them after the last message for EVERY consumer, also for one that never stores (steady state).
         val stores = mapOf<String?, Int>(null to 0, "plain-$stream" to 0, "storing-$stream" to 10, "other-app-$stream" to 3)
         val totalStreamStores = stores.values.sum()
-        // (2) every lag is >= 0 and at most total stream stores plus 1 for storing consumers (all offset-tracking entries on the shared stream advance the stream offset)
+        // The one bound the broker keeps: at least 0 and at most the stores of the whole stream plus 1 (the ruling's slack), for every row of every
+        // sample. It does not say who stored: the unnamed and the plain consumer are inside the bound too, and no row is required to read 0 or more than 0.
+        val limit = totalStreamStores + 1L
         for (rows in samples + listOf(settled, later)) {
-            for (r in rows.filter { it.connectionName.isNotEmpty() }) {
-                val ownStores = stores.getValue(r.name?.takeIf { it.isNotEmpty() })
-                val limit = if (ownStores > 0) totalStreamStores + 1 else 1
-                assertTrue(r.offsetLag in 0..limit.toLong(), "consumer '${r.name}' reports offset_lag ${r.offsetLag}, expected 0..$limit")
+            for (r in rows) {
+                assertTrue(r.offsetLag in 0..limit, "consumer '${r.name}' reports offset_lag ${r.offsetLag}, expected 0..$limit: every application's stored offsets on the stream count ($totalStreamStores stores in all) for every consumer, not only for the one that stored them")
             }
         }
-        // (1) and (3): the unnamed and the named non-storing consumer are exactly 0, although another application stored on the same stream
-        for ((label, rows) in listOf("settled" to settled, "later" to later)) {
-            for (r in rows.filter { it.name.isNullOrEmpty() || it.name == "plain-$stream" }) {
-                assertEquals(0L, r.offsetLag, "$label: consumer '${r.name}' never stores an offset and has read everything, so offset_lag must be 0 (it must not borrow the lag of another application's stores)")
+    }
+
+    @Test
+    fun `S-A2 a stream without stored offsets reads lag 0 for every consumer, in the first statistics window and in the steady state`() = runBlocking<Unit> {
+        val stream = unique("m206-nolag-")
+        val e = createStream(stream)
+        publish(e, stream, 100, reference = "pub-$stream")
+        // Nobody stores an offset on this stream: noTrackingStrategy for both, so the stream holds the 100 messages and no tracking entry.
+        consume(e, stream, null, Tracking.None, 100)
+        consume(e, stream, "named-$stream", Tracking.None, 100)
+        val held = connection()
+
+        val settled = awaitUntil(
+            "two consumer rows of $stream with settled offsets",
+            fetch = { consumersOf(held, stream) },
+            done = { rows -> rows.size == 2 && rows.all { it.connectionName.isNotEmpty() && it.offset >= 99 } },
+        )
+        println("SPIKE-A2 settled ${settled.sortedBy { it.name.orEmpty() }.joinToString { "name=${it.name} offset=${it.offset} offset_lag=${it.offsetLag}" }}")
+
+        // The observation covers the first window and the steady state. Every sample is asserted: two rows (a vanished row must not pass as
+        // "nothing is behind") and lag 0 for both, which is what makes "Caught up" reachable on a real broker.
+        val samples = observe(OBSERVATION_MS, OBSERVATION_EVERY_MS) { consumersOf(held, stream) }
+        for ((atMs, rows) in samples) {
+            println("SPIKE-A2 +${atMs}ms ${rows.sortedBy { it.name.orEmpty() }.joinToString { "${lagKey(it.name)}=${it.offset}/${it.offsetLag}" }}")
+        }
+        for ((atMs, rows) in samples) {
+            assertEquals(2, rows.size, "+${atMs}ms: expected the unnamed and the named consumer of $stream, got $rows")
+            for (r in rows) {
+                assertEquals(0L, r.offsetLag, "+${atMs}ms: consumer '${r.name}' has read everything on a stream where nobody stored an offset, so offset_lag must be 0 (offset ${r.offset}); rows: $rows")
             }
         }
-        // No assertion that a storing consumer reads 0 or 1 (lag ruling).
+    }
+
+    /**
+     * An observation, not a wait for a state: reads [fetch] on a fixed schedule (every [everyMs], for [durationMs] from the first read) and
+     * returns every sample with the milliseconds since the first read, so the caller asserts on all of them and a late deviation is not missed.
+     * The sleep is inside this bounded helper only; a failing [fetch] ends the observation.
+     */
+    private fun <T> observe(durationMs: Long, everyMs: Long, fetch: () -> T): List<Pair<Long, T>> {
+        val start = System.nanoTime()
+        val samples = mutableListOf<Pair<Long, T>>()
+        var n = 0L
+        while (n * everyMs <= durationMs) {
+            val wait = start + TimeUnit.MILLISECONDS.toNanos(n * everyMs) - System.nanoTime()
+            if (wait > 0) TimeUnit.NANOSECONDS.sleep(wait)
+            samples += TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) to fetch()
+            n++
+        }
+        return samples
     }
 
     // ---- S-B ----
