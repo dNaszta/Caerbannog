@@ -32,8 +32,8 @@ Out: operator policies; editing a policy that exists on the broker; a free "othe
 - BDD: `21_topology_planner_recipes.feature` / "A pattern the app cannot evaluate is said so and can still be added" (@fake-broker @negative)
 - BDD: `21_topology_planner_recipes.feature` / "Two policies of a plan that match the same queue are pointed out" (@fake-broker @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "A policy that would take the place of a policy on the broker is pointed out by the check" (@fake-broker @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "Retention of a stream is saved as a policy" (@fake-broker @needs-decision @needs-spike)
-- BDD: `21_topology_planner_recipes.feature` / "The response stream gets the same retention unless I untick it" (@fake-broker @needs-decision @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "Retention of a stream is saved as a policy" (@fake-broker @needs-spike)
+- BDD: `21_topology_planner_recipes.feature` / "The response stream gets the same retention unless I untick it" (@fake-broker @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "Operator policies are not built by the wizard" (@fake-broker @negative)
 - Unit tests, written first: `PolicyFormTest`, `PolicyKeyCatalogTest` (every entry has evidence; the offered list per target equals the measured effect matrix), `PatternMatchesTest` (reuse of the matcher, hostile patterns cannot hang: the M8-03 cases), `ExactPatternTest` (every regular-expression character escaped; the pattern of one and of two names matches exactly those names with the app's matcher), `PlanValidationPolicyTest`, `PlanCheckPolicyNoteTest`. Compose: `PolicyFormUiTest`.
 - Live: the retention policy and one limits policy of the catalog are part of the gate (`M9-13`); this task adds no live test of its own beyond the spike's.
@@ -49,7 +49,7 @@ None (owner decision 2026-11-15).
 
 ## Open points
 - S-F1 decides the catalog; S-F2 decides whether the two notes exist at all. If policies turn out to combine, the notes are dropped and A4 is rewritten.
-- Q4 (retention in the stream form, the response stream gets the same): built as recommended only after S-F1d; if a policy-set retention is not shown by the app's stream list (it reads the stream's arguments today), that is reported as a follow-up for the stream list, not fixed here.
+- Q4 (decided 2026-11-15: retention in the stream form as one policy covering the stream and, with a tick, its response stream): built only after S-F1d confirms the keys; if a policy-set retention is not shown by the app's stream list (it reads the stream's arguments today), that is reported as a follow-up for the stream list, not fixed here.
 - A plain label per key is wording: the list of labels is shown to the owner with the spike results before step 2.
 
 ## Definition of done

@@ -7,11 +7,14 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   Every kind below only adds ordinary migration actions to the plan (declareStream, declarePolicy,
   declareExchange, declareQueue, declareBinding). What a pattern does on the broker is measured by the spikes
   M9-00a, M9-00b and M9-00c before its form is built; scenarios tagged @needs-spike state the expected
-  behaviour and are corrected to the measured one. Scenarios tagged @needs-decision state the recommended
-  answer of an open owner question (docs/spec.md, "Topology planner (M9)").
+  behaviour and are corrected to the measured one. The owner answered the open questions Q1 to Q16 on
+  2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"). The one tag
+  @needs-decision that remains is on the scenarios of Q3 revised (@m9-07b, the owner's IoT flow, to be confirmed
+  at the review of the mockup) and on the one scenario of Q17 (the key of the correlation-id header).
 
-  Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-08 policies, @m9-09 dead-lettering
-  for a queue, @m9-10 MQTT routes, @m9-11 bindings on a headers exchange, @m9-13 the gate.
+  Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
+  stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
+  message, @m9-11 bindings on a headers exchange, @m9-13 the gate.
 
   Background:
     Given I am connected to "uat-eu" with the virtual host "/"
@@ -70,8 +73,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the response stream name field showed the hint "This name does not follow kebab-case, for example orders-replies"
     And the plan lists "Declare stream orders" and "Declare stream Orders_Replies"
 
-  @m9-07 @needs-decision @fake-broker
-  Scenario: A stream pair is two streams and nothing else
+  @m9-07 @fake-broker
+  Scenario: A stream pair is two streams and no routing unless an MQTT tick is set
     When I add a stream "telemetry" with the wizard and tick "Also create its response stream (DLN)"
     Then the plan holds no exchange, no binding and no policy
 
@@ -103,6 +106,112 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I remove the step "Declare stream telemetry"
     Then the plan still lists "Declare stream telemetry-dln"
     And it is no longer shown as a response stream
+
+  # ---- M9-07b: the optional MQTT routes of a stream pair (owner decision O13, Q3 revised) ----
+  # The owner's flow: a request is a message in the request stream with the destination device id in a header;
+  # the owner's own service turns it into an MQTT message for the device; the device answers on a fixed topic
+  # with its id in it (devices/<id>/answer); the answer lands in the response stream and is processed from there;
+  # request and answer are matched by a correlation id in the message, which the planner never touches.
+  # The planner plans the two streams and the routes. It plans no bridge from a stream to an MQTT message.
+  # DECIDED (revised) by the architect from the owner's description; the owner confirms it at the mockup review.
+
+  @m9-07b @needs-decision @fake-broker
+  Scenario: The MQTT ticks are offered only with the response stream and are off until I tick them
+    When I open the stream form
+    Then "Answers arrive over MQTT" and "Requests are also recorded from an MQTT topic" are not offered
+    When I tick "Also create its response stream (DLN)"
+    Then both are offered and neither is ticked
+
+  @m9-07b @smoke @needs-decision @needs-spike @fake-broker
+  Scenario: Answers arrive over MQTT adds one route into the response stream
+    When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
+    Then the summary says "This adds 3 steps"
+    And the plan lists these steps in this order
+      | Declare stream device-commands                            |
+      | Declare stream device-commands-dln                        |
+      | MQTT route devices/+/answer to stream device-commands-dln |
+    And the route is the action "declareBinding" from "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
+
+  @m9-07b @needs-decision @needs-spike @fake-broker
+  Scenario: Requests are also recorded from an MQTT topic adds one route into the request stream
+    When I add a stream "device-commands" with its response stream and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
+    Then the plan lists these steps in this order
+      | Declare stream device-commands                  |
+      | Declare stream device-commands-dln              |
+      | MQTT route commands/# to stream device-commands |
+
+  @m9-07b @needs-decision @needs-spike @fake-broker
+  Scenario: Both ticks add two routes, the answers route first
+    When I add a stream "device-commands" with its response stream, tick "Answers arrive over MQTT" with the topic filter "devices/+/answer" and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
+    Then the summary says "This adds 4 steps"
+    And the plan lists these steps in this order
+      | Declare stream device-commands                            |
+      | Declare stream device-commands-dln                        |
+      | MQTT route devices/+/answer to stream device-commands-dln |
+      | MQTT route commands/# to stream device-commands           |
+
+  @m9-07b @needs-decision @fake-broker
+  Scenario: The wizard says what it does not plan
+    When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
+    Then the summary says "Your own service turns a request into an MQTT message; the planner does not plan that."
+
+  @m9-07b @needs-decision @needs-spike @fake-broker
+  Scenario: The routes of a pair are ordinary steps
+    Given a plan with the stream pair "device-commands" and the answers route "devices/+/answer" added by the wizard
+    When I remove the step "MQTT route devices/+/answer to stream device-commands-dln"
+    Then the plan lists "Declare stream device-commands" and "Declare stream device-commands-dln"
+    And the plan has no problem
+
+  @m9-07b @negative @needs-decision @fake-broker
+  Scenario Outline: The topic filter of a tick is checked like an MQTT route
+    When I tick "<tick>" in the stream form and enter the topic filter "<filter>"
+    Then the form says "<message>"
+    And "Next" is disabled
+
+    Examples:
+      | tick                                          | filter           | message                        |
+      | Answers arrive over MQTT                      |                  | Enter a topic filter           |
+      | Answers arrive over MQTT                      | devices/#/answer | # must be the last level       |
+      | Requests are also recorded from an MQTT topic | sens+/x          | + must stand for a whole level |
+
+  @m9-07b @needs-decision @fake-broker
+  Scenario: Without the response stream the MQTT ticks go away
+    Given the stream form with the response stream and "Answers arrive over MQTT" ticked
+    When I untick "Also create its response stream (DLN)"
+    Then the MQTT ticks are not offered any more
+    And the summary holds the stream only
+
+  @m9-07b @needs-decision @fake-broker
+  Scenario: The review graph shows a note where the owner's service sits
+    When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
+    Then the review graph shows an edge from "amq.topic" to "device-commands-dln" labelled "devices/+/answer" and "MQTT route"
+    And it shows the note "Your own service turns a request into an MQTT message; the planner does not plan that." between "device-commands" and "amq.topic"
+    And the note is not a step and cannot be changed
+
+  @m9-07b @needs-decision @fake-broker
+  Scenario: No note without an MQTT route into a response stream
+    Given a plan that declares the stream "telemetry"
+    When I add a stream "device-commands" with its response stream
+    Then the review graph shows no note about a service
+    When I add an MQTT route from "sensors/#" to the stream "telemetry" with the wizard
+    Then the review graph still shows no note about a service
+
+  @m9-07b @needs-decision @needs-spike @fake-broker
+  Scenario: A saved pair with its answers route is recognised again
+    Given a pending migration "0005" that declares the streams "device-commands" and "device-commands-dln" and binds "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
+    When I choose "Edit steps" for "0005"
+    Then the step "Declare stream device-commands-dln" is shown as the response stream (DLN) of "device-commands"
+    And the planner lists "MQTT route devices/+/answer to stream device-commands-dln"
+    And the review graph shows the note about the owner's service
+
+  @m9-07b @broker @needs-decision @needs-spike
+  Scenario: A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it
+    Given a real RabbitMQ 4 broker with the MQTT plugin
+    And a plan with the stream "device-commands", its response stream and the answers route "devices/+/answer"
+    When the plan is saved and applied by the migration runner
+    And a device "d42" publishes an MQTT message with the correlation id "c-1" to "devices/d42/answer"
+    Then the stream "device-commands-dln" holds one message more and the stream "device-commands" none
+    And the message carries the correlation id where the measured rule says it appears
 
   # ---- M9-08: policies (owner decision O7) ----
 
@@ -179,7 +288,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the step "Declare policy orders-dlx" shows "Will be created"
     And it shows the note "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
 
-  @m9-08 @needs-decision @needs-spike @fake-broker
+  @m9-08 @needs-spike @fake-broker
   Scenario: Retention of a stream is saved as a policy
     When I add a stream "telemetry" with the wizard and set "Keep messages for" to "7D"
     Then the plan lists these steps in this order
@@ -187,7 +296,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Declare policy telemetry-retention |
     And the policy applies to streams, matches exactly "telemetry" and holds "max-age" "7D"
 
-  @m9-08 @needs-decision @needs-spike @fake-broker
+  @m9-08 @needs-spike @fake-broker
   Scenario: The response stream gets the same retention unless I untick it
     When I add a stream "telemetry" with its response stream and set "Keep messages for" to "7D"
     Then the policy "telemetry-retention" matches "telemetry" and "telemetry-dln" and nothing else
@@ -252,7 +361,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the four dead-lettering steps come after "Declare quorum queue orders"
     And the plan has no problem
 
-  @m9-09 @needs-decision @needs-spike @fake-broker
+  @m9-09 @needs-spike @fake-broker
   Scenario: Dead letters can go to a stream
     Given the broker has the quorum queue "orders"
     When I add dead-lettering for the queue "orders" with the wizard and choose a stream as the target
@@ -262,7 +371,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Bind orders-dlx to orders-dlq      |
       | Declare policy orders-dlx          |
 
-  @m9-09 @needs-decision @needs-spike @fake-broker
+  @m9-09 @needs-spike @fake-broker
   Scenario: At least once needs my tick and says what it changes
     Given the broker has the quorum queue "orders"
     When I choose "At least once" in the dead-lettering form for "orders"
@@ -270,7 +379,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I tick it and finish the wizard
     Then the policy holds "dead-letter-strategy" "at-least-once" and "overflow" "reject-publish"
 
-  @m9-09 @needs-decision @needs-spike @fake-broker
+  @m9-09 @needs-spike @fake-broker
   Scenario: At most once is the default and adds no strategy setting
     Given the broker has the quorum queue "orders"
     When I add dead-lettering for the queue "orders" with the wizard
@@ -316,6 +425,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | sensors/+/temp    | sensors.*.temp    |
       | sensors/#         | sensors.#         |
       | devices/d1/status | devices.d1.status |
+      | devices/+/answer  | devices.*.answer  |
       | #                 | #                 |
 
   @m9-10 @fake-broker
@@ -389,13 +499,59 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add an MQTT route from "sensors/+/temp" to the stream "telemetry" with the wizard
     Then the review graph shows an edge from "amq.topic" to "telemetry" labelled "sensors/+/temp" and "MQTT route"
 
-  @m9-10 @fake-broker
-  Scenario: After applying, a test message can be sent to the route
+  # A15 (architect addition, the owner sees it at the mockup review): the test message asks for a sample value
+  # for every wildcard of the filter, then opens the existing Publish MQTT dialog, which accepts no wildcards.
+  @m9-10 @smoke @fake-broker
+  Scenario: After applying, a test message asks for a sample value and opens the dialog with a concrete topic
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
-    And the migration "0005" with the MQTT route "sensors/+/temp" to the stream "telemetry" is applied to "uat-eu"
+    And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
     When I choose "Send a test message" for that route on the Migrations screen
-    Then the Publish MQTT dialog opens with the topic "sensors/item/temp"
+    Then I am asked for a value for the "+" in level 2, which starts as "item"
+    When I enter "d42"
+    Then the Publish MQTT dialog opens with the topic "devices/d42/answer"
     And nothing is published until I press Publish
+
+  @m9-10 @fake-broker
+  Scenario: A route without wildcards opens the dialog at once
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "devices/d1/status" to the stream "telemetry" is applied to "uat-eu"
+    When I choose "Send a test message" for that route on the Migrations screen
+    Then no value is asked for
+    And the Publish MQTT dialog opens with the topic "devices/d1/status"
+
+  @m9-10 @fake-broker
+  Scenario: A hash asks for the rest of the topic
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "sensors/#" to the stream "telemetry" is applied to "uat-eu"
+    When I choose "Send a test message" for that route on the Migrations screen
+    Then I am asked for a value for the rest of the topic, which starts as "test"
+    When I enter "room1/temp"
+    Then the Publish MQTT dialog opens with the topic "sensors/room1/temp"
+
+  @m9-10 @negative @fake-broker
+  Scenario Outline: A sample value that would not make a valid topic is refused
+    Given the test message of the route "devices/+/answer" asks for the value of the "+"
+    When I enter "<value>"
+    Then it says "<message>"
+    And the dialog is not opened
+
+    Examples:
+      | value | message                  |
+      |       | Enter a value            |
+      | d/42  | One level only: no /     |
+      | d+42  | No + or # in a value     |
+      | d#42  | No + or # in a value     |
+
+  @m9-10 @needs-decision @needs-spike @fake-broker
+  Scenario: The dialog opens with a correlation-id header that is generated and can be changed
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
+    When I choose "Send a test message" for that route and enter "d42"
+    Then the dialog holds one header "correlation-id" with a generated value
+    And it is an MQTT 5 user property like every header of the dialog
+    When I open the test message again and enter "d42"
+    Then the generated value is a different one
+    And nothing was published
 
   @m9-10 @negative @fake-broker
   Scenario Outline: The test message is not offered where publishing is not possible
@@ -426,7 +582,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   # ---- M9-11: bindings on a headers exchange ----
 
-  @m9-11 @smoke @needs-decision @needs-spike @fake-broker
+  @m9-11 @smoke @needs-spike @fake-broker
   Scenario: A binding on a headers exchange carries its headers and the match rule
     Given a plan that declares the headers exchange "documents" and the quorum queue "pdf-reports"
     When I add a binding from "documents" to the queue "pdf-reports" that matches all of the headers
@@ -435,20 +591,20 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the plan lists "Bind documents to pdf-reports" with the detail "format=pdf, type=report, x-match=all"
     And the binding form showed no routing key field
 
-  @m9-11 @needs-decision @needs-spike @fake-broker
+  @m9-11 @needs-spike @fake-broker
   Scenario: Header values keep their type in the saved file
     Given a plan with a headers binding whose header "pages" is the number 10 and whose header "signed" is true
     When I choose "Save as migration"
     Then the saved file holds "pages" as the number 10 and "signed" as the boolean true
 
-  @m9-11 @needs-decision @fake-broker
+  @m9-11 @fake-broker
   Scenario: Two bindings that differ only in their headers are two steps
     Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
     When I add a binding from "documents" to "reports" that matches the header "format" "pdf"
     And I add a binding from "documents" to "reports" that matches the header "format" "csv"
     Then the plan has both bindings and no problem
 
-  @m9-11 @negative @needs-decision @needs-spike @fake-broker
+  @m9-11 @negative @needs-spike @fake-broker
   Scenario: A headers binding without a header says what it would match
     Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
     When I open the binding form for "documents" and add no header

@@ -18,7 +18,7 @@ In:
 - The explaining text under the tick, fixed in `PlannerTexts`, worded from S-D.
 - `planPreview`: a `PlanLink(RESPONSE_STREAM, stream, response)`; `ui`: the Stream card in the wizard, `StreamFormView`, the indented pair row in the step list, the dotted link in the graph.
 
-Out: retention fields (`M9-08`); routing for the pair (Q3: none); super streams.
+Out: retention fields (`M9-08`); routing for the pair: the two optional MQTT ticks of the owner's request and answer flow are `M9-07b` (O13, Q3 revised), and without a tick the pair has no routing (decided); super streams.
 
 ## Acceptance
 - BDD: `21_topology_planner_recipes.feature` / "A stream is one step" (@fake-broker @smoke)
@@ -27,7 +27,7 @@ Out: retention fields (`M9-08`); routing for the pair (Q3: none); super streams.
 - BDD: `21_topology_planner_recipes.feature` / "The response stream name is suggested with a suffix in the naming style" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "The suggested name follows the stream name until I change it" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "A response stream with a name of my own gets a hint and is still added" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A stream pair is two streams and nothing else" (@fake-broker @needs-decision)
+- BDD: `21_topology_planner_recipes.feature` / "A stream pair is two streams and no routing unless an MQTT tick is set" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "The wizard says what a response stream is" (@fake-broker @needs-spike)
 - BDD: `21_topology_planner_recipes.feature` / "A saved pair is shown as a pair again when its name follows the rule" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "Two streams whose names do not follow the rule are two streams" (@fake-broker)
@@ -39,15 +39,15 @@ Out: retention fields (`M9-08`); routing for the pair (Q3: none); super streams.
 `declareStream` stays a name-only action and the stream manager is untouched: this task adds no broker call and no executor change. The pair is two independent steps; nothing ties their lifetime. No broker: fakes only.
 
 ## UX
-`docs/ux/Planner.dc.html`: "4." form Stream (without the Retention block, which is `M9-08`), step 8 and 9 of the main block, the dotted link in the review graph.
+`docs/ux/Planner.dc.html`: "4." form Stream (this task builds the name and the response-stream tick; the MQTT ticks are `M9-07b` and the Retention block is `M9-08`), step 8 and 9 of the main block, the dotted link in the review graph.
 
 ## MCP
 None (owner decision 2026-11-15).
 
 ## Open points
-- Q2 (the on-screen word): built as "Response stream (DLN)".
-- Q3 (routing for the pair): built as recommended, the two streams only.
-- Q6 (suffix word fixed): built as `dln`.
+- Q2 (decided 2026-11-15): the on-screen word is "Response stream (DLN)".
+- Q3 (revised, O13): without an MQTT tick the pair is two streams and no routing, which is what this task builds; the ticks are `M9-07b`, which waits for the owner's confirmation of the revised Q3 and for the MQTT route step (`M9-10`), so this task does not.
+- Q6 (decided 2026-11-15): the suffix word is fixed, `dln`.
 - S-D: the sentence "RabbitMQ does not move messages into it by itself: your applications write to it." is used only if the spike confirms it; otherwise the architect rewords it before step 2.
 
 ## Definition of done

@@ -71,7 +71,7 @@ None. Owner decision 2026-11-15 ("no MCP"). The check is read-only, so a tool wo
 
 ## Open points
 - S-G decides the argument rule. Until it is measured the build stops after the first commit and the port with `FakeDeclareCheck`.
-- Q14 (wording of the results) is used by `M9-06`; the core types carry no wording.
+- Q14 (wording of the results, decided 2026-11-15 as written) is used by `M9-06`; the core types carry no wording.
 - A broker that changes between check and apply: the apply keeps its own conflict rule; nothing to build.
 
 ## Definition of done

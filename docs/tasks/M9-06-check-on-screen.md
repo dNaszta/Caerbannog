@@ -36,7 +36,7 @@ The time in the summary comes from the injected clock (`RefreshClock`), never fr
 None (owner decision 2026-11-15).
 
 ## Open points
-Q14: the result words are built as written in the spec; a different wording is a change in `PlannerTexts` only.
+Q14 (decided 2026-11-15, as written): the result words are built as in the spec; a later wording change is a change in `PlannerTexts` only.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

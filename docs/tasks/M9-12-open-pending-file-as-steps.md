@@ -32,7 +32,7 @@ Out: opening an invalid file (it stays in the invalid list); merging two files; 
 - BDD: `19_topology_planner.feature` / "A file with virtual hosts or permissions is not opened in the planner" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "A file with entries the planner does not know is edited as JSON only" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "A file that changed on disk while it was open is not overwritten" (@fake-broker @negative)
-- BDD: `19_topology_planner.feature` / "The raw JSON editor stays beside "Edit steps"" (@fake-broker @needs-decision)
+- BDD: `19_topology_planner.feature` / "The raw JSON editor stays beside "Edit steps"" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "Editing a file leaves the draft of a new plan alone" (@fake-broker)
 - Unit tests, written first: `PlanOpeningTest` (one test per refusal and their order: hash, access, unknown keys, applied elsewhere), `MigrationParserUnknownKeysTest` and `ActionCodecKeysGuardTest` (core.migrations), `PlannerViewModelEditFileTest` (no write without a change, same bytes after open and close, checksum guard, discard question, the draft untouched), `PlanRoundTripTest` (every action kind of the format, with arguments, flags, deletes and operator policies: open, add one step, save, parse: the old actions are equal and in place). Compose: `MigrationsEditStepsUiTest`, `PlannerEditFileUiTest`.
 - A test with a sentinel hash in a `declareUser` file: the planner state, the draft file and every text never hold it, and no `PlannerViewModel` is created for that file.
@@ -47,8 +47,8 @@ The first save of a hand-written file rewrites it in the app's layout (the write
 None (owner decision 2026-11-15).
 
 ## Open points
-- Q16: "Edit steps" beside "Edit file" is built as recommended.
-- Q10: deletes are not built by the wizard; a delete in a file is a read-only step (already the rule here).
+- Q16 (decided 2026-11-15): "Edit steps" is the main button beside "Edit file".
+- Q10 (decided 2026-11-15): deletes are not built by the wizard; a delete in a file is a read-only step (already the rule here).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

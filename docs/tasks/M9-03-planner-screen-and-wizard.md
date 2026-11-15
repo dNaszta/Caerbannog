@@ -21,8 +21,9 @@ In:
 Out: the review graph (`M9-04`; until then the review card shows the JSON view only); the check button's behaviour (`M9-06`; until then the button is not drawn); "Edit steps" (`M9-12`); stream, policy, dead-lettering and MQTT kinds (their cards appear in the wizard with the task that builds each form; a kind that is not built is not drawn).
 
 ## Acceptance
-- BDD: `19_topology_planner.feature` / "The planner is opened from the Migrations screen" (@fake-broker @needs-decision)
-- BDD: `19_topology_planner.feature` / "After saving, Apply is pressed on the Migrations screen" (@fake-broker @needs-decision)
+- BDD: `09_topology_queues.feature` / "Topology is changed with a plan, not on the Topology screen" (@fake-broker @negative)
+- BDD: `19_topology_planner.feature` / "The planner is opened from the Migrations screen" (@fake-broker)
+- BDD: `19_topology_planner.feature` / "After saving, Apply is pressed on the Migrations screen" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A Read-only connection can plan, check and save, and is told that applying is locked" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "Without configure permission the planner says that applying is locked" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "A RabbitMQ 3.x connection gets no planner" (@fake-broker @negative @safety)
@@ -42,9 +43,10 @@ No decision in a composable: enabled, disabled, texts, order of banners all come
 None (UI of a capability that has no tool by owner decision 2026-11-15).
 
 ## Open points
-- Q11: the entry ("New plan" on the Migrations screen) and Apply on the Migrations screen after a save are built as recommended. If the owner wants a drawer item or Apply inside the planner, this brief gets an addendum before the build.
-- Q16 ("Edit steps" beside "Edit file") belongs to `M9-12`.
-- The owner reviews the mockup before step 2 of this task.
+- Q11 (decided 2026-11-15): the entry is "New plan" on the Migrations screen and Apply stays on the Migrations screen after a save. A drawer item or Apply inside the planner would be a new decision.
+- Q15 (decided 2026-11-15): the Topology screen stays read-only; the `@m9-03` outline in `09` ("Topology is changed with a plan, not on the Topology screen") is bound by this task's suite, which also selects feature `09` for `@M9` scenarios.
+- Q16 ("Edit steps" beside "Edit file", decided) belongs to `M9-12`.
+- The owner reviews the mockup before step 2 of this task (the owner also confirms the revised Q3 there).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

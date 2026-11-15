@@ -1,7 +1,7 @@
 @topology @queues
 Feature: Topology and quorum queues
   As an engineer
-  I want to see and, where allowed, change the queues, exchanges and bindings of a broker
+  I want to see the queues, exchanges and bindings of a broker, and to change them with a plan
   So that I can understand how messages are routed without opening the Management UI
 
   The app shows topology and statistics. It never consumes, acknowledges, deletes or purges the messages
@@ -9,9 +9,23 @@ Feature: Topology and quorum queues
   is the requeue peek: every message is returned to the queue and shown as not acknowledged.
 
   Milestones: the scenarios tagged @M2 are the read-only topology screen (task M2-08): the queues,
-  exchanges and bindings of the connection's virtual host, with statistics. The scenarios tagged @M5
-  change topology (declare, edit, delete, add to a migration) and are built with the migrations.
-  Until then the screen has no control that changes anything.
+  exchanges and bindings of the connection's virtual host, with statistics.
+
+  The Topology screen stays read-only (owner decision Q15, 2026-11-15). Topology is changed with a plan in
+  the Topology planner (M9, features 19 to 21), saved as a migration and applied from the Migrations screen
+  (feature 10), so a migration is the one way to change a broker. Six scenarios tagged @M5 used to describe
+  edit controls on this screen (declare a queue, edit a policy, add a binding, delete with a typed name,
+  the locked actions, add to a migration file). They were never built and are replaced by the one @M9
+  scenario near the end of the topology scenarios. Where each old idea lives now:
+  declare a queue and bind: 19 "Add a queue, an exchange and a binding with the wizard";
+  edit a policy: 21 "A policy is built from a form";
+  locked without configure permission or at Read-only: 19 "A Read-only connection can plan, check and save,
+  and is told that applying is locked" and "Without configure permission the planner says that applying is
+  locked", and 10 "Apply is disabled without configure permission";
+  delete: not in the first version of the planner (Q10); a delete action in a migration file needs the
+  level Full control (10, "Deleting something that is already gone is a no-op");
+  add a queue to a migration file from this screen: left for later as "Add to plan" (docs/spec.md,
+  "Topology planner (M9)", "Left for later"), with its scenario written when that task exists.
 
   Background:
     Given I am connected to "uat-eu"
@@ -59,53 +73,24 @@ Feature: Topology and quorum queues
     Then there is no control to consume, acknowledge, delete or purge its messages
     And the only control that shows its messages is the requeue peek, labelled "Not acknowledged (requeued)"
 
-  @M5 @fake-broker
-  Scenario: Declare a quorum queue when allowed
+  # Owner decision Q15 (2026-11-15): replaces the six @M5 scenarios that described edit controls on this
+  # screen. Tagged @M9, not @M2 or @M7, so RunTopologyAcceptanceTest does not select it; the planner's own
+  # suite binds it when the planner screen exists (task M9-03).
+  @M9 @m9-03 @negative @fake-broker
+  Scenario Outline: Topology is changed with a plan, not on the Topology screen
     Given the user has configure permission on "/"
-    When I declare a quorum queue "invoices"
-    Then the broker is asked to create a quorum queue "invoices"
-    And "invoices" appears in the list
-
-  @M5 @fake-broker
-  Scenario: Edit a queue's policy when allowed
-    Given the user has configure permission on "/"
-    And a quorum queue "orders" with the policy "quorum-default"
-    When I change the policy of "orders" to "quorum-strict"
-    Then the broker applies "quorum-strict" to "orders"
-
-  @M5 @fake-broker
-  Scenario: Add a binding when allowed
-    Given the user has configure permission on "/"
-    When I bind the exchange "events" to the queue "orders" with routing key "order.created"
-    Then the binding appears in the details of "orders"
-
-  @M5 @fake-broker
-  Scenario: Deleting a queue needs the name typed to confirm
-    Given the user has configure permission on "/"
-    When I choose to delete the queue "legacy-orders"
-    Then I must type "legacy-orders" before the delete is enabled
-    When I type "legacy-orders" and confirm
-    Then the broker is asked to delete the queue "legacy-orders"
-
-  @M5 @negative @fake-broker
-  Scenario Outline: Everything that changes topology is locked without configure permission
-    Given the user has no configure permission on "/"
-    When I select the queue "orders"
-    Then the "<action>" action is disabled
-    And it explains that topology is locked because the user has no configure permission
+    And the connection "uat-eu" has the topology control level "Full control"
+    And a quorum queue "orders"
+    When I select the queue "orders" on the topology screen
+    Then there is no control to <change>
+    And <where>
 
     Examples:
-      | action      |
-      | Edit policy |
-      | Delete queue |
-      | Add binding |
-
-  @M5 @fake-broker
-  Scenario: A locked queue can still be added to a migration file
-    Given the user has no configure permission on "/"
-    When I choose "Add to migration" for the queue "orders"
-    Then a migration file with the queue's declaration is prepared
-    And I am told it can be applied on a connection that allows it
+      | change                       | where                                                                                          |
+      | declare a queue              | a queue is declared by the Queue step of a plan                                                |
+      | change the policy of a queue | a policy is declared by the Policy step of a plan                                              |
+      | bind an exchange to a queue  | a binding is declared by the Binding step of a plan                                            |
+      | delete a queue               | no step of the wizard deletes anything and a delete action in a migration file needs the level Full control |
 
   @M2 @fake-broker
   Scenario: Search queues by name
@@ -291,7 +276,8 @@ Feature: Topology and quorum queues
     And none of them was a request for the messages of a queue
 
   # Decision T4 (recommended): in M2 the screen has no action that changes topology, so none is drawn,
-  # not even a disabled one. The locked actions of the @M5 scenarios come with the migrations.
+  # not even a disabled one. With the planner (Q15) this stays true: a locked connection is told so by
+  # the planner and by the Migrations screen, never by a disabled button here.
   @M2 @fake-broker
   Scenario: The M2 topology screen offers no action that changes topology
     Given the user has configure permission on "/"

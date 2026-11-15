@@ -39,8 +39,8 @@ interface PlanDraftStore {
 Out: any composable (`M9-03`); the check (`M9-05`, `M9-06`); opening a migration file (`M9-12`); applying (the Migrations screen does it, unchanged).
 
 ## Acceptance
-- BDD: `19_topology_planner.feature` / "The naming style is remembered on this machine" (@fake-broker @needs-decision)
-- BDD: `19_topology_planner.feature` / "The naming style is kebab-case until I choose another" (@fake-broker @needs-decision)
+- BDD: `19_topology_planner.feature` / "The naming style is remembered on this machine" (@fake-broker)
+- BDD: `19_topology_planner.feature` / "The naming style is kebab-case until I choose another" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A plan is a draft until it is saved" (@fake-broker @smoke)
 - BDD: `19_topology_planner.feature` / "Save as migration writes the next version" (@fake-broker @smoke)
 - BDD: `19_topology_planner.feature` / "A saved plan is applied by the existing Apply" (@fake-broker)
@@ -48,8 +48,8 @@ Out: any composable (`M9-03`); the check (`M9-05`, `M9-06`); opening a migration
 - BDD: `19_topology_planner.feature` / "Saving never overwrites a migration file" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "Dismiss discards the draft after a question" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "An empty plan is dismissed without a question" (@fake-broker)
-- BDD: `19_topology_planner.feature` / "A draft survives a restart" (@fake-broker @needs-decision)
-- BDD: `19_topology_planner.feature` / "There is one draft at a time" (@fake-broker @needs-decision)
+- BDD: `19_topology_planner.feature` / "A draft survives a restart" (@fake-broker)
+- BDD: `19_topology_planner.feature` / "There is one draft at a time" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "The draft is not kept in the migrations folder" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A draft that cannot be read is reported and kept" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "An empty plan cannot be saved" (@fake-broker @negative)
@@ -73,9 +73,9 @@ Model the planner as two sealed things, not flags: `PlannerMode` (`NewPlan` now,
 None (owner decision 2026-11-15). The draft is in the app's own data and no tool reads it; a saved plan is an ordinary migration file that `caerbannog_list_migrations` and `caerbannog_dry_run_migration` already see.
 
 ## Open points
-- Q9 (the draft survives a restart; one draft; Dismiss asks once): built as recommended. If the owner wants no persistence, `FilePlanDraftStore` is replaced by an in-memory store in the composition root and the two `@needs-decision` scenarios are rewritten; nothing else changes.
-- Q8, Q5 (where the style lives, the default): built as recommended (per machine, kebab-case).
-- Q11 (Apply happens on the Migrations screen): the view model only reports `SavedPlan`; where the screen goes is `M9-03`.
+- Q9 (decided 2026-11-15): the draft survives a restart, one draft at a time, Dismiss asks once when the plan has a step.
+- Q8, Q5 (decided 2026-11-15): the style is chosen in the planner and remembered per machine, the default is kebab-case.
+- Q11 (decided 2026-11-15): Apply happens on the Migrations screen; the view model only reports `SavedPlan`, where the screen goes is `M9-03`.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

@@ -23,6 +23,7 @@ data class PlanGraph(
     val links: List<PlanLink> = emptyList(), // dead-letter and response-stream links; filled by M9-07 and M9-09
     val edgeLabels: Map<String, String> = emptyMap(),   // an MQTT route's topic filter; filled by M9-10
     val notice: PlanGraphNotice? = null,     // TooLarge | OnlyThePlan
+    val notes: List<PlanGraphNote> = emptyList(),   // plain notes drawn between two nodes, never a step or an edge; filled by M9-07b
 )
 fun planPreview(plan: TopologyPlan, known: KnownTopology): PlanGraph
 ```
@@ -32,7 +33,7 @@ fun planPreview(plan: TopologyPlan, known: KnownTopology): PlanGraph
 - Accessible names: a node reads "<kind> <name>, new" or "<kind> <name>, already on the broker"; nodes are reachable by Tab as in the Bindings graph; no node is a button that changes anything.
 - Test tags: `planner:reviewGraph`, `planGraphNode:<id>`, `planGraphNew:<id>`, `planner:graphNotice`, `planner:reviewViewSwitch`.
 
-Out: the dead-letter edge (`M9-09`), the response-stream link (`M9-07`), the MQTT label (`M9-10`): this task only carries the fields; drawing on the graph (never).
+Out: the dead-letter edge (`M9-09`), the response-stream link (`M9-07`), the MQTT label (`M9-10`), the note about the owner's service (`M9-07b`): this task only carries the fields; drawing on the graph (never).
 
 ## Acceptance
 - BDD: `19_topology_planner.feature` / "The review graph shows the result with the new parts marked" (@fake-broker @smoke)

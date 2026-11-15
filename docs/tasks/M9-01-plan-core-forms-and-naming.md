@@ -1,6 +1,6 @@
 # M9-01: Plan core: the plan model, the queue, exchange and binding forms, plain words, validation and naming
 
-Milestone: M9    Depends on: the owner's review of the M9 plan; no spike    Size: M
+Milestone: M9    Depends on: none (the owner answered the open questions on 2026-11-15); no spike    Size: M
 
 PLANNED 2026-11-15. Not started. First task of the earliest working slice (`M9-01`, `M9-02`, `M9-03`).
 
@@ -53,7 +53,7 @@ Out: the view model, storage and settings (`M9-02`); every screen (`M9-03`); the
 - BDD: `19_topology_planner.feature` / "Cancelling the wizard adds nothing" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "The wizard offers exactly these kinds" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A fanout or a direct exchange" (@fake-broker)
-- BDD: `19_topology_planner.feature` / "A topic or a headers exchange" (@fake-broker @needs-decision)
+- BDD: `19_topology_planner.feature` / "A topic or a headers exchange" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A new queue is a quorum queue unless I choose otherwise" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A form that cannot be added says why" (@fake-broker @negative)
 - BDD: `19_topology_planner.feature` / "The same thing declared twice with other settings is a problem in the plan" (@fake-broker @negative)
@@ -64,7 +64,7 @@ Out: the view model, storage and settings (`M9-02`); every screen (`M9-03`); the
 - BDD: `19_topology_planner.feature` / "A plan is for one virtual host" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "A name that does not follow the naming style gets a hint and can still be added" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "The hint follows the chosen naming style" (@fake-broker)
-- BDD: `19_topology_planner.feature` / "Names that already exist on the broker are never flagged" (@fake-broker @needs-decision)
+- BDD: `19_topology_planner.feature` / "Names that already exist on the broker are never flagged" (@fake-broker)
 - BDD: `19_topology_planner.feature` / "Changing the naming style renames nothing" (@fake-broker)
 - New suite `RunTopologyPlannerAcceptanceTest` (package `dev.caerbannog.acceptance.planner`, features `19`, `20`, `21`, filter `@m9-01 and @fake-broker and not @needs-decision and not @needs-spike`, widened by each later task). The steps talk to a small `PlannerDriver` in the glue that, in this task, calls the forms and the plan functions directly; `M9-02` re-points the driver at the view model without editing a feature line.
 - Unit tests, written first: `TopologyPlanTest` (operations, ids, virtual host move), `QueueFormTest`, `ExchangeFormTest`, `BindingFormTest` (problems as a table; `formOf` round trip for every action a form builds; null for arguments, flags, deletes and the four access actions), `PlanValidationTest` (one test per rule, and the parser's reason passed through unchanged), `PlanNamingTest` (one table per style for `follows`, `example`, `derived`, `baseOf`; hostile names: empty, 1,000 characters, control characters, only separators), `PlannerTextsGuardTest` (no text holds markup or a placeholder left unfilled).
@@ -80,9 +80,9 @@ None in this task. The forms and texts are the ones of `docs/ux/Planner.dc.html`
 None. Owner decision 2026-11-15 ("no MCP"), recorded in `docs/spec.md` "Topology planner (M9)", "MCP evaluation": the planner is a form for a person, and a saved plan is an ordinary migration that the existing read-only tools already list and dry-run.
 
 ## Open points
-- Q1 (topic and headers exchanges): the outline "A topic or a headers exchange" is `@needs-decision`; build fanout and direct, and add the two types when the owner confirms (one enum entry each, no other change).
-- Q5, Q6, Q7 (default style, fixed suffix words, what the hint covers): built as recommended; a different answer changes a constant or one condition.
-- Q13 (queue form: name and type only): built as recommended.
+- Q1 (decided 2026-11-15): the Exchange form offers fanout, direct, topic and headers; the binding form of a headers exchange is `M9-11`.
+- Q5, Q6, Q7 (decided 2026-11-15): the default style is kebab-case, the suffix words are fixed, the hint covers every new name of a queue, exchange, stream or policy and never an existing broker name, a routing key, a topic filter or a header name.
+- Q13 (decided 2026-11-15): the queue form is name and type only.
 - S-H (broker name rules) is not measured: the form blocks only on the app's own rules.
 
 ## Definition of done

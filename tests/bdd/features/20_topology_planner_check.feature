@@ -13,7 +13,7 @@ Feature: Check a plan against the broker
   PLANNED 2026-11-15, not built. The exact rule for "the same settings" of a queue and an exchange waits
   for the spike M9-00c (S-G); the scenarios below use differences that today's comparison already tells
   apart (type, flags, a declared argument with another value). Sub-tags: @m9-05 the check in core and
-  data-rabbit, @m9-06 the check on the screen. The wording of the results is owner question Q14.
+  data-rabbit, @m9-06 the check on the screen. The wording of the results is decided (Q14, 2026-11-15).
 
   Background:
     Given I am connected to "uat-eu" with the virtual host "/"

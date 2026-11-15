@@ -126,10 +126,10 @@ body{margin:0}
 
 <section id="states-m9" style="display:flex;flex-direction:column;gap:24px;margin-top:16px">
 <div class="t-tl">Other states (M9)</div>
-<div class="t-bs dim">The block above is a checked plan on a connection that may change topology. Everything below is drawn only in its state. Texts are fixed texts of the planner (core); names from a plan, a file or the broker are plain text, never markup. Items marked "pending Q.." follow the recommended answer of an open owner question in docs/spec.md, "Topology planner (M9)"; items marked "pending S-.." wait for a spike.</div>
+<div class="t-bs dim">The block above is a checked plan on a connection that may change topology. Everything below is drawn only in its state. Texts are fixed texts of the planner (core); names from a plan, a file or the broker are plain text, never markup. The owner answered the open questions Q1 to Q16 on 2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"); only the revised Q3 (the optional MQTT ticks of a stream pair and the graph note, sections 4, 5 and 8) is still to be confirmed at the review of this mockup, and Q17 (the header key of the test message, section 14) is open. Items marked "pending S-.." wait for a spike.</div>
 
 <section id="state-entry" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">1. Entry: the Migrations screen (pending Q11, Q16)</div>
+<div class="t-ts">1. Entry: the Migrations screen (Q11, Q16 decided)</div>
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>New plan</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">upload_file</span>Import JSON</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">download</span>Export current topology</button><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">play_arrow</span>Apply pending</button></div>
 <div class="pcard" style="max-width:340px;border-style:dashed"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="t-tm">Draft plan</span><span class="pill warn">Not saved</span></div><div class="t-bs">Orders with dead-lettering and a telemetry route</div><div class="t-bs dim">10 steps · not a migration yet</div><div style="display:flex;gap:8px;margin-top:4px"><button class="btn tonal lead" type="button" style="height:32px"><span class="ms sm" aria-hidden="true">edit</span>Continue plan</button><button class="btn text danger" type="button" style="height:32px">Dismiss</button></div></div>
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;max-width:640px"><button class="btn tonal lead" type="button"><span class="ms sm" aria-hidden="true">format_list_numbered</span>Edit steps</button><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">data_object</span>Edit file</button><span style="flex-grow:1"></span><button class="btn outlined lead" type="button"><span class="ms sm" aria-hidden="true">rule</span>Validate again</button><button class="btn filled" type="button">Apply 0005</button></div>
@@ -158,7 +158,7 @@ body{margin:0}
 </div>
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn filled" type="button">Next</button></div>
 </div></div>
-<div class="t-bs dim">A dialog over the planner. Arrow keys move between the kinds, Enter is Next, Esc is Cancel (nothing is added). There is no kind that deletes, none for users, virtual hosts or permissions, and none that touches messages. "Topic or headers" is pending Q1.</div>
+<div class="t-bs dim">A dialog over the planner. Arrow keys move between the kinds, Enter is Next, Esc is Cancel (nothing is added). There is no kind that deletes, none for users, virtual hosts or permissions, and none that touches messages. Topic and headers exchanges are offered (Q1 decided).</div>
 </section>
 
 <section id="state-wizard-forms" style="display:flex;flex-direction:column;gap:8px">
@@ -172,7 +172,7 @@ body{margin:0}
 <div class="opt"><span class="radio" aria-hidden="true"></span><div><b>Classic queue</b><div class="t-bs">One copy on one node.</div></div></div>
 <div class="t-bs dim">Limits and dead-lettering are set with a policy step, so they can be changed later without deleting the queue.</div>
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
-<div class="t-bs dim">Build note: the hint (O11) is advice: the field keeps its normal outline and Next stays enabled. An empty name, "." or ".." is an error: red outline, the reason under the field ("Give the queue a name", the parser's text for "." and ".."), Next disabled. Name and type only (pending Q13).</div></div>
+<div class="t-bs dim">Build note: the hint (O11) is advice: the field keeps its normal outline and Next stays enabled. An empty name, "." or ".." is an error: red outline, the reason under the field ("Give the queue a name", the parser's text for "." and ".."), Next disabled. Name and type only (Q13 decided).</div></div>
 
 <div class="wiz" id="form-exchange"><div class="t-tm">Exchange</div>
 <label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>events</span></span></label>
@@ -189,7 +189,7 @@ body{margin:0}
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
 <div class="t-bs dim">Build note: both fields are a text field with suggestions: first the items this plan declares ("in this plan"), then, when connected, those on the broker. A typed name that is in neither list is allowed and gets the note "Not in this plan and not seen on the broker". The routing key field is hidden for a fanout or headers exchange when its type is known.</div></div>
 
-<div class="wiz" id="form-binding-headers"><div class="t-tm">Binding on a headers exchange (pending Q1, S-E)</div>
+<div class="wiz" id="form-binding-headers"><div class="t-tm">Binding on a headers exchange (Q1 decided, S-E pending)</div>
 <label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">From exchange</span><span class="v"><span>documents</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
 <label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">To queue</span><span class="v"><span>pdf-reports</span><span class="ms" aria-hidden="true">arrow_drop_down</span></span></label>
 <div class="t-ts">A message matches when</div>
@@ -201,15 +201,20 @@ body{margin:0}
 <div class="t-bs dim">Build note: written as binding arguments with x-match "all" or "any"; value types text, number, true or false. Which x-match values the broker accepts and what a binding without a header matches is measured first (S-E).</div></div>
 
 <div class="wiz" id="form-stream"><div class="t-tm">Stream</div>
-<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>telemetry</span></span></label>
-<div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div><b>Also create its response stream (DLN)</b><div class="t-bs dim">Optional. The pair of this stream, for the messages that would be dead-lettered on a queue.</div></div></div>
-<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Response stream name</span><span class="v"><span>telemetry-dln</span></span></label>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>device-commands</span></span></label>
+<div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div><b>Also create its response stream (DLN)</b><div class="t-bs dim">Optional. The pair of this stream: where the answers to its requests are processed.</div></div></div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Response stream (DLN) name</span><span class="v"><span>device-commands-dln</span></span></label>
 <div class="banner info" style="padding:8px 12px"><span class="ms sm" aria-hidden="true">info</span><div class="t-bs">A response stream is an ordinary stream. RabbitMQ does not move messages into it by itself: your applications write to it.</div></div>
+<div class="t-ts">MQTT routes for the pair (optional)</div>
+<div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div><b>Answers arrive over MQTT</b><div class="t-bs dim">Adds an MQTT route into the response stream.</div></div></div>
+<label class="tf" style="--tf-bg:var(--sc-high);margin-left:30px"><span class="l">Topic filter of the answers</span><span class="v"><span class="mono">devices/+/answer</span></span></label>
+<div class="t-bs dim" style="margin:-8px 0 0 46px">Saved as a binding on amq.topic with the key <span class="mono">devices.*.answer</span>.</div>
+<div class="chk"><span class="box" role="checkbox" aria-checked="false" tabindex="0"></span><div><b>Requests are also recorded from an MQTT topic</b><div class="t-bs dim">Adds an MQTT route into the request stream. Off: the topic field is not shown.</div></div></div>
 <div class="t-ts">Retention</div>
 <div style="display:flex;gap:8px"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Keep messages for</span><span class="v"><span>7D</span></span></label><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Keep at most</span><span class="v"><span>not set</span></span></label></div>
 <div class="chk"><span class="box on" role="checkbox" aria-checked="true" tabindex="0"><span class="ms sm" aria-hidden="true" style="font-size:14px">check</span></span><div>Same retention for the response stream</div></div>
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
-<div class="t-bs dim">Build note: the tick is off by default (O10); the name is suggested from the stream name, the suffix dln and the naming style (O11) and follows the stream name until it is edited by hand. The info text is pending S-D, the word "Response stream (DLN)" pending Q2. The Retention block is pending Q4 and S-F1: it is saved as one policy step (telemetry-retention, applies to streams); without it the form is name and tick only.</div></div>
+<div class="t-bs dim">Build note: every tick is off by default (O10, O13). The response stream name is suggested from the stream name, the suffix dln and the naming style (O11) and follows the stream name until it is edited by hand. The two MQTT ticks are drawn only while the response stream is ticked (unticking it hides them and drops their routes); each opens a topic filter field checked like the MQTT route form (section 4, form MQTT route: "Enter a topic filter", "# must be the last level", "+ must stand for a whole level"); the answers field shows the owner's example devices/+/answer as its placeholder, the requests field has none. The example is the owner's IoT flow: a request is a message in the request stream with the destination device id in a header; his own service turns it into an MQTT message for the device; the device answers on devices/&lt;id&gt;/answer, which lands in the response stream; request and answer are matched by a correlation id in the message, which the planner never touches. The two tick texts are the architect's wording; the revised Q3 is to be confirmed by the owner. The info text is pending S-D, the MQTT ticks pending S-A and the MQTT route step (M9-10, task M9-07b). The Retention block is pending S-F1 (Q4 decided): it is saved as one policy step (device-commands-retention, applies to streams); without it the form is name and ticks only.</div></div>
 
 <div class="wiz" id="form-policy"><div class="t-tm">Policy</div>
 <label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Name</span><span class="v"><span>orders-limits</span></span></label>
@@ -235,7 +240,7 @@ body{margin:0}
 <div class="opt"><span class="radio" aria-hidden="true"></span><div><b>At least once</b><div class="t-bs">Dead letters are kept until the dead-letter queue has them. Needs "refuse new messages when the queue is full".</div></div></div>
 <div class="chk"><span class="box" role="checkbox" aria-checked="false" tabindex="0"></span><div><b>Publishers are refused when the queue is full</b><div class="t-bs dim">Required for "At least once". It changes what your publishers see.</div></div></div>
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled" type="button">Next</button></div>
-<div class="t-bs dim">Build note: the queue is picked from this plan or the broker; it is not declared or changed by this recipe. Names are suggested with the suffixes dlx and dlq (O11). The stream target is pending Q12 and S-C; "At least once" and its tick are drawn only if S-C confirms it works by policy, and only for a quorum queue. A queue that already has a policy on the broker gets the warning of the Policy form.</div></div>
+<div class="t-bs dim">Build note: the queue is picked from this plan or the broker; it is not declared or changed by this recipe. Names are suggested with the suffixes dlx and dlq (O11). The stream target is offered only if S-C confirms it (Q12 decided); "At least once" and its tick are drawn only if S-C confirms it works by policy, and only for a quorum queue. A queue that already has a policy on the broker gets the warning of the Policy form.</div></div>
 
 <div class="wiz" id="form-mqtt"><div class="t-tm">MQTT route (pending S-A, S-B)</div>
 <label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Topic filter</span><span class="v"><span class="mono">sensors/+/temp</span></span></label>
@@ -258,11 +263,18 @@ body{margin:0}
 <div class="t-bs">Messages that orders rejects, expires or drops will go to orders-dlq. The queue orders itself is not changed.</div>
 <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add to plan</button></div>
 </div></div>
+<div class="frame" style="padding:24px;margin-top:8px"><div class="wiz">
+<div class="t-tl">This adds 3 steps</div>
+<div class="list"><div class="step"><span class="no">1</span><div class="tx">Declare stream <span class="mono">device-commands</span></div></div><div class="step sub"><span class="no">2</span><span class="ms sm" aria-hidden="true">subdirectory_arrow_right</span><div class="tx">Declare stream <span class="mono">device-commands-dln</span><div class="note">Response stream (DLN) of device-commands</div></div></div><div class="step"><span class="no">3</span><span class="ms sm" aria-hidden="true">sensors</span><div class="tx">MQTT route <span class="mono">devices/+/answer</span> to stream <span class="mono">device-commands-dln</span><div class="note">Binding on amq.topic with the key devices.*.answer</div></div></div></div>
+<div class="t-bs">Your own service turns a request into an MQTT message; the planner does not plan that.</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Back</button><button class="btn filled lead" type="button"><span class="ms sm" aria-hidden="true">add</span>Add to plan</button></div>
+</div></div>
+<div class="t-bs dim">The second summary is the stream pair with the answers route ticked (the revised Q3): the sentence under the list is the same constant as the note of the review graph (section 8) and is shown whenever an answers route is part of the summary. "Add to plan" appends the three steps in this order: the two streams, then the answers route, then, if ticked, the requests route.</div>
 <div class="t-bs dim">A single-step kind shows "This adds 1 step". "Add to plan" appends the steps at the end, closes the wizard and puts the focus on the first new step. Nothing is sent to the broker and no file is written. The sentence under the list exists only for a recipe; its wording is pending S-C.</div>
 </section>
 
 <section id="state-naming" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">6. Naming style (O10, O11; default and where it is kept pending Q5, Q8)</div>
+<div class="t-ts">6. Naming style (O10, O11; kebab-case by default, remembered per machine: Q5, Q8 decided)</div>
 <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
 <div style="background:var(--sc-high);border-radius:12px;padding:8px 0;width:340px;box-shadow:0 2px 6px 2px rgba(0,0,0,.15)" role="menu" aria-label="Naming style">
 <div class="step" role="menuitemradio" aria-checked="true" style="border:0"><span class="radio on" aria-hidden="true"></span><div class="tx"><b>kebab-case</b><div class="note mono">orders-dln</div></div></div>
@@ -271,7 +283,7 @@ body{margin:0}
 <div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>camelCase</b><div class="note mono">ordersDln</div></div></div>
 <div class="step" role="menuitemradio" aria-checked="false" style="border:0"><span class="radio" aria-hidden="true"></span><div class="tx"><b>No convention</b><div class="note">No hints; derived names as in kebab-case</div></div></div>
 </div>
-<div class="t-bs dim" style="flex:1 1 320px">The chip in the plan header opens this menu. The style decides two things only: the names the wizard suggests for derived things (suffixes dln, dlq, dlx, retention; fixed words pending Q6) and the hint under a name field. Changing the style renames nothing; existing steps get their hint from the new style. The hint is advice (O11): it never blocks Next, Add to plan or Save. It covers new names of queues, exchanges, streams and policies (pending Q7), never routing keys, topic filters, header names or names that exist on the broker.</div>
+<div class="t-bs dim" style="flex:1 1 320px">The chip in the plan header opens this menu. The style decides two things only: the names the wizard suggests for derived things (suffixes dln, dlq, dlx, retention; fixed words: Q6 decided) and the hint under a name field. Changing the style renames nothing; existing steps get their hint from the new style. The hint is advice (O11): it never blocks Next, Add to plan or Save. It covers new names of queues, exchanges, streams and policies (Q7 decided), never routing keys, topic filters, header names or names that exist on the broker.</div>
 </div>
 </section>
 
@@ -290,11 +302,22 @@ body{margin:0}
 <div class="t-ts">8. Review graph: other cases</div>
 <div class="banner info"><span class="ms" aria-hidden="true">hub</span><div style="flex:1"><b>This plan is too large to draw</b><div class="t-bs" style="margin-top:4px">The graph shows at most 60 items. The step list is the review.</div></div></div>
 <div class="banner info"><span class="ms" aria-hidden="true">link_off</span><div style="flex:1"><b>Only the plan is drawn</b><div class="t-bs" style="margin-top:4px">Not connected: what already exists on a broker is not shown.</div></div></div>
-<div class="t-bs dim">The first replaces the graph (the rule of the Bindings graph). The second is a line above the graph when there is no connection, or the broker could not be read: every node then comes from the plan, and an exchange or queue that a binding refers to and the plan does not declare is drawn with a dotted outline and "not in this plan".</div>
+<div class="t-ts" style="margin-top:8px">The request and answer flow of a stream pair (revised Q3)</div>
+<svg viewBox="0 0 960 220" role="img" aria-label="Review graph: new stream device-commands, a note that your own service turns a request into an MQTT message, exchange amq.topic routing devices/+/answer to the new stream device-commands-dln, and the response link between the two new streams" style="width:100%;height:auto;background:var(--surface);border:1px solid var(--outline-variant);border-radius:12px">
+<rect x="190" y="34" width="200" height="56" rx="10" fill="var(--sc-low)" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text class="gsub" x="290" y="54" text-anchor="middle">Your own service turns a request</text><text class="gsub" x="290" y="70" text-anchor="middle">into an MQTT message; the planner</text><text class="gsub" x="290" y="86" text-anchor="middle">does not plan that.</text>
+<path class="gedge new" d="M570 62 L790 62"/><text class="glabel" x="680" y="52" text-anchor="middle">devices/+/answer</text><text class="gsub" x="680" y="80" text-anchor="middle">MQTT route</text>
+<path class="gedge new pair" d="M90 84 L90 170 L870 170 L870 84"/><text class="gsub" x="480" y="162" text-anchor="middle">response (DLN)</text>
+<rect class="gnode new" x="10" y="40" width="160" height="44" rx="8"/><text class="gname" x="22" y="60">device-commands</text><text class="gsub" x="22" y="76">stream</text><rect x="132" y="32" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="149" y="44" text-anchor="middle">new</text>
+<rect class="gnode" x="410" y="40" width="160" height="44" rx="8"/><text class="gname" x="422" y="60">amq.topic</text><text class="gsub" x="422" y="76">exchange, topic</text>
+<rect class="gnode new" x="790" y="40" width="160" height="44" rx="8"/><text class="gname" x="802" y="60">device-commands-dln</text><text class="gsub" x="802" y="76">stream</text><rect x="912" y="32" width="34" height="16" rx="8" fill="var(--primary)"/><text class="gnew" x="929" y="44" text-anchor="middle">new</text>
+</svg>
+<div class="t-bs dim">The dashed rounded box is a note, not a step and not an edge: it has no focus action and cannot be changed. It is drawn between the request stream and amq.topic whenever an MQTT route leads into a response stream; it is derived from the steps (the pair is recognised by its name, the route by its binding), so it also appears for a pair typed by hand or opened from a file, and not for a route into a stream that is not a response stream. The planner plans no bridge from a stream to an MQTT message (an application does that), and reads and writes no correlation id.</div>
+<div class="t-bs dim">The first banner above replaces the graph (the rule of the Bindings graph). The second is a line above the graph when there is no connection, or the broker could not be read: every node then comes from the plan, and an exchange or queue that a binding refers to and the plan does not declare is drawn with a dotted outline and "not in this plan".</div>
 </section>
 
 <section id="state-check" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">9. Check against the broker: every result (wording pending Q14)</div>
+<div class="t-ts">9. Check against the broker: every result (wording as decided in Q14)</div>
 <div class="list" style="max-width:820px">
 <div class="step"><span class="no">1</span><div class="tx">Declare quorum queue <span class="mono">invoices</span></div><span class="pill info">Will be created</span></div>
 <div class="step"><span class="no">2</span><div class="tx">Declare direct exchange <span class="mono">events</span></div><span class="pill">Already there</span></div>
@@ -313,11 +336,11 @@ body{margin:0}
 <div class="t-ts">10. Save as migration</div>
 <div class="banner ok"><span class="ms" aria-hidden="true">check_circle</span><div style="flex:1"><b>Plan saved as 0005</b><div class="t-bs" style="margin-top:4px">Nothing was sent to the broker. Apply it when you are ready.</div><div class="mono">/Users/dana/work/migrations/0005.json</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
 <div class="banner err"><span class="ms" aria-hidden="true">error</span><div style="flex:1"><b>The file could not be written</b><div class="t-bs" style="margin-top:4px">The plan is still here as a draft. Nothing was changed.</div></div><button class="iconbtn" type="button" aria-label="Dismiss"><span class="ms sm" aria-hidden="true">close</span></button></div>
-<div class="t-bs dim">The first banner is drawn on the Migrations screen, which opens with 0005 selected (pending Q11): the file is an ordinary pending migration, with its dry run and the existing "Apply 0005". The version is the next free number in the folder; a file is never overwritten. The draft is gone after a successful save. The second banner stays in the planner. A disabled Save reports its reason: "Add a step first", "Fix the 1 problem in the plan first", "Choose a migrations folder first", "The folder is read-only".</div>
+<div class="t-bs dim">The first banner is drawn on the Migrations screen, which opens with 0005 selected (Q11 decided): the file is an ordinary pending migration, with its dry run and the existing "Apply 0005". The version is the next free number in the folder; a file is never overwritten. The draft is gone after a successful save. The second banner stays in the planner. A disabled Save reports its reason: "Add a step first", "Fix the 1 problem in the plan first", "Choose a migrations folder first", "The folder is read-only".</div>
 </section>
 
 <section id="state-dismiss" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">11. Dismiss (O5; the question pending Q9)</div>
+<div class="t-ts">11. Dismiss (O5; Q9 decided)</div>
 <div class="frame" style="min-height:240px"><div class="scrim"><div class="dialog"><div class="t-tl">Dismiss this plan?</div><div style="font:400 14px/20px Roboto,system-ui,sans-serif;color:var(--on-surface-variant)">Its 10 steps are discarded. Nothing was sent to the broker.</div><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Keep the plan</button><button class="btn text danger" type="button">Dismiss</button></div></div></div></div>
 <div class="t-bs dim">Asked only when the plan has a step. "Keep the plan", Esc or a click outside change nothing. "Dismiss" discards the draft and goes back to the Migrations screen; no migration file is touched.</div>
 </section>
@@ -353,9 +376,28 @@ body{margin:0}
 </section>
 
 <section id="state-mqtt-test" style="display:flex;flex-direction:column;gap:8px">
-<div class="t-ts">14. After applying: an MQTT route of an applied migration (Migrations screen)</div>
-<div style="display:flex;align-items:center;gap:12px;max-width:820px"><span class="ms" aria-hidden="true" style="color:var(--ok,#386A20)">check_circle</span><span style="flex-grow:1">MQTT route <span class="mono">sensors/+/temp</span> to stream <span class="mono">telemetry</span></span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Send a test message</button></div>
-<div class="t-bs dim">The action row of an applied file names an MQTT route as in the planner and offers "Send a test message": it opens the existing Publish MQTT dialog with the topic sensors/item/temp (a concrete topic that matches the filter). Nothing is published until Publish is pressed. The button is disabled with its reason when the connection has no MQTT port ("This connection has no MQTT port") or the user may not publish.</div>
+<div class="t-ts">14. After applying: an MQTT route of an applied migration (Migrations screen); the test message asks for a sample value (A15, an architect addition)</div>
+<div style="display:flex;align-items:center;gap:12px;max-width:820px"><span class="ms" aria-hidden="true" style="color:var(--ok,#386A20)">check_circle</span><span style="flex-grow:1">MQTT route <span class="mono">devices/+/answer</span> to stream <span class="mono">device-commands-dln</span></span><button class="btn text lead" type="button"><span class="ms sm" aria-hidden="true">send</span>Send a test message</button></div>
+<div class="t-bs dim">The action row of an applied file names an MQTT route as in the planner and offers "Send a test message". The button is disabled with its reason when the connection has no MQTT port ("This connection has no MQTT port") or the user may not publish; it is not offered for a pending or modified file.</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+<div class="frame" style="flex:1 1 440px;min-height:300px"><div class="scrim"><div class="dialog" style="width:420px">
+<div class="t-tl">Send a test message</div>
+<div class="t-bs dim">Route <span class="mono">devices/+/answer</span> to stream <span class="mono">device-commands-dln</span>. The dialog that follows accepts no wildcards, so give the + a value.</div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Value for the + in level 2</span><span class="v"><span>d42</span></span></label>
+<div class="t-bs dim" style="margin:-8px 0 0 16px">for example a device id</div>
+<div class="t-bs">Topic: <span class="mono">devices/d42/answer</span></div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn text" type="button">Open the dialog</button></div>
+</div></div></div>
+<div class="frame" style="flex:1 1 440px;min-height:300px"><div class="scrim"><div class="dialog" style="width:420px">
+<div style="display:flex;align-items:center;gap:8px"><div class="t-tl" style="flex:1">Publish MQTT message</div><span class="pill info">Existing dialog</span></div>
+<label class="tf" style="--tf-bg:var(--sc-high)"><span class="l">Topic</span><span class="v"><span class="mono">devices/d42/answer</span></span></label>
+<div class="t-ts">Headers (MQTT 5 user properties)</div>
+<div style="display:flex;gap:8px;align-items:center"><label class="tf" style="flex:1;--tf-bg:var(--sc-high)"><span class="l">Key</span><span class="v"><span class="mono">correlation-id</span></span></label><label class="tf" style="flex:2;--tf-bg:var(--sc-high)"><span class="l">Value</span><span class="v"><span class="mono">3f2a9c1e-7b04-4d6e-9a58-c0d1e2f34a56</span></span></label></div>
+<div class="t-bs dim">The payload and the other fields are the dialog's own. Nothing is published until Publish is pressed.</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn text" type="button">Cancel</button><button class="btn text" type="button">Publish</button></div>
+</div></div></div>
+</div>
+<div class="t-bs dim">Left: one field for every wildcard of the filter, in order ("Value for the + in level 2"; a # asks for "Value for the rest of the topic" and starts as test; a + starts as item); a filter without wildcards asks nothing and opens the dialog at once. Refusals under the field, fixed texts: "Enter a value", "One level only: no /", "No + or # in a value"; a refused value never opens the dialog. Right: the existing Publish MQTT dialog, opened with the concrete topic and one header, key correlation-id (pending Q17, recommended), a generated value, an MQTT 5 user property in the dialog's own headers list, editable like any header; opening the test message again generates another value. Only existing parts are used (the dialog, its headers, the publisher and the publish gate), so the owner can play a device and watch the answer arrive in the response stream with the existing stream browser. Where the correlation id appears on the stream message is measured first (S-A6, S-A7); until then the dialog shows no sentence about it.</div>
 </section>
 
 </section>
