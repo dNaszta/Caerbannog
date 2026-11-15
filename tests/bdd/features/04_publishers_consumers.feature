@@ -95,7 +95,7 @@ Feature: Publishers and consumers of a stream
     Then the tab lists 2 publishers and 3 consumers
 
   # M2-17 (2026-11-15). Live twins of the lag rule, bound to RealBrokerClientsTest "S-A ...". The broker's lag is read in its steady state
-  # (after the second statistics refresh, about 5 s after a consumer attaches), not only in the first window, which reads 0 for everyone.
+  # (after the second statistics refresh, about 5 s after a consumer attaches), not only in the first window, where the lags differ per consumer and a consumer on a stream where nobody stored reads 0.
   @broker
   Scenario: A consumer that has read everything on a stream where nobody stored an offset is caught up
     Given a real broker where nobody has stored an offset on "orders-events"
