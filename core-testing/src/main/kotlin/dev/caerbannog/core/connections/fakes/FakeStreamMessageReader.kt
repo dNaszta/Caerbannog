@@ -6,6 +6,7 @@ import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.browser.StreamMessageReader
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * In-memory test double for [StreamMessageReader].
@@ -19,8 +20,8 @@ class FakeStreamMessageReader : StreamMessageReader {
     private val failed = ConcurrentHashMap<Pair<String, String>, String>()
     private val chunkStartOffsets = ConcurrentHashMap<Pair<String, String>, Long>()
 
-    /** Recorded calls in format "vhost/stream:start:pageSize". */
-    val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
+    /** Recorded calls in format "vhost/stream:start:pageSize". Safe to read while calls are being recorded: iterating it works on a snapshot and never throws. */
+    val calls: MutableList<String> = CopyOnWriteArrayList()
 
     fun addMessage(
         vhost: String = "/",

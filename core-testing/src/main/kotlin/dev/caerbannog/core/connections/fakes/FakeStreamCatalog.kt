@@ -14,6 +14,7 @@ import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.Visibility
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * M2-03 part 2 test double for [StreamCatalog]. Lives in `core-testing`, shared by the `core` and `acceptance-tests`
@@ -57,8 +58,11 @@ class FakeStreamCatalog : StreamCatalog {
     /** True: every call answers [CatalogResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
-    /** Names of the calls in order: "listStreams", "streamDetail", "publishers", "publisherCounts", "consumers", "superStreams", "capabilities". */
-    val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
+    /**
+     * Names of the calls in order: "listStreams", "streamDetail", "publishers", "publisherCounts", "consumers", "superStreams", "capabilities".
+     * Safe to read while calls are being recorded: iterating it (count, filter, a loop) works on a snapshot and never throws.
+     */
+    val calls: MutableList<String> = CopyOnWriteArrayList()
 
     private val holds = ConcurrentHashMap<String, CallGate>()
     private val pageFailures = ConcurrentHashMap<Int, CatalogResult.Failure>()
