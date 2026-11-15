@@ -44,6 +44,7 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,7 +54,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
@@ -559,44 +563,48 @@ internal fun LastOffset(state: StreamClientsState) {
 private fun ClientsSections(state: StreamClientsState, loading: Boolean, events: StreamClientsEvents) {
     val listState = rememberLazyListState()
     val scrolls = rememberClientsScrollStates()
+    // The hint popup of an "i" is drawn inside the rows, so this list clips it; the popups need the viewport to stay whole (M2-17d).
+    val viewport = remember { mutableStateOf<Rect?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val contentWidth = maxWidth - ClientsHorizontalPadding * 2
         // One container for the whole list: mouse selection works in the rows, the other items opt out with DisableSelection.
-        SelectionContainer {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(horizontal = ClientsHorizontalPadding, vertical = 16.dp),
-            ) {
-                state.banner?.let { banner ->
-                    item(key = "banner") { Box(Modifier.padding(bottom = 16.dp)) { DisableSelection { LostConnectionBanner(banner, StreamListTexts.RETRY, events::retry, tag = "clientsBanner") } } }
-                }
-                state.ownConnectionsNotice?.let { notice ->
-                    item(key = "notice") {
-                        Box(Modifier.padding(bottom = 16.dp)) {
-                            DisableSelection {
-                                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        ConnectionIcon(AppIcon.Info, SmallIconSize)
-                                        Text(notice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("ownConnectionsNotice"))
+        CompositionLocalProvider(LocalHintViewport provides viewport) {
+            SelectionContainer {
+                LazyColumn(
+                    Modifier.fillMaxSize().onGloballyPositioned { viewport.value = it.boundsInRoot() },
+                    state = listState,
+                    contentPadding = PaddingValues(horizontal = ClientsHorizontalPadding, vertical = 16.dp),
+                ) {
+                    state.banner?.let { banner ->
+                        item(key = "banner") { Box(Modifier.padding(bottom = 16.dp)) { DisableSelection { LostConnectionBanner(banner, StreamListTexts.RETRY, events::retry, tag = "clientsBanner") } } }
+                    }
+                    state.ownConnectionsNotice?.let { notice ->
+                        item(key = "notice") {
+                            Box(Modifier.padding(bottom = 16.dp)) {
+                                DisableSelection {
+                                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            ConnectionIcon(AppIcon.Info, SmallIconSize)
+                                            Text(notice, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("ownConnectionsNotice"))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                val stale = state.stale && !loading
-                publishersSection(if (loading) null else state.publishers, stale, state, contentWidth, scrolls.publishers)
-                consumersSection(if (loading) null else state.consumers, stale, state, contentWidth, scrolls.consumers)
-                if (!loading) {
-                    item(key = "footnote") {
-                        DisableSelection {
-                            Text(
-                                StreamClientsTexts.FOOTNOTE,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.testTag("clientsFootnote"),
-                            )
+                    val stale = state.stale && !loading
+                    publishersSection(if (loading) null else state.publishers, stale, state, contentWidth, scrolls.publishers)
+                    consumersSection(if (loading) null else state.consumers, stale, state, contentWidth, scrolls.consumers)
+                    if (!loading) {
+                        item(key = "footnote") {
+                            DisableSelection {
+                                Text(
+                                    StreamClientsTexts.FOOTNOTE,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.testTag("clientsFootnote"),
+                                )
+                            }
                         }
                     }
                 }
