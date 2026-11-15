@@ -31,7 +31,8 @@ import javax.net.ssl.SSLContext
  * `java.io.IOException: HTTP/1.1 header parser received no bytes`. The JDK retries a failed GET exactly once, on the next pooled connection; a
  * client that holds two or more idle connections (two screens polling, a click next to a tick) meets a second dead one, [ManagementHttp] answers
  * [ManagementReply.Unreachable], and the view models turn that into D2 "Connection lost" for good (no retry, the rows go stale until the user
- * reconnects). With `-Djdk.httpclient.keepalive.timeout=2` the live test passed 30 of 30 (without it 10 of 30 failed).
+ * reconnects). The 10 of 30 above was not reproduced in the M2-16 verification (the same shape passed 12 of 12 on the code before the fix), so this
+ * class, on real sockets, is the proof of the retry.
  *
  * No Docker: a hand-rolled keep-alive HTTP/1.1 server (over TLS like the broker's management port, and plain) drops the request that arrives on a
  * connection it has already served once, without a word, which is what the client saw. The first test is the regression test for the fix chosen
