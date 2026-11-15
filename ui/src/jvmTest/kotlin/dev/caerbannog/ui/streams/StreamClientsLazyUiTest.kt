@@ -70,9 +70,12 @@ class StreamClientsLazyUiTest {
         const val HEIGHT = 800
     }
 
-    /** Every third row is Behind (has the "i"), the last row is Behind too, so it can be scrolled to and focused. */
-    private fun rows(n: Int = ROWS, offset: String = "100"): List<ConsumerRowState> = (0 until n).map { i ->
-        val behind = i % 3 == 0 || i == n - 1
+    /**
+     * Every third row is Behind (has the "i"), the last row is Behind too, so it can be scrolled to and focused.
+     * With [everyRowBehind] every row is Behind, the common case on a stream where an application stores offsets (M2-17d).
+     */
+    private fun rows(n: Int = ROWS, offset: String = "100", everyRowBehind: Boolean = false): List<ConsumerRowState> = (0 until n).map { i ->
+        val behind = everyRowBehind || i % 3 == 0 || i == n - 1
         consumer(
             "c$i", "c$i", offset = offset, behind = if (behind) "${100 + i}" else "0",
             status = if (behind) ConsumerStatus.Behind(100L + i) else ConsumerStatus.CaughtUp,
@@ -226,6 +229,67 @@ class StreamClientsLazyUiTest {
             waitForIdle()
         }
         assertTrue(problems.isEmpty(), "The hint popup is not usable in a long list:\n" + problems.joinToString("\n"))
+    }
+
+    /** Consumer rows fully inside the list viewport, top to bottom (all rows, Behind or not). */
+    private fun DesktopComposeUiTest.fullyVisibleRows(): List<String> {
+        val view = list().fetchSemanticsNode().boundsInRoot
+        return names().filter { bounds("consumerCell:$it:Name").let { b -> b.top >= view.top + 1 && b.bottom <= view.bottom - 1 } }
+            .sortedBy { bounds("consumerCell:$it:Name").top }
+    }
+
+    // --- 4b (M2-17d) --------------------------------------------------------------------------------------------------------
+
+    /**
+     * M2-17d probe: with EVERY row Behind, the bottom-most fully visible row has the "i" too, and the viewport has little room below
+     * it (the 16 dp content padding). The popup opens beside the "i", top aligned, going down, and the lazy list clips at its viewport,
+     * so the popup must fit anyway: the rule of [popupProblems], plus the real layout rect of the dark surface inside the viewport.
+     *
+     * Why the extra rect: `boundsInRoot` of a node is already cut by the clip of its parents, so the "leaves the list viewport" line of
+     * [popupProblems] cannot fire for a clipped popup (only its "too small" line does, and only while less than 20 px stay visible).
+     * The unclipped rect is `positionInRoot` + `size`; `statusHintPopup:<key>` sits on the text inside the padding, so the surface is that
+     * rect plus [HintPopupPadding] on every side.
+     */
+    @Test
+    fun `with every row Behind the hint popup of the bottom-most fully visible row is whole inside the list viewport, at the top and in the middle`() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+        clientsScreen(content(consumers = rows(everyRowBehind = true)))
+        waitForIdle()
+        val problems = mutableListOf<String>()
+        val facts = mutableListOf<String>()
+        for ((place, scroll) in listOf<Pair<String, DesktopComposeUiTest.() -> Unit>>(
+            "top" to { scrollToTop() },
+            "middle" to { list().performScrollToIndex(ROWS / 2); waitForIdle() },
+        )) {
+            scroll()
+            val view = list().fetchSemanticsNode().boundsInRoot
+            val without = image()
+            val visible = fullyVisibleRows()
+            val behind = visibleBehindRows()
+            assertTrue(visible.size >= 4, "$place: at least four fully visible rows expected, got $visible")
+            assertEquals(visible, behind, "$place: with every row Behind, every fully visible row must carry the i")
+            if (place == "middle") assertTrue(visible.first() != "c0" && visible.last() != "c${ROWS - 1}", "$place: scrolled into the middle of the list, got $visible")
+            val key = behind.last()
+            // Precondition that must not fail silently: this IS the bottom-most fully visible row, nothing fully visible is below it.
+            val rowBottom = bounds("consumerCell:$key:Name").bottom
+            assertTrue(visible.all { bounds("consumerCell:$it:Name").bottom <= rowBottom + 0.5f }, "$place: $key is not the bottom-most fully visible row: $visible")
+            assertTrue(view.bottom - rowBottom < 40f, "$place: expected little room below the bottom-most fully visible row ($key), got ${view.bottom - rowBottom} px below it in $view")
+
+            problems += popupProblems("$place bottom-most", key, without)
+            val node = onNodeWithTag("statusHintPopup:$key", useUnmergedTree = true).fetchSemanticsNode()
+            val text = Rect(node.positionInRoot, androidx.compose.ui.geometry.Size(node.size.width.toFloat(), node.size.height.toFloat()))
+            val pad = HintPopupPadding.value // the test density is 1, so dp and px are the same
+            val surface = Rect(text.left - pad, text.top - pad, text.right + pad, text.bottom + pad)
+            facts += "$place: row $key (${visible.indexOf(key) + 1} of ${visible.size} fully visible), row bottom $rowBottom, viewport $view, clipped popup text ${node.boundsInRoot}, " +
+                "unclipped popup text $text, surface $surface, surface overflow below viewport ${surface.bottom - view.bottom} px"
+            val out = listOf("below" to surface.bottom - view.bottom, "above" to view.top - surface.top, "right" to surface.right - view.right, "left" to view.left - surface.left).filter { it.second > 0f }
+            if (out.isNotEmpty()) {
+                problems += "$place bottom-most ($key): the popup surface $surface leaves the list viewport $view (clipped): " + out.joinToString { "${it.second} px ${it.first}" }
+            }
+            onRoot().performKeyInput { keyDown(Key.Escape); keyUp(Key.Escape) }
+            waitForIdle()
+        }
+        println("M2-17d probe facts:\n" + facts.joinToString("\n"))
+        assertTrue(problems.isEmpty(), "The hint popup of the bottom-most fully visible Behind row is not whole in a long list:\n" + problems.joinToString("\n"))
     }
 
     // --- 5 ------------------------------------------------------------------------------------------------------------------
