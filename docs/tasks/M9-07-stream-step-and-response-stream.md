@@ -52,3 +52,5 @@ None (owner decision 2026-11-15).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+Note (architect, M9-06 step 5, 2026-11-16, follow-up F1): after a check at 1280 x 800 the two-line check banner (summary plus caveat, about 60 px) shortens the review graph box for a 3-step plan so it draws a scrollbar, against the M9-04 F4 intent (a small plan readable at 1280). M9-07 is the next task to touch the planner screen: make the banner take less height (for example the caveat on the same line when it fits, or the banner beside the step list header) or let the graph box take the remaining height, and extend `PlanReviewGraphRound2UiTest` with a checked 3-step plan at 1280 x 800 (no scrollbar). Do not shorten or reword the caveat text without the owner (item 1 of the M9-06 Owner review list). Also look at the stacked layout gap above the review card (item 10).
