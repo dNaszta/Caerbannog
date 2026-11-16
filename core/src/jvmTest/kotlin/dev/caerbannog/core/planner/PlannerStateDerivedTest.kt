@@ -25,8 +25,8 @@ class PlannerStateDerivedTest {
     fun close() = closers.forEach { it() }
 
     /** [reopen]: start the view model again after [prepare] (what a restart or a rebuilt window does); not for a test about the session itself. */
-    private fun rig(context: PlannerContext = PlannerContext(), reopen: Boolean = true, prepare: PlannerRig.() -> Unit = {}): PlannerRig =
-        PlannerRig(context = context).also { closers += it::close; it.prepare(); if (reopen) it.restart() }
+    private fun rig(context: PlannerContext = PlannerContext(), reopen: Boolean = true, reader: KnownTopologyReader? = null, prepare: PlannerRig.() -> Unit = {}): PlannerRig =
+        PlannerRig(context = context, reader = reader).also { closers += it::close; it.prepare(); if (reopen) it.restart() }
 
     private val sample = MigrationAction.DeclareQueue("orders")
     private val reason3x = "This broker runs RabbitMQ 3.x: it is a migration source only"
@@ -237,7 +237,8 @@ class PlannerStateDerivedTest {
     @Test
     fun `the binding form offers the exchanges and destinations of this plan first, then the broker, and asks the routing key`() {
         val known = KnownTopology(exchanges = mapOf("amq.topic" to "topic"), queues = setOf("audit"))
-        val r = rig(PlannerContext(known = known)) { queue("orders"); exchange("events") }
+        // M9-04: the broker's names come from the reader (the one read), no longer from the context.
+        val r = rig(reader = dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader(known)) { queue("orders"); exchange("events") }
         r.vm.openWizard(); r.vm.chooseKind("Binding")
         val details = assertIs<WizardState.Details>(r.state.wizard)
         assertEquals(

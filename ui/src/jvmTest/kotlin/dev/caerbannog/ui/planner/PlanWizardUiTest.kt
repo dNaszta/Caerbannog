@@ -40,7 +40,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class PlanWizardUiTest {
 
-    private fun rig(context: PlannerContext = PlannerContext(), prepare: UiRig.() -> Unit = {}) = UiRig(context = context, prepare = prepare)
+    private fun rig(context: PlannerContext = PlannerContext(), reader: dev.caerbannog.core.planner.KnownTopologyReader? = null, prepare: UiRig.() -> Unit = {}) = UiRig(context = context, reader = reader, prepare = prepare)
 
     private fun DesktopComposeUiTest.open(r: UiRig) {
         showPlanner(r)
@@ -300,7 +300,8 @@ class PlanWizardUiTest {
     @Test
     fun `the suggestions list this plan first and then the broker, and choosing one fills the field`() = runDesktopComposeUiTest(1280, 800) {
         val known = KnownTopology(exchanges = mapOf("amq.topic" to "topic"), queues = setOf("audit"))
-        val r = rig(PlannerContext(known = known)) { queue("orders"); exchange("events") }
+        // M9-04: the broker's names come from the reader, no longer from the context.
+        val r = rig(reader = dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader(known)) { queue("orders"); exchange("events") }
         toForm(r, "Binding")
         node("planForm:suggestionsBtn:exchange").performClick()
         assertDrawn("planForm:suggestion:exchange:events")

@@ -23,6 +23,8 @@ internal class PlannerRig(
     var context: PlannerContext = PlannerContext(),
     val store: FakePlanDraftStore = FakePlanDraftStore(),
     val settings: FakeAppSettings = FakeAppSettings(),
+    /** M9-04: the one read of the broker's names; null is no connection (or a connection with no planner). */
+    val reader: KnownTopologyReader? = null,
 ) {
     val folders = FakeMigrationFolders(folderPath)
     val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
@@ -31,7 +33,7 @@ internal class PlannerRig(
     var vm: PlannerViewModel = build()
     val state: PlannerState get() = vm.state.value
 
-    private fun build() = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0)
+    private fun build() = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
 
     /** The app is closed and opened again, or the window rebuilt the view model for a changed [context]. */
     fun restart(newContext: PlannerContext = context): PlannerViewModel {

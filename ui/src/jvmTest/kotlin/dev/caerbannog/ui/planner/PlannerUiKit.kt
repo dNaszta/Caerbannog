@@ -12,12 +12,15 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolder
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
+import dev.caerbannog.core.planner.KnownTopologyReader
 import dev.caerbannog.core.planner.NamingStyle
+import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerViewModel
@@ -43,6 +46,9 @@ import kotlinx.coroutines.cancel
  *    `planner:namingOption:<NamingStyle name>`, `planner:description` (editable), `planner:vhost`, `planner:draftPill`, `planner:saveReason`
  *    (the reason of a disabled Save, drawn only while it is disabled), `planner:banner` (title and detail), `planner:error` (errorMessage and
  *    errorDetail), `planner:emptyState`, `planner:reviewEmpty`, `planner:reviewCard`, `planner:jsonView`, `planner:jsonCopyBtn`,
+ *    (M9-04) `planner:reviewGraph`, `planner:graphNotice`, `planner:reviewViewSwitch` with the options `planner:reviewViewSwitch:Graph` and
+ *    `planner:reviewViewSwitch:Json` (radio, `selected` semantics), graph nodes `planGraphNode:<id>` (id `e:<name>` or `q:<name>`, content
+ *    description = the accessible name) and `planGraphNew:<id>` (the "new" pill of a node, or of an edge: `planGraphNew:edge-<i>`); `planGraphNotInPlan:<id>` (the words "not in this plan" on a node that is);
  *    `planner:stepList` (the lazy list), `planner:wholePlanProblem:<i>`, `planner:question` (+ `planner:questionConfirmBtn`, `planner:questionCancelBtn`),
  *    banner buttons `planner:retryDraftBtn`, `planner:startNewPlanBtn`, `planner:chooseFolderBtn`.
  *  - step list (0-based index): `planStep:<i>` (row: title and detail as merged text, focusable), `planStepMenu:<i>` (the "more" button) with the
@@ -60,13 +66,15 @@ internal class UiRig(
     latest: String? = "0004",
     context: PlannerContext = PlannerContext(),
     val store: FakePlanDraftStore = FakePlanDraftStore(),
+    /** M9-04: the broker's names; null is no connection (the graph says only the plan is drawn). */
+    val reader: KnownTopologyReader? = null,
     prepare: UiRig.() -> Unit = {},
 ) {
     val folders = FakeMigrationFolders(folderPath)
     val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
     val settings = FakeAppSettings()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-    private var current: PlannerViewModel = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0)
+    private var current: PlannerViewModel = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
     val vm: PlannerViewModel get() = current
     val events = RecordedPlannerEvents { current }
     val state: PlannerState get() = current.state.value
@@ -74,7 +82,7 @@ internal class UiRig(
     init {
         prepare()
         // The window rebuilds the view model from the draft file; the screen then starts from what was saved.
-        current = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0)
+        current = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
     }
 
     fun close() = scope.cancel()
@@ -131,6 +139,7 @@ internal class RecordedPlannerEvents(private val vm: () -> PlannerViewModel) : P
     override fun cancelQuestion() = vm().cancelQuestion().also("cancelQuestion")
     override fun retryDraft() = vm().retryDraft().also("retryDraft")
     override fun flush() = vm().flush().also("flush")
+    override fun selectReviewView(view: ReviewView) = vm().selectReviewView(view).also("selectReviewView:$view")
 }
 
 /** The planner screen over [rig]; [onNavigate] receives the drawer and the app bar's navigation. */
@@ -174,4 +183,10 @@ internal fun DesktopComposeUiTest.assertNotDrawn(tag: String) = node(tag).assert
 internal fun DesktopComposeUiTest.isEditable(tag: String): Boolean {
     val c = node(tag).fetchSemanticsNode().config
     return c.getOrNull(SemanticsActions.SetText) != null || c.getOrNull(SemanticsProperties.EditableText) != null
+}
+
+/** The review card shows the graph first (M9-04); the JSON text is behind the switch. */
+internal fun DesktopComposeUiTest.showJson() {
+    node("planner:reviewViewSwitch:Json").performClick()
+    waitForIdle()
 }
