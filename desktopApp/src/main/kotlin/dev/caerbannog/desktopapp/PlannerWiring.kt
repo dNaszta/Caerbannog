@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.FolderOpener
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.KnownTopologyReader
@@ -11,6 +12,7 @@ import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.SavedPlan
 import dev.caerbannog.core.planner.StepForm
 import dev.caerbannog.core.streams.CatalogResult
+import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.streams.StreamListRequest
 import dev.caerbannog.core.topology.TopologyCatalog
@@ -117,7 +119,18 @@ fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: Corou
         context = plannerContextOf(inputs),
         scope = scope,
         reader = knownTopologyReaderOf(inputs),
+        declareCheck = inputs.declareCheck,
+        // The summary says when the check ran; the view model's own default clock is for tests and always says 0.
+        clock = RefreshClock { System.currentTimeMillis() },
     )
+
+/**
+ * What the planner window keys its view model on: the context AND the check port. A reconnect to the same profile has the same context
+ * but a new port, and a view model keyed on the context alone would keep the port of the closed connection.
+ */
+data class PlannerKey(val context: PlannerContext, val declareCheck: DeclareCheck?)
+
+fun plannerKeyOf(inputs: MigrationsInputs): PlannerKey = PlannerKey(plannerContextOf(inputs), inputs.declareCheck)
 
 /**
  * Follows [viewModel] for the navigation: a saved plan closes the planner and opens Migrations with that version waiting; a confirmed
@@ -171,5 +184,6 @@ class PlannerEventsAdapter(
     override fun cancelQuestion() = viewModel.cancelQuestion()
     override fun retryDraft() = viewModel.retryDraft()
     override fun flush() = viewModel.flush()
+    override fun check() = viewModel.check()
     override fun showFolder(path: String) = folderOpener.show(path)
 }

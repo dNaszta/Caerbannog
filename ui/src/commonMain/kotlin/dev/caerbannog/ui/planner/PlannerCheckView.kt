@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -57,8 +59,8 @@ internal fun CheckBanner(state: PlannerState, events: PlannerEvents) {
         is CheckState.Done -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BannerRow(
                 icon = AppIcon.FactCheck,
-                container = MaterialTheme.colorScheme.tertiaryContainer,
-                content = MaterialTheme.colorScheme.onTertiaryContainer,
+                container = MaterialTheme.colorScheme.surfaceVariant,
+                content = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("planner:checkSummary"),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -101,7 +103,7 @@ private fun BannerRow(
     ) {
         ConnectionIcon(icon, IconSize, tint = content)
         Row(Modifier.weight(1f)) {
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides content) { text() }
+            CompositionLocalProvider(LocalContentColor provides content) { text() }
         }
         trailing()
     }
