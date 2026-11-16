@@ -31,3 +31,5 @@ None, same reason as `M9-05` (owner decision 2026-11-15, no MCP for the planner)
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated.
+
+Note (architect, M9-05 step 5, 2026-11-16): while measuring, also record what a real GET answers for the names `.` and `..` (the fake says Absent; the app never sends them, M9-01 refuses them) so the fake and the check stay honest. Not a scope widening: one line in the spike log.
