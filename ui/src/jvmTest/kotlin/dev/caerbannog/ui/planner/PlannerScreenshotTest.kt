@@ -62,7 +62,7 @@ class PlannerScreenshotTest {
         node("planner:addStepBtn").performClick(); node("planWizard:next").performClick(); node("planForm:name").performTextInput("orders")
         node("planWizard:next").performClick()
     }
-    @Test fun `06 naming menu`() = shot("06-naming", UiRig { queue("orders") }) { node("planner:namingChip").performClick() }
+    @Test fun `06 naming menu`() = shot("06-naming", UiRig { queue("orders") }, dialog = true) { node("planner:namingChip").performClick() }
     @Test fun `07 problem and note in the step list`() = shot("07-problems", UiRig { binding("events", "orders", "k"); queue("orders"); queue("orders"); exchange("events") })
     @Test fun `10 save failed`() = shot("10-save-failed", UiRig { queue("orders"); folder.failWrite(1) }) { node("planner:saveBtn").performClick() }
     @Test fun `11 dismiss question`() = shot("11-dismiss", UiRig { threeSteps() }, dialog = true) { node("planner:dismissBtn").performClick() }
