@@ -14,7 +14,7 @@ import io.ktor.client.HttpClient
  * Every failure (401, 403, 5xx, silence, a refusal, a name that cannot be a request) is [BrokerFinding.Unreadable] with a fixed text of
  * [ExecutorReasons]; the broker's body and exception text never reach a result.
  */
-internal class ManagementDeclareCheck(private val reader: ResourceReader) : DeclareCheck {
+class ManagementDeclareCheck internal constructor(private val reader: ResourceReader) : DeclareCheck {
 
     override suspend fun find(action: MigrationAction): BrokerFinding {
         val reply = try {
