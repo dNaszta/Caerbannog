@@ -110,10 +110,10 @@ Feature: Check a plan against the broker
 
   @m9-05 @negative @fake-broker
   Scenario: A plan for another virtual host is blocked and nothing is read from that virtual host
-    Given a plan for the virtual host "/orders" that declares the quorum queue "invoices"
+    Given a plan for the virtual host "orders" that declares the quorum queue "invoices"
     When I check the plan against "uat-eu"
-    Then the step shows "Blocked" with the reason "The action belongs to virtual host /orders; this connection is for /"
-    And no request for the virtual host "/orders" was sent
+    Then the step shows "Blocked" with the reason "The action belongs to virtual host orders; this connection is for /"
+    And no request for the virtual host "orders" was sent
 
   @m9-05 @negative @fake-broker
   Scenario: A delete in an opened file needs Full control
