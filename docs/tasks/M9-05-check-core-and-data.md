@@ -70,6 +70,7 @@ None in this task (results are drawn by `M9-06`; wording in `docs/ux/Planner.dc.
 None. Owner decision 2026-11-15 ("no MCP"). The check is read-only, so a tool would not break a safety rule; offering one later is a new owner decision (spec "Topology planner (M9)", "MCP evaluation").
 
 ## Open points
+- Follow-up from the M9-04 review (architect, 2026-11-16), small and unrelated to the check, do it in the first commit that touches `PlanReviewCard`: (F4) at 1280 px a small exchange-to-queue plan overflows the side-by-side card; raise `SIDE_BY_SIDE_FROM` in `PlannerScreen.kt` (900 dp, suggest about 1400 dp) after the owner agrees (item 11 of the M9-04 owner review list), and check the `PlanReviewGraphRound2UiTest` fit test at 1280. (F5) in `PlannerViewModel.syncKnown`, a reader that throws `CancellationException` while the scope lives leaves `knownPending` true; clear it in a `finally`-like path (answer `null` unless the scope itself is cancelled) and add a core test.
 - S-G decides the argument rule. Until it is measured the build stops after the first commit and the port with `FakeDeclareCheck`.
 - Q14 (wording of the results, decided 2026-11-15 as written) is used by `M9-06`; the core types carry no wording.
 - A broker that changes between check and apply: the apply keeps its own conflict rule; nothing to build.
