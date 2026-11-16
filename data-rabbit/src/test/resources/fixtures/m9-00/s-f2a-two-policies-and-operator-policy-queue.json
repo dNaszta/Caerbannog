@@ -1,0 +1,17 @@
+{
+  "arguments": {
+    "x-queue-type": "quorum"
+  },
+  "auto_delete": false,
+  "durable": true,
+  "effective_policy_definition": {
+    "max-length": 5,
+    "message-ttl": 60000
+  },
+  "exclusive": false,
+  "name": "fx-f2a",
+  "operator_policy": "fx-op",
+  "policy": "fx-hi",
+  "type": "quorum",
+  "vhost": "/"
+}

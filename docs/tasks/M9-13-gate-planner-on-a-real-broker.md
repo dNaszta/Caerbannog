@@ -31,7 +31,7 @@ Out: mutation runs beyond two (as `M8-11`); the UI; a cluster.
 - At most two live mutation runs: the policy placed before the exchange (the dead-letter count must fail or the check must show it), and a wrong translation of `+` (the MQTT count must fail).
 
 ## Design notes
-Bounded polling everywhere, no sleep; the statistics lag up to 5 s. Clean up: the container is the clean-up. The gate uses facts of the three spikes; if a spike left an item unmeasured the gate does not rely on it. At-least-once and a stream as dead-letter target are not in the gate (they are optional parts of `M9-09`).
+Bounded polling everywhere, no sleep; the statistics lag up to 5 s. Clean up: the container is the clean-up. A policy shows on a queue about 6 seconds after the `PUT` (M9-00c, all queue types): any wait for `policy` or `effective_policy_definition` is a bounded poll of up to 90 seconds, never a fixed delay; and a gate policy must hold only keys its target honours (a policy with one ignored key binds to nothing). The gate uses facts of the three spikes; if a spike left an item unmeasured the gate does not rely on it. At-least-once and a stream as dead-letter target are not in the gate (they are optional parts of `M9-09`).
 
 ## UX
 None.
