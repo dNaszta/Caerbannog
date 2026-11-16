@@ -1,0 +1,1 @@
+{"arguments":{"x-super-stream":true},"auto_delete":false,"durable":true,"internal":false,"name":"orders","type":"direct","user_who_performed_action":"rmq-cli","vhost":"m914-e5a-556811b7"}

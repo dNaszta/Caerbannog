@@ -1,0 +1,1 @@
+[{"vhost":"m914-e6-2f939df3","name":"e6-op","pattern":"^e6-","apply-to":"queues","definition":{"max-length":100000},"priority":3}]

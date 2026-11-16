@@ -147,12 +147,19 @@ class RealBrokerM5MigrationTest {
         // broker A is the shared container; broker B is a second, empty one
         api.put("/api/vhosts/$vhost", "{}"); track("/api/vhosts/$vhost")
         api.put("/api/permissions/$vhost/guest", """{"configure":".*","write":".*","read":".*"}""")
-        assertTrue(api.put("/api/queues/$vhost/$queue", """{"durable":true,"arguments":{"x-queue-type":"quorum"}}""").ok)
+        // M9-14: the gate topology now has a queue with typed arguments, a headers binding with typed arguments and a policy (the thorough
+        // round trip, with streams, a super stream, flags and an operator policy, is RealBrokerM9ExportSpikeTest "E7")
+        assertTrue(api.put("/api/queues/$vhost/$queue", """{"durable":true,"arguments":{"x-queue-type":"quorum","x-delivery-limit":5,"x-dead-letter-exchange":"$target"}}""").ok)
         assertTrue(api.put("/api/queues/$vhost/$classic", """{"durable":true,"arguments":{"x-queue-type":"classic"}}""").ok)
         assertTrue(api.put("/api/exchanges/$vhost/$exchange", """{"type":"topic","durable":true}""").ok)
         assertTrue(api.put("/api/exchanges/$vhost/$target", """{"type":"fanout","durable":true,"internal":false}""").ok)
         assertTrue(api.post("/api/bindings/$vhost/e/$exchange/q/$queue", """{"routing_key":"order.created"}""").ok)
         assertTrue(api.post("/api/bindings/$vhost/e/$exchange/e/$target", """{"routing_key":"dead"}""").ok)
+        val headers = unique("hdr")
+        assertTrue(api.put("/api/exchanges/$vhost/$headers", """{"type":"headers","durable":true}""").ok)
+        assertTrue(api.post("/api/bindings/$vhost/e/$headers/q/$classic", """{"routing_key":"","arguments":{"x-match":"all","region":"eu","level":3,"urgent":true}}""").ok)
+        val policy = unique("limits")
+        assertTrue(api.put("/api/policies/$vhost/$policy", """{"pattern":"^never-matches-$run$","apply-to":"queues","priority":7,"definition":{"max-length":5000}}""").ok)
 
         val clientA = TlsSupport.buildHttpClient(BrokerTransport.Plain, 10_000)
         val httpA = ManagementHttp(clientA, container.adminUsername, container.adminPassword).also { toClose += it }
@@ -175,14 +182,15 @@ class RealBrokerM5MigrationTest {
             assertEquals(MigrationApplyResult.Success(listOf(exported.version)), result)
 
             fun shape(a: MgmtApi): Set<String> = buildSet {
-                a.get("/api/queues/$vhost").arr.forEach { q -> q.jsonObject.let { add("queue ${it["name"]!!.jsonPrimitive.content} ${it["type"]!!.jsonPrimitive.content} ${it["durable"]!!.jsonPrimitive.content}") } }
+                a.get("/api/queues/$vhost").arr.forEach { q -> q.jsonObject.let { add("queue ${it["name"]!!.jsonPrimitive.content} ${it["type"]!!.jsonPrimitive.content} ${it["durable"]!!.jsonPrimitive.content} ${it["arguments"]}") } }
                 a.get("/api/exchanges/$vhost").arr.map { it.jsonObject }.filter { it["name"]!!.jsonPrimitive.content.let { n -> n.isNotEmpty() && !n.startsWith("amq.") } }
                     .forEach { add("exchange ${it["name"]!!.jsonPrimitive.content} ${it["type"]!!.jsonPrimitive.content} ${it["durable"]!!.jsonPrimitive.content}") }
                 a.get("/api/bindings/$vhost").arr.map { it.jsonObject }.filter { it["source"]!!.jsonPrimitive.content.isNotEmpty() }
-                    .forEach { add("binding ${it["source"]!!.jsonPrimitive.content} ${it["destination_type"]!!.jsonPrimitive.content} ${it["destination"]!!.jsonPrimitive.content} ${it["routing_key"]!!.jsonPrimitive.content}") }
+                    .forEach { add("binding ${it["source"]!!.jsonPrimitive.content} ${it["destination_type"]!!.jsonPrimitive.content} ${it["destination"]!!.jsonPrimitive.content} ${it["routing_key"]!!.jsonPrimitive.content} ${it["arguments"]}") }
+                a.get("/api/policies/$vhost").arr.forEach { p -> p.jsonObject.let { add("policy ${it["name"]!!.jsonPrimitive.content} ${it["pattern"]} ${it["apply-to"]} ${it["priority"]} ${it["definition"]}") } }
             }
-            assertEquals(shape(api), shape(apiB), "B must have the same queues, exchanges and bindings as A")
-            assertEquals(6, shape(apiB).size)
+            assertEquals(shape(api), shape(apiB), "B must have the same queues (with arguments), exchanges, bindings (with arguments) and policies as A")
+            assertEquals(9, shape(apiB).size)
         }
     }
 

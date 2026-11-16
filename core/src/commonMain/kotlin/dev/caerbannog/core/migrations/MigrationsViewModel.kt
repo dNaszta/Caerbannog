@@ -2,9 +2,6 @@ package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.streams.CatalogResult
-import dev.caerbannog.core.topology.BindingRow
-import dev.caerbannog.core.topology.ExchangeRow
-import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +39,8 @@ data class MigrationsScreenState(
     val applyOutcome: ApplyOutcome? = null,
     /** Why this connection cannot apply migrations (for example a 3.x broker), or null. */
     val unavailableReason: String? = null,
+    /** M9-14: the one line under the export result naming what the last export left out; null when nothing was, cleared by the next export. */
+    val exportNote: String? = null,
 ) {
     /** True when a folder is chosen and exists, so "Show folder" has something to open; decided by the typed problem, never by text. */
     val canShowFolder: Boolean
@@ -290,79 +289,37 @@ class MigrationsViewModel(
             refuseWrite()
             return null
         }
-        val actions = readTopologyActions()
-        if (actions == null) {
-            _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ) }
+        val export = readTopologyExport()
+        if (export == null) {
+            _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ, exportNote = null) }
             return null
         }
         val exported = try {
             repository.exportTopology(
                 version = repository.nextVersion(),
                 description = "Exported broker topology",
-                actions = actions,
+                actions = export.actions,
             )
         } catch (_: MigrationWriteException) {
-            _state.update { it.copy(errorMessage = FILE_NOT_WRITTEN) }
+            _state.update { it.copy(errorMessage = FILE_NOT_WRITTEN, exportNote = null) }
             return null
         }
+        _state.update { it.copy(exportNote = export.note) }
         loadMigrations()
         selectVersion(exported.version)
         return exported
     }
 
-    /** Every queue page, then the exchanges and the bindings; null as soon as one call fails. */
-    private suspend fun readTopologyActions(): List<MigrationAction>? {
-        val catalog = topologyCatalog ?: return emptyList()
-        val queues = allQueues(catalog) ?: return null
+    /** The queue and stream declarations, exchanges, bindings, policies and operator policies; null as soon as one read fails. */
+    private suspend fun readTopologyExport(): TopologyExportResult? {
+        val catalog = topologyCatalog ?: return TopologyExportResult(emptyList(), null)
+        val declarations = (catalog.queueDeclarations(vhost) as? CatalogResult.Success)?.value ?: return null
         val exchanges = (catalog.exchanges(vhost) as? CatalogResult.Success)?.value ?: return null
         val bindings = (catalog.bindings(vhost) as? CatalogResult.Success)?.value ?: return null
-        return queues.map(::queueAction) + exchanges.mapNotNull(::exchangeAction) + bindings.mapNotNull(::bindingAction)
+        val policies = (catalog.policies(vhost) as? CatalogResult.Success)?.value ?: return null
+        val operatorPolicies = (catalog.operatorPolicies(vhost) as? CatalogResult.Success)?.value ?: return null
+        return TopologyExport.actions(vhost, declarations, exchanges, bindings, policies, operatorPolicies)
     }
-
-    private suspend fun allQueues(catalog: TopologyCatalog): List<QueueRow>? {
-        val rows = mutableListOf<QueueRow>()
-        var page = 1
-        do {
-            val result = (catalog.queues(vhost, page) as? CatalogResult.Success)?.value ?: return null
-            rows += result.rows
-            page++
-        } while (result.page < result.pageCount)
-        return rows
-    }
-
-    private fun queueAction(row: QueueRow): MigrationAction =
-        if (row.type == "stream") {
-            MigrationAction.DeclareStream(name = row.name, vhost = vhost)
-        } else {
-            MigrationAction.DeclareQueue(name = row.name, type = row.type, vhost = vhost)
-        }
-
-    private fun exchangeAction(row: ExchangeRow): MigrationAction? =
-        if (row.name.isEmpty() || row.name.startsWith("amq.")) {
-            null
-        } else {
-            MigrationAction.DeclareExchange(
-                name = row.name,
-                type = row.type,
-                vhost = vhost,
-                durable = row.durable,
-                autoDelete = row.autoDelete,
-                internal = row.internal,
-            )
-        }
-
-    private fun bindingAction(row: BindingRow): MigrationAction? =
-        if (row.source.isEmpty() || row.destination.isEmpty()) {
-            null
-        } else {
-            MigrationAction.DeclareBinding(
-                exchange = row.source,
-                queue = row.destination,
-                routingKey = row.routingKey,
-                vhost = vhost,
-                destinationType = row.destinationType,
-            )
-        }
 
     private fun writableRepository(): MigrationFileRepository? = if (_state.value.isImportEnabled) currentRepository() else null
 

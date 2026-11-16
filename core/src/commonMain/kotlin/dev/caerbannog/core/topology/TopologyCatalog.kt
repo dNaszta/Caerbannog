@@ -31,6 +31,18 @@ interface TopologyCatalog {
     /** Every binding of [vhost] in one call, the implicit bindings of the default exchange included; the caller filters. */
     suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>>
 
+    /**
+     * M9-14: EVERY queue and stream of [vhost] with the flags and typed arguments the broker stores, for the topology export. Unpaged for the caller
+     * (the real catalog reads the pages itself and returns all of them or one failure, never a partial list). Streams are included, unlike [queues].
+     */
+    suspend fun queueDeclarations(vhost: String): CatalogResult<List<QueueDeclaration>>
+
+    /** M9-14: the policies of [vhost] (`GET /api/policies/{vhost}`); operator policies are NOT in it. */
+    suspend fun policies(vhost: String): CatalogResult<List<PolicyRow>>
+
+    /** M9-14: the operator policies of [vhost] (`GET /api/operator-policies/{vhost}`). */
+    suspend fun operatorPolicies(vhost: String): CatalogResult<List<PolicyRow>>
+
     /** One queue, [CatalogResult.NotFound] when it does not exist (any more) or is a stream. */
     suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow>
 
