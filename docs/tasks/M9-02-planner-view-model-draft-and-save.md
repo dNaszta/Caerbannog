@@ -76,6 +76,7 @@ None (owner decision 2026-11-15). The draft is in the app's own data and no tool
 - Q9 (decided 2026-11-15): the draft survives a restart, one draft at a time, Dismiss asks once when the plan has a step.
 - Q8, Q5 (decided 2026-11-15): the style is chosen in the planner and remembered per machine, the default is kebab-case.
 - Q11 (decided 2026-11-15): Apply happens on the Migrations screen; the view model only reports `SavedPlan`, where the screen goes is `M9-03`.
+- Note from the M9-01 review (architect, 2026-11-16): `TopologyPlan.append` hands out max id + 1, so after the last step is removed its id is given to the next appended step ("never repeats a live id" is all M9-01 promises). The view model must not key a selection, an undo entry or an in-flight edit on a step id across a removal; clear or re-resolve them when a step is removed. Add a unit test for it in `PlannerViewModelWizardTest`. `PlanProblem.stepId` is `Int?`: null is a problem of the whole plan (the parser round trip), shown at the top of the list, not on a step.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
