@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.planner.CheckState
 import dev.caerbannog.core.planner.PlanStep
 import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerTexts
@@ -182,6 +183,8 @@ private fun StepRow(
     val blocking = all.filter { it.blocking }
     val notes = all.filterNot { it.blocking }
     val selected = state.selectedStepId == step.id
+    val result = state.stepCheck(step.id)
+    val stale = (state.check as? CheckState.Done)?.stale == true
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -230,12 +233,14 @@ private fun StepRow(
                         )
                     }
                 }
+                if (result != null) StepCheckReasons(index, result, stale)
                 if (notes.isNotEmpty()) {
                     Column(Modifier.testTag("planStepNote:$index"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         notes.forEach { NoteLine(it.message) }
                     }
                 }
             }
+            if (result != null) StepCheckPills(index, result, stale)
             StepMenu(index, step, isFirst = index == 0, isLast = isLast, events = events)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

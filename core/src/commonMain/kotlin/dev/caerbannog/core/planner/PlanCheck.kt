@@ -24,7 +24,21 @@ sealed interface StepFinding {
 }
 
 /** [blocked] is the dry-run reason of that action (null when nothing blocks it); [notes] are fixed sentences about the finding. */
-data class StepCheck(val stepId: Int, val finding: StepFinding, val blocked: String?, val notes: List<String> = emptyList())
+data class StepCheck(val stepId: Int, val finding: StepFinding, val blocked: String?, val notes: List<String> = emptyList()) {
+    /** The lines under the step: why it is blocked, what the finding says in a sentence, then the notes. Fixed texts only. */
+    val reasons: List<String>
+        get() = listOfNotNull(
+            blocked,
+            when (finding) {
+                is StepFinding.Missing -> finding.what
+                is StepFinding.NotChecked -> finding.reason
+                else -> null
+            },
+        ) + notes
+
+    /** True when the lines are a warning about the step (it would stop, or cannot run), not just information. */
+    val isProblem: Boolean get() = blocked != null || finding == StepFinding.Different || finding is StepFinding.Missing
+}
 
 sealed interface PlanCheckResult {
     /** Nothing was sent; [reason] is the connection's fixed reason. */

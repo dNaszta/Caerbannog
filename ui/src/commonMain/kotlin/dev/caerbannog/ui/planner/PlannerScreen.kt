@@ -151,10 +151,10 @@ private fun PlannerActions(state: PlannerState, events: PlannerEvents) {
     }
     val checkReason = state.checkDisabledReason
     val check: @Composable () -> Unit = {
-        OutlinedButton(onClick = {}, enabled = state.checkEnabled, modifier = Modifier.testTag("planner:checkBtn")) {
+        OutlinedButton(onClick = events::check, enabled = state.checkEnabled, modifier = Modifier.testTag("planner:checkBtn")) {
             ConnectionIcon(AppIcon.FactCheck, SmallIconSize)
             Spacer(Modifier.width(8.dp))
-            Text(PlannerTexts.CHECK_LABEL)
+            Text(state.checkLabel)
         }
     }
     if (checkReason != null && !state.checkEnabled) TooltipArea(tooltip = { ReasonTooltip(checkReason) }) { check() } else check()
@@ -202,6 +202,7 @@ private fun PlannerBody(
                 )
             }
         }
+        CheckBanner(state, events)
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             if (maxWidth >= SIDE_BY_SIDE_FROM) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {

@@ -134,11 +134,12 @@ object PlannerTexts {
     private val SUMMARY_ORDER: List<Pair<String, (StepFinding) -> Boolean>> = listOf(
         "will be created" to { f -> f == StepFinding.WillBeCreated },
         "already there" to { f -> f == StepFinding.AlreadyThere },
-        "will be deleted" to { f -> f == StepFinding.WillBeDeleted },
-        "already gone" to { f -> f == StepFinding.AlreadyGone },
         "exists with different settings" to { f -> f == StepFinding.Different },
         "needs something that is missing" to { f -> f is StepFinding.Missing },
         "could not be checked" to { f -> f is StepFinding.NotChecked },
+        // After the declare words, so the sentence of a plan without a delete step reads as in the mockup. Owner review item 3 may move them.
+        "will be deleted" to { f -> f == StepFinding.WillBeDeleted },
+        "already gone" to { f -> f == StepFinding.AlreadyGone },
     )
 
     fun draftCardSteps(steps: Int): String = "$steps ${plural(steps, "step")} \u00b7 not a migration yet"

@@ -39,6 +39,9 @@ interface PlannerEvents {
     fun cancelQuestion()
     fun retryDraft()
 
+    /** Reads the broker (only reads) and shows a result per step; the plan, the draft and Save are not touched. */
+    fun check()
+
     /** The screen is left: a description still waiting for its quiet time is written now. */
     fun flush()
 
