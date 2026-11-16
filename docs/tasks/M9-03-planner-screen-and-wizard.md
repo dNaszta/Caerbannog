@@ -47,6 +47,7 @@ None (UI of a capability that has no tool by owner decision 2026-11-15).
 - Q15 (decided 2026-11-15): the Topology screen stays read-only; the `@m9-03` outline in `09` ("Topology is changed with a plan, not on the Topology screen") is bound by this task's suite, which also selects feature `09` for `@M9` scenarios.
 - Q16 ("Edit steps" beside "Edit file", decided) belongs to `M9-12`.
 - The owner reviews the mockup before step 2 of this task (the revised Q3 and the sample-value test message are already confirmed, O14).
+- Note from the M9-01 review (architect, 2026-11-16): (1) a `BindingForm` problem that comes from the parser is always on the field `exchange`, even when the destination caused it (the parser's reason does not say which); show a binding problem as one message of the page, not only under the exchange field. (2) `PlanValidation` also returns a non-blocking note ("The plan declares X twice with the same settings"); the mockup shows red problems only, so show a note in the neutral style and keep it out of the count in "Fix the N problems". (3) Two texts were not pinned by a scenario and are the developer's wording (`PlannerTexts.declaredTwice`, `queueAndStreamOfOneName`); the owner sees them at the mockup review.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
