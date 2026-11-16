@@ -122,9 +122,10 @@ class StreamFormUiTest {
         assertEquals("orders-dln", fieldText("planForm:responseName"))
         assertEquals(PlannerTexts.RESPONSE_STREAM_NOTE, textOf("planForm:responseNote"))
         assertEquals(
-            "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them.",
+            "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it.",
             textOf("planForm:responseNote"),
         )
+        node("planForm:responseNote").assertIsDisplayed()
         node("planWizard:next").assertIsEnabled()
         r.close()
     }

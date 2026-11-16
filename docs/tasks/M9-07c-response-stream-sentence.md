@@ -44,3 +44,4 @@ Tests written first and failing for the right reason (the old expected text), th
 
 ## Status
 - Step 1 (architect, 2026-11-17, round 0, branch `brief-owner-answers-m9`): brief written from the owner's answer (O16, item 6). Scenario written with `@needs-M9-07c` (no `@fake-broker`); old scenario and the four pinning tests listed above, left untouched until step 2 so the suite stays green. Next: step 2 (test developer).
+- Step 2 (test developer, 2026-11-17, round 0, branch `m9-07c-response-stream-sentence`): old scenario deleted, new one tagged `@fake-broker` (no `@needs-M9-07c`); `PlannerTextsStreamTest` (two tests rewritten, class comment updated), `StreamFormUiTest` (literal now the final text, plus `assertIsDisplayed` on the note). Red because `RESPONSE_STREAM_NOTE` still holds the old text. Next: step 3 (senior developer): change the constant and its KDoc only.
