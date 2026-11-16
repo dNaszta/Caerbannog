@@ -11,6 +11,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -163,6 +164,74 @@ class ManagementExportReadsTest {
         assertEquals(CatalogResult.Unexpected, ManagementJson.parsePolicies("""{"error":"x"}"""))
         assertEquals(CatalogResult.Unexpected, ManagementJson.parsePolicies("""[{"name":"p","pattern":"^a","definition":{}}]"""), "no apply-to and no priority: nothing is guessed")
         assertEquals(CatalogResult.Success(emptyList<PolicyRow>()), ManagementJson.parsePolicies("[]"))
+    }
+
+    // ---- M9-14b F3: the two parsers are tolerant like the exchange and binding ones ---------------------------------------------
+
+    private val tooDeep = "[".repeat(40) + "1" + "]".repeat(40)
+    private fun declarationsPage(vararg items: String) = """{"items":[${items.joinToString(",")}],"page":1,"page_count":1,"page_size":500,"total_count":${items.size}}"""
+
+    @Test
+    fun `a queue argument the model refuses is left out and the row says so, the typable arguments and the neighbours are untouched`() {
+        val bad = """{"name":"x","type":"quorum","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"quorum","deep":$tooDeep,"x-delivery-limit":3}}"""
+        val good = """{"name":"y","type":"quorum","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"quorum","x-delivery-limit":3}}"""
+        val result = ManagementJson.parseQueueDeclarations(declarationsPage(bad, good), "/")
+        val rows = (result as CatalogResult.Success<QueueDeclarationPage>).value.rows.associateBy { it.name }
+        val x = rows.getValue("x")
+        assertFalse(x.typedArgumentsComplete)
+        assertEquals(mapOf("x-delivery-limit" to ArgumentValue.Whole(3)), x.arguments, "a refused value is never guessed, x-queue-type is still not an argument")
+        assertTrue(rows.getValue("y").typedArgumentsComplete, "a neighbour is not marked")
+        assertEquals(x.arguments, rows.getValue("y").arguments)
+    }
+
+    @Test
+    fun `a stream or exclusive queue with a refused argument is marked too, the page still succeeds`() {
+        val stream = """{"name":"s","type":"stream","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"stream","deep":$tooDeep}}"""
+        val exclusive = """{"name":"e","type":"classic","durable":false,"auto_delete":false,"exclusive":true,"arguments":{"deep":$tooDeep}}"""
+        val rows = (ManagementJson.parseQueueDeclarations(declarationsPage(stream, exclusive), "/") as CatalogResult.Success<QueueDeclarationPage>).value.rows
+        assertEquals(listOf(false, false), rows.map { it.typedArgumentsComplete })
+        assertEquals(listOf(emptyMap<String, ArgumentValue>(), emptyMap<String, ArgumentValue>()), rows.map { it.arguments })
+    }
+
+    @Test
+    fun `a declarations page that is refused as a structure is still Unexpected even next to a refused value`() {
+        val bad = """{"name":"x","type":"quorum","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"deep":$tooDeep}}"""
+        val noFlag = """{"name":"z","type":"quorum","auto_delete":false,"exclusive":false,"arguments":{}}"""
+        assertEquals(CatalogResult.Unexpected, ManagementJson.parseQueueDeclarations(declarationsPage(bad, noFlag), "/"))
+    }
+
+    @Test
+    fun `a policy definition value the model refuses is left out and the row says so, neighbours are untouched`() {
+        val bad = """{"vhost":"/","name":"p","pattern":".*","apply-to":"all","priority":2,"definition":{"deep":$tooDeep,"max-length":5}}"""
+        val good = """{"vhost":"/","name":"q","pattern":".*","apply-to":"queues","priority":0,"definition":{"max-length":5}}"""
+        val rows = (ManagementJson.parsePolicies("[$bad,$good]") as CatalogResult.Success<List<PolicyRow>>).value.associateBy { it.name }
+        val p = rows.getValue("p")
+        assertFalse(p.definitionComplete)
+        assertEquals(mapOf("max-length" to ArgumentValue.Whole(5)), p.definition)
+        assertEquals(Triple(".*", "all", 2), Triple(p.pattern, p.applyTo, p.priority), "the rest of the row is read as usual")
+        assertTrue(rows.getValue("q").definitionComplete, "a neighbour is not marked")
+    }
+
+    @Test
+    fun `operator policies are tolerant the same way, and a policy without a refused value is complete by default`() {
+        assertTrue(PolicyRow("p", "/", ".*", "all", 0, emptyMap()).definitionComplete)
+        assertTrue(QueueDeclaration("q", "/", "quorum").typedArgumentsComplete)
+        val bad = """[{"vhost":"/","name":"op","pattern":".*","apply-to":"queues","priority":1,"definition":{"deep":$tooDeep}}]"""
+        val row = (ManagementJson.parsePolicies(bad) as CatalogResult.Success<List<PolicyRow>>).value.single()
+        assertFalse(row.definitionComplete)
+        assertTrue(row.definition.isEmpty())
+    }
+
+    @Test
+    fun `the whole catalog read of declarations and policies succeeds with a refused value, no CatalogResult variant is new`() {
+        val seen = CopyOnWriteArrayList<Seen>()
+        val bad = """{"name":"x","type":"quorum","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"deep":$tooDeep}}"""
+        val policy = """[{"vhost":"/","name":"p","pattern":".*","apply-to":"all","priority":0,"definition":{"deep":$tooDeep}}]"""
+        val catalog = catalog(seen) { path, _ -> 200 to (if (path.contains("policies")) policy else declarationsPage(bad)) }
+        val declarations = runBlocking { catalog.queueDeclarations("/") }
+        assertFalse((declarations as CatalogResult.Success).value.single().typedArgumentsComplete)
+        assertFalse((runBlocking { catalog.policies("/") } as CatalogResult.Success).value.single().definitionComplete)
+        assertFalse((runBlocking { catalog.operatorPolicies("/") } as CatalogResult.Success).value.single().definitionComplete)
     }
 
     // ---- the catalog over a recording engine ---------------------------------------------------------------------------------

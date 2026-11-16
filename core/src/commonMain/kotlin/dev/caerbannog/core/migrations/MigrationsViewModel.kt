@@ -289,10 +289,16 @@ class MigrationsViewModel(
             refuseWrite()
             return null
         }
-        val export = readTopologyExport()
-        if (export == null) {
-            _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ, exportNote = null) }
-            return null
+        val export = when (val outcome = readTopologyExport()) {
+            null -> {
+                _state.update { it.copy(errorMessage = TOPOLOGY_NOT_READ, exportNote = null) }
+                return null
+            }
+            TopologyExportOutcome.NotWritable -> {
+                _state.update { it.copy(errorMessage = TOPOLOGY_NOT_WRITABLE, exportNote = null) }
+                return null
+            }
+            is TopologyExportOutcome.Written -> outcome.result
         }
         val exported = try {
             repository.exportTopology(
@@ -311,8 +317,8 @@ class MigrationsViewModel(
     }
 
     /** The queue and stream declarations, exchanges, bindings, policies and operator policies; null as soon as one read fails. */
-    private suspend fun readTopologyExport(): TopologyExportResult? {
-        val catalog = topologyCatalog ?: return TopologyExportResult(emptyList(), null)
+    private suspend fun readTopologyExport(): TopologyExportOutcome? {
+        val catalog = topologyCatalog ?: return TopologyExportOutcome.Written(TopologyExportResult(emptyList(), null))
         val declarations = (catalog.queueDeclarations(vhost) as? CatalogResult.Success)?.value ?: return null
         val exchanges = (catalog.exchanges(vhost) as? CatalogResult.Success)?.value ?: return null
         val bindings = (catalog.bindings(vhost) as? CatalogResult.Success)?.value ?: return null
@@ -394,6 +400,7 @@ class MigrationsViewModel(
 
     private companion object {
         const val TOPOLOGY_NOT_READ = "The topology could not be read"
+        const val TOPOLOGY_NOT_WRITABLE = "The topology was read, but a setting in it cannot be written to a migration file."
         const val FILE_NOT_WRITTEN = "The file could not be written"
         const val HISTORY_UNREADABLE = "The applied history cannot be read, so nothing can be applied"
         const val HISTORY_NOT_MOVED = "The history file could not be moved aside; it was not changed"

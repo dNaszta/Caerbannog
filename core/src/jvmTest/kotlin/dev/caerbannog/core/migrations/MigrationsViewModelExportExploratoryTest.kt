@@ -29,6 +29,8 @@ class MigrationsViewModelExportExploratoryTest {
         fun export() = runBlocking { vm.exportCurrentTopology() }
     }
 
+    private val NOT_WRITABLE = "The topology was read, but a setting in it cannot be written to a migration file."
+
     private fun decl(name: String, type: String = "classic", arguments: Map<String, ArgumentValue> = emptyMap()) = QueueDeclaration(name, "/", type, arguments = arguments)
 
     @Test
@@ -53,14 +55,29 @@ class MigrationsViewModelExportExploratoryTest {
     }
 
     @Test
-    fun `CHARACTERISATION the note of a 12 partition super stream names every partition as retention, with the leader locator argument`() {
+    fun `CHARACTERISATION twelve streams that are not a super stream give ten entries and and 2 more, a leader locator is not called retention`() {
         val rig = Rig(FakeTopologyCatalog().apply {
-            for (i in 0 until 12) addStream("orders-$i", arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+            for (i in 0 until 12) addStream("orders-%02d".format(i), arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced")))
         })
         rig.export()
         val note = assertNotNull(rig.vm.state.value.exportNote)
-        assertEquals(12, Regex("retention of stream").findAll(note).count(), note)
-        println("M9-14 note length for 12 partitions: ${note.length}")
+        assertEquals(10, Regex("leader locator of stream").findAll(note).count(), note)
+        assertEquals(0, Regex("retention").findAll(note).count(), note)
+        assertTrue(note.endsWith("; and 2 more"), note)
+        println("M9-14b note length for 12 streams: ${note.length}")
+    }
+
+    @Test
+    fun `CHARACTERISATION the CLI super stream of 12 partitions is one short entry`() {
+        val rig = Rig(FakeTopologyCatalog().apply {
+            addExchange(FakeTopologyCatalog.exchange("orders", superStream = true, typedArguments = mapOf("x-super-stream" to ArgumentValue.Flag(true))))
+            for (i in 0 until 12) {
+                addStream("orders-$i", arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+                addBinding(BindingRow("orders", "/", "orders-$i", BindingDestinationType.QUEUE, "$i"))
+            }
+        })
+        rig.export()
+        assertEquals("Left out: leader locator of super stream orders (12 partitions)", rig.vm.state.value.exportNote)
     }
 
     @Test
@@ -90,9 +107,9 @@ class MigrationsViewModelExportExploratoryTest {
 
     // ---- F1 round 2: an exchange or binding argument that could not be typed makes the export fail loudly, never write a thinner file ----
 
-    private fun assertFailsLoudly(rig: Rig, why: String) {
+    private fun assertFailsLoudly(rig: Rig, why: String, message: String = NOT_WRITABLE) {
         assertEquals(null, rig.export(), "$why: a file was returned")
-        assertEquals("The topology could not be read", rig.vm.state.value.errorMessage, why)
+        assertEquals(message, rig.vm.state.value.errorMessage, why)
         assertEquals(null, rig.vm.state.value.exportNote, why)
         assertTrue(runBlocking { rig.vm.state.value.entries }.isEmpty(), "$why: a file is listed")
     }
@@ -116,14 +133,29 @@ class MigrationsViewModelExportExploratoryTest {
     }
 
     @Test
-    fun `an incomplete binding of a left-out queue still fails, nothing about the broker is guessed, and a later export of a complete topology works`() {
+    fun `an incomplete binding of a left-out queue exports fine, binding and queue are both left out, and a later export works too`() {
         val fake = FakeTopologyCatalog().apply {
             declare(QueueDeclaration("conn", "/", "classic", durable = false, exclusive = true)); addExchange(FakeTopologyCatalog.exchange("events"))
             addBinding(BindingRow("events", "/", "conn", BindingDestinationType.QUEUE, "k", typedArgumentsComplete = false))
         }
         val rig = Rig(fake)
-        assertFailsLoudly(rig, "incomplete binding of a left-out queue")
+        val file = assertNotNull(rig.export())
+        assertTrue(file.up.none { it is MigrationAction.DeclareBinding || it is MigrationAction.DeclareQueue }, "${file.up}")
+        assertEquals(null, rig.vm.state.value.errorMessage)
+        assertEquals("Left out: exclusive queue conn", rig.vm.state.value.exportNote)
         fake.deleteBinding("events", "conn", "k")
+        assertNotNull(rig.export())
+    }
+
+    @Test
+    fun `an incomplete binding that IS written still fails loud with the new sentence, and a later export of a complete topology works`() {
+        val fake = FakeTopologyCatalog().apply {
+            declare(decl("orders", "quorum")); addExchange(FakeTopologyCatalog.exchange("events"))
+            addBinding(BindingRow("events", "/", "orders", BindingDestinationType.QUEUE, "k", typedArgumentsComplete = false))
+        }
+        val rig = Rig(fake)
+        assertFailsLoudly(rig, "incomplete binding that is written")
+        fake.deleteBinding("events", "orders", "k")
         rig.vm.dismissError()
         assertNotNull(rig.export())
     }

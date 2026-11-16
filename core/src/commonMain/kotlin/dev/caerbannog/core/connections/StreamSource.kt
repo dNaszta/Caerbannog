@@ -34,11 +34,11 @@ import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
-import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.PolicyRow
 import dev.caerbannog.core.topology.QueueDeclaration
 import dev.caerbannog.core.topology.QueueInspectionResult
 import dev.caerbannog.core.topology.QueueMessageInspector
+import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
 import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
