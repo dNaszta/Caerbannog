@@ -1,0 +1,1 @@
+[{"source":"<exchange>","vhost":"/","destination":"<queue>","destination_type":"queue","routing_key":"","arguments":{"a":1,"x-match":"all"},"properties_key":"~4tmbCA"},{"source":"<exchange>","vhost":"/","destination":"<queue>","destination_type":"queue","routing_key":"","arguments":{"a":2,"x-match":"all"},"properties_key":"~_BJVLg"}]

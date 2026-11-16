@@ -1,0 +1,6 @@
+stream 'text-correlation-data': properties={reply-to=text:/exchanges/amq.topic/devices.d42.reply, correlation-id=bytes:corr-bytes-1, content-type=text:application/json, absolute-expiry-time=Long:0, creation-time=Long:0} applicationProperties={trace=text:t1} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+stream 'binary-correlation-data': properties={reply-to=text:/exchanges/amq.topic/devices.d42.reply, correlation-id=bytes:0x010203ff, absolute-expiry-time=Long:0, creation-time=Long:0} applicationProperties={} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+stream 'control': properties={} applicationProperties={} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+quorum 'text-correlation-data': routingKey=devices.d42.answer exchange=amq.topic properties={"correlation_id":"corr-bytes-1","delivery_mode":2,"headers":{"trace":"t1","x-reply-to-topic":"devices.d42.reply"},"content_type":"application/json"}
+quorum 'binary-correlation-data': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2,"headers":{"x-correlation-id":"Not UTF-8, base64 is: AQID/w==","x-reply-to-topic":"devices.d42.reply"}}
+quorum 'control': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2}
