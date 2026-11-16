@@ -71,11 +71,11 @@ class PlannerScreenUiTest {
     }
 
     @Test
-    fun `Check is drawn disabled with the reason, not hidden (until the check exists)`() = runDesktopComposeUiTest(1280, 800) {
+    fun `Check is drawn disabled with the reason, not hidden, when the connection brought no check port`() = runDesktopComposeUiTest(1280, 800) {
         val r = rig { threeSteps() }
         showPlanner(r)
         node("planner:checkBtn").assertIsDisplayed().assertIsNotEnabled()
-        assertEquals(PlannerTexts.CHECK_LATER, r.state.checkDisabledReason)
+        assertEquals(dev.caerbannog.core.planner.PlanCheck.NO_CHECK, r.state.checkDisabledReason)
         r.close()
     }
 

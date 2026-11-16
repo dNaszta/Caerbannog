@@ -14,6 +14,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolder
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.planner.BindingForm
@@ -27,6 +28,7 @@ import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.StepForm
 import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
+import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.streams.connected
 import dev.caerbannog.ui.streams.noControlEvents
@@ -54,6 +56,9 @@ import kotlinx.coroutines.cancel
  *  - step list (0-based index): `planStep:<i>` (row: title and detail as merged text, focusable), `planStepMenu:<i>` (the "more" button) with the
  *    items `planStepMenu:<i>:edit`, `:moveUp`, `:moveDown`, `:remove`, `planStepProblem:<i>` (blocking problems of the step, with the pill
  *    "Problem"), `planStepNote:<i>` (notes, neutral, no pill).
+ *  - (M9-06) the check: `planner:checkSummary` (the summary line and the caveat), `planner:checkProgress`, `planner:checkStale` (the stale line) with its
+ *    button `planner:checkAgainBtn`; per step `planStepResult:<i>` (the result pill; while the result is stale its semantics say `stateDescription` "stale"),
+ *    `planStepBlocked:<i>` (the "Blocked" pill) and `planStepReason:<i>` (the reason line: the dry run's reason, the note, the missing/unreadable sentence).
  *  - wizard: `planWizard` (the dialog), `planWizard:kind:<Kind>` (radio, `selected` semantics), `planWizard:next`, `:back`, `:cancel`, `:add`,
  *    `planWizard:summary`, `planWizard:pageMessage`; forms `planForm:name`, `planForm:type:<value>`, `planForm:exchange`, `planForm:destination`,
  *    `planForm:destinationKind:queue|exchange`, `planForm:routingKey`, `planForm:hint:<field>`, `planForm:error:<field>`,
@@ -61,20 +66,32 @@ import kotlinx.coroutines.cancel
  */
 internal const val FOLDER = "/work/migrations"
 
+/** The time of every check of the UI tests: a fixed instant, so a summary says the same on every machine except for the zone (the tests format it as the screen does). */
+internal const val CHECK_TIME = 1_700_000_000_000L
+
 internal class UiRig(
     folderPath: String? = FOLDER,
     latest: String? = "0004",
-    context: PlannerContext = PlannerContext(),
+    private val context: PlannerContext = PlannerContext(),
     val store: FakePlanDraftStore = FakePlanDraftStore(),
     /** M9-04: the broker's names; null is no connection (the graph says only the plan is drawn). */
     val reader: KnownTopologyReader? = null,
+    /** M9-06: the connection's read-only check port; null is a connection without one. */
+    val declareCheck: DeclareCheck? = null,
+    /** M9-06: the time of a check, epoch milliseconds (the virtual clock of the view model). */
+    var nowMillis: Long = CHECK_TIME,
     prepare: UiRig.() -> Unit = {},
 ) {
     val folders = FakeMigrationFolders(folderPath)
     val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
     val settings = FakeAppSettings()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-    private var current: PlannerViewModel = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
+    private fun build() = PlannerViewModel(
+        store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis },
+    )
+
+    private var current: PlannerViewModel = build()
     val vm: PlannerViewModel get() = current
     val events = RecordedPlannerEvents { current }
     val state: PlannerState get() = current.state.value
@@ -82,7 +99,7 @@ internal class UiRig(
     init {
         prepare()
         // The window rebuilds the view model from the draft file; the screen then starts from what was saved.
-        current = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
+        current = build()
     }
 
     fun close() = scope.cancel()
@@ -140,6 +157,7 @@ internal class RecordedPlannerEvents(private val vm: () -> PlannerViewModel) : P
     override fun retryDraft() = vm().retryDraft().also("retryDraft")
     override fun flush() = vm().flush().also("flush")
     override fun selectReviewView(view: ReviewView) = vm().selectReviewView(view).also("selectReviewView:$view")
+    override fun check() = vm().check().also("check")
 }
 
 /** The planner screen over [rig]; [onNavigate] receives the drawer and the app bar's navigation. */

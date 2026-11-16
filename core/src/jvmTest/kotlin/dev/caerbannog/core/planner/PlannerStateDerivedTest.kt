@@ -163,11 +163,10 @@ class PlannerStateDerivedTest {
     }
 
     @Test
-    fun `Check is disabled until M9-06 and says why`() {
-        assertEquals("Checking comes in a later step", PlannerTexts.CHECK_LATER)
+    fun `Check is disabled without a check port and says why (M9-06 replaced the placeholder text)`() {
         val s = rig { queue("orders") }.state
         assertFalse(s.checkEnabled)
-        assertEquals(PlannerTexts.CHECK_LATER, s.checkDisabledReason)
+        assertEquals(PlanCheck.NO_CHECK, s.checkDisabledReason)
     }
 
     // ---- the migration text (the JSON view) ----

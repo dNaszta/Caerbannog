@@ -1,8 +1,10 @@
 package dev.caerbannog.core.migrations.fakes
 
+import dev.caerbannog.core.connections.fakes.CallGate
 import dev.caerbannog.core.migrations.BrokerFinding
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationAction
+import kotlinx.coroutines.CancellationException
 import java.util.Collections
 
 /**
@@ -12,6 +14,8 @@ import java.util.Collections
  *    comparison rule: whether a queue is "the same" is the matcher's business (`ManagementDeclareCheck`, tested in data-rabbit);
  *  - every call is recorded in [calls], in order, before it is answered, also a call that then throws or is cancelled;
  *  - an answer can be a suspending block ([answerWith]), so a test can hold a read, cancel it, or let it fail.
+ * M9-06: [holdOn] makes the read of one resource name wait until a [CallGate] is released (a check seen "at step 4", a late result), and [cancelled] records
+ * every read that was cancelled while it waited, so "the check was cancelled" is a fact a test can state.
  * [answerNamed] matches the resource name of a declare or delete action (queue, exchange, stream, policy), so the probe a check makes for an end
  * of a binding (a declare of that name) is scripted without building the exact action; [answer] matches one exact action.
  */
@@ -28,11 +32,27 @@ class FakeDeclareCheck : DeclareCheck {
 
     fun answerWith(name: String, block: suspend (MigrationAction) -> BrokerFinding): FakeDeclareCheck = apply { named[name] = block }
 
+    /** The reads that were cancelled while they were answering (only a read that can notice a cancellation: see [holdOn]). */
+    val cancelled: MutableList<MigrationAction> = Collections.synchronizedList(ArrayList())
+
+    /**
+     * The read of [name] records itself, then waits until the returned gate is released and answers [then]. One gate per name. With [ignoreCancellation]
+     * (the default) a cancelled caller is NOT told, so a test can prove that the view model drops a late answer by itself; without it a cancelled read
+     * throws `CancellationException` and is listed in [cancelled].
+     */
+    fun holdOn(name: String, then: BrokerFinding = BrokerFinding.Absent, ignoreCancellation: Boolean = true): CallGate =
+        CallGate(ignoreCancellation).also { gate -> named[name] = { gate.await(); then } }
+
     override suspend fun find(action: MigrationAction): BrokerFinding {
         calls += action
         val script = exact[action] ?: nameOf(action)?.let { named[it] }
             ?: throw IllegalStateException("FakeDeclareCheck: nothing scripted for \"${action.description}\" (${action.actionName}); scripted: ${named.keys} and ${exact.size} exact")
-        return script(action)
+        try {
+            return script(action)
+        } catch (e: CancellationException) {
+            cancelled += action
+            throw e
+        }
     }
 
     private fun nameOf(action: MigrationAction): String? = when (action) {

@@ -69,10 +69,11 @@ class PlannerDraftSteps {
     @Given("a plan with {int} steps")
     fun planWithSteps(count: Int) {
         d.newPlan()
+        // M9-06: "a plan with 10 steps" (the running check); after the five named ones come queue-6, queue-7, ...
         val forms = listOf(
             d.queueForm("orders", "quorum"), d.exchangeForm("events", "direct"), d.bindingForm("events", "orders", "order.created"),
             d.queueForm("audit", "quorum"), d.queueForm("billing", "quorum"),
-        )
+        ) + (6..maxOf(count, 6)).map { d.queueForm("queue-$it", "quorum") }
         forms.take(count).forEach { d.addWithWizard(it) }
         assertEquals(count, d.plan.steps.size, "this step builds up to ${forms.size} steps")
     }

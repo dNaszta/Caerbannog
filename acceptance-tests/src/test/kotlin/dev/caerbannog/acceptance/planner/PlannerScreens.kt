@@ -79,6 +79,7 @@ internal class ViewModelPlannerEvents(private val vm: PlannerViewModel) : Planne
     override fun retryDraft() = vm.retryDraft()
     override fun flush() = vm.flush()
     override fun selectReviewView(view: ReviewView) = vm.selectReviewView(view)
+    override fun check() = vm.check()
 }
 
 @OptIn(ExperimentalTestApi::class)
@@ -98,6 +99,12 @@ internal class PlannerScreenDriver(vm: PlannerViewModel) : ScreenDriver({
     fun description(tag: String): String? = exec {
         waitForIdle()
         nodesWithPrefix(tag).firstOrNull { tagOf(it) == tag }?.config?.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ")
+    }
+
+    /** The state description (semantics) of the node with [tag]; null when it has none or is not drawn. M9-06: a stale result pill says "stale". */
+    fun stateDescription(tag: String): String? = exec {
+        waitForIdle()
+        nodesWithPrefix(tag).firstOrNull { tagOf(it) == tag }?.config?.getOrNull(SemanticsProperties.StateDescription)
     }
 
     /** Every node under the node tagged [tag] that offers an action that changes something: a click, a long click, a text. */
