@@ -6,7 +6,8 @@ import dev.caerbannog.core.migrations.MigrationParser
 /**
  * What the planner knows about the connection, as plain values the window builds (shaped like `MigrationsInputs`, which lives in
  * `desktopApp`). The window rebuilds the view model when it changes. [connectionName] null means not connected; [unavailableReason] is why a
- * connection cannot run migrations (RabbitMQ 3.x, version unknown), null when it can; [known] is what the broker has, read by the caller.
+ * connection cannot run migrations (RabbitMQ 3.x, version unknown), null when it can. What the broker has is read by the view model
+ * through a [KnownTopologyReader], so there is one source of broker names.
  */
 data class PlannerContext(
     val connectionName: String? = "uat-eu",
@@ -14,7 +15,6 @@ data class PlannerContext(
     val controlLevel: TopologyControlLevel = TopologyControlLevel.FULL_CONTROL,
     val hasConfigurePermission: Boolean = true,
     val unavailableReason: String? = null,
-    val known: KnownTopology = KnownTopology.None,
 )
 
 /** A draft file that cannot be used as a plan: where it is and a fixed reason (never its content). */
@@ -136,6 +136,13 @@ data class PlannerState(
     val dismissed: Boolean = false,
     /** False until the draft file has been read once. */
     val isLoaded: Boolean = false,
+    /** What the broker has for the plan's virtual host; null when nothing was read (no connection) or the read failed. */
+    val known: KnownTopology? = null,
+    /** True while the names of the plan's virtual host are being read: the graph then says nothing about what exists. */
+    val knownPending: Boolean = false,
+    /** The review graph: the plan, with the broker's existing ends when [known] is there. Derived on every change. */
+    val graph: PlanGraph = planPreview(plan, known),
+    val graphView: ReviewView = ReviewView.Graph,
 ) {
     val description: String get() = plan.description
 

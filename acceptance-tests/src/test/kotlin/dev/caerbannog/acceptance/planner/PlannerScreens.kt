@@ -6,8 +6,11 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.requestFocus
 import dev.caerbannog.acceptance.migrations.ScreenDriver
 import dev.caerbannog.core.connections.ChipIcon
 import dev.caerbannog.core.connections.ChipState
@@ -18,6 +21,7 @@ import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.connections.RefreshSectionState
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerViewModel
+import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.StepForm
 import dev.caerbannog.core.topology.BindingsViewMode
 import dev.caerbannog.core.topology.QueueDetailView
@@ -74,6 +78,7 @@ internal class ViewModelPlannerEvents(private val vm: PlannerViewModel) : Planne
     override fun cancelQuestion() = vm.cancelQuestion()
     override fun retryDraft() = vm.retryDraft()
     override fun flush() = vm.flush()
+    override fun selectReviewView(view: ReviewView) = vm.selectReviewView(view)
 }
 
 @OptIn(ExperimentalTestApi::class)
@@ -81,6 +86,45 @@ internal class PlannerScreenDriver(vm: PlannerViewModel) : ScreenDriver({
     val state by vm.state.collectAsState()
     PlannerScreen(state = state, events = ViewModelPlannerEvents(vm), control = connectedChip, controlEvents = noControl, onNavigate = {})
 }) {
+    private fun tagOf(n: SemanticsNode) = n.config.getOrNull(SemanticsProperties.TestTag)
+
+    private fun DesktopComposeUiTest.nodesWithPrefix(prefix: String): List<SemanticsNode> =
+        onAllNodes(SemanticsMatcher("tag starts with $prefix") { tagOf(it)?.startsWith(prefix) == true }, useUnmergedTree = true).fetchSemanticsNodes()
+
+    /** The test tags drawn that start with [prefix], in the order the screen has them, without repeats. */
+    fun tagsWithPrefix(prefix: String): List<String> = exec { waitForIdle(); nodesWithPrefix(prefix).mapNotNull { tagOf(it) }.distinct() }
+
+    /** The content description of the node with [tag]; null when it is not drawn. */
+    fun description(tag: String): String? = exec {
+        waitForIdle()
+        nodesWithPrefix(tag).firstOrNull { tagOf(it) == tag }?.config?.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ")
+    }
+
+    /** Every node under the node tagged [tag] that offers an action that changes something: a click, a long click, a text. */
+    fun actionsUnder(tag: String): List<String> = exec {
+        waitForIdle()
+        val acting = listOf(SemanticsActions.OnClick, SemanticsActions.OnLongClick, SemanticsActions.SetText, SemanticsActions.SetSelection)
+        fun walk(n: SemanticsNode): List<String> =
+            acting.filter { n.config.contains(it) }.map { "${it.name} on ${tagOf(n) ?: "an untagged node"}" } + n.children.flatMap { walk(it) }
+        val root = nodesWithPrefix(tag).firstOrNull { tagOf(it) == tag } ?: error("nothing is drawn with the test tag $tag")
+        walk(root)
+    }
+
+    /** Presses the keyboard's way through the nodes: each in turn takes focus; what a screen reader would say for each is returned in order. */
+    fun focusInTurn(prefix: String): List<String> = exec {
+        waitForIdle()
+        val tags = nodesWithPrefix(prefix).mapNotNull { tagOf(it) }.distinct()
+        tags.map { tag ->
+            val node = onNodeWithTag(tag, useUnmergedTree = true)
+            check(node.fetchSemanticsNode().config.contains(SemanticsActions.RequestFocus)) { "$tag cannot take focus, so Tab cannot reach it" }
+            node.requestFocus()
+            waitForIdle()
+            val now = onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().config
+            check(now.getOrNull(SemanticsProperties.Focused) == true) { "$tag did not take focus" }
+            now.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ").orEmpty()
+        }
+    }
+
     /** True when the node can be typed into. */
     fun isEditable(tag: String): Boolean = exec {
         waitForIdle()

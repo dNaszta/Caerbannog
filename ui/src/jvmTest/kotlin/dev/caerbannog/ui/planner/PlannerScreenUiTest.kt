@@ -325,6 +325,7 @@ class PlannerScreenUiTest {
         val r = rig { queue("orders") }
         showPlanner(r)
         assertDrawn("planner:reviewCard")
+        showJson()
         val text = textOf("planner:jsonView")
         assertTrue(text.contains("declareQueue") && text.contains("orders"), text)
         assertFalse(isEditable("planner:jsonView"), "the JSON view must be read only")
@@ -336,6 +337,7 @@ class PlannerScreenUiTest {
     fun `the JSON view follows the plan when a step is added`() = runDesktopComposeUiTest(1280, 800) {
         val r = rig { queue("orders") }
         showPlanner(r)
+        showJson()
         r.exchange("events")
         waitForIdle()
         assertTrue(textOf("planner:jsonView").contains("declareExchange"), textOf("planner:jsonView"))

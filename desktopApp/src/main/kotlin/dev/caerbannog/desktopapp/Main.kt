@@ -27,6 +27,7 @@ import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.core.connections.deleteStreamGate
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
 import dev.caerbannog.core.publish.PublishMessageViewModel
@@ -51,7 +52,10 @@ import dev.caerbannog.ui.streams.StreamsScreen
 import dev.caerbannog.ui.topology.EmptyQueueInspectionEvents
 import dev.caerbannog.ui.topology.QueueInspectionEvents
 import dev.caerbannog.ui.topology.TopologyScreen
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -452,21 +456,28 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
 
 /**
  * The planner, a sub-screen of Migrations. The view model is rebuilt when what it is built from changes (the connection, its level or
- * permission); it runs on its own IO scope, because the draft store does blocking file I/O. Leaving the screen flushes a pending description
- * before the scope ends.
+ * permission). The window keeps ONE planner scope (one IO thread: the draft store does blocking file I/O) and each view model runs in a child
+ * job of it. On a rebuild the old view model is flushed BEFORE the new one is created, so the flush is queued first on the same thread and
+ * the new view model reads a description the old one still held back (M9-03 review, R1 and R2). The old one's job is cancelled behind its
+ * flush, so it stops collecting. Leaving the screen flushes and ends the scope the same way.
  */
 @Composable
 private fun PlannerWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val connections by composition.viewModel.state.collectAsState()
     val inputs = composition.migrationsInputs(connections)
     val context = plannerContextOf(inputs)
-    val plannerScope = remember(context) { newPlannerScope() }
-    val plannerVm = remember(context) { composition.createPlannerViewModel(inputs, plannerScope) }
-    DisposableEffect(plannerVm) {
+    val windowScope = remember { newPlannerScope() }
+    val live = remember { LivePlanner() }
+    val plannerVm = remember(context) {
+        live.retire(windowScope)
+        val job = SupervisorJob(windowScope.coroutineContext[Job])
+        composition.createPlannerViewModel(inputs, CoroutineScope(windowScope.coroutineContext + job)).also { live.vm = it; live.job = job }
+    }
+    DisposableEffect(windowScope) {
         onDispose {
-            plannerVm.flush()
+            live.retire(windowScope)
             // Queued behind the flush on the planner's one thread, so the draft is written before the scope ends.
-            plannerScope.launch { plannerScope.cancel() }
+            windowScope.launch { windowScope.cancel() }
         }
     }
     LaunchedEffect(plannerVm) { composition.followPlanner(plannerVm, this) }
@@ -479,6 +490,21 @@ private fun PlannerWindowContent(composition: AppComposition, control: Connectio
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
     )
+}
+
+/** The view model of the planner window that is running now, so the next one can flush it first. Not state: nothing draws from it. */
+private class LivePlanner {
+    var vm: PlannerViewModel? = null
+    var job: Job? = null
+
+    fun retire(windowScope: CoroutineScope) {
+        val old = vm ?: return
+        val oldJob = job
+        old.flush()
+        if (oldJob != null) windowScope.launch { oldJob.cancel() }
+        vm = null
+        job = null
+    }
 }
 
 private const val TICK_MILLIS: Long = 1000

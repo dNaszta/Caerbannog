@@ -227,7 +227,8 @@ class PlannerScreenSteps {
     @When("I choose the {string} view of the review")
     fun chooseJsonView(view: String) {
         assertEquals("JSON", view)
-        assertTrue(screen.isDrawn("planner:jsonView"), "the JSON view is not drawn (until the graph exists it is the review card)")
+        screen.click("planner:reviewViewSwitch:Json")
+        assertTrue(screen.isDrawn("planner:jsonView"), "the JSON view is not drawn after the switch was pressed")
     }
 
     @Then("I see the migration text with the action {string} for {string}")

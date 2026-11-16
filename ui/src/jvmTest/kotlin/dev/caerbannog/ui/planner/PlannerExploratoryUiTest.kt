@@ -150,6 +150,7 @@ class PlannerExploratoryUiTest {
         val clipboard = FakeClipboard()
         setContent { CompositionLocalProvider(LocalClipboard provides clipboard) { PlannerOver(r) } }
         waitForIdle()
+        showJson()
         node("planner:jsonCopyBtn").performClick()
         waitForIdle()
         assertEquals(r.state.migrationText, clipboard.text)

@@ -28,6 +28,7 @@ import dev.caerbannog.core.planner.SaveGate
 import dev.caerbannog.core.planner.StepForm
 import dev.caerbannog.core.planner.TopologyPlan
 import dev.caerbannog.core.planner.WizardState
+import dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader
 import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
 import dev.caerbannog.core.topology.BindingDestinationType
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +70,14 @@ class PlannerDriver {
     var known = KnownTopology.None
         set(value) { field = value; restart() }
 
+    /** False: the broker answers nothing the planner can use (the read gives null), as for a virtual host the user cannot see. */
+    var brokerReadable = true
+
+    /** The one read of the broker's names (M9-04): a fake that records what it was asked. Null when not connected, as the app gives no reader then. */
+    val reader: FakeKnownTopologyReader? get() = currentReader
+
+    private var currentReader: FakeKnownTopologyReader? = null
+
     /** The naming style on this machine (before the view model exists; the planner changes it with [chooseStyle]). */
     var style: NamingStyle
         get() = settings.plannerNamingStyle
@@ -85,11 +94,13 @@ class PlannerDriver {
             vhost = vhost,
             controlLevel = controlLevel,
             hasConfigurePermission = configurePermission,
-            known = known,
-        ), scope, descriptionDebounceMillis = 0).also { created ->
+        ), scope, descriptionDebounceMillis = 0, reader = readerForNewViewModel()).also { created ->
             current = created
             scope.launch { created.state.collect { s -> s.question?.let { q -> if (questions.lastOrNull() != q) questions += q } } }
         }
+
+    private fun readerForNewViewModel(): FakeKnownTopologyReader? =
+        (if (connected && unavailableReason == null) FakeKnownTopologyReader(known.takeIf { brokerReadable }) else null).also { currentReader = it }
 
     val state: PlannerState get() = vm.state.value
 

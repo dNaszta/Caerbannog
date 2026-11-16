@@ -67,6 +67,10 @@ fun buildBindingGraph(
     showDefaultExchange: Boolean = false,
     streams: List<StreamSummary> = emptyList(),
     mqttClients: List<MqttClientRow> = emptyList(),
+    /** Names drawn even with no binding (the planner's declared exchanges); they count in the node cap. Empty: today's behaviour. */
+    extraExchanges: List<String> = emptyList(),
+    /** Same for queues and streams (a stream is drawn as one when it is in [streams]). */
+    extraQueues: List<String> = emptyList(),
 ): BindingGraph {
     val filteredBindings = bindings.filter { showDefaultExchange || it.source.isNotEmpty() }
     val activeMqttClients = mqttClients.filter { it.subscriptions.isNotEmpty() }
@@ -87,6 +91,8 @@ fun buildBindingGraph(
     if (activeMqttClients.isNotEmpty()) {
         activeExchangeNames.add("amq.topic")
     }
+    activeExchangeNames.addAll(extraExchanges)
+    activeQueueNames.addAll(extraQueues)
 
     val totalNodesCount = activeExchangeNames.size + activeQueueNames.size + activeMqttClients.size
     if (totalNodesCount > MAX_GRAPH_NODES) {

@@ -451,6 +451,30 @@ Feature: Topology planner
     When I move through the review graph with the keyboard
     Then the node "orders" is announced as "queue orders, new"
 
+  @m9-04 @fake-broker
+  Scenario: When the broker cannot be read only the plan is drawn
+    Given the broker cannot be read
+    And a plan that binds "events" to the new queue "orders"
+    When I look at the review graph
+    Then it says "Only the plan is drawn" and that the broker could not be read
+    And the exchange "events" is drawn as "not in this plan"
+    And the queue "orders" is marked "new"
+
+  @m9-04 @fake-broker
+  Scenario: Something the plan declares and the broker already has is not marked new
+    Given the broker has the quorum queue "orders"
+    And a plan that declares the quorum queue "orders"
+    When I look at the review graph
+    Then it shows the queue "orders" as already on the broker
+
+  @m9-04 @smoke @fake-broker
+  Scenario: The review card shows the graph first and the JSON text on request
+    Given a plan with a queue, an exchange and a binding
+    When I look at the review card
+    Then the graph is shown
+    When I switch the review to JSON
+    Then the migration text with the version "draft" is shown and can be copied
+
   # ---- M9-12: a pending migration file opened as steps ----
 
   @m9-12 @smoke @fake-broker

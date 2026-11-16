@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -59,6 +60,7 @@ import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerBanner
 import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerTexts
+import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.SaveGate
 import dev.caerbannog.core.planner.WizardState
 import dev.caerbannog.ui.appframe.AppDestination
@@ -204,12 +206,12 @@ private fun PlannerBody(
             if (maxWidth >= SIDE_BY_SIDE_FROM) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.weight(1f).fillMaxHeight())
-                    PlanReviewCard(state, Modifier.weight(1f).fillMaxHeight())
+                    PlanReviewCard(state, events, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.weight(1f).fillMaxWidth())
-                    PlanReviewCard(state, Modifier.weight(1f).fillMaxWidth())
+                    PlanReviewCard(state, events, Modifier.weight(1f).fillMaxWidth())
                 }
             }
         }
@@ -432,9 +434,9 @@ private fun tonePair(tone: Tone): Pair<Color, Color> = when (tone) {
 
 // ---- review card ----
 
-/** Until the review graph (M9-04) the card shows the migration text the plan would be saved as, read only. */
+/** The review card (docs/ux/Planner.dc.html): the result of the plan as a graph, shown first, or the migration text the plan would be saved as. Read only. */
 @Composable
-private fun PlanReviewCard(state: PlannerState, modifier: Modifier = Modifier) {
+private fun PlanReviewCard(state: PlannerState, events: PlannerEvents, modifier: Modifier = Modifier) {
     val copy = rememberCopyToClipboard()
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -443,13 +445,16 @@ private fun PlanReviewCard(state: PlannerState, modifier: Modifier = Modifier) {
         modifier = modifier.testTag("planner:reviewCard"),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(PlannerTexts.REVIEW_TITLE, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 if (!state.isEmpty) {
-                    TextButton(onClick = { copy(state.migrationText) }, modifier = Modifier.testTag("planner:jsonCopyBtn")) {
-                        ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Copy")
+                    ReviewViewSwitch(state.graphView, events::selectReviewView)
+                    if (state.graphView == ReviewView.Json) {
+                        TextButton(onClick = { copy(state.migrationText) }, modifier = Modifier.testTag("planner:jsonCopyBtn")) {
+                            ConnectionIcon(AppIcon.ContentCopy, SmallIconSize)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Copy")
+                        }
                     }
                 }
             }
@@ -460,23 +465,31 @@ private fun PlanReviewCard(state: PlannerState, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("planner:reviewEmpty"),
                 )
+            } else if (state.graphView == ReviewView.Graph) {
+                PlanReviewGraph(state.graph, Modifier.weight(1f, fill = false).fillMaxWidth())
+                Text(PlannerTexts.GRAPH_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                val scroll = rememberScrollState()
-                Box(Modifier.weight(1f, fill = false).fillMaxWidth()) {
-                    SelectionContainer(Modifier.fillMaxWidth().padding(end = 12.dp)) {
-                        Text(
-                            text = state.migrationText,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            modifier = Modifier.verticalScroll(scroll).testTag("planner:jsonView"),
-                        )
-                    }
-                    if (scroll.canScrollForward || scroll.canScrollBackward) {
-                        VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).matchParentSize())
-                    }
-                }
+                JsonView(state.migrationText)
                 Text(PlannerTexts.REVIEW_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.JsonView(text: String) {
+    val scroll = rememberScrollState()
+    Box(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+        SelectionContainer(Modifier.fillMaxWidth().padding(end = 12.dp)) {
+            Text(
+                text = text,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                modifier = Modifier.verticalScroll(scroll).testTag("planner:jsonView"),
+            )
+        }
+        if (scroll.canScrollForward || scroll.canScrollBackward) {
+            VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).matchParentSize())
         }
     }
 }
