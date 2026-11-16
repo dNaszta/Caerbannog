@@ -475,6 +475,26 @@ class PlannerViewModelCheckTest {
     }
 
     @Test
+    fun `not connected and no port - the not-connected text, as PlanCheck run orders its refusals`() {
+        val r = rig(null, PlannerContext(connectionName = null)) { queue("a") }
+        assertFalse(r.state.checkEnabled)
+        assertEquals(PlannerTexts.NOT_CONNECTED, r.state.checkDisabledReason)
+    }
+
+    @Test
+    fun `editing the description does not mark the result stale`() {
+        val port = FakeDeclareCheck()
+        val r = rig(port) { queue("a"); queue("b") }
+        port.scriptAll(r)
+        r.vm.check()
+        val fresh = r.done()
+        r.vm.setDescription("Orders and invoices")
+        val now = r.done()
+        assertFalse(now.stale, "a description is not a step: the broker check does not depend on it")
+        assertEquals(fresh.results, now.results)
+    }
+
+    @Test
     fun `connected but no port - the fixed no-check text`() {
         val r = rig(null) { queue("a") }
         assertFalse(r.state.checkEnabled)

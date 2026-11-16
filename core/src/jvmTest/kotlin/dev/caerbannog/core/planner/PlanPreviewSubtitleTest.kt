@@ -42,11 +42,20 @@ class PlanPreviewSubtitleTest {
     }
 
     @Test
-    fun `no exchange or queue node of the review graph uses the parenthesis form`() {
+    fun `no node of the review graph uses the parenthesis form, streams included`() {
         val g = graphOf(
             MigrationAction.DeclareExchange("a", "direct"), MigrationAction.DeclareQueue("orders", "quorum"),
-            MigrationAction.DeclareBinding("a", "orders", "k"),
+            MigrationAction.DeclareBinding("a", "orders", "k"), MigrationAction.DeclareStream("log"),
         )
         g.graph.nodes.forEach { assertEquals(false, it.node.detail.contains("("), "${it.node.id}: \"${it.node.detail}\"") }
+    }
+
+    @Test
+    fun `a stream of the plan and a stream of the broker both say stream, with no parenthesis and no count`() {
+        val declared = graphOf(MigrationAction.DeclareStream("log"))
+        assertEquals("stream", declared.detailOf("q:log"))
+        val known = KnownTopology(exchanges = mapOf("events" to "direct"), streams = setOf("audit"))
+        val g = graphOf(MigrationAction.DeclareBinding("events", "audit", "k"), known = known)
+        assertEquals("stream", g.detailOf("q:audit"))
     }
 }
