@@ -67,3 +67,5 @@ Tests written first and passing, no unrelated changes, spec and scenarios update
 
 ## What the spike settled (M9-00c, 2026-11-16)
 This task may rely on, without measuring again: `PolicyKeyMatrix` (accept, effect, `wrongTypeRows`; core-testing), the whole-policy rule, the one-policy rule with priorities, the 500 on a numeric `max-age`, the policy delay of about 6 seconds (any live wait is a bounded poll), and the table "Measured facts of M9-00c" in `docs/spec.md`. The catalog test compares the catalog with `PolicyKeyMatrix.effect`. It may NOT rely on: operator policies, `apply-to: queues` reaching streams, the tie winner.
+
+Note (architect, M9-05b review, 2026-11-16): the check judges only the 20 arguments of `DeclareEquivalenceTable`. If this task offers an argument outside them, first add a live row to the table and the honoured sets in `HonouredArgumentRule` (see `M9-05b-check-argument-rule.md`, Notes for later tasks).

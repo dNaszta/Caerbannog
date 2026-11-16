@@ -115,3 +115,5 @@ Tests written first and passing, no unrelated changes, spec and scenarios update
 | 4 | minor | PlanNaming.kt:99 | `words` splits at any non-letter/digit, the brief said `-`, `_`, `.`, space; the code is wider (better for `a/b`), brief not changed | accept; no action |
 | 5 | idea | PlanValidation.kt:36-59, :70 | `bindingsBeforeTheirTargets` is long and `Need.kind` is a string (primitive obsession) | optional: small enum when M9-07 adds stream rules |
 | 6 | idea | StepForms.kt:29, :65 | `actions` runs `problems` (a parser round trip) and then builds again; fine at form size | none |
+
+Note (architect, M9-05b review, 2026-11-16): the check judges only the 20 arguments of `DeclareEquivalenceTable`. If this task offers an argument outside them, first add a live row to the table and the honoured sets in `HonouredArgumentRule` (see `M9-05b-check-argument-rule.md`, Notes for later tasks).
