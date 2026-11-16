@@ -87,6 +87,33 @@ Safety and architecture: no new broker call (`declareStream` is untouched, the s
 ## UX
 `docs/ux/Planner.dc.html`: "4." form Stream (this task builds the name and the response-stream tick; the MQTT ticks are `M9-07b` and the Retention block is `M9-08`), step 8 and 9 of the main block, the dotted link in the review graph.
 
+- Step 4a (architect, 2026-11-16, round 1): decision on the step 4 findings, see "Round 2 decision" below. F1 is a defect to fix in this task (round 2 for the senior developer, tests RED first by the test developer); F2 and F3 are not fixed here.
+
+## Round 2 decision (architect, 2026-11-16)
+
+**F1 (major): fix in this task.** A review graph about 50 px high after a check of a 7-step plan defeats the review card (the card is on the page, but the graph cannot be read). The 0.65 share is right for few rows and wrong for many: the card must have a floor.
+
+Remedy: keep `STACKED_STEPS_SHARE` as the hug limit, and add a floor for the card. In the stacked layout `stepsMaxHeight = max(min(body * 0.65, body - REVIEW_CARD_MIN), STEPS_PANEL_MIN)`. `REVIEW_CARD_MIN` is about 300 dp (the developer tunes it until the graph numbers below hold; it counts the card title, the checked summary, the graph box and the buttons). `STEPS_PANEL_MIN` is the height of a panel with its header and three rows, so a plan of up to three steps is never squeezed and the case already fixed (3 steps checked at 1280 x 800, no graph scrollbar; 3 rows not scrolling; the stacked gap) gives the same sizes as now. When the steps exceed what is left, the step list scrolls inside its panel with its scrollbar (the panel already has one; the lazy list stays). The 1400 dp side-by-side layout is untouched.
+
+Acceptance numbers (the test developer pins these as RED tests first; "dp" is the test density, 1 px = 1 dp in `runDesktopComposeUiTest`):
+
+| # | Test (file) | State | Must hold |
+| --- | --- | --- | --- |
+| A1 | new, `PlanReviewGraphRound2UiTest` | 7 queue steps, checked (`sevenResults`-style), 1600 x 1000 | the graph box (`planReview:graph` or the existing graph tag) is at least 140 dp high; the review card (title to buttons) is fully inside the window |
+| A2 | existing F1 test in `PlanReviewGraphRound2UiTest` | 3 steps, checked, 1280 x 800 | unchanged: no graph scrollbar |
+| A3 | new, `PlannerLayoutUiTest` | 7 steps, checked, 1600 x 1000 | the step list shows a vertical scrollbar (the list scrolls), rows 0 to 2 are fully inside the list panel, and the panel is at least `STEPS_PANEL_MIN` high (3 rows) |
+| A4 | CHANGED, `PlannerLayoutUiTest` "a seven step plan at 1600 x 1000 shows every row without scrolling the list" | 7 steps, NOT checked, 1600 x 1000 | relaxed (I own this): rows 0 to 2 must be fully visible; the list may scroll. It no longer asserts all seven rows. Rename it to "a seven step plan at 1600 x 1000 shows at least the first three rows; the list scrolls when the card needs its floor". The only reason is the card floor; with no check the card needs less, so if all 7 rows fit with the floor the test may keep asserting it, the developer decides by the numbers, but the test must not fail either way. |
+| A5 | existing, `PlannerLayoutUiTest` three-step no-scroll test (1280 x 800 and 1600 x 1000) | 3 steps | unchanged: no list scroll |
+| A6 | existing gap test (<= 32 dp), side-by-side tests at 1400 dp and wider | | unchanged |
+
+If a floor of 140 dp for the graph needs a card floor above 300 dp at 1600 x 1000 (body about 700 dp), the developer raises `REVIEW_CARD_MIN` and tells the test developer; the 140 dp number in A1 does not move. A short screenshot refresh of `planner-check-01-results.png` shows the graph readable (the test developer looks at it).
+
+**F2 (minor): not in this task.** A queue plus a pair is 3 nodes in one column and three plain queues behave the same at 1280 x 800 (195 px graph box, scrollbar, third node partly cut): it comes from the M9-04 graph layout, not from the pair. Follow-up note for the M9-08 brief: a graph column of three nodes should fit at 1280 x 800 (or the node spacing shrink). The scrollbar keeps it reachable meanwhile.
+
+**F3 (minor): leave.** The legend line "Dotted: response stream (DLN)" is added with M9-09 as decided earlier; the dotted link is in the graph already and the pair row names it.
+
+Wording implications for the owner: none. Files changed by this decision: this brief only. Next: test developer writes A1, A3, A4 (RED for A1 and A3), then the senior developer builds the floor.
+
 ## MCP
 None (owner decision 2026-11-15).
 
