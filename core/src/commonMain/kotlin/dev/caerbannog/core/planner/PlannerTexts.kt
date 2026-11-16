@@ -131,6 +131,10 @@ object PlannerTexts {
         "Dotted outline, \"not in this plan\": the broker has no such item and the plan does not declare it",
     )
 
+    const val NEW_MARK: String = "new"
+    const val NOT_IN_THIS_PLAN: String = "not in this plan"
+    const val GRAPH_NOTE: String = "Read only. Nothing on the graph changes the plan."
+
     private fun subject(name: String, fallback: String): String = if (echoableName(name)) name else fallback
 
     private fun plural(n: Int, word: String): String = if (n == 1) word else "${word}s"
