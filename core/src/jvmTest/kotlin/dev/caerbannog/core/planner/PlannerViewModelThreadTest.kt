@@ -58,16 +58,25 @@ class PlannerViewModelThreadTest {
         val renderThreads: MutableList<String> = Collections.synchronizedList(ArrayList())
         val inconsistent: MutableList<String> = Collections.synchronizedList(ArrayList())
 
+        /** Off while the rig starts: a StateFlow collector gets the current value at once on the thread that subscribes (the test's), which says nothing about publishing. */
+        @Volatile
+        var recording = false
+
         val vm = PlannerViewModel(store, folders.ports, settings, PlannerContext(), scope)
 
         init {
             watcher.launch {
                 vm.state.collect { s ->
-                    renderThreads += threadName()
-                    consistencyProblem(s)?.let { inconsistent += it }
+                    if (recording) {
+                        renderThreads += threadName()
+                        consistencyProblem(s)?.let { inconsistent += it }
+                    }
                 }
             }
             await("the draft is loaded") { it.isLoaded }
+            barrier()
+            store.threads.clear() // the load ran at start-up; only what the calls below cause is judged
+            recording = true
         }
 
         fun onUi(block: () -> Unit) { executor.submit(block).get(20, TimeUnit.SECONDS) }
