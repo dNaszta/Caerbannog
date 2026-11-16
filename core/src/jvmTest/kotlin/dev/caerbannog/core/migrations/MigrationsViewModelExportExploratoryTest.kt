@@ -87,4 +87,44 @@ class MigrationsViewModelExportExploratoryTest {
         val bindings = assertNotNull(rig.export()).up.filterIsInstance<MigrationAction.DeclareBinding>()
         assertEquals(1, bindings.size)
     }
+
+    // ---- F1 round 2: an exchange or binding argument that could not be typed makes the export fail loudly, never write a thinner file ----
+
+    private fun assertFailsLoudly(rig: Rig, why: String) {
+        assertEquals(null, rig.export(), "$why: a file was returned")
+        assertEquals("The topology could not be read", rig.vm.state.value.errorMessage, why)
+        assertEquals(null, rig.vm.state.value.exportNote, why)
+        assertTrue(runBlocking { rig.vm.state.value.entries }.isEmpty(), "$why: a file is listed")
+    }
+
+    @Test
+    fun `an exchange with an argument that could not be typed fails the export and writes no file`() {
+        val rig = Rig(FakeTopologyCatalog().apply {
+            declare(decl("orders", "quorum")); addExchange(FakeTopologyCatalog.exchange("fine"))
+            addExchange(dev.caerbannog.core.topology.ExchangeRow("odd", "/", "headers", true, false, false, arguments = mapOf("deep" to "[[[...]]]"), typedArgumentsComplete = false))
+        })
+        assertFailsLoudly(rig, "incomplete exchange")
+    }
+
+    @Test
+    fun `a binding with an argument that could not be typed fails the export and writes no file`() {
+        val rig = Rig(FakeTopologyCatalog().apply {
+            declare(decl("orders", "quorum")); addExchange(FakeTopologyCatalog.exchange("events"))
+            addBinding(BindingRow("events", "/", "orders", BindingDestinationType.QUEUE, "k", arguments = mapOf("deep" to "[[[...]]]"), typedArgumentsComplete = false))
+        })
+        assertFailsLoudly(rig, "incomplete binding")
+    }
+
+    @Test
+    fun `an incomplete binding of a left-out queue still fails, nothing about the broker is guessed, and a later export of a complete topology works`() {
+        val fake = FakeTopologyCatalog().apply {
+            declare(QueueDeclaration("conn", "/", "classic", durable = false, exclusive = true)); addExchange(FakeTopologyCatalog.exchange("events"))
+            addBinding(BindingRow("events", "/", "conn", BindingDestinationType.QUEUE, "k", typedArgumentsComplete = false))
+        }
+        val rig = Rig(fake)
+        assertFailsLoudly(rig, "incomplete binding of a left-out queue")
+        fake.deleteBinding("events", "conn", "k")
+        rig.vm.dismissError()
+        assertNotNull(rig.export())
+    }
 }

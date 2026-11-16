@@ -91,8 +91,17 @@ class ManagementExportExploratoryTest {
     }
 
     @Test
-    fun `characterisation of F1, today the same bodies are Unexpected for the screen reads`() {
-        val exchange = """[{"name":"x","vhost":"/","type":"headers","durable":true,"auto_delete":false,"internal":false,"arguments":{"deep":$tooDeep}}]"""
-        assertTrue(ManagementJson.parseExchanges(exchange) == CatalogResult.Unexpected, "if this fails the screen read became tolerant: enable the Disabled test above")
+    fun `F1 fixed, a refused argument leaves the row readable, shows its display text, keeps the typable arguments and marks the row incomplete`() {
+        val exchange = """[{"name":"x","vhost":"/","type":"headers","durable":true,"auto_delete":false,"internal":false,"arguments":{"deep":$tooDeep,"ok":3}},
+            {"name":"y","vhost":"/","type":"fanout","durable":true,"auto_delete":false,"internal":false,"arguments":{"ok":3}}]"""
+        val rows = (ManagementJson.parseExchanges(exchange) as CatalogResult.Success).value.associateBy { it.name }
+        assertTrue(!rows.getValue("x").typedArgumentsComplete)
+        assertTrue(rows.getValue("x").arguments.containsKey("deep") && rows.getValue("x").arguments["ok"] == "3", "the display text stays: ${rows.getValue("x").arguments.keys}")
+        assertEquals(ArgumentValue.Whole(3), rows.getValue("x").typedArguments["ok"])
+        assertTrue(!rows.getValue("x").typedArguments.containsKey("deep"), "a value the model refuses is never guessed")
+        assertTrue(rows.getValue("y").typedArgumentsComplete, "a neighbour is not marked")
+        val binding = """[{"source":"x","vhost":"/","destination":"q","destination_type":"queue","routing_key":"","arguments":{"deep":$tooDeep}}]"""
+        val b = (ManagementJson.parseBindingList(binding) as CatalogResult.Success).value.single()
+        assertTrue(!b.typedArgumentsComplete && b.arguments.containsKey("deep"))
     }
 }
