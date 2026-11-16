@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.brokerMajorVersion
 import dev.caerbannog.core.connections.displayableBrokerVersion
 import dev.caerbannog.core.json.UntrustedJson
 import dev.caerbannog.core.json.parseUntrustedJson
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.streams.StreamManager
 import kotlinx.coroutines.delay
@@ -20,6 +21,8 @@ internal data class MigrationAccess(
     val unavailableReason: String?,
     /** The displayable version text of the one overview read; null when it could not be read or looks odd. */
     val version: String? = null,
+    /** M9-05: the read-only check; null exactly when [executor] is null, decided by the same overview read. */
+    val declareCheck: DeclareCheck? = null,
 ) {
 
     companion object {
@@ -36,7 +39,12 @@ internal data class MigrationAccess(
             return when {
                 major == null -> MigrationAccess(null, UNKNOWN_VERSION)
                 major < FIRST_SUPPORTED_MAJOR -> MigrationAccess(null, THREE_X, version)
-                else -> MigrationAccess(ManagementTopologyMigrationExecutor(http, requests, streams) { delay(it) }, null, version)
+                else -> MigrationAccess(
+                    ManagementTopologyMigrationExecutor(http, requests, streams) { delay(it) },
+                    null,
+                    version,
+                    ManagementDeclareCheck(ResourceReader(http, requests)),
+                )
             }
         }
 

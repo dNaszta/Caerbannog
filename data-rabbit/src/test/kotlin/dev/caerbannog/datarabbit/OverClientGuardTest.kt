@@ -5,12 +5,12 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * M5-08a: `ManagementTopologyMigrationExecutor.overClient` is the one documented TEST seam (the acceptance glue cannot see the internal
+ * M5-08a: `ManagementTopologyMigrationExecutor.overClient` is a documented TEST seam (M9-05 adds `ManagementDeclareCheck.overClient` for the same reason: the acceptance glue cannot see the internal `ManagementHttp`) (the acceptance glue cannot see the internal
  * `ManagementHttp`). No production source of any module may call it; the gateway builds the executor with the internal constructor.
  */
 class OverClientGuardTest {
 
-    private val allowedDefinition = setOf("ManagementTopologyMigrationExecutor.kt", "M508aTestStubs.kt")
+    private val allowedDefinition = setOf("ManagementTopologyMigrationExecutor.kt", "M508aTestStubs.kt", "ManagementDeclareCheck.kt")
 
     @Test
     fun `no production file calls overClient`() {

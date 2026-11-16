@@ -80,104 +80,9 @@ class MigrationRunner(
         /** M8-12a: the tags of the connection's user; a broker-level action needs "administrator" (and Full control). */
         userTags: Set<String> = emptySet(),
     ): MigrationDryRun {
-        // A file with an access action is checked action by action; a topology-only file keeps the rules below untouched.
-        if (migration.up.any { it.isBrokerLevel }) return dryRunPerAction(migration, hasConfigurePermission, controlLevel, vhost, userTags)
-        if (!hasConfigurePermission) {
-            val actions = migration.up.map {
-                ActionDryRun(it, allowed = false, reason = "User has no configure permission on this virtual host")
-            }
-            return MigrationDryRun(
-                version = migration.version,
-                actions = actions,
-                canApply = false,
-                blockedReason = "The user has no configure permission on this connection",
-            )
-        }
-
-        if (controlLevel == TopologyControlLevel.READ_ONLY) {
-            val actions = migration.up.map {
-                ActionDryRun(it, allowed = false, reason = "Topology control level is Read-only")
-            }
-            return MigrationDryRun(
-                version = migration.version,
-                actions = actions,
-                canApply = false,
-                blockedReason = "Topology control level is Read-only",
-            )
-        }
-
-        val actions = migration.up.map { action ->
-            if (action.vhost != vhost) {
-                ActionDryRun(action = action, allowed = false, reason = otherVhostReason(action.vhost, vhost))
-            } else if (action.isDestructive && controlLevel != TopologyControlLevel.FULL_CONTROL) {
-                ActionDryRun(
-                    action = action,
-                    allowed = false,
-                    reason = "Destructive actions require Full control level",
-                )
-            } else {
-                ActionDryRun(action = action, allowed = true)
-            }
-        }
-
-        val allAllowed = actions.all { it.allowed }
-        return MigrationDryRun(
-            version = migration.version,
-            actions = actions,
-            canApply = allAllowed,
-            blockedReason = when {
-                allAllowed -> null
-                migration.up.any { it.vhost != vhost } -> "Some actions belong to another virtual host than this connection's"
-                else -> "Some actions are blocked by control level"
-            },
-        )
+        val verdict = MigrationDryRunRules.evaluate(migration.up, hasConfigurePermission, controlLevel, vhost, userTags)
+        return MigrationDryRun(migration.version, verdict.actions, verdict.canApply, verdict.blockedReason)
     }
-
-    /**
-     * A broker-level action needs the administrator tag and Full control; the configure permission and the V1 vhost rule do not apply to it.
-     * A topology action keeps its rules. Read-only blocks everything.
-     */
-    private fun dryRunPerAction(
-        migration: MigrationFile,
-        hasConfigurePermission: Boolean,
-        controlLevel: TopologyControlLevel,
-        vhost: String,
-        userTags: Set<String>,
-    ): MigrationDryRun {
-        val readOnly = controlLevel == TopologyControlLevel.READ_ONLY
-        val actions = migration.up.map { action ->
-            val reason = when {
-                readOnly -> READ_ONLY_REASON
-                action.isBrokerLevel -> when {
-                    ADMINISTRATOR !in userTags -> NEEDS_ADMINISTRATOR
-                    controlLevel != TopologyControlLevel.FULL_CONTROL -> NEEDS_FULL_CONTROL
-                    else -> null
-                }
-                !hasConfigurePermission -> "User has no configure permission on this virtual host"
-                action.vhost != vhost -> otherVhostReason(action.vhost, vhost)
-                action.isDestructive && controlLevel != TopologyControlLevel.FULL_CONTROL -> "Destructive actions require Full control level"
-                else -> null
-            }
-            ActionDryRun(action, allowed = reason == null, reason = reason)
-        }
-        val first = actions.firstOrNull { !it.allowed }
-        val blockedReason = when {
-            first == null -> null
-            readOnly || first.action.isBrokerLevel -> first.reason
-            !hasConfigurePermission -> "The user has no configure permission on this connection"
-            first.action.vhost != vhost -> "Some actions belong to another virtual host than this connection's"
-            else -> "Some actions are blocked by control level"
-        }
-        return MigrationDryRun(migration.version, actions, canApply = first == null, blockedReason = blockedReason)
-    }
-
-    /** Names a virtual host only through the echo rule; the wording keeps saying "virtual host" either way. */
-    private fun otherVhostReason(actionVhost: String, connectionVhost: String): String =
-        if (echoableName(actionVhost) && echoableName(connectionVhost)) {
-            "The action belongs to virtual host $actionVhost; this connection is for $connectionVhost"
-        } else {
-            "The action belongs to another virtual host than this connection's"
-        }
 
     /**
      * Resolves the current status of each migration file for the specified profile.
@@ -284,10 +189,7 @@ class MigrationRunner(
         }
 
     private companion object {
-        const val ADMINISTRATOR = "administrator"
         const val READ_ONLY_REASON = "Topology control level is Read-only"
-        const val NEEDS_ADMINISTRATOR = "Creating virtual hosts, users and permissions needs the administrator tag"
-        const val NEEDS_FULL_CONTROL = "Creating virtual hosts, users and permissions needs the level Full control"
         const val NOT_RECORDED = "The migration was applied but could not be recorded; running it again is safe"
     }
 }

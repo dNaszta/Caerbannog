@@ -9,6 +9,8 @@ import dev.caerbannog.core.streams.AppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -306,11 +308,14 @@ class PlannerViewModel(
         knownPending = true
         val generation = ++readGeneration
         scope.launch {
-            // A reader that fails is an unread broker; the plan stays usable. A cancelled read is not a failure.
+            // A reader that fails is an unread broker; the plan stays usable. A CancellationException counts as a cancelled read only when
+            // this scope itself is cancelled; one thrown by the reader's own call (a timeout) is an unread broker, or knownPending would
+            // stay true for ever.
             val answer = try {
                 source.read(vhost)
             } catch (e: CancellationException) {
-                throw e
+                currentCoroutineContext().ensureActive()
+                null
             } catch (_: Exception) {
                 null
             }

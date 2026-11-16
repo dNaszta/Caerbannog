@@ -75,6 +75,8 @@ class FakeConnectionGateway(
         override val brokerVersion: String? = null,
         /** M8-02a: the GET-only reads of a 3.x connection; null for every other connection. */
         override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
+        /** M9-05: the read-only check of a 4.x connection; null exactly when [migrationExecutor] is null. */
+        override val declareCheck: dev.caerbannog.core.migrations.DeclareCheck? = null,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -107,6 +109,7 @@ class FakeConnectionGateway(
     private val topologies = ConcurrentHashMap<String, FakeTopologyCatalog>()
     private val migrationReasons = ConcurrentHashMap<String, String>()
     private val migrationExecutors = ConcurrentHashMap<String, dev.caerbannog.core.migrations.TopologyMigrationExecutor>()
+    private val declareChecks = ConcurrentHashMap<String, dev.caerbannog.core.migrations.DeclareCheck>()
     private val brokerVersions = ConcurrentHashMap<String, String>()
     private val threeXReadsByName = ConcurrentHashMap<String, dev.caerbannog.core.migrate3x.fakes.FakeThreeXReads>()
     private val overviews = AtomicInteger()
@@ -170,6 +173,9 @@ class FakeConnectionGateway(
     /** The catalog every connection opened for [profileName] exposes; configure it before Connect. */
     /** M5-08a: the migration executor every connection opened for [profileName] exposes (none by default). */
     fun setMigrationExecutor(profileName: String, executor: dev.caerbannog.core.migrations.TopologyMigrationExecutor) { migrationExecutors[profileName] = executor }
+
+    /** M9-05: the read-only check the connections opened for [profileName] bring (a 3.x or unreadable-version connection gets none, like its executor). */
+    fun setDeclareCheck(profileName: String, check: dev.caerbannog.core.migrations.DeclareCheck) { declareChecks[profileName] = check }
 
     /** M5-08a R1: the connections opened for [profileName] have no executor and say why (like a 3.x broker or an unreadable version). */
     fun setMigrationUnavailable(profileName: String, reason: String) { migrationReasons[profileName] = reason }
@@ -287,6 +293,7 @@ class FakeConnectionGateway(
             migrationUnavailableReason = if (threeX) THREE_X_REASON else if (oddVersion) UNKNOWN_VERSION_REASON else migrationReasons[name],
             brokerVersion = version,
             threeXReads = if (threeX) threeXReadsOf(name) else null,
+            declareCheck = if (threeX || oddVersion || name in unreadable) null else declareChecks[name],
         )
         opened += held
         log += "opened:$name#${held.number}"

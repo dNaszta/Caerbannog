@@ -33,6 +33,7 @@ class RabbitMqHeldConnection(
     override val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
     /** M5-08a: the management migration executor of this connection (the gateway passes it); null when none. */
     override val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null,
+    override val declareCheck: dev.caerbannog.core.migrations.DeclareCheck? = null,
     /** M5-08a R1: the fixed reason there is no executor (3.x, or the version could not be read). */
     override val migrationUnavailableReason: String? = null,
     /** The displayable version text the gateway read from the overview; null when unreadable. */
