@@ -11,6 +11,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -367,30 +368,55 @@ internal fun AppFrameLayout(
     leading: @Composable RowScope.() -> Unit = {},
     features: Set<ConnectionFeature> = LocalNavigationFeatures.current.features,
     featuresDisabledReason: String? = LocalNavigationFeatures.current.reason,
+    /** Test tag of the title text, for a screen whose tests look at the title itself. */
+    titleTag: String? = null,
     content: @Composable () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
             AppDrawer(activeItem, onNavigate, features, featuresDisabledReason, modifier = Modifier.width(280.dp).fillMaxHeight())
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                AppBar(title, leading, actions, chip)
+                AppBar(title, leading, actions, chip, titleTag)
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
             }
         }
     }
 }
 
+/**
+ * The app bar. The title keeps its natural width and the screen's actions and the chip share the rest in a [FlowRow], so a narrow window
+ * wraps the buttons onto a second line instead of squeezing the title or a button (the defect M8-14c describes on the Migrations screen).
+ */
 @Composable
-private fun AppBar(title: String, leading: @Composable RowScope.() -> Unit, actions: @Composable RowScope.() -> Unit, chip: (@Composable () -> Unit)?) {
+private fun AppBar(
+    title: String,
+    leading: @Composable RowScope.() -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+    chip: (@Composable () -> Unit)?,
+    titleTag: String?,
+) {
     Row(
         modifier = Modifier.testTag("appBar").fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 24.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         leading()
-        Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        actions()
-        chip?.invoke()
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = if (titleTag != null) Modifier.testTag(titleTag) else Modifier,
+        )
+        FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            actions()
+            chip?.invoke()
+        }
     }
 }
 

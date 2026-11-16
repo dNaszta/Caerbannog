@@ -39,7 +39,7 @@ class PlannerSteps {
     fun setUp() { d = PlannerDriver(); PlannerWorld.driver = d }
 
     @After
-    fun tearDown() = d.close()
+    fun tearDown() { PlannerScreens.endScenario(); d.close() }
 
     // ---- Background ----
 
@@ -52,7 +52,7 @@ class PlannerSteps {
     @Given("the connection {string} has the topology control level {string}")
     fun level(profile: String, label: String) {
         d.controlLevel = when (label) {
-            "Read only" -> TopologyControlLevel.READ_ONLY
+            "Read only", "Read-only" -> TopologyControlLevel.READ_ONLY
             "Declare and edit" -> TopologyControlLevel.DECLARE_AND_EDIT
             "Full control" -> TopologyControlLevel.FULL_CONTROL
             else -> error("unknown topology control level \"$label\"")
@@ -135,6 +135,10 @@ class PlannerSteps {
         "Add to plan" -> d.addToPlan()
         "Save as migration" -> d.vm.saveAsMigration()
         "Dismiss" -> d.vm.dismiss()
+        "New plan" -> {
+            assertTrue(d.entry() is PlannerEntry.NewPlan, "the Migrations screen offers ${d.entry()}, not \"New plan\"")
+            d.newPlan() // the planner is opened on the screen of the real composable: PlannerScreenSteps looks at it
+        }
         "Keep the plan" -> d.vm.cancelQuestion()
         "Start a new plan" -> d.vm.startNewPlan()
         "Continue plan" -> {
@@ -162,9 +166,14 @@ class PlannerSteps {
     @When("I open the binding form")
     fun openBindingForm() = d.fill(d.bindingForm("", "", ""))
 
+    /** Two uses of one sentence: the kinds of the wizard (a list), and the one entry button of the Migrations screen (`@m9-03`). */
     @Then("I can choose {}")
     fun canChoose(list: String) {
         val expected = Regex("\"([^\"]*)\"").findAll(list).map { it.groupValues[1] }.toList()
+        if (expected.size == 1 && expected.single() in listOf("New plan", "Continue plan")) {
+            assertEquals(expected.single(), d.entry().label, "the button of the Migrations screen")
+            return
+        }
         assertEquals(expected, PlannerTexts.WIZARD_KINDS, "the wizard kinds, in order")
     }
 
@@ -200,9 +209,13 @@ class PlannerSteps {
     fun formSays(message: String) = assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
 
     @Then("{string} is disabled")
-    fun disabled(button: String) {
-        assertEquals("Next", button)
-        assertFalse(d.nextEnabled(), "Next should be disabled; problems=${d.formProblems()}")
+    fun disabled(button: String) = when (button) {
+        "Next" -> assertFalse(d.nextEnabled(), "Next should be disabled; problems=${d.formProblems()}")
+        "Check" -> {
+            assertFalse(d.state.checkEnabled, "Check should be disabled")
+            assertFalse(PlannerScreens.forViewModel(d.vm).isEnabled("planner:checkBtn"), "the Check button is enabled on the screen")
+        }
+        else -> error("no button \"$button\" is known to the steps")
     }
 
     @Then("{string} is enabled")

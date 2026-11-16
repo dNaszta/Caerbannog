@@ -59,6 +59,9 @@ data class PlanStep(val id: Int, val action: MigrationAction) {
 
     /** The second line of the step, or null. */
     val detail: String? get() = action.detail
+
+    /** False for a step no wizard form can hold (it stays as written): the row menu offers no Edit for it. */
+    val isEditable: Boolean get() = StepForms.formOf(action) != null
 }
 
 private fun MigrationAction.onVhost(vhost: String): MigrationAction = when (this) {

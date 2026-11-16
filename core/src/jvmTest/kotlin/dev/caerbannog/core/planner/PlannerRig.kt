@@ -31,7 +31,7 @@ internal class PlannerRig(
     var vm: PlannerViewModel = build()
     val state: PlannerState get() = vm.state.value
 
-    private fun build() = PlannerViewModel(store, folders.ports, settings, context, scope)
+    private fun build() = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0)
 
     /** The app is closed and opened again, or the window rebuilt the view model for a changed [context]. */
     fun restart(newContext: PlannerContext = context): PlannerViewModel {

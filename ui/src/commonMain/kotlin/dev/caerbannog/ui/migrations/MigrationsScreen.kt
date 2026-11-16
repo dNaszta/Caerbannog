@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -59,6 +60,8 @@ import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
+import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -66,6 +69,9 @@ import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+
+/** Compact buttons: five of them and the connection chip share one line at 1280 px. */
+private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 
 @Composable
 fun MigrationsScreen(
@@ -90,8 +96,17 @@ fun MigrationsScreen(
     control: ConnectionControlState? = null,
     controlEvents: ConnectionControlEvents? = null,
     onNavigate: (AppDestination) -> Unit = {},
+    /** What the draft of the planner offers: "New plan" or "Continue plan" with a card, or "Open planner" for a draft that cannot be read (M9-03). */
+    plannerEntry: PlannerEntry = PlannerEntry.NewPlan,
+    onOpenPlanner: () -> Unit = {},
+    /** Called after the user confirmed the question "Dismiss this plan?" on the draft card. */
+    onDismissDraft: () -> Unit = {},
+    /** "Plan saved as ...", set by the window after a save; transient, not part of the migrations state. */
+    plannerNotice: String? = null,
+    onDismissPlannerNotice: () -> Unit = {},
 ) {
     var showImportDialog by remember { mutableStateOf(false) }
+    var askDismissDraft by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
     AppFrameLayout(
@@ -99,13 +114,21 @@ fun MigrationsScreen(
         modifier = modifier,
         onNavigate = onNavigate,
         actions = {
+            // M9-03: the way into the planner is the first button.
+            Button(
+                onClick = onOpenPlanner,
+                modifier = Modifier.testTag("migrations:newPlanBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
+            ) {
+                Text(plannerEntry.label)
+            }
+
             // M8-06a, owner decision 1: the second entry to the migration from 3.x (the first is the drawer item).
             OutlinedButton(
                 onClick = { onNavigate(AppDestination.MigrateFromThree) },
                 modifier = Modifier.testTag("migrations:migrate3xBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.DriveFileMove, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(AppDestination.MigrateFromThree.label)
             }
 
@@ -113,9 +136,8 @@ fun MigrationsScreen(
                 onClick = { showImportDialog = true },
                 enabled = state.canImport,
                 modifier = Modifier.testTag("migrations:importBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.UploadFile, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Import JSON")
             }
 
@@ -123,9 +145,8 @@ fun MigrationsScreen(
                 onClick = onExportTopology,
                 enabled = state.canExport,
                 modifier = Modifier.testTag("migrations:exportBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.Download, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Export current topology")
             }
 
@@ -133,9 +154,8 @@ fun MigrationsScreen(
                 onClick = onApplyPending,
                 enabled = state.canApplyPending,
                 modifier = Modifier.testTag("migrations:applyPendingBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.PlayArrow, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Apply pending")
             }
         },
@@ -166,6 +186,8 @@ fun MigrationsScreen(
                     Advice(MigrationsWording.ADVICE_TOP, "migrations-advice-top", Modifier.weight(1f))
                 }
             }
+
+            plannerNotice?.let { PlannerNoticeBanner(it, onDismissPlannerNotice) }
 
             FolderRow(state, onShowFolder, onChangeFolder)
 
@@ -230,7 +252,15 @@ fun MigrationsScreen(
 
             // Main Content Area: Left file list + Right detail
             val selectedFile = state.selectedFile
+            val draftCard: @Composable () -> Unit = {
+                DraftCard(
+                    entry = plannerEntry,
+                    onContinue = onOpenPlanner,
+                    onDismiss = { askDismissDraft = true },
+                )
+            }
             if (state.folder is MigrationFolderState.ChooseFolder) {
+                draftCard()
                 ChooseFolderPanel(onChooseFolder)
             } else Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -244,6 +274,7 @@ fun MigrationsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    draftCard()
                     Text(
                         text = "Migration files",
                         style = MaterialTheme.typography.labelMedium,
@@ -294,6 +325,17 @@ fun MigrationsScreen(
                 }
             }
         }
+    }
+
+    if (askDismissDraft && plannerEntry is PlannerEntry.ContinuePlan) {
+        DismissDraftDialog(
+            question = PlannerQuestion.Dismiss(plannerEntry.stepCount),
+            onCancel = { askDismissDraft = false },
+            onConfirm = {
+                askDismissDraft = false
+                onDismissDraft()
+            },
+        )
     }
 
     state.confirmation?.let { EmptyHistoryDialog(it, onCancelEmptyHistory, onConfirmEmptyHistory) }

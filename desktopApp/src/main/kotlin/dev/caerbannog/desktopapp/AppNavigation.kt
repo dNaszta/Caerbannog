@@ -1,6 +1,7 @@
 package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.migrate3x.SourceKind
+import dev.caerbannog.core.planner.SavedPlan
 import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,8 +57,43 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
         _requestedSource.value = null
     }
 
+    private val _plannerOpen = MutableStateFlow(false)
+
+    /** True while the planner is shown. It is a sub-screen of Migrations, the way a stream is of Streams: the drawer keeps Migrations selected. */
+    val plannerOpen: StateFlow<Boolean> = _plannerOpen.asStateFlow()
+
+    private val _savedPlan = MutableStateFlow<SavedPlan?>(null)
+
+    /** The plan that was just saved as a migration, waiting for the Migrations screen to select it and show its notice; null when none. */
+    val savedPlan: StateFlow<SavedPlan?> = _savedPlan.asStateFlow()
+
+    /** Opens the planner. Only from Migrations; anything else does nothing. */
+    fun openPlanner() {
+        if (_screen.value == AppDestination.Migrations) _plannerOpen.value = true
+    }
+
+    /** Back to the Migrations list; harmless when the planner is not open. */
+    fun closePlanner() {
+        _plannerOpen.value = false
+    }
+
+    /** The planner saved [saved]: it closes and Migrations is shown, with the new version waiting in [savedPlan]. */
+    fun planSaved(saved: SavedPlan) {
+        _plannerOpen.value = false
+        _screen.value = AppDestination.Migrations
+        _savedPlan.value = saved
+    }
+
+    /** The Migrations screen took the saved plan. */
+    fun savedPlanHandled() {
+        _savedPlan.value = null
+    }
+
     fun open(destination: AppDestination) {
         if (destination !in WITH_SCREEN) return
+        // Any drawer item leads to a list or screen, never back into an open planner; a saved plan nobody took belongs to the save that made it.
+        _plannerOpen.value = false
+        if (destination != AppDestination.Migrations) _savedPlan.value = null
         _initialOffset.value = null
         // Streams or any other drawer item with a screen leads to a list or screen, never back into an old stream.
         _selectedStream.value = null
