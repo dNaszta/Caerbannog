@@ -40,7 +40,7 @@ None.
 None.
 
 ## Open points
-The gate's plan follows the decided answers (retention by policy, Q4; the response stream without MQTT ticks, Q2 and Q3). The MQTT ticks of the stream pair (`M9-07b`) are not part of the gate: they have their own live scenario, which needs S-A6 and S-A7 (the owner confirmed the revised Q3 on 2026-11-15, O14).
+The gate's plan follows the decided answers (retention by policy, Q4; the response stream without MQTT ticks, Q2 and Q3). The MQTT ticks of the stream pair (`M9-07b`) are not part of the gate: they have their own live scenario, which has its own live scenario (S-A6 and S-A7 are measured, M9-00a: the correlation id of a user property arrives as an application property; the owner confirmed the revised Q3 on 2026-11-15, O14). The gate's MQTT route `sensors/+/temp` to `telemetry` uses the measured key `sensors.*.temp`; the gate stays on the default MQTT exchange of its throwaway broker (a broker with `mqtt.exchange` set to another name is a documented risk, S-B2, not a gate case).
 
 ## Definition of done
 The gate passes on a machine with Docker or rootless Podman, twice in a row; the two mutations were red; the milestone status in `docs/spec.md` and `docs/tasks/README.md` is updated by the architect.
