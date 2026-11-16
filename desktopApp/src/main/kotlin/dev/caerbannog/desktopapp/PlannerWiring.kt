@@ -1,6 +1,8 @@
 package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.migrations.FolderOpener
+import dev.caerbannog.core.planner.KnownTopology
+import dev.caerbannog.core.planner.KnownTopologyReader
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerEntry
@@ -8,6 +10,10 @@ import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.SavedPlan
 import dev.caerbannog.core.planner.StepForm
+import dev.caerbannog.core.streams.CatalogResult
+import dev.caerbannog.core.streams.StreamCatalog
+import dev.caerbannog.core.streams.StreamListRequest
+import dev.caerbannog.core.topology.TopologyCatalog
 import dev.caerbannog.ui.planner.PlannerEvents
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +42,67 @@ fun plannerContextOf(inputs: MigrationsInputs): PlannerContext {
 }
 
 /**
+ * The reader of the broker's names for [inputs], or null: no connection, a connection that cannot run migrations (RabbitMQ 3.x is a read-only
+ * migration source, it is sent nothing), or a catalog that is missing. With null the planner sends no request of any kind.
+ */
+fun knownTopologyReaderOf(inputs: MigrationsInputs): KnownTopologyReader? {
+    if (inputs.connectionName.isBlank() || inputs.unavailableReason != null) return null
+    val topology = inputs.topology ?: return null
+    val streams = inputs.streams ?: return null
+    return CatalogKnownTopologyReader(topology, streams)
+}
+
+/**
+ * [KnownTopologyReader] over the catalogs the Topology and Streams screens already use. Makes list calls only: the exchanges, every page of
+ * the queues and every page of the streams. It has no path under one queue's name and never asks for bindings (the broker's own bindings are
+ * not drawn). Any failed call, also of a later page, answers null: half a list would call existing things "not in this plan".
+ */
+class CatalogKnownTopologyReader(
+    private val topology: TopologyCatalog,
+    private val streams: StreamCatalog,
+) : KnownTopologyReader {
+    override suspend fun read(vhost: String): KnownTopology? {
+        val exchanges = (topology.exchanges(vhost) as? CatalogResult.Success)?.value ?: return null
+        val queues = allQueues(vhost) ?: return null
+        val streamNames = allStreams(vhost) ?: return null
+        return KnownTopology(
+            // The default exchange is not a name a plan can bind to.
+            exchanges = exchanges.filterNot { it.isDefault }.associate { it.name to it.type },
+            queues = queues,
+            streams = streamNames,
+        )
+    }
+
+    private suspend fun allQueues(vhost: String): Set<String>? {
+        val names = mutableSetOf<String>()
+        var page = 1
+        do {
+            val result = (topology.queues(vhost, page) as? CatalogResult.Success)?.value ?: return null
+            names += result.rows.map { it.name }
+            page++
+        } while (page <= result.pageCount)
+        return names
+    }
+
+    private suspend fun allStreams(vhost: String): Set<String>? {
+        val names = mutableSetOf<String>()
+        var page = 1
+        do {
+            val result = (streams.listStreams(StreamListRequest(vhost = vhost, page = page, pageSize = STREAM_PAGE_SIZE)) as? CatalogResult.Success)?.value
+                ?: return null
+            names += result.rows.map { it.name }
+            page++
+        } while (page <= result.pageCount)
+        return names
+    }
+
+    private companion object {
+        /** The broker's maximum page size, as for the queues. */
+        const val STREAM_PAGE_SIZE = 500
+    }
+}
+
+/**
  * The scope of a planner view model: `Dispatchers.IO` limited to one thread, with a [SupervisorJob]. The draft store does blocking file I/O
  * under a lock, which must never run on the UI dispatcher; one thread keeps the calls in order, and a failing call does not end the scope.
  */
@@ -49,6 +116,7 @@ fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: Corou
         settings = appSettings,
         context = plannerContextOf(inputs),
         scope = scope,
+        reader = knownTopologyReaderOf(inputs),
     )
 
 /**

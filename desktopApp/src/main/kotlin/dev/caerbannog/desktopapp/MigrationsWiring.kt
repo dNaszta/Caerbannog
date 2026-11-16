@@ -8,6 +8,7 @@ import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
+import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.topology.TopologyCatalog
 import kotlinx.coroutines.CoroutineScope
 
@@ -26,6 +27,8 @@ data class MigrationsInputs(
     /** Why there is no [executor]: never blank when there is none; null when there is one. */
     val unavailableReason: String?,
     val topology: TopologyCatalog?,
+    /** The stream catalog of the same connection as [topology]; the planner reads stream names from it. */
+    val streams: StreamCatalog? = null,
 )
 
 internal const val NOT_CONNECTED = "Connect to a broker first"
@@ -53,6 +56,7 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
             else -> source.migrationUnavailableReason?.takeIf { it.isNotBlank() } ?: NO_EXECUTOR
         },
         topology = source?.topology,
+        streams = source?.catalog,
     )
 }
 
