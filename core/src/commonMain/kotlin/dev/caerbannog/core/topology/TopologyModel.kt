@@ -91,6 +91,8 @@ data class QueueDeclaration(
     val autoDelete: Boolean = false,
     val exclusive: Boolean = false,
     val arguments: Map<String, ArgumentValue> = emptyMap(),
+    /** M9-14b: false when an argument value could not be typed: [arguments] then lacks it; see [ExchangeRow.typedArgumentsComplete]. */
+    val typedArgumentsComplete: Boolean = true,
 )
 
 /** M9-14: one policy or operator policy of a virtual host with its typed [definition]. [applyTo] is the broker's text (`queues`, `streams`, `all`, ...). */
@@ -101,6 +103,8 @@ data class PolicyRow(
     val applyTo: String,
     val priority: Int,
     val definition: Map<String, ArgumentValue>,
+    /** M9-14b: false when a definition value could not be typed: [definition] then lacks it and an export must not trust it. */
+    val definitionComplete: Boolean = true,
 )
 
 /** One virtual host of `GET /api/vhosts`; the name is all the app needs (`/` is the default vhost). */
