@@ -2,6 +2,7 @@ package dev.caerbannog.desktopapp
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.core.connections.deleteStreamGate
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
+import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
 import dev.caerbannog.core.publish.PublishMessageViewModel
@@ -40,6 +42,7 @@ import dev.caerbannog.ui.appframe.LocalNavigationFeatures
 import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.migrations.MigrationsScreen
+import dev.caerbannog.ui.planner.PlannerScreen
 import dev.caerbannog.ui.publish.PublishEvents
 import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
 import dev.caerbannog.ui.streams.StreamListEvents
@@ -48,9 +51,12 @@ import dev.caerbannog.ui.streams.StreamsScreen
 import dev.caerbannog.ui.topology.EmptyQueueInspectionEvents
 import dev.caerbannog.ui.topology.QueueInspectionEvents
 import dev.caerbannog.ui.topology.TopologyScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * M1-05: renders the real Connections screen. M2-03 part 2: all wiring lives in [createAppComposition]
@@ -74,12 +80,14 @@ fun main() = application {
     Window(onCloseRequest = { handleCloseRequest(composition, ::exitApplication) }, title = "Caerbannog", state = windowState) {
         val screen by composition.navigation.screen.collectAsState()
         val openStream by composition.navigation.selectedStream.collectAsState()
+        val plannerOpen by composition.navigation.plannerOpen.collectAsState()
         val navigationFeatures by composition.navigationFeatures.collectAsState()
         CompositionLocalProvider(LocalNavigationFeatures provides NavigationFeaturesInfo(navigationFeatures.features, navigationFeatures.reason)) {
             when (screen) {
                 AppDestination.Streams -> openStream?.let { StreamWindowContent(composition, control, it) } ?: StreamsWindowContent(composition, control)
                 AppDestination.Topology -> TopologyWindowContent(composition, control)
-                AppDestination.Migrations -> MigrationsWindowContent(composition, control)
+                AppDestination.Migrations ->
+                    if (plannerOpen) PlannerWindowContent(composition, control) else MigrationsWindowContent(composition, control)
                 AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
                 else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
             }
@@ -392,6 +400,22 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
     val current by rememberUpdatedState(migrationsVm)
     val folderOpener = remember { DesktopFolderOpener() }
 
+    // The way into the planner: read from the draft file each time this screen is shown (the planner may just have saved or dismissed it).
+    var plannerEntry by remember { mutableStateOf<PlannerEntry>(PlannerEntry.NewPlan) }
+    LaunchedEffect(composition) { plannerEntry = withContext(Dispatchers.IO) { composition.plannerEntry() } }
+
+    // After a save the planner has closed: show the notice and select the new version once the listing has it.
+    val savedPlan by composition.navigation.savedPlan.collectAsState()
+    var plannerNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(savedPlan, state.entries) {
+        val saved = savedPlan ?: return@LaunchedEffect
+        plannerNotice = saved.message
+        if (state.entries.any { it.file.version == saved.version }) {
+            current.selectVersion(saved.version)
+            composition.navigation.savedPlanHandled()
+        }
+    }
+
     MigrationsScreen(
         state = state,
         onSelectVersion = { current.selectVersion(it) },
@@ -410,6 +434,47 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         onConfirmEmptyHistory = { current.confirmEmptyHistory() },
         onCancelEmptyHistory = { current.cancelEmptyHistory() },
         onDismissOutcome = { current.dismissOutcome() },
+        control = control,
+        controlEvents = composition.control,
+        onNavigate = composition.navigation::open,
+        plannerEntry = plannerEntry,
+        onOpenPlanner = composition.navigation::openPlanner,
+        onDismissDraft = {
+            scope.launch {
+                withContext(Dispatchers.IO) { composition.planDraftStore.clear() }
+                plannerEntry = PlannerEntry.NewPlan
+            }
+        },
+        plannerNotice = plannerNotice,
+        onDismissPlannerNotice = { plannerNotice = null },
+    )
+}
+
+/**
+ * The planner, a sub-screen of Migrations. The view model is rebuilt when what it is built from changes (the connection, its level or
+ * permission); it runs on its own IO scope, because the draft store does blocking file I/O. Leaving the screen flushes a pending description
+ * before the scope ends.
+ */
+@Composable
+private fun PlannerWindowContent(composition: AppComposition, control: ConnectionControlState) {
+    val connections by composition.viewModel.state.collectAsState()
+    val inputs = composition.migrationsInputs(connections)
+    val context = plannerContextOf(inputs)
+    val plannerScope = remember(context) { newPlannerScope() }
+    val plannerVm = remember(context) { composition.createPlannerViewModel(inputs, plannerScope) }
+    DisposableEffect(plannerVm) {
+        onDispose {
+            plannerVm.flush()
+            // Queued behind the flush on the planner's one thread, so the draft is written before the scope ends.
+            plannerScope.launch { plannerScope.cancel() }
+        }
+    }
+    LaunchedEffect(plannerVm) { composition.followPlanner(plannerVm, this) }
+    val state by plannerVm.state.collectAsState()
+    val events = remember(plannerVm) { PlannerEventsAdapter(plannerVm) }
+    PlannerScreen(
+        state = state,
+        events = events,
         control = control,
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,

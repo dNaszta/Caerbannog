@@ -24,6 +24,7 @@ import dev.caerbannog.core.migrations.MigrationFolderPorts
 import dev.caerbannog.core.migrations.MigrationFolderStore
 import dev.caerbannog.core.migrations.MigrationHistoryRepository
 import dev.caerbannog.core.migrations.NowProvider
+import dev.caerbannog.core.planner.PlanDraftStore
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshTarget
@@ -31,6 +32,7 @@ import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.topology.TopologyContext
 import dev.caerbannog.core.topology.TopologyViewModel
+import dev.caerbannog.datarabbit.FilePlanDraftStore
 import dev.caerbannog.datarabbit.FolderMigrationFileRepository
 import dev.caerbannog.datarabbit.JavaKeyringSecretStore
 import dev.caerbannog.datarabbit.JsonFileAppSettings
@@ -103,6 +105,10 @@ class AppComposition(
     val migrationHistory: MigrationHistoryRepository,
     /** What the Migrations screen needs around its files: the remembered folder, the chooser, the folder repositories and [migrationHistory]. */
     val migrationFolderPorts: MigrationFolderPorts,
+    /** The one planner draft of this machine (M9-03), a file of the app's own data and never in the migrations folder. */
+    val planDraftStore: PlanDraftStore,
+    /** The per-machine settings (the planner keeps its naming style there). */
+    val appSettings: AppSettings,
     private val streamListScope: CoroutineScope,
     /** The file loader, dialogs and the in-memory held analysis of the Migrate from 3.x screen (M8-06a). */
     val migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
@@ -150,6 +156,7 @@ fun createAppComposition(
     migrationHistoryFile: Path = Path.of(System.getProperty("user.home"), ".caerbannog", "migration-history.json"),
     migrationFolderChooser: MigrationFolderChooser = SwingMigrationFolderChooser(),
     migrateFromThree: MigrateFromThreeParts = MigrateFromThreeParts(),
+    planDraftFile: Path = FilePlanDraftStore.defaultFile(),
 ): AppComposition {
     val session = ConnectionSession(permissionChecker, secretStore)
     val active = ActiveConnection(session, gateway)
@@ -208,7 +215,8 @@ fun createAppComposition(
             if (disabled) navigation.open(AppDestination.Connections)
         }
     }
-    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory), streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope))
+    return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory),
+        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope))
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.

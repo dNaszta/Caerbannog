@@ -28,7 +28,7 @@ data class MigrationsInputs(
     val topology: TopologyCatalog?,
 )
 
-private const val NOT_CONNECTED = "Connect to a broker first"
+internal const val NOT_CONNECTED = "Connect to a broker first"
 private const val NO_EXECUTOR = "This connection cannot run migrations"
 
 /**
