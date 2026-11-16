@@ -1,0 +1,5 @@
+{
+  "measured": "RabbitMQ 4.4.0, Erlang 29.1.2, 2026-11-16: a message rejected without requeue (and one that expired) from a quorum queue, dead-lettered by policy through a fanout exchange into a stream",
+  "annotationKeys": ["x-exchange","x-first-death-exchange","x-first-death-queue","x-first-death-reason","x-last-death-exchange","x-last-death-queue","x-last-death-reason","x-opt-deaths","x-routing-key"],
+  "applicationKeys": ["order"]
+}

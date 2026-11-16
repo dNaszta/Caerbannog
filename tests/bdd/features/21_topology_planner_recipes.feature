@@ -17,7 +17,12 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md and docs/tasks/M9-00c-spike-policies-equivalence-names.md. The
   scenarios carry the decided text word for word and no scenario of 19, 20 or 21 carries needs-decision any more. The
   MQTT facts (S-A, S-B) and the headers facts (S-E) are measured: the tags m9-07b, m9-10 and m9-11 lost needs-spike.
-  Only the m9-09 scenarios still carry needs-spike (M9-00b: S-C, S-D).
+  The dead-lettering facts (S-C, S-D, M9-00b, measured 2026-11-16 on RabbitMQ 4.4.0) are in docs/spec.md "Measured facts of
+  M9-00b": the m9-09 scenarios lost needs-spike, no scenario carries it any more. The scenarios that carry NEW wording from
+  that spike (the at-least-once explanation and its slow delivery, the note for a queue with its own dead-letter argument,
+  the two policy notes) carry @needs-decision until the owner answers the Owner review list of
+  docs/tasks/M9-00b-spike-dead-lettering-and-streams.md; the planner runner (@m9-01 to @m9-07, not @needs-decision) does not
+  select them, and no other runner selects the m9-09 or m9-08 tags.
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
@@ -360,6 +365,38 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I check the plan against "uat-eu"
     Then the step "Declare policy orders-dlx" shows no note about another policy
 
+  # Two notes that come from M9-00b (S-C4, S-C6): wording proposed, owner review list items 4 and 5 of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md.
+  @m9-08 @fake-broker @needs-decision
+  Scenario Outline: A policy that asks for at least once without the setting that makes it hold is pointed out
+    Given a plan that declares the policy "orders-dlx" on "^orders$" with <settings>
+    Then the step "Declare policy orders-dlx" shows the note "RabbitMQ accepts this but would not keep a message it cannot pass on: at least once only holds together with the setting that refuses publishers when the queue is full."
+
+    Examples:
+      | settings                                                                                                         |
+      | "dead-letter-exchange" "orders-dlx" and "dead-letter-strategy" "at-least-once"                                   |
+      | "dead-letter-exchange" "orders-dlx" and "dead-letter-strategy" "at-least-once" and "overflow" "drop-head"        |
+
+  @m9-08 @fake-broker
+  Scenario: A policy that asks for at least once together with reject-publish is not pointed out
+    Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx" and "dead-letter-strategy" "at-least-once" and "overflow" "reject-publish"
+    Then the step "Declare policy orders-dlx" shows no note about at least once
+
+  @m9-08 @fake-broker @needs-decision
+  Scenario: A policy that names a dead-letter exchange that is nowhere is pointed out
+    Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx"
+    And neither the broker nor the plan has the exchange "orders-dlx"
+    Then the step "Declare policy orders-dlx" shows the note "The exchange orders-dlx does not exist yet. RabbitMQ accepts the policy and then loses the dead letters."
+
+  @m9-08 @fake-broker
+  Scenario: A policy that names a dead-letter exchange declared earlier in the plan is not pointed out
+    Given a plan that declares the exchange "orders-dlx" and then the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx"
+    Then the step "Declare policy orders-dlx" shows no note about a missing exchange
+
+  @m9-08 @negative @fake-broker
+  Scenario: The policy form offers no dead-letter setting for streams
+    When I choose what the policy applies to: "Streams"
+    Then the offered settings do not include "dead-letter-exchange" or "dead-letter-routing-key"
+
   @m9-08 @fake-broker
   Scenario: Retention of a stream is saved as a policy
     When I add a stream "telemetry" with the wizard and set "Keep messages for" to "7D"
@@ -382,7 +419,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   # ---- M9-09: dead-lettering for a queue ("DLX"; architect decision A4: by policy) ----
 
-  @m9-09 @smoke @needs-spike @fake-broker
+  @m9-09 @smoke @fake-broker
   Scenario: Dead-lettering for a queue adds four steps, the policy last
     Given the broker has the quorum queue "orders"
     When I add dead-lettering for the queue "orders" with the wizard
@@ -433,7 +470,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the four dead-lettering steps come after "Declare quorum queue orders"
     And the plan has no problem
 
-  @m9-09 @needs-spike @fake-broker
+  @m9-09 @fake-broker
   Scenario: Dead letters can go to a stream
     Given the broker has the quorum queue "orders"
     When I add dead-lettering for the queue "orders" with the wizard and choose a stream as the target
@@ -443,7 +480,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Bind orders-dlx to orders-dlq      |
       | Declare policy orders-dlx          |
 
-  @m9-09 @needs-spike @fake-broker
+  @m9-09 @fake-broker
   Scenario: At least once needs my tick and says what it changes
     Given the broker has the quorum queue "orders"
     When I choose "At least once" in the dead-lettering form for "orders"
@@ -451,23 +488,56 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I tick it and finish the wizard
     Then the policy holds "dead-letter-strategy" "at-least-once" and "overflow" "reject-publish"
 
-  @m9-09 @needs-spike @fake-broker
+  @m9-09 @fake-broker
   Scenario: At most once is the default and adds no strategy setting
     Given the broker has the quorum queue "orders"
     When I add dead-lettering for the queue "orders" with the wizard
     Then the policy holds "dead-letter-exchange" and no "dead-letter-strategy" and no "overflow"
 
-  @m9-09 @negative @needs-spike @fake-broker
+  @m9-09 @negative @fake-broker
   Scenario: At least once is not offered for a classic queue
     Given the broker has the classic queue "legacy"
     When I choose the queue "legacy" in the dead-lettering form
     Then "At least once" is not offered
 
-  @m9-09 @needs-spike @fake-broker
+  @m9-09 @fake-broker
   Scenario: A queue that already has a policy is pointed out before the recipe is added
     Given the broker has the quorum queue "orders" with the policy "limits" applied
     When I choose the queue "orders" in the dead-lettering form
     Then the form says "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
+
+  @m9-09 @fake-broker
+  Scenario: Switching back to At most once takes both at-least-once settings away again
+    Given the broker has the quorum queue "orders"
+    When I choose "At least once" in the dead-lettering form for "orders"
+    And I tick "Publishers are refused when the queue is full"
+    And I choose "At most once" and finish the wizard
+    Then the policy holds "dead-letter-exchange" and no "dead-letter-strategy" and no "overflow"
+
+  @m9-09 @negative @fake-broker
+  Scenario: At least once is not offered when the queue's type is not known
+    When I choose the queue "unlisted" in the dead-lettering form without a connection
+    Then "At least once" is not offered
+
+  # The wording of the next three scenarios is proposed from M9-00b (S-C2, S-C3, S-C5): owner review list items 1 to 3 of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md.
+  @m9-09 @fake-broker @needs-decision
+  Scenario: The default says that a dead letter can be lost
+    Given the broker has the quorum queue "orders"
+    When I choose "At most once" in the dead-lettering form for "orders"
+    Then the form says "If the dead-letter target cannot take a message, RabbitMQ drops it."
+
+  @m9-09 @fake-broker @needs-decision
+  Scenario: At least once says what it needs, what it changes and that it can be slow
+    Given the broker has the quorum queue "orders"
+    When I choose "At least once" in the dead-lettering form for "orders"
+    Then the form says "RabbitMQ keeps a message it cannot pass on and retries. Retries can take minutes, so do not rely on a quick delivery."
+    And the form says "While the queue is full, publishers are refused. A quorum queue holds one message more than its limit."
+
+  @m9-09 @fake-broker @needs-decision
+  Scenario: A queue that declares its own dead-letter exchange is pointed out
+    Given the broker has the quorum queue "orders" declared with the argument "x-dead-letter-exchange" "legacy-dlx"
+    When I choose the queue "orders" in the dead-lettering form
+    Then the form says "The queue orders names its own dead-letter exchange legacy-dlx. RabbitMQ uses that one and ignores this policy's exchange."
 
   @m9-09 @fake-broker
   Scenario: The review graph shows the dead-letter path
