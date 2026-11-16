@@ -84,8 +84,31 @@ class FakeMigrationFolder(
         return result
     }
 
-    override suspend fun exportTopology(version: String, description: String, actions: List<MigrationAction>): MigrationFile =
-        throw MigrationWriteException("the generate flow must not use exportTopology: it must save what `generate` returned")
+    /**
+     * M9-02: off by default, so the generate flow of M8 still fails loudly if it uses [exportTopology]. The planner turns it on ([allowExport]):
+     * it then behaves like `FolderMigrationFileRepository.exportTopology`: a read-only or unavailable folder, a failing write and a version that
+     * exists all throw [MigrationWriteException] with nothing written (a file is never overwritten); a write is recorded in [attempts] and [written].
+     */
+    var exportAllowed: Boolean = false
+
+    fun allowExport(): FakeMigrationFolder = apply { exportAllowed = true }
+
+    override suspend fun exportTopology(version: String, description: String, actions: List<MigrationAction>): MigrationFile {
+        if (!exportAllowed) throw MigrationWriteException("the generate flow must not use exportTopology: it must save what `generate` returned")
+        val rawJson = MigrationParser.exportToJson(version, description, actions)
+        attempts += rawJson
+        beforeWrite(attempts.size)
+        unavailable?.let { throw MigrationWriteException(it.message) }
+        if (readOnly) throw MigrationWriteException(FOLDER_READ_ONLY_MESSAGE)
+        failing[attempts.size]?.let { throw MigrationWriteException(it) }
+        failingVersions[version]?.let { throw MigrationWriteException(it) }
+        if (version in files) throw MigrationWriteException("that version already exists")
+        val file = (MigrationParser.parse(rawJson) as? MigrationValidationResult.Valid)?.migration
+            ?: throw MigrationWriteException("the file could not be written")
+        files[version] = file
+        written += version
+        return file
+    }
 
     override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult =
         throw AssertionError("a saved migration is never rewritten: updateFile($version) was called")

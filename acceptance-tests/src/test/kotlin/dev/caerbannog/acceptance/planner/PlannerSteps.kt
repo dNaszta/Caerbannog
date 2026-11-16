@@ -6,11 +6,13 @@ import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.NamingStyle
+import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.SuggestionSource
 import dev.caerbannog.core.topology.BindingDestinationType
 import io.cucumber.datatable.DataTable
+import io.cucumber.java.After
 import io.cucumber.java.Before
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -19,7 +21,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 
-/** M9-01 steps for `19_topology_planner.feature`. One class, one driver: Cucumber has no dependency injection here. */
+/** The driver of the running scenario, shared by the step classes of this package (Cucumber has no dependency injection here). */
+object PlannerWorld {
+    lateinit var driver: PlannerDriver
+}
+
+/** M9-01 steps for `19_topology_planner.feature`; the draft, save and dismiss steps of M9-02 are in [PlannerDraftSteps]. Both use the one driver of [PlannerWorld]. */
 class PlannerSteps {
     private var d = PlannerDriver()
 
@@ -29,12 +36,15 @@ class PlannerSteps {
     private val bindRow = Regex("^Bind (.+) to (.+) with (.+)$")
 
     @Before
-    fun setUp() { d = PlannerDriver() }
+    fun setUp() { d = PlannerDriver(); PlannerWorld.driver = d }
+
+    @After
+    fun tearDown() = d.close()
 
     // ---- Background ----
 
     @Given("I am connected to {string} with the virtual host {string}")
-    fun connected(profile: String, vhost: String) { d.profile = profile; d.vhost = vhost; d.newPlan() }
+    fun connected(profile: String, vhost: String) { d.profile = profile; d.vhost = vhost; d.restart() }
 
     @Given("the user has configure permission on {string}")
     fun configure(vhost: String) { assertEquals(d.vhost, vhost); d.configurePermission = true }
@@ -50,7 +60,7 @@ class PlannerSteps {
     }
 
     @Given("the migrations folder is {string} and its latest migration file is {string}")
-    fun folder(path: String, latest: String) { d.migrationsFolder = path; d.latestMigration = latest }
+    fun folder(path: String, latest: String) = d.chooseMigrationsFolder(path, latest)
 
     // ---- Plans ----
 
@@ -79,7 +89,7 @@ class PlannerSteps {
     @Given("a plan with the steps")
     fun planWithSteps(table: DataTable) {
         d.newPlan()
-        d.plan = d.plan.append(table.asLists().map { actionOf(it.single()) })
+        table.asLists().forEach { d.addWithWizard(formOfRow(it.single())) }
     }
 
     @Given("the broker has the quorum queue {string}")
@@ -89,7 +99,7 @@ class PlannerSteps {
     fun brokerExchange(name: String) { d.known = d.known.copy(exchanges = d.known.exchanges + (name to "direct")) }
 
     @When("I choose the naming style {string}")
-    fun chooseStyle(label: String) { d.style = style(label) }
+    fun chooseStyle(label: String) = d.chooseStyle(style(label))
 
     // ---- The wizard ----
 
@@ -109,21 +119,31 @@ class PlannerSteps {
     fun openWizard() = d.openWizard()
 
     @When("I choose {string} in the wizard and enter the name {string}")
-    fun chooseAndEnter(kind: String, name: String) = d.fill(formFor(kind, name))
+    fun chooseAndEnter(kind: String, name: String) { d.fill(formFor(kind, name)); d.next() }
 
     @When("I choose {string} in the wizard, enter the name {string} and cancel")
-    fun chooseEnterCancel(kind: String, name: String) { d.fill(formFor(kind, name)); d.cancelWizard() }
+    fun chooseEnterCancel(kind: String, name: String) { d.fill(formFor(kind, name)); d.next(); d.cancelWizard() }
 
     @When("I enter the queue name {string} in the wizard")
     fun enterQueueName(name: String) = d.fill(d.queueForm(name, null))
 
     @When("I finish the wizard")
-    fun finish() = d.addToPlan()
+    fun finish() = d.finishWizard()
 
     @When("I choose {string}")
-    fun choose(button: String) {
-        assertEquals("Add to plan", button)
-        d.addToPlan()
+    fun choose(button: String) = when (button) {
+        "Add to plan" -> d.addToPlan()
+        "Save as migration" -> d.vm.saveAsMigration()
+        "Dismiss" -> d.vm.dismiss()
+        "Keep the plan" -> d.vm.cancelQuestion()
+        "Start a new plan" -> d.vm.startNewPlan()
+        "Continue plan" -> {
+            assertTrue(d.entry() is PlannerEntry.ContinuePlan, "the Migrations screen offers ${d.entry()}, not \"Continue plan\"")
+            d.restart()
+            d.vm
+            Unit
+        }
+        else -> error("no button \"$button\" is known to the steps")
     }
 
     @When("I fill the {string} form with {}")
@@ -186,9 +206,10 @@ class PlannerSteps {
     }
 
     @Then("{string} is enabled")
-    fun enabled(button: String) {
-        assertEquals("Next", button)
-        assertTrue(d.nextEnabled(), "Next should be enabled; problems=${d.formProblems()}")
+    fun enabled(button: String) = when (button) {
+        "Next" -> assertTrue(d.nextEnabled(), "Next should be enabled; problems=${d.formProblems()}")
+        "Save as migration" -> assertTrue(d.saveEnabled(), "Save as migration should be enabled; the gate says ${d.saveGate()}")
+        else -> error("no button \"$button\" is known to the steps")
     }
 
     @Then("the name field shows {}")
@@ -284,12 +305,11 @@ class PlannerSteps {
         else -> error("this task's steps know the kinds Queue and Exchange, not \"$kind\"")
     }
 
-    private fun actionOf(row: String): MigrationAction {
-        declareQueueRow.matchEntire(row)?.let { return MigrationAction.DeclareQueue(name = it.groupValues[2], type = it.groupValues[1], vhost = d.vhost) }
-        declareExchangeRow.matchEntire(row)?.let { return MigrationAction.DeclareExchange(name = it.groupValues[2], type = it.groupValues[1], vhost = d.vhost) }
-        bindRow.matchEntire(row)?.let {
-            return MigrationAction.DeclareBinding(exchange = it.groupValues[1], queue = it.groupValues[2], routingKey = it.groupValues[3], vhost = d.vhost)
-        }
+    /** A row of a step table is the form that builds it, so a plan from a table goes through the wizard like any other. */
+    private fun formOfRow(row: String): dev.caerbannog.core.planner.StepForm {
+        declareQueueRow.matchEntire(row)?.let { return d.queueForm(it.groupValues[2], it.groupValues[1]) }
+        declareExchangeRow.matchEntire(row)?.let { return d.exchangeForm(it.groupValues[2], it.groupValues[1]) }
+        bindRow.matchEntire(row)?.let { return d.bindingForm(it.groupValues[1], it.groupValues[2], it.groupValues[3]) }
         error("the table row \"$row\" is not one of the three step kinds of this task")
     }
 }

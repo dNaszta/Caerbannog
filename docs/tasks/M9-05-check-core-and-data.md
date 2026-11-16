@@ -76,3 +76,5 @@ None. Owner decision 2026-11-15 ("no MCP"). The check is read-only, so a tool wo
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+Note (architect, M9-02 step 2.5): the `@m9-02` scenario "The planner cannot change the broker by itself" says "I check the plan, save it and dismiss a second plan", but the M9-02 glue step only saves and dismisses (no Check yet). This task extends that step to call Check, with the recording executor still asserting reads only.

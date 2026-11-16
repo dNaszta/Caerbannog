@@ -297,6 +297,14 @@ Feature: Topology planner
     When I confirm
     Then the old file exists under the new name with its original bytes and the plan is empty
 
+  @m9-02 @negative @security @fake-broker
+  Scenario: A draft that holds a password hash is reported and kept
+    Given the draft file on disk holds a "declareUser" action with a password hash
+    When I open the planner
+    Then I see the path of the draft file and that it could not be read
+    And the draft file still has exactly its original bytes
+    And nothing is written to the draft file
+
   @m9-02 @negative @fake-broker
   Scenario: An empty plan cannot be saved
     Given a new plan
