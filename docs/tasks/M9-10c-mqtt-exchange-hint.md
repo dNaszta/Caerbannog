@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: M9-10 (the assumption sentence), M9-05 (the check's GET calls); decision of the owner (review list item 9)    Size: S
 
-PROPOSED 2026-11-16 by the architect at step 3 of `M9-00a`. Not started and not scheduled: build it only if the owner wants more than the assumption sentence of `M9-10`.
+PROPOSED 2026-11-16 by the architect at step 3 of `M9-00a`. Not started and not scheduled. DECIDED (owner, 2026-11-16: "do arch suggest", item 9 of the `M9-00a` review list): build only the assumption sentence of `M9-10` now; whether `M9-10c` is built is decided after the first slice, and it stays unscheduled until then.
 
 ## Goal
 When the plan holds an MQTT route and the broker shows that its MQTT plugin uses an exchange other than `amq.topic`, the planner says so next to the route instead of saying nothing.

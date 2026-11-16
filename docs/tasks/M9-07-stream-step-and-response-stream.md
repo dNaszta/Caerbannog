@@ -71,7 +71,8 @@ The tests are the exact API; the senior developer builds to them. Confirmed, wit
 
 Safety and architecture: no new broker call (`declareStream` is untouched, the stream manager and executor are untouched), no new dependency, no MCP tool (owner decision 2026-11-15; M9-07 adds nothing the MCP server has to expose). `core` stays pure (`StreamForm`, `PlanPairs` and the texts are `commonMain` with no `java.*`). `PlanCheck` already treats a `DeclareStream` as a queue name, so the new steps need no change there; a check of a pair is two ordinary stream steps. A response stream is an ordinary `DeclareStream`: no marker is written to the file.
 
-## Owner review list (new wording the owner has not seen; the architect recommends, the owner decides)
+## Owner review list (new wording)
+ALL ITEMS (1 to 12) DECIDED (owner, 2026-11-16: "do arch suggest" = the architect's recommendation): items 1 to 8 keep as built; 9 and 10 stay left out; 11 no wording change; 12 keep the tighter card spacing, final. Was: new wording the owner has not seen.
 | # | Where | Text | Recommendation |
 | --- | --- | --- | --- |
 | 1 | Note under the name field while the tick is on (`RESPONSE_STREAM_NOTE`) | "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them." Replaces the mockup text, which holds the sentence about RabbitMQ not moving messages (needs spike M9-00b). | Keep: it states only what the planner does. Reword it when M9-00b has run and may add one sentence about the broker. |

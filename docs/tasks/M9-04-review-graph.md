@@ -100,7 +100,7 @@ The tests are the exact API spec; the senior developer follows them. Confirmed a
 
 ## Owner review list (consolidated by the architect, step 5, round 2, 2026-11-16)
 
-Wording and look only, each a one-line change in `PlannerTexts` or the card. None blocks the merge. Screenshots: `ui/build/screenshots/planner-graph-*.png` (run `task test:screenshots`).
+ALL 11 ITEMS DECIDED (owner, 2026-11-16: "do arch suggest" = the architect's recommendation): each as recommended in the Recommendation column (items 7 to 10 and 11 were already answered "recommended" on 2026-11-16, see `M9-06`), final. Wording and look only, each a one-line change in `PlannerTexts` or the card. None blocks the merge. Screenshots: `ui/build/screenshots/planner-graph-*.png` (run `task test:screenshots`).
 
 | # | Item | Recommendation |
 | --- | --- | --- |
