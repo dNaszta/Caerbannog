@@ -1,0 +1,15 @@
+{
+  "request": "GET /api/queues/%2F/%2E%2E",
+  "status": 200,
+  "bodyIsAList": true,
+  "firstEntryKeys": [
+    "arguments",
+    "auto_delete",
+    "consumer_capacity",
+    "consumer_utilisation",
+    "consumers",
+    "delayed_retry",
+    "delivery_limit",
+    "durable"
+  ]
+}
