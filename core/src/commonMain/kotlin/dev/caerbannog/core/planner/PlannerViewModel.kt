@@ -135,6 +135,7 @@ class PlannerViewModel(
             "Queue" -> QueueForm(name = "")
             "Exchange" -> ExchangeForm(name = "")
             "Binding" -> BindingForm(exchange = "", destination = "")
+            "Stream" -> StreamForm(name = "")
             else -> return@act
         }
         page = Page.Form(blank, editing = null)
@@ -602,6 +603,7 @@ class PlannerViewModel(
             exchangeSuggestions = if (binding != null) ctx.exchangeSuggestions() else emptyList(),
             destinationSuggestions = binding?.let { ctx.destinationSuggestions(it.destinationKind) }.orEmpty(),
             asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
+            suggestedResponseName = (form as? StreamForm)?.suggestedResponseName(ctx).orEmpty(),
         )
     }
 

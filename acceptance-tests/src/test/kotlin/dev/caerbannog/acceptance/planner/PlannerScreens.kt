@@ -10,6 +10,7 @@ import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.requestFocus
 import dev.caerbannog.acceptance.migrations.ScreenDriver
 import dev.caerbannog.core.connections.ChipIcon
@@ -130,6 +131,29 @@ internal class PlannerScreenDriver(vm: PlannerViewModel) : ScreenDriver({
             check(now.getOrNull(SemanticsProperties.Focused) == true) { "$tag did not take focus" }
             now.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ").orEmpty()
         }
+    }
+
+    /** M9-07: the state of a toggle (the response stream tick): true On, false Off; fails when nothing toggleable is drawn with [tag]. */
+    fun isOn(tag: String): Boolean = exec {
+        waitForIdle()
+        val nodes = onAllNodes(SemanticsMatcher("tag $tag") { it.config.getOrNull(SemanticsProperties.TestTag) == tag }, useUnmergedTree = true).fetchSemanticsNodes()
+        check(nodes.isNotEmpty()) { "nothing is drawn with the test tag $tag" }
+        val state = nodes.first().config.getOrNull(SemanticsProperties.ToggleableState) ?: error("$tag is not a toggle")
+        state == androidx.compose.ui.state.ToggleableState.On
+    }
+
+    /** M9-07: types [text] into the field with [tag] as a user would (replacing what is there); the screen sends the event. */
+    fun replaceText(tag: String, text: String) = exec {
+        waitForIdle()
+        onNodeWithTag(tag, useUnmergedTree = true).performTextReplacement(text)
+        waitForIdle()
+    }
+
+    /** M9-07: what is typed in the text field with [tag]; null when it is not drawn. */
+    fun fieldText(tag: String): String? = exec {
+        waitForIdle()
+        onAllNodes(SemanticsMatcher("tag $tag") { it.config.getOrNull(SemanticsProperties.TestTag) == tag }, useUnmergedTree = true)
+            .fetchSemanticsNodes().firstOrNull()?.config?.getOrNull(SemanticsProperties.EditableText)?.text
     }
 
     /** True when the node can be typed into. */

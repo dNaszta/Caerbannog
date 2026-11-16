@@ -13,12 +13,13 @@ object PlannerTexts {
     )
 
     /** The kinds that have a form today, in wizard order. The others of [WIZARD_KINDS] are drawn when the task that builds their form lands. */
-    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding")
+    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream")
 
     fun kindDescription(kind: String): String = when (kind) {
         "Queue" -> "A quorum or classic queue"
         "Exchange" -> "Fanout, direct, topic or headers"
         "Binding" -> "From an exchange to a queue or an exchange"
+        "Stream" -> "Optionally with its response stream (DLN)"
         else -> ""
     }
 
@@ -64,6 +65,21 @@ object PlannerTexts {
 
     const val QUEUE_NAME_MISSING: String = "Give the queue a name"
     const val EXCHANGE_NAME_MISSING: String = "Give the exchange a name"
+    const val STREAM_NAME_MISSING: String = "Give the stream a name"
+    const val RESPONSE_NAME_MISSING: String = "Give the response stream a name"
+    const val RESPONSE_NAME_SAME: String = "The response stream needs a name of its own"
+    const val RESPONSE_STREAM_TICK: String = "Also create its response stream (DLN)"
+    const val RESPONSE_STREAM_NAME_LABEL: String = "Response stream (DLN) name"
+
+    /** Says only what the planner does: no claim about the broker until the spike M9-00b has measured it. */
+    const val RESPONSE_STREAM_NOTE: String =
+        "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them."
+    const val RESPONSE_LINK_LABEL: String = "response (DLN)"
+
+    /** The second line of a response stream's row; the name goes in only through the echo rule. */
+    fun responseStreamOf(request: String): String =
+        if (echoableName(request)) "Response stream (DLN) of $request" else "Response stream (DLN)"
+
     const val BINDING_EXCHANGE_MISSING: String = "Choose the exchange to bind from"
     const val BINDING_DESTINATION_MISSING: String = "Choose what to bind to"
 

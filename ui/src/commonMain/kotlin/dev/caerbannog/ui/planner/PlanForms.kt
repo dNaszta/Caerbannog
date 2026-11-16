@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +33,7 @@ import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.QueueForm
+import dev.caerbannog.core.planner.StreamForm
 import dev.caerbannog.core.planner.Suggestion
 import dev.caerbannog.core.planner.SuggestionSource
 import dev.caerbannog.core.planner.WizardState
@@ -102,6 +105,40 @@ internal fun BindingFormView(initial: BindingForm, details: WizardState.Details,
     ) { change(form.copy(destination = it)) }
     if (details.asksRoutingKey) {
         FormField("routingKey", "Routing key", form.routingKey, details, onNext) { change(form.copy(routingKey = it)) }
+    }
+}
+
+@Composable
+internal fun StreamFormView(initial: StreamForm, details: WizardState.Details, events: PlannerEvents, onNext: () -> Unit) {
+    var form by remember(details.editingStepId) { mutableStateOf(initial) }
+    val change = { new: StreamForm -> form = new; events.updateForm(new) }
+    Text("Stream", style = MaterialTheme.typography.titleLarge)
+    FormField("name", "Name", form.name, details, onNext, autoFocus = true) { change(form.copy(name = it)) }
+    // The tick is for adding: an edit replaces one step, so it offers no second stream.
+    if (details.editingStepId == null) {
+        Row(
+            modifier = Modifier
+                .toggleable(value = form.withResponse, role = Role.Checkbox, onValueChange = { change(form.copy(withResponse = it)) })
+                .padding(vertical = 4.dp)
+                .testTag("planForm:responseTick"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(checked = form.withResponse, onCheckedChange = null)
+            Text(PlannerTexts.RESPONSE_STREAM_TICK, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (form.withResponse) {
+            // The view has no naming style: the view model hands over the suggestion, which follows the stream name until the user edits it.
+            FormField("responseName", PlannerTexts.RESPONSE_STREAM_NAME_LABEL, form.responseName ?: details.suggestedResponseName, details, onNext) {
+                change(form.copy(responseName = it))
+            }
+            Text(
+                PlannerTexts.RESPONSE_STREAM_NOTE,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("planForm:responseNote"),
+            )
+        }
     }
 }
 

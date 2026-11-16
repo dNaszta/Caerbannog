@@ -54,3 +54,5 @@ None (owner decision 2026-11-15).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+- Notes from the M9-07 review (2026-11-16): (F2) three nodes in one column draw a graph scrollbar at 1280 x 800 (M9-04 layout), look at it when the policy node is added; remove the unused `GRAPH_BOX_MIN` in `PlannerScreen.kt` or derive the card floors from it while touching that file.

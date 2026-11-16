@@ -169,6 +169,9 @@ private fun StepList(
     }
 }
 
+/** A response stream sits under its request stream, one step further in. */
+private val RESPONSE_INDENT = 24.dp
+
 @Composable
 private fun StepRow(
     index: Int,
@@ -185,6 +188,7 @@ private fun StepRow(
     val selected = state.selectedStepId == step.id
     val result = state.stepCheck(step.id)
     val stale = (state.check as? CheckState.Done)?.stale == true
+    val pairLine = state.responseStreamLine(step.id)
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -216,9 +220,14 @@ private fun StepRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(24.dp),
             )
+            // The number stays in its column; the icon and the words move in.
+            if (pairLine != null) Spacer(Modifier.width(RESPONSE_INDENT))
             ConnectionIcon(step.action.icon(), SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(step.title, style = MaterialTheme.typography.bodyMedium)
+                pairLine?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planStepPair:$index"))
+                }
                 step.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (blocking.isNotEmpty()) {
                     Row(Modifier.testTag("planStepProblem:$index"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {

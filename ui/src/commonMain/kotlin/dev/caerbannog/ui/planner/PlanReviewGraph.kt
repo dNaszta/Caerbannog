@@ -43,7 +43,7 @@ import dev.caerbannog.ui.topology.BindingGraphCanvas
  */
 @Composable
 internal fun PlanReviewGraph(graph: PlanGraph, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         graph.notice?.let { GraphNotice(it) }
         if (graph.notice != PlanGraphNotice.TooLarge) {
             GraphLegend()

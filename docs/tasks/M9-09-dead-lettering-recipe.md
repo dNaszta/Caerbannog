@@ -52,5 +52,7 @@ None (owner decision 2026-11-15).
 - S-C1 decides the summary sentence; until then it is not final wording.
 - S-F2 decides the policy warning.
 
+- Note (architect, M9-07 step 2.5, 2026-11-16): the outline "The dead-letter names are suggested with suffixes in the naming style" (feature 21) still starts with `Given the naming style is "<style>"`, which is a `@Then` assertion and cannot set the style. M9-07 fixed the same line of its own outline to `Given I chose the naming style "<style>" in the planner` (step in `PlannerDraftSteps`); the test developer of this task does the same here.
+
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

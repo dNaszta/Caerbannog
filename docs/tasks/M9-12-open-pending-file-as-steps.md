@@ -50,5 +50,7 @@ None (owner decision 2026-11-15).
 - Q16 (decided 2026-11-15): "Edit steps" is the main button beside "Edit file".
 - Q10 (decided 2026-11-15): deletes are not built by the wizard; a delete in a file is a read-only step (already the rule here).
 
+- Stand-ins from M9-07 (architect, step 2.5, 2026-11-16): `PlannerStreamSteps` (acceptance-tests, `planner` package) binds `a pending migration {string} that declares the streams {string} and {string}` (puts the actions in the draft file) and `I choose {string} for {string}` (restarts the planner on that draft; it knows only "Edit steps"). They serve the two `@m9-07` scenarios "A saved pair is shown as a pair again when its name follows the rule" and "Two streams whose names do not follow the rule are two streams" (feature 21, `I choose "Edit steps" for "0005"`). M9-12 must REPLACE the step `I choose {string} for {string}` with the real Migrations screen button (one binding only, or Cucumber reports an ambiguous step) and bind the pending-migration step to a real pending file, then run those two scenarios against the real path. A response stream recognised by `PlanPairs` is opened as an ordinary stream step (`StepForms.formOf(DeclareStream)` gives `StreamForm(name)`, no tick).
+
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

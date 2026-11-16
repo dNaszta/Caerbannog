@@ -155,9 +155,17 @@ fun planPreview(
         newNodeIds = isNew,
         newEdgeIds = graph.edges.map { it.edge.id }.toSet(),
         notInPlanNodeIds = notInPlan,
+        links = responseLinks(plan),
         notice = notice,
     )
 }
+
+/** One link per recognised pair, from the request stream to its response stream; a link is not an edge, so it adds no routing. */
+private fun responseLinks(plan: TopologyPlan): List<PlanLink> = PlanPairs.responseOf(plan).mapNotNull { (response, request) ->
+    val from = (plan.steps.firstOrNull { it.id == request }?.action as? MigrationAction.DeclareStream)?.name
+    val to = (plan.steps.firstOrNull { it.id == response }?.action as? MigrationAction.DeclareStream)?.name
+    if (from == null || to == null) null else PlanLink("q:$from", "q:$to", PlanLinkKind.ResponseStream)
+}.distinct()
 
 private fun GraphNode.rawName(): String = id.substring(2)
 

@@ -46,7 +46,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   @m9-07 @fake-broker
   Scenario Outline: The response stream name is suggested with a suffix in the naming style
-    Given the naming style is "<style>"
+    Given I chose the naming style "<style>" in the planner
     When I enter the stream name "orders" and tick "Also create its response stream (DLN)"
     Then the response stream name is suggested as "<suggested>"
 
@@ -78,10 +78,11 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add a stream "telemetry" with the wizard and tick "Also create its response stream (DLN)"
     Then the plan holds no exchange, no binding and no policy
 
-  @m9-07 @needs-spike @fake-broker
+  # The sentence about what the broker does (S-D, spike M9-00b) is deferred: it is not measured, so this text says only what the planner does.
+  @m9-07 @fake-broker
   Scenario: The wizard says what a response stream is
     When I tick "Also create its response stream (DLN)" in the stream form
-    Then the form says "A response stream is an ordinary stream. RabbitMQ does not move messages into it by itself: your applications write to it."
+    Then the form says "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them."
 
   @m9-07 @fake-broker
   Scenario: A saved pair is shown as a pair again when its name follows the rule

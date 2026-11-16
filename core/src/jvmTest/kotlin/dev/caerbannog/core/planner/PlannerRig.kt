@@ -65,6 +65,8 @@ internal class PlannerRig(
 
     fun queue(name: String, type: String = "quorum") = add(QueueForm(name = name, type = type))
     fun exchange(name: String, type: String = "direct") = add(ExchangeForm(name = name, type = type))
+    fun stream(name: String, withResponse: Boolean = false, responseName: String? = null) =
+        add(StreamForm(name = name, withResponse = withResponse, responseName = responseName))
     fun binding(exchange: String, queue: String, key: String = "") =
         add(BindingForm(exchange = exchange, destination = queue, destinationKind = BindingDestinationType.QUEUE, routingKey = key))
 
@@ -85,6 +87,7 @@ internal class PlannerRig(
             is QueueForm -> "Queue"
             is ExchangeForm -> "Exchange"
             is BindingForm -> "Binding"
+            is StreamForm -> "Stream"
         }
     }
 }
