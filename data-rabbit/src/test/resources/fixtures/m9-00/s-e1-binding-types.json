@@ -1,0 +1,1 @@
+[{"source":"<exchange>","vhost":"/","destination":"<queue>","destination_type":"queue","routing_key":"","arguments":{"decimal":1.5,"flag":true,"negative":-3,"number":10,"numeric-text":"10","text":"abc","x-match":"all"},"properties_key":"~jHtONQ"}]

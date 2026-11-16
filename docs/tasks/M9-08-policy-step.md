@@ -33,12 +33,12 @@ Out: operator policies; editing a policy that exists on the broker; a free "othe
 - BDD: `21_topology_planner_recipes.feature` / "A pattern the app cannot evaluate is said so and can still be added" (@fake-broker @negative)
 - BDD: `21_topology_planner_recipes.feature` / "Two policies of a plan that match the same queue are pointed out" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "Policies of a plan that cannot bind to the same queue are not pointed out" (outline, @fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A policy whose settings one kind of queue ignores is said to have no effect on it" (@fake-broker @needs-decision: proposed wording)
+- BDD: `21_topology_planner_recipes.feature` / "A policy whose settings one kind of queue ignores is said to have no effect on it" (@fake-broker; wording decided 2026-11-16)
 - BDD: `21_topology_planner_recipes.feature` / "A policy that would take the place of a policy on the broker is pointed out by the check" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A policy that would never apply because the broker's policy has the higher priority is pointed out by the check" (@fake-broker @needs-decision)
-- BDD: `21_topology_planner_recipes.feature` / "A policy with the same priority as the broker's policy is pointed out by the check" (@fake-broker @needs-decision)
+- BDD: `21_topology_planner_recipes.feature` / "A policy that would never apply because the broker's policy has the higher priority is pointed out by the check" (@fake-broker; wording decided 2026-11-16)
+- BDD: `21_topology_planner_recipes.feature` / "A policy with the same priority as the broker's policy is pointed out by the check" (@fake-broker; wording decided 2026-11-16)
 - BDD: `21_topology_planner_recipes.feature` / "A policy on a queue that the broker applies no policy to is not pointed out" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A policy that applies to more than one kind of target offers only what all of them honour" (outline, @fake-broker @needs-decision)
+- BDD: `21_topology_planner_recipes.feature` / "A policy that applies to more than one kind of target offers only what all of them honour" (outline, @fake-broker; wording decided 2026-11-16)
 - BDD: `21_topology_planner_recipes.feature` / "Keep messages for is saved as text" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "Retention of a stream is saved as a policy" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "The response stream gets the same retention unless I untick it" (@fake-broker)
@@ -58,7 +58,7 @@ None (owner decision 2026-11-15).
 ## Open points
 - Settled by the spike (2026-11-16): the catalog (S-F1b), the notes exist (S-F2a: no merge). Not settled: whether a policy with `apply-to: queues` includes streams (conservative reading above), the winner of an equal-priority tie (the note says it is not predictable), `M`, `h`, `m` as `max-age` units.
 - Q4 (decided 2026-11-15: retention in the stream form as one policy covering the stream and, with a tick, its response stream): the keys are confirmed (S-F1b: `max-age`, `max-length-bytes`, `stream-max-segment-size-bytes` take effect on a stream). The stream list does NOT show a policy-set retention (S-F1d): the follow-up is `M9-08b`, to be merged before the retention block is released. Not fixed here.
-- A plain label per key is wording: the list of labels is shown to the owner with the spike results before step 2 (Owner review list item 2 of `M9-00c`, together with the target labels and the three proposed notes, items 3 to 5).
+- A plain label per key is wording: the list of labels is shown to the owner with the spike results before step 2 (Owner review list item 2 of `M9-00c`, together with the target labels and the three notes, items 3 to 5; all DECIDED by the owner on 2026-11-16, "do arch suggest" = the recommendation).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
