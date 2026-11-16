@@ -83,6 +83,7 @@ class RabbitMqConnectionGateway(
                 mqttPublisher = RabbitMqMqttPublisher(profile, password, transport),
                 queueInspector = ManagementQueueMessageInspector(http, requests),
                 migrationExecutor = access.executor,
+                declareCheck = access.declareCheck,
                 migrationUnavailableReason = access.unavailableReason,
             ),
         )
