@@ -1,6 +1,6 @@
 # M9-10: MQTT route step: a topic filter to a queue or stream, saved as a binding on amq.topic
 
-Milestone: M9    Depends on: M9-00a (measured 2026-11-16: S-A1 to S-A4, S-B, S-A6, S-A7), M9-03, M9-04; the refusal texts, the `amq.topic` assumption sentence and the sentence under the correlation-id header wait for the owner (Owner review list of `M9-00a`, items 1 to 5), the logic does not; "Edit steps" scenarios also need M9-12    Size: M (the largest of M9; if step 3 passes its third day, the sample-value dialog, which depends on nothing else in this task, is cut out as `M9-10b`)
+Milestone: M9    Depends on: M9-00a (measured 2026-11-16: S-A1 to S-A4, S-B, S-A6, S-A7), M9-03, M9-04; the refusal texts, the `amq.topic` assumption sentence and the sentence under the correlation-id header are DECIDED (owner, 2026-11-16, Owner review list of `M9-00a`, items 1 to 5); "Edit steps" scenarios also need M9-12    Size: M (the largest of M9; if step 3 passes its third day, the sample-value dialog, which depends on nothing else in this task, is cut out as `M9-10b`)
 
 PLANNED 2026-11-15. Not started.
 
@@ -26,9 +26,9 @@ Out: MQTT subscriptions, QoS or retained settings of a route (a route is only a 
 - BDD: `21_topology_planner_recipes.feature` / "An MQTT route is saved as a binding on amq.topic" (@fake-broker @smoke; the examples now also hold `+` and `a/b/c`)
 - BDD: `21_topology_planner_recipes.feature` / "An MQTT route can lead to a queue or to a stream" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "A topic filter that MQTT does not allow is refused in the form" (@fake-broker @negative)
-- BDD: `21_topology_planner_recipes.feature` / "A topic filter that RabbitMQ would not carry back unchanged, or that is almost surely a mistake, is refused" (outline of six rows: dot, `*` inside a level, a whole-level `*`, empty level, leading `/`, trailing `/`; @fake-broker @negative @needs-decision: wording for the owner; replaces "A topic filter that cannot be translated safely is refused")
+- BDD: `21_topology_planner_recipes.feature` / "A topic filter that RabbitMQ would not carry back unchanged, or that is almost surely a mistake, is refused" (outline of six rows: dot, `*` inside a level, a whole-level `*`, empty level, leading `/`, trailing `/`; @fake-broker @negative; wording decided 2026-11-16; replaces "A topic filter that cannot be translated safely is refused")
 - BDD: `21_topology_planner_recipes.feature` / "A filter that works as typed is accepted" (outline: a space, a leading `$`, `sensors/#`; @fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "The form says that amq.topic is an assumption" (@fake-broker @needs-decision: wording for the owner)
+- BDD: `21_topology_planner_recipes.feature` / "The form says that amq.topic is an assumption" (@fake-broker; wording decided 2026-11-16)
 - BDD: `21_topology_planner_recipes.feature` / "The form shows the binding it will write and a topic that matches" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "A saved MQTT route is shown as an MQTT route again" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "An MQTT route to something the planner does not know is named without its kind" (@fake-broker)
@@ -39,7 +39,7 @@ Out: MQTT subscriptions, QoS or retained settings of a route (a route is only a 
 - BDD: `21_topology_planner_recipes.feature` / "A hash asks for the rest of the topic" (@fake-broker)
 - BDD: `21_topology_planner_recipes.feature` / "A sample value that would not make a valid topic is refused" (@fake-broker @negative)
 - BDD: `21_topology_planner_recipes.feature` / "The dialog opens with a correlation-id header that is generated and can be changed" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "The dialog says where the correlation id arrives" (@fake-broker @needs-decision: wording for the owner)
+- BDD: `21_topology_planner_recipes.feature` / "The dialog says where the correlation id arrives" (@fake-broker; wording decided 2026-11-16)
 - BDD: `21_topology_planner_recipes.feature` / "The test message is not offered where publishing is not possible" (@fake-broker @negative)
 - BDD: `21_topology_planner_recipes.feature` / "A route of a migration that is not applied here offers no test message" (@fake-broker @negative)
 - BDD: `21_topology_planner_recipes.feature` / "A message published over MQTT to a planned route reaches a stream and a queue" (@broker; now also checks that a `alarms/#` route receives `alarms` itself, measured in S-A2)
@@ -64,7 +64,7 @@ None for the planner (owner decision 2026-11-15). The existing tool `caerbannog_
 - Recognition (A10) keeps `sensors..temp` and any key `toFilter` refuses as an ordinary binding (the outline of 'A binding on amq.topic that is not a plain MQTT route stays a binding' is unchanged).
 - The wording of the disabled reason without write permission reuses the existing text of the publish gate.
 - Q17 (decided by the owner on 2026-11-15, O14): the header key of the test message is `correlation-id`, an MQTT 5 user property only, editable in the dialog.
-- Four scenarios carry `@needs-decision` for wording only (refusals, assumption sentence, sentence under the header; Owner review list of `M9-00a`, items 1 to 5). Build them with the proposed texts and keep them out of the suite until the owner has answered; the other scenarios of this task are unaffected.
+- The wording of four scenarios (refusals, assumption sentence, sentence under the header; Owner review list of `M9-00a`, items 1 to 5) is DECIDED (owner, 2026-11-16: "do arch suggest"); they lost `@needs-decision` and carry the decided text. Item 8 (correlation data field) is decided as "keep Q17, no dialog change", reopenable; item 9: only the assumption sentence now.
 - The owner's service may read the standard AMQP `correlation-id` rather than the application property (review list item 8): the test message would then not exercise it. Not a blocker of this task.
 - A custom MQTT exchange (S-B2) is the largest risk of this task: a route on `amq.topic` applies without error and routes nothing. The assumption sentence is the whole answer here; `M9-10c` is the optional hint.
 

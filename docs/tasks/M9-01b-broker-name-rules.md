@@ -20,7 +20,7 @@ In (`core.planner`, `commonMain`, no `java.*`; UTF-8 byte length is counted with
 Out: hints for names (advice stays O11); the 255-byte rule for streams, exchanges, policies (accepted by the broker); names with `.`/`..` (already refused); case variants of `amq.` (unmeasured).
 
 ## Acceptance
-- BDD: `19_topology_planner.feature` / "A name that RabbitMQ would refuse is refused by the form" (outline, 5 rows; @m9-01b @negative @fake-broker; `@needs-decision` stays until the owner has seen the two messages, Owner review list item 1 of `M9-00c`)
+- BDD: `19_topology_planner.feature` / "A name that RabbitMQ would refuse is refused by the form" (outline, 5 rows; @m9-01b @negative @fake-broker; the two messages DECIDED by the owner on 2026-11-16, Owner review list item 1 of `M9-00c`; `@needs-decision` removed)
 - BDD: `19_topology_planner.feature` / "A name that RabbitMQ accepts is not refused by the form" (outline, 5 rows; @m9-01b @fake-broker)
 - Unit: `QueueFormTest`, `ExchangeFormTest`, `StreamFormTest` rows per name (prefix, 255 and 256 ASCII bytes, 127 and 128 two-byte characters, a four-byte character at the border); `Utf8LengthTest` (1 to 4 byte code points, well-formed text only).
 
@@ -34,8 +34,8 @@ One pure `BrokerNameRules` object, used by the three forms; messages in `Planner
 None (owner decision 2026-11-15, no MCP for the planner).
 
 ## Open points
-- Wording (Owner review list item 1): the proposed messages are `Names that start with "amq." are reserved` and `A queue name can be at most 255 bytes long`.
-- Whether a file's `amq.` step should also show a note in the plan: not proposed (the apply says it); add if the owner wants it.
+- Wording (Owner review list item 1, DECIDED 2026-11-16): the messages are `Names that start with "amq." are reserved` and `A queue name can be at most 255 bytes long`.
+- Whether a file's `amq.` step should also show a note in the plan: DECIDED (owner, 2026-11-16, item 10 of `M9-00c`): no note; the check says "Will be created" and the apply says the broker's refusal.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

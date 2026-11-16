@@ -1,6 +1,6 @@
 # M9-14b: Export polish (follow-ups of the M9-14 review)
 
-Milestone: M9 (follow-up)    Depends on: M9-14 merged (on main since 342b0a7)    Size: S (core, plus the two strict parsers in `data-rabbit`; no `ui` line changes)
+Milestone: M9 (follow-up)    Depends on: M9-14 merged; the owner's answers to items 3 to 6 of its Owner review list (ANSWERED 2026-11-16, see there)    Size: S (core, plus the two strict parsers in `data-rabbit`; no `ui` line changes)
 
 ## Goal
 The export note says the right thing in the right amount, the export failure text says the right reason, and the export checks only what it writes.
@@ -96,7 +96,7 @@ None (UI-only; the MCP server has no export tool, and no new capability is added
 Tests to add (test developer, before step 3 is merged; tests first): (i) `TopologyExportNoteTest`: a stream whose `typedArgumentsComplete = false` and no other argument gives "Left out: other settings of stream X"; the same with retention gives "retention and other settings of stream X"; a super stream partition with the flag false adds "other settings" to the union. (ii) `MigrationsViewModelExportTest`: a stream with a refused argument exports, writes the file and the note says "other settings of stream X". (iii) `ManagementExportReadsTest`: already pins the flag for queues (a stream is a queue row); only check a `x-queue-type=stream` row is covered, add one if not. No existing test changes beyond step 2.
 
 ## Open points
-None blocking. Wording above is final for the build unless the owner edits the list.
+Wording: DECIDED (owner, 2026-11-16, items 3 to 6 of the M9-14 list): the text of the note kept, one entry per super stream with a cap of about ten ("and N more"), the second sentence "The topology was read, but a setting in it cannot be written to a migration file.", and each setting named only when present. Nothing is open; the brief is ready to build. Not in this task (owner, 2026-11-16: "do arch suggest"): the stream's retention and leader locator in the export wait for `declareStream` arguments, a separate follow-up.
 
 ## Status
 - Step 1 (architect, 2026-11-16, round 0, branch `m9-14b-export-polish`, base main `342b0a7`): brief CHANGED against the real code (`TopologyExport.kt`, `MigrationsViewModel.readTopologyExport`, `ManagementJson` parsers, `typedArgumentsComplete`, `MigrationsExportNoteUiTest`, feature `10` @m9-14): owner answers recorded; wording constants decided; F3 needs the two strict `data-rabbit` parsers to become tolerant (so it is not core only); F4 test named; F5 out, F6 in; 7 scenarios written in feature `10` (tag `@m9-14b`, glue missing, so they fail until step 2). Next: step 2 (test developer: glue, unit tests, parser tests, all red first).

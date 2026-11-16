@@ -40,7 +40,7 @@ None.
 None, same reason as `M9-05` (owner decision 2026-11-15, no MCP for the planner).
 
 ## Open points
-- Wording: the apply's text for rule 2 ("was found with different settings after it was declared") differs from the check's "Exists with different settings"; no change proposed (Owner review list item 8, `M9-00c`).
+- Wording: the apply's text for rule 2 ("was found with different settings after it was declared") differs from the check's "Exists with different settings"; no change (DECIDED, owner 2026-11-16, Owner review list item 8, `M9-00c`: keep both).
 - A wrong "Already there" for an argument outside the 20 classified ones is harmless (the apply stops, nothing changes) and is reported as such.
 
 ## Definition of done
