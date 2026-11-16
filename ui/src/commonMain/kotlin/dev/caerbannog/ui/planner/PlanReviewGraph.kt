@@ -52,6 +52,7 @@ internal fun PlanReviewGraph(graph: PlanGraph, modifier: Modifier = Modifier) {
                 plan = graph,
                 size = Modifier.fillMaxWidth().heightIn(min = 160.dp).weight(1f, fill = false),
                 containerTag = "planner:reviewGraph",
+                scrollbars = true,
             )
         }
     }

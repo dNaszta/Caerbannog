@@ -2,6 +2,9 @@ package dev.caerbannog.ui.topology
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -73,22 +77,22 @@ internal fun BindingGraphCanvas(
     plan: PlanGraph? = null,
     size: Modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp, max = 800.dp),
     containerTag: String = "bindingsGraphContainer",
+    /** Scrollbars for mouse users, drawn only on overflow. Off for the Topology screen, whose canvas stays as it was. */
+    scrollbars: Boolean = false,
 ) {
-    val nodes = graph.nodes
-    val edges = graph.edges
+    // The review graph closes an empty first column (a plan of queues only has no exchange to its left), so a small plan fits its card.
+    val shift = if (plan == null) 0f else (graph.nodes.minOfOrNull { it.x } ?: 24f) - 24f
+    val nodes = if (shift == 0f) graph.nodes else graph.nodes.map { it.copy(x = it.x - shift) }
+    val edges = if (shift == 0f) graph.edges else graph.edges.map { it.copy(fromX = it.fromX - shift, toX = it.toX - shift, labelX = it.labelX - shift) }
     val maxX = (nodes.maxOfOrNull { it.x } ?: 0f) + NODE_WIDTH + 48f
     val maxY = (nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f
-    val graphWidth = maxOf(640f, maxX).dp
-    val graphHeight = maxOf(400f, maxY).dp
+    // The Bindings graph keeps its minimum size; the review graph is as big as its content, so a small plan fits its card and has no bar.
+    val graphWidth = maxOf(if (plan == null) 640f else 0f, maxX).dp
+    val graphHeight = maxOf(if (plan == null) 400f else 0f, maxY).dp
 
-    Box(
-        size
-            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            .horizontalScroll(rememberScrollState())
-            .verticalScroll(rememberScrollState())
-            .testTag(containerTag),
-    ) {
+    val horizontal = rememberScrollState()
+    val vertical = rememberScrollState()
+    val drawing: @Composable () -> Unit = {
         Box(Modifier.size(graphWidth, graphHeight)) {
             // Edges canvas
             val edgeColor = MaterialTheme.colorScheme.outline
@@ -171,6 +175,28 @@ internal fun BindingGraphCanvas(
                     onSelectQueue = onSelectQueue,
                     onOpenStream = onOpenStream,
                 )
+            }
+        }
+    }
+    val frame = size
+        .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp))
+        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+    if (!scrollbars) {
+        Box(frame.horizontalScroll(horizontal).verticalScroll(vertical).testTag(containerTag)) { drawing() }
+    } else {
+        Box(frame) {
+            Box(Modifier.fillMaxSize().horizontalScroll(horizontal).verticalScroll(vertical).testTag(containerTag)) { drawing() }
+            // Drawn only when the content overflows, so a graph that fits has none. One tagged box holds both bars.
+            val overflows = horizontal.maxValue > 0 || vertical.maxValue > 0
+            if (overflows) {
+                Box(Modifier.matchParentSize().testTag("planner:graphScrollbar")) {
+                    if (horizontal.maxValue > 0) {
+                        HorizontalScrollbar(rememberScrollbarAdapter(horizontal), Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp))
+                    }
+                    if (vertical.maxValue > 0) {
+                        VerticalScrollbar(rememberScrollbarAdapter(vertical), Modifier.align(Alignment.TopEnd).fillMaxHeight().padding(bottom = 12.dp))
+                    }
+                }
             }
         }
     }
