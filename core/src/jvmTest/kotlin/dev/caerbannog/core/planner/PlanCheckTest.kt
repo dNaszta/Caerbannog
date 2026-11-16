@@ -356,7 +356,7 @@ class PlanCheckTest {
     }
 
     @Test
-    fun `a cancelled check stops at once and reads nothing more, and gives no result`() = runBlocking {
+    fun `a cancelled check stops at once and reads nothing more, and gives no result`() = runBlocking<Unit> {
         val gate = CompletableDeferred<Unit>()
         val check = FakeDeclareCheck().answerNamed("orders", BrokerFinding.Same).answerWith("events") { gate.await(); BrokerFinding.Same }
         val third = MigrationAction.DeclareQueue("third")
