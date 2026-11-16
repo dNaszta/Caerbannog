@@ -251,3 +251,22 @@ Feature: Check a plan against the broker
     When the check reads the queue and the exchange named "." and ".." through the management API
     Then every step shows "Could not be checked"
     And the check sent GET requests only
+
+  # M9-14c (owner decision O16, 2026-11-17): what "Already there" compares for a stream. Only what the step declares counts, as for a queue:
+  # a step with no settings is the same whatever the broker holds (a stream the product made carries x-queue-leader-locator balanced);
+  # every declared setting must be on the broker with the same value. Carries @needs-M9-14c and no @fake-broker until step 2 (the planner
+  # runner selects m9-01 to m9-07 with @fake-broker, so nothing selects these before then).
+  @m9-14c @needs-M9-14c
+  Scenario Outline: A stream is compared on the settings its step declares
+    Given the broker has the stream "audit" with "x-max-age" as the text "1D" and "x-queue-leader-locator" as the text "balanced"
+    And a plan with the step <step>
+    When I check the plan against "uat-eu"
+    Then the step <step> shows "<result>"
+
+    Examples:
+      | step                                                       | result                         |
+      | Declare stream audit                                       | Already there                  |
+      | Declare stream audit with x-max-age 1D                     | Already there                  |
+      | Declare stream audit with x-max-age 7D                     | Exists with different settings |
+      | Declare stream audit with x-max-length-bytes 1000000000    | Exists with different settings |
+      | Declare stream archive with x-max-age 7D                   | Will be created                |

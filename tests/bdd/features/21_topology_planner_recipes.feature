@@ -96,6 +96,24 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I tick "Also create its response stream (DLN)" in the stream form
     Then the form says "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them."
 
+  # M9-07c (owner decision O16, 2026-11-17: "add it"): the one sentence about the broker is added, unchanged from the mockup.
+  # Basis: M9-00b S-D1 to S-D3 (RabbitMQ 4.4.0, a plain stream). This scenario REPLACES the one above in step 2 of M9-07c; until then it
+  # carries @needs-M9-07c and no @fake-broker so that no runner selects it (the planner runner needs @fake-broker).
+  @m9-07 @m9-07c @needs-M9-07c
+  Scenario: The wizard says what a response stream is and what RabbitMQ does not do
+    When I tick "Also create its response stream (DLN)" in the stream form
+    Then the form says "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it."
+
+  # M9-14c (owner decision O16, 2026-11-17): the planner's stream form still writes a name only (retention stays a policy, A5, Q4). A
+  # stream step of an opened file that carries settings cannot be held by the form, so it opens read-only and is written back unchanged (A2).
+  # It needs "Edit steps" (M9-12), so it is tagged @m9-12 as well.
+  @m9-12 @m9-14c @needs-M9-14c
+  Scenario: A stream step with settings opens read-only and is kept as written
+    Given a pending migration "0005" that declares the stream "audit" with "x-max-age" as the text "7D"
+    When I choose "Edit steps" for "0005"
+    Then the step "Declare stream audit" is shown read-only with the detail "x-max-age 7D"
+    And saving the plan without a change writes the same bytes
+
   @m9-07 @fake-broker
   Scenario: A saved pair is shown as a pair again when its name follows the rule
     Given a pending migration "0005" that declares the streams "telemetry" and "telemetry-dln"
@@ -724,14 +742,28 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And nothing was published
 
   # Measured (M9-00a, S-A6, S-A7): this header arrives on the stream message as the application property "correlation-id";
-  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. Sentence
-  # under the header decided 2026-11-16 (Owner review list of M9-00a, item 5; item 8: no correlation data field for now).
+  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. The first
+  # sentence was decided 2026-11-16 (Owner review list of M9-00a, item 5). Owner decision O16 (2026-11-17): it is a visible
+  # WARNING, not a quiet hint, and it adds that the owner's service must read and write that application property; the
+  # dialog gets no correlation data field (Q17 stays). The second sentence is the architect's proposal for the owner to approve
+  # (the scenario below carries it; the owner may reword it): the warning is shown as a warning banner, not as plain text.
   @m9-10 @fake-broker
-  Scenario: The dialog says where the correlation id arrives
+  Scenario: The dialog warns that the service must read and write the application property correlation-id
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
     When I choose "Send a test message" for that route and enter "d42"
-    Then under the header "correlation-id" it says "In the stream message this arrives as the application property correlation-id, not as the AMQP correlation-id property."
+    Then under the header "correlation-id" a warning says "In the stream message this arrives as the application property correlation-id, not as the AMQP correlation-id property. Your service must read and write that application property."
+    And the warning is shown as a warning and not as a hint
+    And the dialog has no field for MQTT 5 correlation data
+
+  # Measured (M9-00a, S-A6): on a quorum queue the header arrives as an entry of the headers table, not as an application
+  # property. The queue text is the architect's proposal; the owner has not seen it (list in docs/tasks/M9-10-mqtt-route-step.md).
+  @m9-10 @fake-broker @needs-decision
+  Scenario: The warning for a route into a queue names the headers table
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "sensors/+/temp" to the queue "temperatures" is applied to "uat-eu"
+    When I choose "Send a test message" for that route and enter "s1"
+    Then under the header "correlation-id" a warning says "In the queue message this arrives as an entry of the headers table named correlation-id, not as the AMQP correlation_id property. Your service must read and write that header."
 
   @m9-10 @negative @fake-broker
   Scenario Outline: The test message is not offered where publishing is not possible
