@@ -40,3 +40,5 @@ Q14 (decided 2026-11-15, as written): the result words are built as in the spec;
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+Note (architect, M9-05 step 1, 2026-11-16): (F4) from the M9-04 review moves here, the first task to touch `PlanReviewCard`: raise `SIDE_BY_SIDE_FROM` in `PlannerScreen.kt` from 900 dp to about 1400 dp so a small plan fits at 1280 px (check `PlanReviewGraphRound2UiTest` at 1280). It needs the OWNER'S word (item 11 of the M9-04 owner review list, unanswered); ask before step 3 of this task. Options: A) 1400 dp (recommended); B) keep 900 dp and narrow the nodes; C) leave it.

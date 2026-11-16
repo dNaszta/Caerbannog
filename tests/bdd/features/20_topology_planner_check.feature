@@ -13,7 +13,7 @@ Feature: Check a plan against the broker
   PLANNED 2026-11-15, not built. The exact rule for "the same settings" of a queue and an exchange waits
   for the spike M9-00c (S-G); the scenarios below use differences that today's comparison already tells
   apart (type, flags, a declared argument with another value). Sub-tags: @m9-05 the check in core and
-  data-rabbit, @m9-06 the check on the screen. The wording of the results is decided (Q14, 2026-11-15).
+  data-rabbit, @m9-05b the argument rule measured by S-G (one live scenario), @m9-06 the check on the screen. The wording of the results is decided (Q14, 2026-11-15).
 
   Background:
     Given I am connected to "uat-eu" with the virtual host "/"
@@ -221,7 +221,7 @@ Feature: Check a plan against the broker
     Then every step shows "Already there"
     And the check sent GET requests only
 
-  @m9-05 @broker @needs-spike
+  @m9-05b @broker @needs-spike
   Scenario: What the check calls different is what a real broker refuses
     Given a real RabbitMQ 4 broker with a quorum queue declared with "x-delivery-limit" 3
     And a plan that declares the same queue with "x-delivery-limit" 5
