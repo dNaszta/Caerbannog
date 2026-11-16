@@ -63,8 +63,8 @@ class HelpFocusOrderUiTest {
             MigrationsScreen(state = state, onSelectVersion = {}, onApplyPending = {}, onApplySingle = {}, onImportJson = {}, onExportTopology = {}, onUpdateFile = { _, _ -> }, onValidateAgain = {}, onDismissError = {})
         }
         val stops = stops(12)
-        // the app frame (navigation items) and the four app-bar buttons come first by design; the first stop of the screen's own content is the link
-        val appBar = setOf("migrations:migrate3xBtn", "migrations:importBtn", "migrations:exportBtn", "migrations:applyPendingBtn")
+        // the app frame (navigation items) and the app-bar buttons (New plan, Migrate from 3.x, Import, Export, Apply pending) come first by design; the first stop of the screen's own content is the link
+        val appBar = setOf("migrations:newPlanBtn", "migrations:migrate3xBtn", "migrations:importBtn", "migrations:exportBtn", "migrations:applyPendingBtn")
         val content = stops.filterNot { it.startsWith("navItem:") || it in appBar }
         assertEquals("howto-apply-migrations", content.firstOrNull(), "stops: $stops")
     }
