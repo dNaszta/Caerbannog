@@ -84,7 +84,10 @@ internal fun BindingGraphCanvas(
     val shift = if (plan == null) 0f else (graph.nodes.minOfOrNull { it.x } ?: 24f) - 24f
     val nodes = if (shift == 0f) graph.nodes else graph.nodes.map { it.copy(x = it.x - shift) }
     val edges = if (shift == 0f) graph.edges else graph.edges.map { it.copy(fromX = it.fromX - shift, toX = it.toX - shift, labelX = it.labelX - shift) }
-    val maxX = (nodes.maxOfOrNull { it.x } ?: 0f) + NODE_WIDTH + 48f
+    val links = plan?.let { p -> responseLinkShapes(p, nodes) }.orEmpty()
+    // A link of a pair in one column is drawn on the right of it, with its label: leave room for both.
+    val linkRoom = if (links.isEmpty()) 0f else (links.maxOf { it.labelX } + LINK_LABEL_WIDTH + 12f)
+    val maxX = maxOf((nodes.maxOfOrNull { it.x } ?: 0f) + NODE_WIDTH + 48f, linkRoom)
     val maxY = (nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f
     // The Bindings graph keeps its minimum size; the review graph is as big as its content, so a small plan fits its card and has no bar.
     val graphWidth = maxOf(if (plan == null) 640f else 0f, maxX).dp
@@ -118,6 +121,43 @@ internal fun BindingGraphCanvas(
                         path,
                         color = if (isNew) newEdgeColor else edgeColor,
                         style = Stroke(width = if (isNew) strokeWidthPx * 2 else strokeWidthPx),
+                    )
+                }
+            }
+
+            // Response stream links: dotted, no arrow, never a routing line
+            val linkColor = MaterialTheme.colorScheme.outline
+            Canvas(Modifier.fillMaxSize()) {
+                val width = 1.5.dp.toPx()
+                links.forEach { link ->
+                    val path = Path().apply {
+                        link.points.forEachIndexed { i, (x, y) -> if (i == 0) moveTo(x.dp.toPx(), y.dp.toPx()) else lineTo(x.dp.toPx(), y.dp.toPx()) }
+                    }
+                    drawPath(
+                        path,
+                        color = linkColor,
+                        style = Stroke(width = width, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, width * 2.5f))),
+                    )
+                }
+            }
+            links.forEach { link ->
+                Box(
+                    Modifier
+                        .offset(x = link.labelX.dp, y = link.labelY.dp)
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            layout(placeable.width, placeable.height) { placeable.place(0, -placeable.height / 2) }
+                        }
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .testTag("planGraphLink:${link.sourceId}:${link.targetId}"),
+                ) {
+                    Text(
+                        PlannerTexts.RESPONSE_LINK_LABEL,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
             }
@@ -202,6 +242,42 @@ internal fun BindingGraphCanvas(
     }
 }
 
+/** A response stream link ready to draw: the polyline, and where its label starts (left edge) and sits (vertical middle). */
+private class LinkShape(val sourceId: String, val targetId: String, val points: List<Pair<Float, Float>>, val labelX: Float, val labelY: Float)
+
+private const val LINK_LABEL_WIDTH = 96f
+private const val LINK_BRACKET = 14f
+
+/**
+ * Links whose two nodes are both drawn. Two nodes of one column are joined by a bracket on the right of the column, so the line never crosses
+ * a node between them; nodes of two columns by a straight line from the right side of the left one to the left side of the other.
+ */
+private fun responseLinkShapes(plan: PlanGraph, nodes: List<PositionedNode>): List<LinkShape> = plan.links.mapNotNull { link ->
+    val from = nodes.firstOrNull { it.node.id == link.sourceId } ?: return@mapNotNull null
+    val to = nodes.firstOrNull { it.node.id == link.targetId } ?: return@mapNotNull null
+    val fromY = from.y + NODE_HEIGHT / 2f
+    val toY = to.y + NODE_HEIGHT / 2f
+    if (from.x == to.x) {
+        val right = from.x + NODE_WIDTH
+        LinkShape(
+            link.sourceId, link.targetId,
+            listOf(right to fromY, right + LINK_BRACKET to fromY, right + LINK_BRACKET to toY, right to toY),
+            labelX = right + LINK_BRACKET + 4f,
+            labelY = (fromY + toY) / 2f,
+        )
+    } else {
+        val (left, right) = if (from.x < to.x) from to to else to to from
+        val startX = left.x + NODE_WIDTH
+        val startY = left.y + NODE_HEIGHT / 2f
+        val endY = right.y + NODE_HEIGHT / 2f
+        LinkShape(
+            link.sourceId, link.targetId,
+            listOf(startX to startY, right.x to endY),
+            labelX = (startX + right.x) / 2f - LINK_LABEL_WIDTH / 2f,
+            labelY = (startY + endY) / 2f,
+        )
+    }
+}
 
 @Composable
 private fun GraphNodeCard(

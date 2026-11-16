@@ -54,6 +54,7 @@ import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.QueueForm
+import dev.caerbannog.core.planner.StreamForm
 import dev.caerbannog.core.planner.WizardState
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -238,6 +239,7 @@ private fun KindPage(selected: String, onSelect: (String) -> Unit, onChoose: (St
 private fun kindIcon(kind: String): AppIcon = when (kind) {
     "Queue" -> AppIcon.Queue
     "Exchange" -> AppIcon.SwapHoriz
+    "Stream" -> AppIcon.Stream
     else -> AppIcon.Link
 }
 
@@ -249,6 +251,7 @@ private fun DetailsPage(details: WizardState.Details, events: PlannerEvents, onN
         is QueueForm -> QueueFormView(form, details, events, onNext)
         is ExchangeForm -> ExchangeFormView(form, details, events, onNext)
         is BindingForm -> BindingFormView(form, details, events, onNext)
+        is StreamForm -> StreamFormView(form, details, events, onNext)
     }
 }
 

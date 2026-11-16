@@ -1,6 +1,7 @@
 package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationParser
 
 /**
@@ -198,7 +199,7 @@ data class PlannerState(
     /** "Response stream (DLN) of telemetry" for a step that [PlanPairs] recognises as a response stream; null for every other step. */
     fun responseStreamLine(stepId: Int): String? {
         val request = PlanPairs.responseOf(plan)[stepId] ?: return null
-        val name = (plan.steps.firstOrNull { it.id == request }?.action as? dev.caerbannog.core.migrations.MigrationAction.DeclareStream)?.name
+        val name = (plan.steps.firstOrNull { it.id == request }?.action as? MigrationAction.DeclareStream)?.name
         return PlannerTexts.responseStreamOf(name.orEmpty())
     }
 

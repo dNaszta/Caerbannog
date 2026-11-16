@@ -169,6 +169,9 @@ private fun StepList(
     }
 }
 
+/** A response stream sits under its request stream, one step further in. */
+private val RESPONSE_INDENT = 40.dp
+
 @Composable
 private fun StepRow(
     index: Int,
@@ -185,6 +188,7 @@ private fun StepRow(
     val selected = state.selectedStepId == step.id
     val result = state.stepCheck(step.id)
     val stale = (state.check as? CheckState.Done)?.stale == true
+    val pairLine = state.responseStreamLine(step.id)
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -205,7 +209,7 @@ private fun StepRow(
                 }
                 .clickable { events.selectStep(step.id) }
                 .heightIn(min = 56.dp)
-                .padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
+                .padding(start = if (pairLine != null) RESPONSE_INDENT else 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
                 .testTag("planStep:$index"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -219,6 +223,9 @@ private fun StepRow(
             ConnectionIcon(step.action.icon(), SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(step.title, style = MaterialTheme.typography.bodyMedium)
+                pairLine?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planStepPair:$index"))
+                }
                 step.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (blocking.isNotEmpty()) {
                     Row(Modifier.testTag("planStepProblem:$index"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
