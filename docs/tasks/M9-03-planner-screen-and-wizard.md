@@ -112,3 +112,4 @@ Decisions on the open points:
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+- Coordinator (2026-11-16): status DONE after 2 rounds (Accepted with follow-ups). The Owner review list is consolidated in this brief; wording changes are one-line edits in `PlannerTexts`. Branch not merged or pushed; waiting for the owner's word.
