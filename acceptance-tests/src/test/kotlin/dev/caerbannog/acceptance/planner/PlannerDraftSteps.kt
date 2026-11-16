@@ -99,7 +99,7 @@ class PlannerDraftSteps {
     }
 
     @Given("the migrations folder refuses the write")
-    fun folderRefuses() = d.migrationFolder.failWrite(1)
+    fun folderRefuses() { folderRefusesWrite = true; d.migrationFolder.failWrite(1) }
 
     @Given("no migrations folder has been chosen on this machine")
     fun noFolder() { d.folders.store.folder = null }
@@ -128,8 +128,12 @@ class PlannerDraftSteps {
     @Then("the migrations folder holds no new file")
     fun noNewFile() {
         assertEquals(setOf(d.latestMigration), d.migrationFolder.files.keys, "files in the migrations folder")
-        assertEquals(emptyList<String>(), d.migrationFolder.attempts, "writes the folder was asked to do")
+        // A folder that refuses the write is still asked once (the attempt is recorded before it refuses); otherwise no write may even be tried.
+        if (!folderRefusesWrite) assertEquals(emptyList<String>(), d.migrationFolder.attempts, "writes the folder was asked to do")
+        assertEquals(emptyList<String>(), d.migrationFolder.written, "files the folder wrote")
     }
+
+    private var folderRefusesWrite = false
 
     @Then("the migrations list shows no new migration")
     fun listShowsNoNew() {
