@@ -3,6 +3,7 @@ package dev.caerbannog.datarabbit
 import dev.caerbannog.core.json.UntrustedJson
 import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.migrations.MigrationFolderStore
+import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
 import dev.caerbannog.core.streams.RefreshInterval
@@ -21,7 +22,7 @@ import java.io.File
 private const val MAX_FILE_DEPTH = 32
 
 /**
- * [AppSettings] and [MigrationFolderStore] kept in `settings.json` (`{"streamListRefreshSeconds": 5, "migrationsFolder": "/path"}`). The value is read once, when the object is made,
+ * [AppSettings] and [MigrationFolderStore] kept in `settings.json` (`{"streamListRefreshSeconds": 5, "migrationsFolder": "/path", "plannerNamingStyle": "kebab-case"}`). The value is read once, when the object is made,
  * and held in memory afterwards, so a failing disk never changes what the running app sees.
  *
  * Reading never throws and never writes: a missing, empty, corrupt or unrecognised value reads as [DEFAULT_REFRESH] (and as no migrations folder); `0` is Off.
@@ -38,6 +39,9 @@ class JsonFileAppSettings(
     private val initial: JsonObject? = readObject()
 
     @Volatile
+    private var currentStyle: NamingStyle = readStyle(initial)
+
+    @Volatile
     private var current: RefreshInterval = readInterval(initial)
 
     @Volatile
@@ -48,6 +52,14 @@ class JsonFileAppSettings(
         set(value) {
             current = value
             write(KEY to JsonPrimitive(value.seconds))
+        }
+
+    /** The planner's naming style, stored as the label the user sees; a missing key or an unknown value reads as kebab-case. */
+    override var plannerNamingStyle: NamingStyle
+        get() = currentStyle
+        set(value) {
+            currentStyle = value
+            write(STYLE_KEY to JsonPrimitive(value.label))
         }
 
     /** The folder of the migration files; null (ask the user) when never set, set to null, or when the file holds no usable text there. */
@@ -66,6 +78,11 @@ class JsonFileAppSettings(
     private fun readInterval(root: JsonObject?): RefreshInterval {
         val seconds = (root?.get(KEY) as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull
         return seconds?.let { RefreshInterval.fromSeconds(it) } ?: DEFAULT_REFRESH
+    }
+
+    private fun readStyle(root: JsonObject?): NamingStyle {
+        val label = (root?.get(STYLE_KEY) as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return NamingStyle.entries.firstOrNull { it.label == label } ?: NamingStyle.KEBAB
     }
 
     private fun readFolder(root: JsonObject?): String? =
@@ -112,6 +129,7 @@ class JsonFileAppSettings(
     companion object {
         private const val KEY = "streamListRefreshSeconds"
         private const val FOLDER_KEY = "migrationsFolder"
+        private const val STYLE_KEY = "plannerNamingStyle"
 
         /** `~/.caerbannog/settings.json`, next to `connections.json`. */
         fun defaultFile(): File = File(System.getProperty("user.home"), ".caerbannog/settings.json")
