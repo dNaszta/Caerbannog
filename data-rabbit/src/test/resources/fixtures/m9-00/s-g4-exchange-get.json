@@ -1,0 +1,12 @@
+{
+  "arguments": {
+    "alternate-exchange": "ae",
+    "x-foo": 10
+  },
+  "auto_delete": true,
+  "durable": true,
+  "internal": true,
+  "name": "fx-g4x",
+  "type": "topic",
+  "vhost": "/"
+}
