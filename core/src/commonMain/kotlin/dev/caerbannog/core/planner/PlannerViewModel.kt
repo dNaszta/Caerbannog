@@ -1,11 +1,13 @@
 package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationFolderPorts
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationWriteException
 import dev.caerbannog.core.migrations.folderStateOf
 import dev.caerbannog.core.streams.AppSettings
+import dev.caerbannog.core.streams.RefreshClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -42,6 +44,15 @@ class PlannerViewModel(
     private val descriptionDebounceMillis: Long = DESCRIPTION_DEBOUNCE_MILLIS,
     /** The one read of the broker's names for the review graph; null: not connected, or a connection that gets no planner. */
     private val reader: KnownTopologyReader? = null,
+    /**
+     * The held connection's read-only check port (M9-05); null: none. The planner never writes through it. The window rebuilds the view
+     * model when the connection or this port changes, so a result of another connection can never be shown here.
+     */
+    private val declareCheck: DeclareCheck? = null,
+    /**
+     * The time of a finished check. The default is for the older constructions of tests only; the app passes the system clock.
+     */
+    private val clock: RefreshClock = RefreshClock { 0L },
 ) {
     /** The pages of the wizard; the screen sees [WizardState], derived from this and the current plan. */
     private sealed interface Page {
@@ -78,6 +89,17 @@ class PlannerViewModel(
     /** True while the description in [plan] is newer than the draft file; [debounce] is the timer that writes it. */
     private var descriptionPending = false
     private var debounce: Job? = null
+
+    /** The check as the screen sees it; [checkJob] is the run behind [CheckState.Running], [checkGeneration] tells its answer from a stale one. */
+    private var check: CheckState = CheckState.None
+    private var checkJob: Job? = null
+    private var checkGeneration = 0
+
+    /** The steps of the running check that are still in the plan; an answer for a removed step is dropped (ids are reused by `append`). */
+    private var runStepIds: Set<Int> = emptySet()
+
+    /** True when the plan changed after the running check began: its result arrives stale. */
+    private var runStale = false
 
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<PlannerState> = _state.asStateFlow()
@@ -276,6 +298,98 @@ class PlannerViewModel(
         }
     }
 
+    // ---- the check ----
+
+    /**
+     * Compares the plan with the broker through [PlanCheck], one step at a time, from reads alone. It does nothing while
+     * [checkDisabledReason] says no or while a check runs. The run is a job of [scope], outside the lock, so the plan stays editable; the
+     * answer is applied only if no newer start, dismiss or reset happened ([checkGeneration]).
+     */
+    fun check() = act {
+        val port = declareCheck
+        val connection = context.connectionName
+        if (port == null || connection == null || checkDisabledReason() != null || check is CheckState.Running) return@act
+        val started = plan
+        val generation = ++checkGeneration
+        runStepIds = started.steps.map { it.id }.toSet()
+        runStale = false
+        check = CheckState.Running(step = 1, total = started.steps.size)
+        checkJob = scope.launch {
+            val outcome = try {
+                PlanCheck.run(started, context, port) { position, total -> reportStep(generation, position, total) }
+            } catch (e: CancellationException) {
+                // Cancelled with the scope or by a dismiss: nothing to publish. One thrown by the port's own call is a failed read.
+                currentCoroutineContext().ensureActive()
+                null
+            } catch (_: Exception) {
+                null
+            }
+            lock.withLock {
+                if (generation != checkGeneration) return@withLock
+                check = when (outcome) {
+                    is PlanCheckResult.Checked -> CheckState.Done(
+                        results = outcome.steps.filter { it.stepId in runStepIds },
+                        connectionName = connection,
+                        atMillis = clock.nowMillis(),
+                        stale = runStale,
+                    )
+                    // A refusal cannot come from an enabled button; a failed port ends the run. Either way the planner stays as it was.
+                    is PlanCheckResult.Refused, null -> CheckState.None
+                }
+                checkJob = null
+                publish()
+            }
+        }
+    }
+
+    /** Progress comes from the job, so it hops onto the lock; the step only grows, so a late hop cannot move it back. */
+    private fun reportStep(generation: Int, position: Int, total: Int) {
+        scope.launch {
+            lock.withLock {
+                val running = check as? CheckState.Running ?: return@withLock
+                if (generation == checkGeneration && position > running.step) {
+                    check = CheckState.Running(position, total)
+                    publish()
+                }
+            }
+        }
+    }
+
+    /** The plan the check belongs to is gone: stop the read and forget the result. */
+    private fun dropCheck() {
+        checkGeneration++
+        checkJob?.cancel()
+        checkJob = null
+        check = CheckState.None
+    }
+
+    /** What stops the check, in the order of `PlanCheck.run`; null when it can start. */
+    private fun checkDisabledReason(): String? = when {
+        context.unavailableReason != null -> context.unavailableReason
+        context.connectionName == null -> PlannerTexts.NOT_CONNECTED
+        declareCheck == null -> PlanCheck.NO_CHECK
+        unreadable != null -> PlannerTexts.DRAFT_UNREADABLE
+        plan.steps.isEmpty() -> PlannerTexts.ADD_A_STEP_FIRST
+        else -> null
+    }
+
+    /** The plan's steps or virtual host changed (a description does not count: the check reads steps and virtual host only). */
+    private fun markCheckStale(changed: TopologyPlan) {
+        if (changed.steps == plan.steps && changed.vhost == plan.vhost) return
+        when (val current = check) {
+            is CheckState.Done -> {
+                val ids = changed.steps.map { it.id }.toSet()
+                // A removed step's result goes with it: the next step may get the freed id.
+                check = current.copy(results = current.results.filter { it.stepId in ids }, stale = true)
+            }
+            is CheckState.Running -> {
+                runStale = true
+                runStepIds = runStepIds intersect changed.steps.map { it.id }.toSet()
+            }
+            CheckState.None -> Unit
+        }
+    }
+
     // ---- inside the scope ----
 
     /** One whole call on the scope: skipped when the planner is locked unless [allowedWhenLocked], then published once. */
@@ -336,6 +450,7 @@ class PlannerViewModel(
      */
     private suspend fun changePlan(changed: TopologyPlan, refreshFolder: Boolean = false, writeDraft: Boolean = true) {
         if (changed == plan) return
+        markCheckStale(changed)
         plan = changed
         question = null
         saved = null
@@ -382,6 +497,7 @@ class PlannerViewModel(
     }
 
     private fun resetPlan() {
+        dropCheck()
         dropPending()
         plan = TopologyPlan(vhost = context.vhost)
         page = null
@@ -495,6 +611,9 @@ class PlannerViewModel(
         knownPending = knownPending,
         graph = planPreview(plan, known, if (reader == null) OnlyThePlanCause.NotConnected else OnlyThePlanCause.BrokerNotRead, pending = knownPending),
         graphView = reviewView,
+        check = check,
+        connectionName = context.connectionName,
+        checkDisabledReason = checkDisabledReason(),
         wizard = if (locked()) WizardState.Closed else wizardState(),
         selectedStepId = selected,
         namingStyle = namingStyle,
