@@ -330,6 +330,15 @@ class PlannerDraftSteps {
     /** `M9-05` adds the check; until then there is nothing to press, and the planner has no way to reach a broker at all (PlannerArchitectureGuardTest). */
     @When("I check the plan, save it as a migration and dismiss a second plan")
     fun checkSaveDismiss() {
+        // M9-05: the check is real now: PlanCheck with the real ManagementDeclareCheck over the honest fake of the management API. It may only read.
+        val checked = runBlocking {
+            dev.caerbannog.core.planner.PlanCheck.run(
+                d.plan,
+                dev.caerbannog.core.planner.PlannerContext(d.profile, d.vhost, d.controlLevel, d.configurePermission, d.unavailableReason),
+                CheckWorld.realCheck(),
+            ) { _, _ -> }
+        }
+        assertIs<dev.caerbannog.core.planner.PlanCheckResult.Checked>(checked, "the check did not run: $checked")
         d.vm.saveAsMigration()
         assertNotNull(d.state.saved, "the first plan was not saved: ${d.state.errorMessage}")
         d.addWithWizard(d.queueForm("second", "quorum"))
@@ -338,10 +347,18 @@ class PlannerDraftSteps {
     }
 
     @Then("no request that creates, changes or deletes anything was sent to the broker")
-    fun noWrites() = assertEquals(emptyList<MigrationAction>(), d.executor.executedActions)
+    fun noWrites() {
+        assertEquals(emptyList<MigrationAction>(), d.executor.executedActions)
+        assertEquals(emptyList<String>(), CheckWorld.seen.filter { it.method != "GET" }.map { "${it.method} ${it.path}" }, "the check sent a request that changes something")
+        assertEquals(emptyList<Any>(), CheckWorld.broker.writes)
+    }
 
     @Then("the only requests sent were reads")
-    fun onlyReads() = assertEquals(emptyList<MigrationAction>(), d.executor.executedActions, "the planner has no door but the executor, which recorded these")
+    fun onlyReads() {
+        assertEquals(emptyList<MigrationAction>(), d.executor.executedActions, "the planner has no door but the executor, which recorded these")
+        assertTrue(CheckWorld.seen.isNotEmpty(), "the check sent nothing, so the proof that it only reads proves nothing")
+        assertTrue(CheckWorld.seen.all { it.method == "GET" }, "requests sent: ${CheckWorld.seen.map { "${it.method} ${it.path}" }}")
+    }
 
     @Then("the saved file holds no user, no password and no password hash")
     fun noSecretsInFile() {

@@ -156,6 +156,8 @@ class PlannerGraphSteps {
 
     @Then("it says {string}")
     fun says(title: String) {
+        // M9-05: after a check, "it says" is a sentence of the check result (the step that needs something that is missing), not the graph's notice.
+        if (CheckWorld.result != null) return CheckWorld.saysSentence(title)
         val text = screen.textOf("planner:graphNotice").orEmpty()
         assertTrue(text.contains(title), "the notice says: $text")
     }

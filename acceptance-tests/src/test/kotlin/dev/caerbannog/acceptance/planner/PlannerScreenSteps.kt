@@ -163,6 +163,7 @@ class PlannerScreenSteps {
         d.profile = name
         d.unavailableReason = connection.migrationUnavailableReason
         requestsAfterConnect = requests.size
+        CheckWorld.held = connection; CheckWorld.stubRequests = requests; CheckWorld.requestsAfterConnect = requestsAfterConnect
         assertTrue(requests.all { it.startsWith("GET ") }, "a request that changes something was sent: $requests")
         d.restart()
     }

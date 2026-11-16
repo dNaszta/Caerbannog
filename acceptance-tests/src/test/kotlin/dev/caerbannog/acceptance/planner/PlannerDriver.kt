@@ -64,6 +64,9 @@ class PlannerDriver {
     var unavailableReason: String? = null
     var controlLevel = TopologyControlLevel.FULL_CONTROL
     var migrationsFolder = ""
+
+    /** M9-05: what the Migrations screen applies with; the recording fake unless a scenario puts the real executor over the honest management API. */
+    var migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null
     var latestMigration = ""
 
     /** What the broker has; a change rebuilds the view model, as a new catalog read would. */
@@ -124,7 +127,7 @@ class PlannerDriver {
 
     fun migrationsScreen(): MigrationsViewModel = MigrationsViewModel(
         fileRepository = null,
-        runner = MigrationRunner(folders.history, executor),
+        runner = MigrationRunner(folders.history, migrationExecutor ?: executor),
         profileName = profile,
         vhost = vhost,
         hasConfigurePermission = configurePermission,

@@ -74,7 +74,13 @@ class PlannerSteps {
     fun aNewPlanWithStyle(label: String) { d.style = style(label); d.newPlan() }
 
     @Given("a plan that declares the quorum queue {string}")
-    fun planWithQueue(name: String) { d.newPlan(); d.addWithWizard(d.queueForm(name, "quorum")) }
+    fun planWithQueue(name: String) {
+        d.newPlan()
+        d.addWithWizard(d.queueForm(name, "quorum"))
+        // M9-05: a locked planner (a 3.x connection) opens no wizard, so the plan is empty; the check scenario still needs the plan it is asked about,
+        // as a file or a draft would bring it. The check refuses before it reads the plan, so only its existence matters.
+        if (d.unavailableReason != null) CheckWorld.plan = dev.caerbannog.core.planner.TopologyPlan.of("", listOf(MigrationAction.DeclareQueue(name)), d.vhost)
+    }
 
     @Given("a plan that declares the quorum queue {string} and the direct exchange {string}")
     fun planWithQueueAndExchange(queue: String, exchange: String) {
@@ -93,10 +99,10 @@ class PlannerSteps {
     }
 
     @Given("the broker has the quorum queue {string}")
-    fun brokerQueue(name: String) { d.known = d.known.copy(queues = d.known.queues + name) }
+    fun brokerQueue(name: String) { CheckWorld.seedQueue(name); d.known = d.known.copy(queues = d.known.queues + name) }
 
     @Given("the broker has the direct exchange {string}")
-    fun brokerExchange(name: String) { d.known = d.known.copy(exchanges = d.known.exchanges + (name to "direct")) }
+    fun brokerExchange(name: String) { CheckWorld.seedExchange(name); d.known = d.known.copy(exchanges = d.known.exchanges + (name to "direct")) }
 
     @When("I choose the naming style {string}")
     fun chooseStyle(label: String) = d.chooseStyle(style(label))
