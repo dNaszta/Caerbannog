@@ -59,6 +59,8 @@ import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
+import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -90,8 +92,17 @@ fun MigrationsScreen(
     control: ConnectionControlState? = null,
     controlEvents: ConnectionControlEvents? = null,
     onNavigate: (AppDestination) -> Unit = {},
+    /** What the draft of the planner offers: "New plan" or "Continue plan" with a card, or "Open planner" for a draft that cannot be read (M9-03). */
+    plannerEntry: PlannerEntry = PlannerEntry.NewPlan,
+    onOpenPlanner: () -> Unit = {},
+    /** Called after the user confirmed the question "Dismiss this plan?" on the draft card. */
+    onDismissDraft: () -> Unit = {},
+    /** "Plan saved as ...", set by the window after a save; transient, not part of the migrations state. */
+    plannerNotice: String? = null,
+    onDismissPlannerNotice: () -> Unit = {},
 ) {
     var showImportDialog by remember { mutableStateOf(false) }
+    var askDismissDraft by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
     AppFrameLayout(
@@ -99,6 +110,16 @@ fun MigrationsScreen(
         modifier = modifier,
         onNavigate = onNavigate,
         actions = {
+            // M9-03: the way into the planner is the first button.
+            Button(
+                onClick = onOpenPlanner,
+                modifier = Modifier.testTag("migrations:newPlanBtn"),
+            ) {
+                ConnectionIcon(if (plannerEntry is PlannerEntry.NewPlan) AppIcon.Add else AppIcon.Edit, size = SmallIconSize)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(plannerEntry.label)
+            }
+
             // M8-06a, owner decision 1: the second entry to the migration from 3.x (the first is the drawer item).
             OutlinedButton(
                 onClick = { onNavigate(AppDestination.MigrateFromThree) },
@@ -167,6 +188,8 @@ fun MigrationsScreen(
                 }
             }
 
+            plannerNotice?.let { PlannerNoticeBanner(it, onDismissPlannerNotice) }
+
             FolderRow(state, onShowFolder, onChangeFolder)
 
             // State banners: where the files and the history are, what applying is doing and how it ended.
@@ -230,7 +253,15 @@ fun MigrationsScreen(
 
             // Main Content Area: Left file list + Right detail
             val selectedFile = state.selectedFile
+            val draftCard: @Composable () -> Unit = {
+                DraftCard(
+                    entry = plannerEntry,
+                    onContinue = onOpenPlanner,
+                    onDismiss = { askDismissDraft = true },
+                )
+            }
             if (state.folder is MigrationFolderState.ChooseFolder) {
+                draftCard()
                 ChooseFolderPanel(onChooseFolder)
             } else Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -244,6 +275,7 @@ fun MigrationsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    draftCard()
                     Text(
                         text = "Migration files",
                         style = MaterialTheme.typography.labelMedium,
@@ -294,6 +326,17 @@ fun MigrationsScreen(
                 }
             }
         }
+    }
+
+    if (askDismissDraft && plannerEntry is PlannerEntry.ContinuePlan) {
+        DismissDraftDialog(
+            question = PlannerQuestion.Dismiss(plannerEntry.stepCount),
+            onCancel = { askDismissDraft = false },
+            onConfirm = {
+                askDismissDraft = false
+                onDismissDraft()
+            },
+        )
     }
 
     state.confirmation?.let { EmptyHistoryDialog(it, onCancelEmptyHistory, onConfirmEmptyHistory) }

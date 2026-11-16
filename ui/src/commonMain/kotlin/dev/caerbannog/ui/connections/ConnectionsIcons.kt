@@ -68,6 +68,13 @@ import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.LockPerson
 import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.Queue
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material.icons.outlined.VerifiedUser
@@ -135,6 +142,13 @@ internal enum class AppIcon(val mockupName: String) {
     History("history"),
     RestartAlt("restart_alt"),
     Person("person"),
+    MoreVert("more_vert"),
+    Save("save"),
+    FactCheck("fact_check"),
+    DeleteSweep("delete_sweep"),
+    Queue("queue"),
+    Lightbulb("lightbulb"),
+    FolderOff("folder_off"),
 }
 
 private fun AppIcon.vector(): ImageVector = when (this) {
@@ -192,6 +206,13 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.History -> Icons.Outlined.History
     AppIcon.RestartAlt -> Icons.Outlined.RestartAlt
     AppIcon.Person -> Icons.Outlined.Person
+    AppIcon.MoreVert -> Icons.Outlined.MoreVert
+    AppIcon.Save -> Icons.Outlined.Save
+    AppIcon.FactCheck -> Icons.Outlined.FactCheck
+    AppIcon.DeleteSweep -> Icons.Outlined.DeleteSweep
+    AppIcon.Queue -> Icons.Outlined.Queue
+    AppIcon.Lightbulb -> Icons.Outlined.Lightbulb
+    AppIcon.FolderOff -> Icons.Outlined.FolderOff
 }
 
 /** `.ms.sm` in the mockup. */

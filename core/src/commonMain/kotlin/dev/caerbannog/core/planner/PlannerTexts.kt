@@ -12,6 +12,50 @@ object PlannerTexts {
         "Queue", "Exchange", "Binding", "Stream", "Policy", "Dead-lettering for a queue", "MQTT route",
     )
 
+    /** The kinds that have a form today, in wizard order. The others of [WIZARD_KINDS] are drawn when the task that builds their form lands. */
+    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding")
+
+    fun kindDescription(kind: String): String = when (kind) {
+        "Queue" -> "A quorum or classic queue"
+        "Exchange" -> "Fanout, direct, topic or headers"
+        "Binding" -> "From an exchange to a queue or an exchange"
+        else -> ""
+    }
+
+    /** One sentence per exchange type, under the type choice of the exchange form. */
+    fun exchangeTypeNote(type: String): String = when (type) {
+        "fanout" -> "Fanout: a message goes to every bound queue."
+        "direct" -> "Direct: a message goes to the queues bound with exactly its routing key."
+        "topic" -> "Topic: a message goes by a pattern with * and #."
+        "headers" -> "Headers: a message goes by its headers, not by the routing key."
+        else -> ""
+    }
+
+    fun queueTypeNote(type: String): String = when (type) {
+        "quorum" -> "Replicated, durable."
+        "classic" -> "One copy on one node."
+        else -> ""
+    }
+
+    /** What a naming style does to a derived name, for the menu of the plan header. */
+    fun namingExample(style: NamingStyle): String =
+        if (style == NamingStyle.NONE) "No hints; derived names as in kebab-case" else PlanNaming.derived("orders", DerivedWord.DLN, style)
+
+    const val QUEUE_FORM_NOTE: String =
+        "Limits and dead-lettering are set with a policy step, so they can be changed later without deleting the queue."
+    const val INFO_LINE: String =
+        "A plan is a draft. Nothing on this screen changes the broker: saving writes a migration file, and the file is applied from the Migrations screen."
+    const val NO_STEPS_HELP: String =
+        "Add the first step with the wizard: a queue, an exchange or a binding. You do not write JSON; the plan is saved as a migration file when you are done."
+    const val STEPS_TITLE: String = "Steps, applied from top to bottom"
+    const val REVIEW_TITLE: String = "The migration this plan saves as"
+    const val REVIEW_NOTE: String = "Read only. This is the text of the file that Save as migration writes."
+    const val WIZARD_KIND_TITLE: String = "What do you want to add?"
+    const val NOT_IN_PLAN_NOTE: String = "Not in this plan and not seen on the broker"
+    const val CHECK_LABEL: String = "Check"
+    const val DISMISS_LABEL: String = "Dismiss"
+    const val PROBLEM_PILL: String = "Problem"
+
     const val QUEUE_NAME_MISSING: String = "Give the queue a name"
     const val EXCHANGE_NAME_MISSING: String = "Give the exchange a name"
     const val BINDING_EXCHANGE_MISSING: String = "Choose the exchange to bind from"

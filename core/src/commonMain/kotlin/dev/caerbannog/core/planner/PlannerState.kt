@@ -65,13 +65,19 @@ data class SavedPlan(val version: String, val fileName: String) {
 /** A question that waits for Confirm or Cancel. */
 sealed interface PlannerQuestion {
     val text: String
+    val confirmLabel: String
+    val cancelLabel: String
 
     data class Dismiss(val steps: Int) : PlannerQuestion {
         override val text: String get() = PlannerTexts.dismissQuestion(steps)
+        override val confirmLabel: String get() = PlannerTexts.DISMISS_LABEL
+        override val cancelLabel: String get() = "Keep the plan"
     }
 
     data class StartNewPlan(val asideFileName: String) : PlannerQuestion {
         override val text: String get() = PlannerTexts.startNewPlanQuestion(asideFileName)
+        override val confirmLabel: String get() = "Move file and start"
+        override val cancelLabel: String get() = "Cancel"
     }
 }
 
