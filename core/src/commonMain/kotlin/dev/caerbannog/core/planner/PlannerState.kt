@@ -41,6 +41,8 @@ sealed interface WizardState {
         val destinationSuggestions: List<Suggestion> = emptyList(),
         /** False for a fanout or headers exchange whose type is known: the routing key is not asked. */
         val asksRoutingKey: Boolean = true,
+        /** The response name a stream form suggests in the plan's naming style; empty for the other forms. The screen has no naming style of its own. */
+        val suggestedResponseName: String = "",
     ) : WizardState {
         /** A hint never disables Next (O11); a problem does. */
         val nextEnabled: Boolean get() = problems.isEmpty()
@@ -192,6 +194,13 @@ data class PlannerState(
 
     /** "Check against uat-eu", or "Check" while there is no connection. */
     val checkLabel: String get() = PlannerTexts.checkLabel(connectionName)
+
+    /** "Response stream (DLN) of telemetry" for a step that [PlanPairs] recognises as a response stream; null for every other step. */
+    fun responseStreamLine(stepId: Int): String? {
+        val request = PlanPairs.responseOf(plan)[stepId] ?: return null
+        val name = (plan.steps.firstOrNull { it.id == request }?.action as? dev.caerbannog.core.migrations.MigrationAction.DeclareStream)?.name
+        return PlannerTexts.responseStreamOf(name.orEmpty())
+    }
 
     /** The result of [stepId] in the check that is shown; null when there is none (no check, running, or a step added after it). */
     fun stepCheck(stepId: Int): StepCheck? = (check as? CheckState.Done)?.results?.firstOrNull { it.stepId == stepId }

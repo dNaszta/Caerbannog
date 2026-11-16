@@ -46,6 +46,67 @@ data class ExchangeForm(val name: String, val type: String = "direct") : StepFor
     private fun build(ctx: FormContext) = MigrationAction.DeclareExchange(name = name, type = type, vhost = ctx.plan.vhost)
 }
 
+/**
+ * A stream, with its response stream (DLN) when [withResponse] (O9, O10). [responseName] null means "follows the stream name"; any string, even
+ * an empty one, means the user typed it, so a later change of [name] leaves it alone.
+ */
+data class StreamForm(
+    val name: String,
+    val withResponse: Boolean = false,
+    val responseName: String? = null,
+) : StepForm {
+    /** The response name the stream name gives in the plan's naming style; empty while there is no stream name. */
+    fun suggestedResponseName(ctx: FormContext): String =
+        if (name.isEmpty()) "" else PlanNaming.derived(name, DerivedWord.DLN, ctx.namingStyle)
+
+    fun effectiveResponseName(ctx: FormContext): String = responseName ?: suggestedResponseName(ctx)
+
+    override fun problems(ctx: FormContext): List<FieldProblem> {
+        val own = FormChecks.nameProblem(name, PlannerTexts.STREAM_NAME_MISSING, "name") { build(name, ctx) }
+            .ifEmpty { queueConflict(name, "name", ctx) }
+        if (!withResponse) return own
+        val response = effectiveResponseName(ctx)
+        // A response name that follows an empty stream name is not a second problem: the first one says what to do.
+        if (responseName == null && name.isEmpty()) return own
+        val theirs = FormChecks.nameProblem(response, PlannerTexts.RESPONSE_NAME_MISSING, "responseName") { build(response, ctx) }
+            .ifEmpty {
+                if (response == name) {
+                    listOf(FieldProblem("responseName", PlannerTexts.RESPONSE_NAME_SAME))
+                } else {
+                    queueConflict(response, "responseName", ctx)
+                }
+            }
+        return own + theirs
+    }
+
+    override fun actions(ctx: FormContext): List<MigrationAction> = when {
+        problems(ctx).isNotEmpty() -> emptyList()
+        withResponse -> listOf(build(name, ctx), build(effectiveResponseName(ctx), ctx))
+        else -> listOf(build(name, ctx))
+    }
+
+    override fun hints(ctx: FormContext): List<FieldHint> =
+        FormChecks.nameHint(name, ctx, "name") { isNewStreamName(name, ctx) } +
+            // The suggestion is built from the stream name, which already has its own hint: only a name typed by hand gets one.
+            if (withResponse && responseName != null) {
+                FormChecks.nameHint(responseName, ctx, "responseName") { isNewStreamName(responseName, ctx) }
+            } else {
+                emptyList()
+            }
+
+    private fun isNewStreamName(candidate: String, ctx: FormContext): Boolean =
+        candidate !in ctx.known.queues && candidate !in ctx.known.streams
+
+    private fun queueConflict(candidate: String, field: String, ctx: FormContext): List<FieldProblem> =
+        if (ctx.plan.steps.any { (it.action as? MigrationAction.DeclareQueue)?.name == candidate }) {
+            listOf(FieldProblem(field, PlannerTexts.queueAndStreamOfOneName(candidate)))
+        } else {
+            emptyList()
+        }
+
+    private fun build(streamName: String, ctx: FormContext) = MigrationAction.DeclareStream(name = streamName, vhost = ctx.plan.vhost)
+}
+
 /** A binding never hints: an exchange, a destination and a routing key are mostly names the broker has already (Q7). */
 data class BindingForm(
     val exchange: String,
@@ -102,6 +163,8 @@ object StepForms {
             } else {
                 null
             }
+        // A stream has no arguments here, so every one is editable; a response stream of a pair is edited as an ordinary stream.
+        is MigrationAction.DeclareStream -> StreamForm(name = action.name)
         else -> null
     }
 }
@@ -115,9 +178,9 @@ internal object FormChecks {
     }
 
     /** A hint for the name of something new: not for an empty name and not for a name the broker already has. */
-    fun nameHint(name: String, ctx: FormContext, isNew: () -> Boolean): List<FieldHint> {
+    fun nameHint(name: String, ctx: FormContext, field: String = "name", isNew: () -> Boolean): List<FieldHint> {
         if (name.isEmpty() || !isNew()) return emptyList()
-        return PlanNaming.hint(name, ctx.namingStyle)?.let { listOf(FieldHint("name", it)) }.orEmpty()
+        return PlanNaming.hint(name, ctx.namingStyle)?.let { listOf(FieldHint(field, it)) }.orEmpty()
     }
 
     /** The reason the parser gives for a file holding [action], or null when it accepts it. */
