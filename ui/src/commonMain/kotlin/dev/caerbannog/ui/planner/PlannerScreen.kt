@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -76,6 +77,9 @@ import dev.caerbannog.ui.migrations.Pill
 
 /** Below this width the step list and the review card stand one above the other instead of side by side. */
 private val SIDE_BY_SIDE_FROM = 1400.dp
+
+/** The most of the page the step list takes when the card is stacked under it. */
+private const val STACKED_STEPS_SHARE = 0.65f
 
 /**
  * The Topology planner (docs/ux/Planner.dc.html): header, step list, wizard, review card with the migration text, and the limited states.
@@ -210,8 +214,11 @@ private fun PlannerBody(
                     PlanReviewCard(state, events, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
+                // The steps hug their rows up to [STACKED_STEPS_SHARE] of the page and the review card takes what is left: with equal weights a
+                // short plan left an empty panel between the two (M9-06 item 10) and the card too little height for its graph (M9-06 F1).
+                val stepsMaxHeight = maxHeight * STACKED_STEPS_SHARE
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.weight(1f).fillMaxWidth())
+                    PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.fillMaxWidth().heightIn(max = stepsMaxHeight))
                     PlanReviewCard(state, events, Modifier.weight(1f).fillMaxWidth())
                 }
             }
