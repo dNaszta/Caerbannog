@@ -31,6 +31,7 @@ class PlannerDraftSteps {
     /** What a file or the draft held when a scenario noted it, to show it was not changed. */
     private val originalBytes = mutableMapOf<String, String>()
 
+    private val SENTINEL_HASH = "S3NTINEL-HASH-77ab"
     private val declareQueueRow = Regex("^Declare (\\w+) queue (.+)$")
     private val bindRow = Regex("^Bind (.+) to (.+) with (.+)$")
 
@@ -265,6 +266,24 @@ class PlannerDraftSteps {
         d.store.putUnreadable("{ \"version\": \"draft\", \"up\": [ { \"action\": \"declareNothing\" ")
         originalBytes["draft"] = d.store.rawText!!
         d.restart()
+    }
+
+    @Given("the draft file on disk holds a {string} action with a password hash")
+    fun draftWithHash(action: String) {
+        assertEquals("declareUser", action, "this glue builds the declareUser shape")
+        val user = MigrationAction.DeclareUser("svc", dev.caerbannog.core.json.SecretValue.of(SENTINEL_HASH), "rabbit_password_hashing_sha256")
+        d.store.putRaw(MigrationParser.exportToJson("draft", "by hand", listOf(user)))
+        originalBytes["draft"] = d.store.rawText!!
+        d.restart()
+    }
+
+    @Then("nothing is written to the draft file")
+    fun nothingWritten() {
+        assertEquals(emptyList<String>(), d.store.savedTexts, "writes to the draft file")
+        assertEquals(0, d.store.clears, "the draft file was cleared")
+        assertEquals(0, d.store.moveAsides, "the draft file was moved")
+        assertEquals(originalBytes["draft"], d.store.rawText)
+        assertFalse(d.state.toString().contains(SENTINEL_HASH), "the hash reached the state")
     }
 
     @When("I open the planner")

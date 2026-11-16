@@ -62,6 +62,8 @@ class FakePlanDraftStore(
         loads++
         val text = rawText ?: return DraftLoad.None
         val parsed = MigrationParser.parse(text) as? MigrationValidationResult.Valid ?: return DraftLoad.Unreadable(path, UNREADABLE_REASON)
+        // A plan never holds a broker-level action (user, virtual host, permissions): such a file is reported and kept, not shown or re-saved.
+        if (parsed.migration.up.any { it.isBrokerLevel }) return DraftLoad.Unreadable(path, ACCESS_REASON)
         return DraftLoad.Loaded(TopologyPlan.of(parsed.migration.description, parsed.migration.up, defaultVhost = "/"))
     }
 
@@ -93,5 +95,6 @@ class FakePlanDraftStore(
     companion object {
         const val DRAFT_VERSION = "draft"
         const val UNREADABLE_REASON = "The file is not a valid plan"
+        const val ACCESS_REASON = "This file holds password hashes. Edit it outside the app."
     }
 }

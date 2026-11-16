@@ -2,6 +2,7 @@ package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationParser
+import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -189,6 +190,21 @@ class PlannerViewModelDraftTest {
     }
 
     private fun assertNotNullState(): DraftUnreadable = rig.state.draftUnreadable ?: error("expected an unreadable draft in ${rig.state}")
+
+    @Test
+    fun `a draft that holds a password hash is unreadable, no save happens after the load, and the hash is not shown`() {
+        val hash = "S3NTINEL-HASH-77ab"
+        rig.store.putDraft("by hand", listOf(MigrationAction.DeclareUser("svc", dev.caerbannog.core.json.SecretValue.of(hash), "rabbit_password_hashing_sha256")))
+        val original = rig.store.rawText
+        rig.restart()
+        assertEquals(FakePlanDraftStore.ACCESS_REASON, assertNotNullState().reason)
+        assertEquals(emptyList(), rig.state.plan.steps, "the access action is not loaded as a step")
+        vm.setDescription("typing"); vm.openWizard(); vm.dismiss(); vm.saveAsMigration()
+        assertEquals(emptyList(), rig.store.savedTexts, "no save after such a load")
+        assertEquals(0, rig.store.clears)
+        assertEquals(original, rig.store.rawText)
+        assertFalse(rig.state.toString().contains(hash), "the hash must not reach the state")
+    }
 
     @Test
     fun `Try again reads the draft file again`() {

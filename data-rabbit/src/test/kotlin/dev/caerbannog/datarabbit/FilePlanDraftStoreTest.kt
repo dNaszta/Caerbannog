@@ -147,6 +147,12 @@ class FilePlanDraftStoreTest {
 
     // ---- unreadable shapes ----
 
+    private val sentinelHash = "S3NTINEL-HASH-77ab"
+    private val userBody: ByteArray = MigrationParser.exportToJson(
+        "draft", "by hand",
+        listOf(MigrationAction.DeclareUser("svc", dev.caerbannog.core.json.SecretValue.of(sentinelHash), "rabbit_password_hashing_sha256")),
+    ).toByteArray()
+
     private val unreadableBodies: List<Pair<String, ByteArray>> = listOf(
         "an empty file" to ByteArray(0),
         "not JSON" to "this is not json".toByteArray(),
@@ -158,6 +164,8 @@ class FilePlanDraftStoreTest {
         "an up that is not an array" to "{\"version\": \"draft\", \"up\": 7}".toByteArray(),
         "binary bytes" to byteArrayOf(0, 1, 2, -1, -2, -3, 127),
         "invalid UTF-8 inside JSON" to byteArrayOf('{'.code.toByte(), '"'.code.toByte(), -61, '"'.code.toByte(), '}'.code.toByte()),
+        "a declareUser with a password hash" to userBody,
+        "a declareVhost" to "{\"version\": \"draft\", \"up\": [{\"action\": \"declareVhost\", \"name\": \"orders\"}]}".toByteArray(),
         "nested too deep" to ("[".repeat(5000) + "]".repeat(5000)).toByteArray(),
     )
 
@@ -170,8 +178,18 @@ class FilePlanDraftStoreTest {
             assertEquals(file.toString(), unreadable.path, what)
             assertTrue(unreadable.reason.isNotBlank(), what)
             assertTrue(unreadable.reason.length < 80 && !unreadable.reason.contains("declareNothing") && !unreadable.reason.contains("draft"), "$what: the reason must not echo content: ${unreadable.reason}")
+            assertFalse(unreadable.reason.contains(sentinelHash), "$what: the reason must not hold the hash")
             assertEquals(body.toList(), bytes().toList(), "$what: reading must not change the file")
         }
+    }
+
+    @Test
+    fun `a draft with an access action says the file holds password hashes`() {
+        putBytes(userBody)
+        assertEquals(
+            DraftLoad.Unreadable(file.toString(), "This file holds password hashes. Edit it outside the app."),
+            load(),
+        )
     }
 
     @Test
