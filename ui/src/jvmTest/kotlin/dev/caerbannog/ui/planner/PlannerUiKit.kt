@@ -27,6 +27,7 @@ import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.StepForm
+import dev.caerbannog.core.planner.StreamForm
 import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.ui.appframe.AppDestination
@@ -63,6 +64,12 @@ import kotlinx.coroutines.cancel
  *    `planWizard:summary`, `planWizard:pageMessage`; forms `planForm:name`, `planForm:type:<value>`, `planForm:exchange`, `planForm:destination`,
  *    `planForm:destinationKind:queue|exchange`, `planForm:routingKey`, `planForm:hint:<field>`, `planForm:error:<field>`,
  *    `planForm:suggestionsBtn:<field>` and `planForm:suggestion:<field>:<name>`.
+ *  - (M9-07) the stream form: `planForm:name` (the stream), `planForm:responseTick` (a toggle: `ToggleableState` On or Off, the label
+ *    `PlannerTexts.RESPONSE_STREAM_TICK`; drawn only when the form adds a stream, never while editing a step), `planForm:responseName` (the
+ *    response stream's text field, drawn only while ticked, its value the effective name), `planForm:responseNote` (the fixed note, drawn while
+ *    ticked), the field tags `planForm:hint:responseName` and `planForm:error:responseName`; the step list: `planStepPair:<i>` (the second line
+ *    of a response stream's row, "Response stream (DLN) of <name>"); the review graph: `planGraphLink:<source id>:<target id>` (the dotted link,
+ *    its text `PlannerTexts.RESPONSE_LINK_LABEL`).
  */
 internal const val FOLDER = "/work/migrations"
 
@@ -114,6 +121,8 @@ internal class UiRig(
 
     fun queue(name: String, type: String = "quorum") = add(QueueForm(name = name, type = type))
     fun exchange(name: String, type: String = "direct") = add(ExchangeForm(name = name, type = type))
+    fun stream(name: String, withResponse: Boolean = false, responseName: String? = null) =
+        add(StreamForm(name = name, withResponse = withResponse, responseName = responseName))
     fun binding(exchange: String, queue: String, key: String = "") = add(BindingForm(exchange = exchange, destination = queue, routingKey = key))
 
     /** The mockup's plan, three steps: a queue, an exchange and a binding of the two. */
@@ -125,6 +134,7 @@ internal class UiRig(
         is QueueForm -> "Queue"
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
+        is StreamForm -> "Stream"
     }
 }
 

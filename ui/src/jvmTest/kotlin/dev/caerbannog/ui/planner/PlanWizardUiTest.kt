@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
  * M9-03 step 2: the three-page wizard (mockup sections 3, 4 and 5), 1280 x 800. RED until `PlanWizardDialog` exists. The kit, the tags and the
  * contract are in [UiRig]. Behaviour pinned here where the mockup is silent:
  *  - page 1: a kind is SELECTED (radio semantics, Queue first) and Next sends `chooseKind(selected)`; only the kinds that have a form are drawn
- *    (Queue, Exchange, Binding): the others of [PlannerTexts.WIZARD_KINDS] come with the task that builds their form;
+ *    (Queue, Exchange, Binding, and since M9-07 Stream): the others of [PlannerTexts.WIZARD_KINDS] come with the task that builds their form;
  *  - Down and Up move the selection between kinds, Enter is Next on pages 1 and 2 and Add to plan on page 3, Esc is Cancel;
  *  - a hint never disables Next; a problem does, with its reason under the field and, for a binding, also as one message of the page;
  *  - "Add to plan" closes the wizard and focuses the row of the first new step.
@@ -65,8 +65,8 @@ class PlanWizardUiTest {
     fun `page 1 offers the kinds that have a form and no other`() = runDesktopComposeUiTest(1280, 800) {
         val r = rig()
         open(r)
-        listOf("Queue", "Exchange", "Binding").forEach { node("planWizard:kind:$it").assertIsDisplayed() }
-        PlannerTexts.WIZARD_KINDS.filterNot { it in listOf("Queue", "Exchange", "Binding") }.forEach {
+        listOf("Queue", "Exchange", "Binding", "Stream").forEach { node("planWizard:kind:$it").assertIsDisplayed() }
+        PlannerTexts.WIZARD_KINDS.filterNot { it in listOf("Queue", "Exchange", "Binding", "Stream") }.forEach {
             assertNotDrawn("planWizard:kind:$it")
         }
         node("planWizard:cancel").assertIsDisplayed().assertIsEnabled()
@@ -80,7 +80,7 @@ class PlanWizardUiTest {
         val r = rig()
         open(r)
         val words = listOf("delete", "remove", "purge", "user", "virtual host", "permission", "message")
-        listOf("Queue", "Exchange", "Binding").forEach { kind ->
+        listOf("Queue", "Exchange", "Binding", "Stream").forEach { kind ->
             val text = textOf("planWizard:kind:$kind").lowercase()
             words.forEach { assertTrue(!text.contains(it), "the kind $kind mentions \"$it\": $text") }
         }

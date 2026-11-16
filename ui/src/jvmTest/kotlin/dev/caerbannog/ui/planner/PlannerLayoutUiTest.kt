@@ -85,4 +85,48 @@ class PlannerLayoutUiTest {
         assertTrue(!textOf("planGraphNode:e:events").contains("(direct)"), "the old form is still drawn: ${textOf("planGraphNode:e:events")}")
         r.close()
     }
+
+    // ---- M9-07: the stacked layout (owner list item 10 of M9-06, "as recommended") ----
+    // Intent only; any remedy satisfies it (the panel hugs its rows, or the card moves up, or the rows are spread).
+
+    private fun DesktopComposeUiTest.bottomOf(tag: String): Float = node(tag).fetchSemanticsNode().let { it.positionInRoot.y + it.size.height }
+
+    @Test
+    fun `stacked, the review card starts right under the last step of a three step plan - no empty panel between`() = runDesktopComposeUiTest(1280, 800) {
+        val r = rig()
+        showPlanner(r)
+        assertEquals("stacked", placement())
+        val gapDp = (node("planner:reviewCard").fetchSemanticsNode().positionInRoot.y - bottomOf("planStep:2")) / density.density
+        assertTrue(gapDp <= 32f, "there are $gapDp dp between the last step row and the review card; the step panel leaves a gap (the limit is one panel border and one spacing, 32 dp)")
+        r.close()
+    }
+
+    @Test
+    fun `the step list of a three step plan does not scroll inside its panel at 1280 x 800 and at 1600 x 1000`() {
+        for ((w, h) in listOf(1280 to 800, 1600 to 1000)) {
+            runDesktopComposeUiTest(w, h) {
+                val r = rig()
+                showPlanner(r)
+                val list = node("planner:stepList").fetchSemanticsNode()
+                val listBottom = list.positionInRoot.y + list.size.height
+                for (i in 0..2) {
+                    assertTrue(bottomOf("planStep:$i") <= listBottom + 0.5f, "at $w x $h the row $i ends at ${bottomOf("planStep:$i")}, below the list panel that ends at $listBottom: the list scrolls")
+                }
+                r.close()
+            }
+        }
+    }
+
+    @Test
+    fun `a seven step plan at 1600 x 1000 shows every row without scrolling the list`() = runDesktopComposeUiTest(1600, 1000) {
+        // The size of the M9-06 check screenshots (step 4 of that task saw the list scroll inside its panel here; at 1600 px the content is still under 1400 dp, so the card is stacked). The page has room: 7 rows are ~400 dp.
+        val r = UiRig { (1..7).forEach { queue("queue-$it") } }
+        showPlanner(r)
+        val list = node("planner:stepList").fetchSemanticsNode()
+        val listBottom = list.positionInRoot.y + list.size.height
+        for (i in 0..6) {
+            assertTrue(bottomOf("planStep:$i") <= listBottom + 0.5f, "row $i ends at ${bottomOf("planStep:$i")}, below the list panel that ends at $listBottom: the list scrolls")
+        }
+        r.close()
+    }
 }

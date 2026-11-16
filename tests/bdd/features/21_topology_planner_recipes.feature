@@ -46,7 +46,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   @m9-07 @fake-broker
   Scenario Outline: The response stream name is suggested with a suffix in the naming style
-    Given the naming style is "<style>"
+    Given I chose the naming style "<style>" in the planner
     When I enter the stream name "orders" and tick "Also create its response stream (DLN)"
     Then the response stream name is suggested as "<suggested>"
 

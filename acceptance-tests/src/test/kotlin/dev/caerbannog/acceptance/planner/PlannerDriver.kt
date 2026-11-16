@@ -27,6 +27,7 @@ import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.SaveGate
 import dev.caerbannog.core.planner.StepForm
+import dev.caerbannog.core.planner.StreamForm
 import dev.caerbannog.core.planner.TopologyPlan
 import dev.caerbannog.core.planner.WizardState
 import dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader
@@ -233,6 +234,9 @@ class PlannerDriver {
 
     fun queueForm(name: String, type: String?) = if (type == null) QueueForm(name = name) else QueueForm(name = name, type = type)
     fun exchangeForm(name: String, type: String) = ExchangeForm(name = name, type = type)
+    fun streamForm(name: String, withResponse: Boolean = false, responseName: String? = null) =
+        StreamForm(name = name, withResponse = withResponse, responseName = responseName)
+
     fun bindingForm(exchange: String, destination: String, routingKey: String) = BindingForm(
         exchange = exchange,
         destination = destination,
@@ -244,5 +248,6 @@ class PlannerDriver {
         is QueueForm -> "Queue"
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
+        is StreamForm -> "Stream"
     }
 }

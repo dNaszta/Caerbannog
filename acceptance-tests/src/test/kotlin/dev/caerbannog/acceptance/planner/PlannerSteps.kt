@@ -212,7 +212,11 @@ class PlannerSteps {
 
     /** A regular expression, not {string}: the parser's message holds quotes of its own (a name must not be "." or ".."). */
     @Then("^the form says \"(.*)\"$")
-    fun formSays(message: String) = assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
+    fun formSays(message: String) {
+        // M9-07: the fixed note of the stream form is also "said" by the form; it is a text of the page, not a problem.
+        if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
+        assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
+    }
 
     @Then("{string} is disabled")
     fun disabled(button: String) = when (button) {

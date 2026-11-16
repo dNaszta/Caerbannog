@@ -60,7 +60,7 @@ class PlannerViewModelWizardTest {
     @Test
     fun `a kind that is not built yet leaves the wizard on the kinds and adds nothing`() {
         vm.openWizard()
-        vm.chooseKind("Stream")
+        vm.chooseKind("Policy")
         assertEquals(WizardState.Kind, rig.state.wizard)
         vm.chooseKind("Not a kind at all")
         assertEquals(WizardState.Kind, rig.state.wizard)

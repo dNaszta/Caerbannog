@@ -3,7 +3,12 @@ package dev.caerbannog.ui.planner
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.performClick
+import dev.caerbannog.core.migrations.BrokerFinding
+import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.migrations.fakes.FakeDeclareCheck
 import dev.caerbannog.core.planner.KnownTopology
+import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -52,6 +57,39 @@ class PlanReviewGraphRound2UiTest {
         showPlanner(r)
         assertEquals(60, r.state.graph.graph.nodes.size)
         assertDrawn("planner:graphScrollbar")
+        r.close()
+    }
+
+    // ---- M9-06 F1, folded into M9-07 ----
+
+    @Test
+    fun `after a check at 1280 x 800 the three item plan still draws its graph without a scrollbar`() = runDesktopComposeUiTest(1280, 800) {
+        // The two-line check banner (summary and caveat, about 60 px) used to shorten the graph box so that a small plan got a scrollbar, against the
+        // M9-04 F4 intent. Any remedy satisfies this (a shorter banner, or a graph box that takes the remaining height); the texts stay as they are.
+        val port = FakeDeclareCheck()
+        val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology.None), declareCheck = port) { threeSteps() }
+        r.state.plan.steps.forEach { step ->
+            when (val a = step.action) {
+                is MigrationAction.DeclareQueue -> port.answerNamed(a.name, BrokerFinding.Absent)
+                is MigrationAction.DeclareExchange -> port.answerNamed(a.name, BrokerFinding.Same)
+                else -> port.answer(a, BrokerFinding.Absent)
+            }
+        }
+        showPlanner(r)
+        assertNotDrawn("planner:graphScrollbar")
+        node("planner:checkBtn").performClick()
+        waitForIdle()
+        assertDrawn("planner:checkSummary")
+        assertTrue(textOf("planner:checkSummary").contains(PlannerTexts.CHECK_CAVEAT), "the caveat is still said in full: ${textOf("planner:checkSummary")}")
+        assertDrawn("planner:reviewGraph")
+        assertNotDrawn("planner:graphScrollbar")
+        val box = node("planner:reviewGraph").fetchSemanticsNode()
+        val bottomOfBox = box.positionInRoot.y + box.size.height
+        val lowest = r.state.graph.graph.nodes.maxOf { n ->
+            val node = node("planGraphNode:${n.node.id}").fetchSemanticsNode()
+            node.positionInRoot.y + node.size.height
+        }
+        assertTrue(lowest <= bottomOfBox + 0.5f, "a node ends at y=$lowest, below the graph box that ends at y=$bottomOfBox")
         r.close()
     }
 
