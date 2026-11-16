@@ -64,7 +64,16 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
         durable: Boolean = true, autoDelete: Boolean = false, internal: Boolean = false,
     ) = MigrationAction.DeclareExchange(name, type, "/", durable, autoDelete, internal, args)
 
+    /** The ids of the table rows this test sent (a row nobody sends must fail the test, see [assertVisitedAll]). */
+    private val visited = mutableSetOf<String>()
+
+    private fun assertVisitedAll(prefix: String) {
+        val all = DeclareEquivalenceTable.rows.map { it.id }.filter { it.startsWith(prefix) }.toSet()
+        assertEquals(all, visited.filter { it.startsWith(prefix) }.toSet(), "every $prefix* row of the table must be sent by the test (missing: ${all - visited}, unknown: ${visited.filter { it.startsWith(prefix) }.toSet() - all})")
+    }
+
     private fun check(id: String, reply: MgmtApi.Reply, problems: MutableList<String>) {
+        visited += id
         val row = DeclareEquivalenceTable.row(id)
         val expectedText = row.bodyHas
         val bodyOk = expectedText == null || expectedText in reply.body
@@ -108,6 +117,7 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
             assertEquals(201, send(queue(name, type, base)).status)
             check("queue.$type.type-argument-omitted", api.put("/api/queues/%2F/$name", """{"durable":true,"auto_delete":false,"arguments":{"$limit":$value}}"""), problems)
         }
+        assertVisitedAll("queue.")
         assertTrue(problems.isEmpty(), "the repeated-declare table differs from the broker:\n${problems.joinToString("\n")}")
     }
 
@@ -123,6 +133,10 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
             "x-stream-filter-size-bytes" to whole(32), "x-consumer-disconnected-timeout" to whole(1000), "x-foo" to text("a"),
         )
         val problems = mutableListOf<String>()
+        DeclareEquivalenceTable.queueComparedArguments.forEach { (type, set) ->
+            val untried = set - candidates.map { it.first }.toSet() - "x-dead-letter-routing-key"
+            assertTrue(untried.isEmpty(), "$type: compared arguments no candidate sends: $untried")
+        }
         listOf("quorum", "classic", "stream").forEach { type ->
             val compared = DeclareEquivalenceTable.queueComparedArguments.getValue(type)
             candidates.forEach { (key, value) ->
@@ -168,6 +182,7 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
         repeat("unknown-argument-added", base) { base.copy(name = it, arguments = withAe + ("x-foo" to text("b"))) }
         repeat("unknown-argument-number-as-text", exchange("x", args = mapOf("x-foo" to whole(10)))) { exchange(it, args = mapOf("x-foo" to text("10"))) }
         repeat("unknown-argument-number-as-decimal", exchange("x", args = mapOf("x-foo" to whole(10)))) { exchange(it, args = mapOf("x-foo" to ArgumentValue.Decimal(10.0))) }
+        assertVisitedAll("exchange.")
         assertTrue(problems.isEmpty(), "the exchange rows differ from the broker:\n${problems.joinToString("\n")}")
     }
 
@@ -261,6 +276,7 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
             found += DeclareEquivalenceTable.StreamAnswer("exchange.put.on-stream-name", statusOf(send(exchange(stream))))
             found += DeclareEquivalenceTable.StreamAnswer("queue.put.stream-on-quorum-queue", statusOf(send(queue(quorum, "stream"))))
         }
+        assertEquals(DeclareEquivalenceTable.streamAnswers.map { it.id }.toSet(), found.map { it.id }.toSet(), "every streamAnswers row must be sent by the test")
         val expected = DeclareEquivalenceTable.streamAnswers.associateBy { it.id }
         val problems = found.mapNotNull { f ->
             val e = expected[f.id]

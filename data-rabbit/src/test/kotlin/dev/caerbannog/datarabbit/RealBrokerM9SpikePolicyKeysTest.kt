@@ -75,11 +75,15 @@ class RealBrokerM9SpikePolicyKeysTest {
     @Test
     fun `S-F1a every key is accepted for every apply-to, an unknown key is the one refusal`() {
         val rows = PolicyKeyMatrix.keys.flatMap { key -> PolicyKeyMatrix.applyTos.map { key to it } }
+        assertEquals(PolicyKeyMatrix.keys.size * PolicyKeyMatrix.applyTos.size, rows.size, "every key and apply-to pair of the matrix is a row")
+        val sent = mutableSetOf<Pair<PolicyKeyMatrix.Key, String>>()
         val wrong = rows.withIndex().mapNotNull { (i, row) ->
             val (key, applyTo) = row
+            sent += row
             val status = putPolicy(unique("acc-$i"), "^$run-nomatch$", """{"${key.name}":${key.sampleJson}}""", applyTo).status
             if (status != PolicyKeyMatrix.ACCEPT_STATUS) "${key.name}=${key.sampleJson} apply-to=$applyTo -> $status" else null
         }
+        assertEquals(rows.toSet(), sent, "every accept row must be sent")
         assertTrue(wrong.isEmpty(), "the accept matrix (all 201) differs from the broker: $wrong")
         val unknown = api.put("/api/policies/%2F/${unique("unk")}", policyBody("^$run-nomatch$", """{"no-such-key":1}"""))
         assertEquals(PolicyKeyMatrix.UNKNOWN_KEY_STATUS, unknown.status, "positive control: an unknown key is refused: $unknown")
@@ -100,6 +104,8 @@ class RealBrokerM9SpikePolicyKeysTest {
                 probes += Probe(target, key, queue)
             }
         }
+        assertTrue(PolicyKeyMatrix.effect.values.flatten().all { e -> PolicyKeyMatrix.keys.any { it.name == e } }, "an effect row names a key that is not in the key list")
+        assertEquals(Target.entries.filter { it != Target.EXCHANGE }.size * PolicyKeyMatrix.keys.size, probes.size, "every (type, key) row of the effect matrix is probed")
         // The positive control of the "no effect" rows: every row that must take effect shows its key; then a settle window.
         val expectedEffect = probes.filter { PolicyKeyMatrix.takesEffect(it.target, it.key.name) }
         val expectedNoEffect = probes - expectedEffect.toSet()
@@ -158,12 +164,15 @@ class RealBrokerM9SpikePolicyKeysTest {
 
     @Test
     fun `S-F1c a value of the wrong type is refused and nothing is stored`() {
+        val sent = mutableListOf<String>()
         val diffs = PolicyKeyMatrix.wrongTypeRows.mapNotNull { row ->
+            sent += row.id
             val name = unique("wt-${row.id}")
             val reply = putPolicy(name, "^$run-nomatch$", """{"${row.key}":${row.valueJson}}""")
             val stored = api.get("/api/policies/%2F/$name").status == 200
             if (reply.status != row.status || stored != row.stored) "${row.id}: status ${reply.status} stored=$stored, table says ${row.status} stored=${row.stored}" else null
         }
+        assertEquals(PolicyKeyMatrix.wrongTypeRows.map { it.id }, sent, "every wrong-type row must be sent")
         assertTrue(diffs.isEmpty(), "the wrong-type table differs from the broker: $diffs")
     }
 
