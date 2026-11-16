@@ -224,6 +224,9 @@ Feature: Check a plan against the broker
   # Measured by M9-00c (S-G, docs/spec.md "Check against the broker"): the check predicts the broker's answer to a
   # repeated declare AND the read-back that follows it. The broker refuses (400) a difference in an argument its queue
   # type honours; it answers 204 and stores nothing for any other argument, and the read-back then stops the apply.
+  # Row 4 and 5 use an argument the quorum type does not honour. "x-foo" is a made-up one: a real 4.4.0 broker refuses the
+  # FIRST declare of "x-max-priority" (and "x-queue-mode", "x-queue-version") on a quorum queue with 400, so it cannot be set
+  # up as "on the broker"; only a repeated declare of it is 204 (row 5, where the read-back then stops the apply).
   @m9-05b @broker
   Scenario Outline: What the check calls different is what a real broker refuses
     Given a real RabbitMQ 4 broker with a quorum queue "orders" declared with <on the broker>
@@ -239,7 +242,7 @@ Feature: Check a plan against the broker
       | "x-delivery-limit" 3 | "x-delivery-limit" 5 | Exists with different settings | the apply stops at that step with "exists with different settings" |
       | "x-delivery-limit" 3 | no arguments         | Exists with different settings | the apply stops at that step with "exists with different settings" |
       | "x-delivery-limit" 3 | "x-delivery-limit" 3 | Already there                  | the apply succeeds and changes nothing                             |
-      | "x-max-priority" 3   | no arguments         | Already there                  | the apply succeeds and changes nothing                             |
+      | "x-foo" 3            | no arguments         | Already there                  | the apply succeeds and changes nothing                             |
       | no arguments         | "x-max-priority" 3   | Exists with different settings | the apply stops at that step                                       |
 
   @m9-05b @broker
