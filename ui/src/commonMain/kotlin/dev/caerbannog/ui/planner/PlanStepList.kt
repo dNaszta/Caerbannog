@@ -170,7 +170,7 @@ private fun StepList(
 }
 
 /** A response stream sits under its request stream, one step further in. */
-private val RESPONSE_INDENT = 40.dp
+private val RESPONSE_INDENT = 24.dp
 
 @Composable
 private fun StepRow(
@@ -209,7 +209,7 @@ private fun StepRow(
                 }
                 .clickable { events.selectStep(step.id) }
                 .heightIn(min = 56.dp)
-                .padding(start = if (pairLine != null) RESPONSE_INDENT else 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
+                .padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
                 .testTag("planStep:$index"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -220,6 +220,8 @@ private fun StepRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(24.dp),
             )
+            // The number stays in its column; the icon and the words move in.
+            if (pairLine != null) Spacer(Modifier.width(RESPONSE_INDENT))
             ConnectionIcon(step.action.icon(), SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(step.title, style = MaterialTheme.typography.bodyMedium)

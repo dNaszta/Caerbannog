@@ -9,6 +9,8 @@ Milestone: M9    Depends on: M9-03, M9-04 (M9-00b is NOT a dependency of this ta
 
 - Step 2.5 (architect, 2026-11-16, round 0, same branch): API shape CONFIRMED as the tests have it; no test, glue or feature file must change (see "API shape confirmed" below). One feature-file edit of step 2 confirmed (the naming-style outline step). The M9-12 stand-ins are recorded in the M9-12 brief. New user-visible wording is collected in the "Owner review list" below (not decided here). No new broker call, executor change, dependency or MCP tool.
 
+- Step 3 (senior developer, 2026-11-16, round 1, same branch): built to the tests, all green (core, ui, desktopApp, acceptance, `./gradlew test --continue`; no `brokerTest`). Commits: core (`StreamForm`, `PlanPairs`, texts, Stream kind, link in `planPreview`), ui (stream form, pair row, dotted link), layout (the stacked card takes the height the steps leave: steps hug their rows up to 65 percent of the page, the card gets the rest; this closes F1, the 63 dp gap and the seven-row scroll with one change, so no test is `@Disabled`), indent (the row number stays in its column, icon and words move in). No new broker call, executor change, dependency or MCP tool; the check words are unchanged; wording is only what the tests and the Owner review list fix, as `PlannerTexts` constants.
+
 ## Goal
 The wizard has a Stream kind. Its form asks for a name and offers the tick "Also create its response stream (DLN)", off by default; with the tick a second stream with a suggested name is added. The pair is shown as a pair in the step list and linked in the review graph, also after the file is saved and opened again, as long as the name follows the rule.
 
