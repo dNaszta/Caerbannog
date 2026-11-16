@@ -93,6 +93,24 @@ class PlanReviewGraphRound2UiTest {
         r.close()
     }
 
+    // ---- M9-07 round 2 (A1): the card has a floor, so a long plan does not squeeze the graph ----
+
+    @Test
+    fun `after a check of seven steps at 1600 x 1000 the graph box is at least 140 dp high and the whole review card is on the page`() = runDesktopComposeUiTest(1600, 1000) {
+        val port = FakeDeclareCheck()
+        val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology.None), declareCheck = port) { (1..7).forEach { queue("queue-$it") } }
+        r.state.plan.steps.forEach { port.answer(it.action, BrokerFinding.Absent) }
+        showPlanner(r)
+        node("planner:checkBtn").performClick()
+        waitForIdle()
+        assertDrawn("planner:checkSummary")
+        val box = node("planner:reviewGraph").fetchSemanticsNode()
+        assertTrue(box.size.height / density.density >= 140f, "the graph box is ${box.size.height / density.density} dp high (the floor is 140 dp)")
+        val card = node("planner:reviewCard").fetchSemanticsNode()
+        assertTrue(card.positionInRoot.y >= 0f && card.positionInRoot.y + card.size.height <= 1000f + 0.5f, "the review card spans ${card.positionInRoot.y} to ${card.positionInRoot.y + card.size.height} of 1000")
+        r.close()
+    }
+
     // ---- F2 ----
 
     @Test

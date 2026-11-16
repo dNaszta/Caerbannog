@@ -89,6 +89,8 @@ Safety and architecture: no new broker call (`declareStream` is untouched, the s
 
 - Step 4a (architect, 2026-11-16, round 1): decision on the step 4 findings, see "Round 2 decision" below. F1 is a defect to fix in this task (round 2 for the senior developer, tests RED first by the test developer); F2 and F3 are not fixed here.
 
+- Step 2, round 2 (test developer, 2026-11-16): tests for the card floor written first. A1 `PlanReviewGraphRound2UiTest` "after a check of seven steps at 1600 x 1000 the graph box is at least 140 dp high and the whole review card is on the page": RED (graph box 115 dp). A3 `PlannerLayoutUiTest` "a checked seven step plan at 1600 x 1000 scrolls in its panel ...": passes on today's code (the 0.65 panel is large and already scrolls), so it is a guard against squeezing the panel below header and three rows (measured from a three row plan in the same window), not a red test; the list scrollbar has no tag, so "scrolls" is tested as row 6 not whole in the panel and reachable by scrolling. A4 relaxed as decided (renamed, first three rows whole). A2, A5, A6 untouched and green. No production code.
+
 ## Round 2 decision (architect, 2026-11-16)
 
 **F1 (major): fix in this task.** A review graph about 50 px high after a check of a 7-step plan defeats the review card (the card is on the page, but the graph cannot be read). The 0.65 share is right for few rows and wrong for many: the card must have a floor.

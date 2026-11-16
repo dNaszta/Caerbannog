@@ -2,6 +2,8 @@ package dev.caerbannog.ui.planner
 
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader
@@ -118,15 +120,60 @@ class PlannerLayoutUiTest {
     }
 
     @Test
-    fun `a seven step plan at 1600 x 1000 shows every row without scrolling the list`() = runDesktopComposeUiTest(1600, 1000) {
-        // The size of the M9-06 check screenshots (step 4 of that task saw the list scroll inside its panel here; at 1600 px the content is still under 1400 dp, so the card is stacked). The page has room: 7 rows are ~400 dp.
+    fun `a seven step plan at 1600 x 1000 shows at least the first three rows - the list scrolls when the card needs its floor`() = runDesktopComposeUiTest(1600, 1000) {
+        // Relaxed by the architect (M9-07 round 2, A4): the card has a floor, so the list may scroll. Unchecked, the card needs less; if all seven rows
+        // still fit the test does not mind. The first three rows must be fully inside the panel either way.
         val r = UiRig { (1..7).forEach { queue("queue-$it") } }
         showPlanner(r)
         val list = node("planner:stepList").fetchSemanticsNode()
         val listBottom = list.positionInRoot.y + list.size.height
-        for (i in 0..6) {
-            assertTrue(bottomOf("planStep:$i") <= listBottom + 0.5f, "row $i ends at ${bottomOf("planStep:$i")}, below the list panel that ends at $listBottom: the list scrolls")
+        for (i in 0..2) {
+            assertTrue(bottomOf("planStep:$i") <= listBottom + 0.5f, "row $i ends at ${bottomOf("planStep:$i")}, below the list panel that ends at $listBottom")
         }
         r.close()
+    }
+
+    // ---- M9-07 round 2 (A3): the card floor makes a long plan scroll in its panel ----
+
+    private fun checkedSevenRig(): UiRig {
+        val port = dev.caerbannog.core.migrations.fakes.FakeDeclareCheck()
+        val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology.None), declareCheck = port) { (1..7).forEach { queue("queue-$it") } }
+        r.state.plan.steps.forEach { port.answer(it.action, dev.caerbannog.core.migrations.BrokerFinding.Absent) }
+        return r
+    }
+
+    @Test
+    fun `a checked seven step plan at 1600 x 1000 scrolls in its panel, with the first three rows whole and the panel no smaller than header and three rows`() {
+        // STEPS_PANEL_MIN is measured, not guessed: the panel (`planner:stepList`) of a three step plan of the same kind in the same window hugs its
+        // rows, so its height is "three rows" as the screen draws them.
+        var threeRows = 0f
+        runDesktopComposeUiTest(1600, 1000) {
+            val r = UiRig { (1..3).forEach { queue("queue-$it") } }
+            showPlanner(r)
+            threeRows = node("planner:stepList").fetchSemanticsNode().size.height.toFloat()
+            r.close()
+        }
+        assertTrue(threeRows > 150f, "the measure of three rows is $threeRows")
+        runDesktopComposeUiTest(1600, 1000) {
+            val r = checkedSevenRig()
+            showPlanner(r)
+            node("planner:checkBtn").performClick()
+            waitForIdle()
+            assertDrawn("planner:checkSummary")
+            val list = node("planner:stepList").fetchSemanticsNode()
+            val listBottom = list.positionInRoot.y + list.size.height
+            for (i in 0..2) {
+                assertTrue(bottomOf("planStep:$i") <= listBottom + 0.5f, "row $i ends at ${bottomOf("planStep:$i")}, below the panel that ends at $listBottom")
+            }
+            assertTrue(list.size.height >= threeRows - 1f, "the panel is ${list.size.height} px high, less than header and three rows ($threeRows)")
+            // The list scrolls (its scrollbar is not tagged, so the fact is tested): row 6 is not whole inside the panel, and scrolling brings it in.
+            val sixWhole = runCatching { bottomOf("planStep:6") <= listBottom + 0.5f }.getOrDefault(false)
+            assertTrue(!sixWhole, "all seven rows are whole in the panel: the card did not get its floor")
+            node("planner:stepList").performScrollToIndex(6)
+            waitForIdle()
+            val after = node("planner:stepList").fetchSemanticsNode()
+            assertTrue(bottomOf("planStep:6") <= after.positionInRoot.y + after.size.height + 0.5f, "row 6 cannot be scrolled into the panel")
+            r.close()
+        }
     }
 }
