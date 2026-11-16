@@ -249,7 +249,7 @@ Feature: Stream list
 
   # M9-08b. Measured by M9-00c (S-F1d): a retention set by a policy on a stream is in the stream's
   # effective_policy_definition, not in its arguments; the list used to read the arguments only.
-  @m9-08b @fake-broker
+  @m9-08b @needs-M9-08b @fake-broker
   Scenario Outline: Retention set by a policy is shown like retention set when the stream was created
     Given a stream "telemetry" with no retention of its own and a policy that sets "<key>" to <value>
     When I open the stream list
