@@ -211,7 +211,6 @@ class PlannerExploratoryUiTest {
 
     // ---- findings ----
 
-    @Disabled("Finding M9-03-F1: the description field keeps its own typed text for good; when the view model is replaced (connection change) and the new one has not seen the pending text, the field shows text that the plan does not hold")
     @Test
     fun `the description field shows what the plan holds after the view model is replaced`() = runDesktopComposeUiTest(1280, 800) {
         val first = rig()

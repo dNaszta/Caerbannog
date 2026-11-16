@@ -398,7 +398,7 @@ private fun AppBar(
     Row(
         modifier = Modifier.testTag("appBar").fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 24.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         leading()
         Text(
@@ -410,7 +410,7 @@ private fun AppBar(
         )
         FlowRow(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {

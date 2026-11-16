@@ -222,7 +222,8 @@ private fun PlannerBody(
 @Composable
 private fun PlanHeader(state: PlannerState, events: PlannerEvents, onEdited: () -> Unit) {
     // The field keeps its own text: the view model answers on another thread, and a field that is rewritten from a late state loses letters.
-    var typed by remember { mutableStateOf<String?>(null) }
+    // Keyed on the events: a new view model (a connection change) has its own plan, and the field must show that, not the old typed text.
+    var typed by remember(events) { mutableStateOf<String?>(null) }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

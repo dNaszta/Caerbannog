@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -69,6 +70,9 @@ import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
 
+/** Compact buttons: five of them and the connection chip share one line at 1280 px. */
+private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+
 @Composable
 fun MigrationsScreen(
     state: MigrationsScreenState,
@@ -114,9 +118,8 @@ fun MigrationsScreen(
             Button(
                 onClick = onOpenPlanner,
                 modifier = Modifier.testTag("migrations:newPlanBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(if (plannerEntry is PlannerEntry.NewPlan) AppIcon.Add else AppIcon.Edit, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(plannerEntry.label)
             }
 
@@ -124,9 +127,8 @@ fun MigrationsScreen(
             OutlinedButton(
                 onClick = { onNavigate(AppDestination.MigrateFromThree) },
                 modifier = Modifier.testTag("migrations:migrate3xBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.DriveFileMove, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(AppDestination.MigrateFromThree.label)
             }
 
@@ -134,9 +136,8 @@ fun MigrationsScreen(
                 onClick = { showImportDialog = true },
                 enabled = state.canImport,
                 modifier = Modifier.testTag("migrations:importBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.UploadFile, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Import JSON")
             }
 
@@ -144,9 +145,8 @@ fun MigrationsScreen(
                 onClick = onExportTopology,
                 enabled = state.canExport,
                 modifier = Modifier.testTag("migrations:exportBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.Download, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Export current topology")
             }
 
@@ -154,9 +154,8 @@ fun MigrationsScreen(
                 onClick = onApplyPending,
                 enabled = state.canApplyPending,
                 modifier = Modifier.testTag("migrations:applyPendingBtn"),
+                contentPadding = BAR_BUTTON_PADDING,
             ) {
-                ConnectionIcon(AppIcon.PlayArrow, size = SmallIconSize)
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Apply pending")
             }
         },
