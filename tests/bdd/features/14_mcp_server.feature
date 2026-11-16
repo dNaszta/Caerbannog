@@ -90,3 +90,10 @@ Feature: Model Context Protocol (MCP) server
     Then the response is a JSON-RPC error with code -32700
     And the error message does not contain any part of the request
     And the server answers the next valid request
+
+  # M9-08b: the same read feeds the MCP stream tools (see 03_stream_list.feature).
+  @m9-08b
+  Scenario: MCP server shows retention that a policy sets on a stream
+    Given the stream "telemetry" on vhost "/" has no retention of its own and a policy that sets "max-age" to "7D"
+    When the client calls MCP tool "caerbannog_list_streams" with profile "dev-local" and vhost "/"
+    Then the tool result includes stream "telemetry" with retention "7D"

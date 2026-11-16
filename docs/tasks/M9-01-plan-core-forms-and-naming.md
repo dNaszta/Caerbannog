@@ -83,7 +83,7 @@ None. Owner decision 2026-11-15 ("no MCP"), recorded in `docs/spec.md` "Topology
 - Q1 (decided 2026-11-15): the Exchange form offers fanout, direct, topic and headers; the binding form of a headers exchange is `M9-11`.
 - Q5, Q6, Q7 (decided 2026-11-15): the default style is kebab-case, the suffix words are fixed, the hint covers every new name of a queue, exchange, stream or policy and never an existing broker name, a routing key, a topic filter or a header name.
 - Q13 (decided 2026-11-15): the queue form is name and type only.
-- S-H (broker name rules) is not measured: the form blocks only on the app's own rules.
+- S-H (broker name rules) was not measured when this task was built: the form blocks only on the app's own rules. Measured since (M9-00c, 2026-11-16): the follow-up brief is `M9-01b-broker-name-rules.md`; nothing in this task changes.
 
 ## API shape confirmed (architect, 2026-11-16, step 2.5)
 The tests fix this shape in `dev.caerbannog.core.planner`, beyond the brief. All of it is confirmed; the senior developer follows it as the tests read.

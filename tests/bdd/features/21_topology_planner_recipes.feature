@@ -10,7 +10,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   behaviour and are corrected to the measured one. The owner answered the open questions Q1 to Q16 on
   2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"), confirmed the
   revised Q3 (his IoT flow, @m9-07b) and answered Q17 (the key of the correlation-id header) the same day
-  (O14), so no scenario carries @needs-decision any more.
+  (O14). Since the spike M9-00c (2026-11-16) four @m9-08 scenarios carry @needs-decision again: they hold wording
+  the architect proposes and the owner has not seen (the target labels and three policy notes); the numbered owner
+  review list of docs/tasks/M9-00c-spike-policies-equivalence-names.md names them (items 2 to 5).
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
@@ -234,7 +236,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I choose "Save as migration"
     Then the saved file holds "max-length" as the number 1000, not as text
 
-  @m9-08 @needs-spike @fake-broker
+  # Measured by M9-00c (S-F1b, docs/spec.md "Measured facts of M9-00c"): a policy binds to a queue only when EVERY key suits its type.
+  @m9-08 @fake-broker
   Scenario Outline: The form offers only the settings measured for what the policy applies to
     When I open the policy form and choose that it applies to "<target>"
     Then the settings offered include "<offered>"
@@ -246,6 +249,26 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Quorum queues | Delivery limit             | Keep messages for          |
       | Streams       | Keep messages for          | Delivery limit             |
       | Streams       | Keep at most (bytes)       | Dead-letter exchange       |
+      | Classic queues | Maximum number of messages | Delivery limit            |
+      | Classic queues | Dead-letter exchange       | Keep messages for         |
+
+  # The labels of the targets "Queues" and "All" and the sentence under the list are wording: owner review list item 2 (M9-00c brief).
+  @m9-08 @needs-decision @fake-broker
+  Scenario Outline: A policy that applies to more than one kind of target offers only what all of them honour
+    When I open the policy form and choose that it applies to "<target>"
+    Then the settings offered are exactly "<offered>"
+    And the form says "<sentence>"
+
+    Examples:
+      | target  | offered                                                                      | sentence                                                              |
+      | Queues  | Keep at most (bytes), Leader locator, Alternate exchange                     | Only settings that every kind of queue honours are offered here       |
+      | All     | Keep at most (bytes), Leader locator, Alternate exchange                     | Only settings that every kind of queue honours are offered here       |
+
+  @m9-08 @fake-broker
+  Scenario: Keep messages for is saved as text
+    Given a plan with the policy "telemetry-retention" that applies to streams and whose setting "max-age" is "7D"
+    When I choose "Save as migration"
+    Then the saved file holds "max-age" as the text "7D", never as a number
 
   @m9-08 @negative @fake-broker
   Scenario Outline: A policy form that cannot be added says why
@@ -274,22 +297,62 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the form says "The app cannot tell which names this pattern matches"
     And "Next" is enabled
 
-  @m9-08 @needs-spike @fake-broker
+  @m9-08 @fake-broker
   Scenario: Two policies of a plan that match the same queue are pointed out
     Given a plan that declares the quorum queue "orders" and the policy "orders-dlx" on "^orders$"
     When I add the policy "orders-limits" on "^orders" with the wizard
     Then both policy steps show the note "The policies orders-dlx and orders-limits both match orders. RabbitMQ applies only one policy to a queue: put the settings into one policy."
     And "Save as migration" is still enabled
 
-  @m9-08 @needs-spike @fake-broker
+  @m9-08 @fake-broker
+  Scenario Outline: Policies of a plan that cannot bind to the same queue are not pointed out
+    Given a plan that declares the quorum queue "orders" and the policy "orders-dlx" on "^orders$" that applies to <first>
+    When I add the policy "orders-limits" on "^orders" that applies to <second> with the wizard
+    Then no step shows a note about two policies
+
+    Examples:
+      | first          | second         |
+      | quorum queues  | streams        |
+      | streams        | quorum queues  |
+
+  # Proposed wording: owner review list item 3.
+  @m9-08 @needs-decision @fake-broker
+  Scenario: A policy whose settings one kind of queue ignores is said to have no effect on it
+    Given a plan that declares the quorum queue "orders" and the policy "orders-old" on "^orders$" with the settings "max-length" and "max-age"
+    Then the policy step shows the note "This policy has no effect on orders: a quorum queue ignores Keep messages for, and RabbitMQ then applies none of the policy's settings."
+
+  @m9-08 @fake-broker
   Scenario: A policy that would take the place of a policy on the broker is pointed out by the check
-    Given the broker has the quorum queue "orders" with the policy "limits" applied
+    Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 0
     And a plan that declares the policy "orders-dlx" on "^orders$" with priority 10
     When I check the plan against "uat-eu"
     Then the step "Declare policy orders-dlx" shows "Will be created"
     And it shows the note "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
 
-  @m9-08 @needs-spike @fake-broker
+  # The two notes below are PROPOSED wording (S-F2a: the higher priority wins and nothing is merged; with equal priority
+  # exactly one applies and which one is not predictable): owner review list items 4 and 5.
+  @m9-08 @needs-decision @fake-broker
+  Scenario: A policy that would never apply because the broker's policy has the higher priority is pointed out by the check
+    Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 10
+    And a plan that declares the policy "orders-dlx" on "^orders$" with priority 0
+    When I check the plan against "uat-eu"
+    Then it shows the note "The broker applies the policy limits to orders, which has a higher priority. Only one policy applies to a queue: this one would not apply."
+
+  @m9-08 @needs-decision @fake-broker
+  Scenario: A policy with the same priority as the broker's policy is pointed out by the check
+    Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 0
+    And a plan that declares the policy "orders-dlx" on "^orders$" with priority 0
+    When I check the plan against "uat-eu"
+    Then it shows the note "The broker applies the policy limits to orders at the same priority. Only one of the two will apply, and RabbitMQ does not say which."
+
+  @m9-08 @fake-broker
+  Scenario: A policy on a queue that the broker applies no policy to is not pointed out
+    Given the broker has the quorum queue "orders" with no policy
+    And a plan that declares the policy "orders-dlx" on "^orders$"
+    When I check the plan against "uat-eu"
+    Then the step "Declare policy orders-dlx" shows no note about another policy
+
+  @m9-08 @fake-broker
   Scenario: Retention of a stream is saved as a policy
     When I add a stream "telemetry" with the wizard and set "Keep messages for" to "7D"
     Then the plan lists these steps in this order
@@ -297,7 +360,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Declare policy telemetry-retention |
     And the policy applies to streams, matches exactly "telemetry" and holds "max-age" "7D"
 
-  @m9-08 @needs-spike @fake-broker
+  @m9-08 @fake-broker
   Scenario: The response stream gets the same retention unless I untick it
     When I add a stream "telemetry" with its response stream and set "Keep messages for" to "7D"
     Then the policy "telemetry-retention" matches "telemetry" and "telemetry-dln" and nothing else
