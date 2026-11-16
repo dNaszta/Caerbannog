@@ -7,6 +7,8 @@ import dev.caerbannog.core.migrations.MigrationWriteException
 import dev.caerbannog.core.migrations.folderStateOf
 import dev.caerbannog.core.streams.AppSettings
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,8 @@ class PlannerViewModel(
     private val settings: AppSettings,
     private val context: PlannerContext,
     private val scope: CoroutineScope,
+    /** Quiet time before a typed description is written to the draft file; 0 writes at once. */
+    private val descriptionDebounceMillis: Long = DESCRIPTION_DEBOUNCE_MILLIS,
 ) {
     /** The pages of the wizard; the screen sees [WizardState], derived from this and the current plan. */
     private sealed interface Page {
@@ -54,6 +58,10 @@ class PlannerViewModel(
     private var error: String? = null
     private var dismissed = false
     private var loaded = false
+
+    /** True while the description in [plan] is newer than the draft file; [debounce] is the timer that writes it. */
+    private var descriptionPending = false
+    private var debounce: Job? = null
 
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<PlannerState> = _state.asStateFlow()
@@ -151,7 +159,29 @@ class PlannerViewModel(
 
     // ---- the plan header and the style ----
 
-    fun setDescription(text: String) = act { changePlan(plan.withDescription(text)) }
+    /**
+     * The text is in the state at once; the draft file follows after [descriptionDebounceMillis] of quiet (a keystroke would otherwise
+     * rewrite the file each time). Save, Dismiss, [flush] and any other change of the plan write it sooner.
+     */
+    fun setDescription(text: String) = act {
+        if (descriptionDebounceMillis <= 0) {
+            changePlan(plan.withDescription(text))
+        } else {
+            changePlan(plan.withDescription(text), writeDraft = false)
+            descriptionPending = true
+            debounce?.cancel()
+            debounce = scope.launch {
+                delay(descriptionDebounceMillis)
+                lock.withLock {
+                    writePending()
+                    publish()
+                }
+            }
+        }
+    }
+
+    /** Writes a description that is still waiting for its quiet time. The screen calls it when the user leaves. */
+    fun flush() = act(allowedWhenLocked = true) { writePending() }
 
     fun setVirtualHost(vhost: String) = act { changePlan(plan.withVhost(vhost)) }
 
@@ -248,7 +278,7 @@ class PlannerViewModel(
      * dropped. [refreshFolder] reads the folder again, so the save gate does not rest on a listing from before the folder changed under us;
      * a keystroke in the description does not ask for it, because a listing reads every migration file.
      */
-    private suspend fun changePlan(changed: TopologyPlan, refreshFolder: Boolean = false) {
+    private suspend fun changePlan(changed: TopologyPlan, refreshFolder: Boolean = false, writeDraft: Boolean = true) {
         if (changed == plan) return
         plan = changed
         question = null
@@ -262,12 +292,25 @@ class PlannerViewModel(
             else -> null
         }
         if (editing != null && editing !in ids) page = null
-        persist()
+        if (writeDraft) persist()
         if (refreshFolder) readFolder()
+    }
+
+    /** Never writes while locked: an unreadable file must stay as it is. */
+    private suspend fun writePending() {
+        if (descriptionPending && !locked()) persist()
+        descriptionPending = false
+    }
+
+    private fun dropPending() {
+        descriptionPending = false
+        debounce?.cancel()
+        debounce = null
     }
 
     /** A plan with a step or a description is kept as the draft; an empty one clears it. */
     private suspend fun persist() {
+        descriptionPending = false
         val kept = plan.steps.isNotEmpty() || plan.description.isNotEmpty()
         if (kept) {
             if (!draftStore.save(plan)) error = PlannerTexts.DRAFT_NOT_SAVED
@@ -283,6 +326,7 @@ class PlannerViewModel(
     }
 
     private fun resetPlan() {
+        dropPending()
         plan = TopologyPlan(vhost = context.vhost)
         page = null
         selected = null
@@ -369,9 +413,24 @@ class PlannerViewModel(
         Page.Kinds -> WizardState.Kind
         is Page.Form -> {
             val ctx = formContext()
-            WizardState.Details(p.form, p.form.problems(ctx), p.form.hints(ctx), p.editing)
+            detailsOf(p.form, p.editing, ctx)
         }
         is Page.Summary -> WizardState.Summary(p.form, p.form.actions(formContext()), p.editing)
+    }
+
+    private fun detailsOf(form: StepForm, editing: Int?, ctx: FormContext): WizardState.Details {
+        val problems = form.problems(ctx)
+        val binding = form as? BindingForm
+        return WizardState.Details(
+            form = form,
+            problems = problems,
+            hints = form.hints(ctx),
+            editingStepId = editing,
+            pageMessage = if (binding != null) problems.firstOrNull()?.message else null,
+            exchangeSuggestions = if (binding != null) ctx.exchangeSuggestions() else emptyList(),
+            destinationSuggestions = binding?.let { ctx.destinationSuggestions(it.destinationKind) }.orEmpty(),
+            asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
+        )
     }
 
     private fun snapshot(): PlannerState = PlannerState(
@@ -392,5 +451,10 @@ class PlannerViewModel(
 
     private fun publish() {
         _state.value = snapshot()
+    }
+
+    companion object {
+        /** About half a second of quiet before a typed description is written to the draft file. */
+        const val DESCRIPTION_DEBOUNCE_MILLIS: Long = 500
     }
 }

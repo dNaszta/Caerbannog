@@ -44,19 +44,25 @@ sealed interface PlannerEntry {
         override val label: String get() = "New plan"
     }
 
-    data class ContinuePlan(val stepCount: Int) : PlannerEntry {
+    data class ContinuePlan(val stepCount: Int, val description: String = "") : PlannerEntry {
         override val label: String get() = "Continue plan"
+
+        /** The line of the draft card under the description. */
+        val stepsText: String get() = PlannerTexts.draftCardSteps(stepCount)
     }
 
     /** The draft cannot be read: the planner opens on its report (neither New nor Continue). */
     data class DraftUnreadable(val path: String) : PlannerEntry {
         override val label: String get() = "Open planner"
+
+        /** The line of the draft card for a file that cannot be read. */
+        val cardText: String get() = PlannerTexts.DRAFT_UNREADABLE
     }
 
     companion object {
         fun of(load: DraftLoad): PlannerEntry = when (load) {
             DraftLoad.None -> NewPlan
-            is DraftLoad.Loaded -> ContinuePlan(load.plan.steps.size)
+            is DraftLoad.Loaded -> ContinuePlan(load.plan.steps.size, load.plan.description)
             is DraftLoad.Unreadable -> DraftUnreadable(load.path)
         }
     }

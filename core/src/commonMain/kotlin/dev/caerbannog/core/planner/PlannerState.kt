@@ -1,6 +1,7 @@
 package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.migrations.MigrationParser
 
 /**
  * What the planner knows about the connection, as plain values the window builds (shaped like `MigrationsInputs`, which lives in
@@ -32,6 +33,14 @@ sealed interface WizardState {
         val problems: List<FieldProblem>,
         val hints: List<FieldHint>,
         val editingStepId: Int?,
+        /** A binding problem as one message of the page (the parser does not say which field caused it); null for the other forms. */
+        val pageMessage: String? = null,
+        /** The exchanges of this plan, then the broker's (a binding form only; empty for the others). */
+        val exchangeSuggestions: List<Suggestion> = emptyList(),
+        /** The destinations that fit the destination kind of a binding form (empty for the others). */
+        val destinationSuggestions: List<Suggestion> = emptyList(),
+        /** False for a fanout or headers exchange whose type is known: the routing key is not asked. */
+        val asksRoutingKey: Boolean = true,
     ) : WizardState {
         /** A hint never disables Next (O11); a problem does. */
         val nextEnabled: Boolean get() = problems.isEmpty()
@@ -126,4 +135,37 @@ data class PlannerState(
 
     /** The plan is not a migration until it is saved (spec A3). */
     val draftLabel: String get() = PlannerTexts.DRAFT_LABEL
+
+    /** The 3.x connection or an unreadable draft: the screen draws no wizard, no add and no save. */
+    val isLocked: Boolean get() = banner is PlannerBanner.NotOffered || draftUnreadable != null
+
+    val isEmpty: Boolean get() = plan.steps.isEmpty()
+
+    /** A plan with no step and no description is nothing to dismiss; a description alone is kept as a draft, so it can be dismissed. */
+    val canDismiss: Boolean get() = !isLocked && (plan.steps.isNotEmpty() || plan.description.isNotEmpty())
+
+    /** Problems about the plan as a whole (shown at the top of the list). */
+    val wholePlanProblems: List<PlanProblem> get() = problems.filter { it.stepId == null }
+
+    fun stepProblems(stepId: Int): List<PlanProblem> = problems.filter { it.stepId == stepId }
+
+    /** The problems that do not block: shown in the neutral style and left out of [blockingCount]. */
+    val notes: List<PlanProblem> get() = problems.filterNot { it.blocking }
+
+    val blockingCount: Int get() = problems.count { it.blocking }
+
+    /** The second line of the error banner, for the one error that has it. */
+    val errorDetail: String? get() = if (errorMessage == PlannerTexts.FILE_NOT_WRITTEN) PlannerTexts.FILE_NOT_WRITTEN_DETAIL else null
+
+    /** Checking is built in M9-06; until then the button is drawn disabled with a reason. */
+    val checkEnabled: Boolean get() = false
+
+    val checkDisabledReason: String? get() = PlannerTexts.CHECK_LATER
+
+    /**
+     * What the plan would be saved as, for the read-only JSON view. The version is not chosen yet (the next free one is picked at save),
+     * so it reads as a draft; it holds exactly what the file will hold: a description and actions, no secret.
+     */
+    val migrationText: String
+        get() = MigrationParser.exportToJson("draft", plan.description, plan.steps.map { it.action })
 }

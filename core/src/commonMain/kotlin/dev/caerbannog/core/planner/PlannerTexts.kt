@@ -21,6 +21,12 @@ object PlannerTexts {
     const val NO_FOLDER: String = "Choose a migrations folder first"
     const val DRAFT_LABEL: String = "Draft, not saved as a migration"
     const val FILE_NOT_WRITTEN: String = "The file could not be written"
+    const val FILE_NOT_WRITTEN_DETAIL: String = "The plan is still here as a draft. Nothing was changed."
+    const val NO_STEPS_YET: String = "No steps yet"
+    const val NOTHING_TO_REVIEW: String = "Nothing to review yet"
+    const val CHECK_LATER: String = "Checking comes in a later step"
+    const val DRAFT_CARD_TITLE: String = "Draft plan"
+    const val DRAFT_CARD_PILL: String = "Not saved"
     const val DRAFT_NOT_SAVED: String = "The draft could not be saved on this machine; the plan is only in memory"
     const val DRAFT_NOT_MOVED: String = "The draft file could not be moved aside; it was not changed"
     const val DRAFT_FILE_NAME: String = "planner-draft.json"
@@ -46,6 +52,8 @@ object PlannerTexts {
         val target = if (echo) "a connection for $planVhost" else "a connection for that virtual host"
         return "This plan is for $plan; $connection is connected to $connectionVhost. It can be saved here and applied on $target."
     }
+
+    fun draftCardSteps(steps: Int): String = "$steps ${plural(steps, "step")} \u00b7 not a migration yet"
 
     fun planSaved(version: String): String = "Plan saved as $version. Nothing was sent to the broker. Apply it when you are ready."
 
