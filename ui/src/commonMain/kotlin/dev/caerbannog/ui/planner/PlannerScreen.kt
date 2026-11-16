@@ -81,6 +81,12 @@ private val SIDE_BY_SIDE_FROM = 1400.dp
 /** The most of the page the step list takes when the card is stacked under it. */
 private const val STACKED_STEPS_SHARE = 0.65f
 
+/** The least the stacked review card keeps (title, check summary, graph box, note) so a long plan cannot squeeze the graph unreadable. */
+private val REVIEW_CARD_MIN = 300.dp
+
+/** The step panel with its header and three rows: a short plan is never squeezed below it, so it keeps its size. */
+private val STEPS_PANEL_MIN = 224.dp
+
 /**
  * The Topology planner (docs/ux/Planner.dc.html): header, step list, wizard, review card with the migration text, and the limited states.
  * State in, events out: every text, every enabled flag and the order of the banners come from [state]; nothing here reaches the broker.
@@ -216,7 +222,7 @@ private fun PlannerBody(
             } else {
                 // The steps hug their rows up to [STACKED_STEPS_SHARE] of the page and the review card takes what is left: with equal weights a
                 // short plan left an empty panel between the two (M9-06 item 10) and the card too little height for its graph (M9-06 F1).
-                val stepsMaxHeight = maxHeight * STACKED_STEPS_SHARE
+                val stepsMaxHeight = maxOf(minOf(maxHeight * STACKED_STEPS_SHARE, maxHeight - REVIEW_CARD_MIN), STEPS_PANEL_MIN)
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.fillMaxWidth().heightIn(max = stepsMaxHeight))
                     PlanReviewCard(state, events, Modifier.weight(1f).fillMaxWidth())
