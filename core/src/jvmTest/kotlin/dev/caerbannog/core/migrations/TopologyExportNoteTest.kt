@@ -104,6 +104,26 @@ class TopologyExportNoteTest {
         assertEquals("transient queue scratch (cannot be applied)", TopologyExport.transientQueueNote("scratch"))
     }
 
+    @Test
+    fun `a stream whose argument the parser refused is exported and named as other settings, alone or with retention`() {
+        val refused = stream("audit").copy(typedArgumentsComplete = false)
+        val outcome = run(declarations = listOf(refused))
+        val result = written(outcome)
+        assertEquals(listOf("audit"), result.actions.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
+        assertEquals("Left out: other settings of stream audit", result.note)
+        assertEquals("Left out: retention and other settings of stream audit", note(listOf(stream("audit", age).copy(typedArgumentsComplete = false))))
+        assertEquals("Left out: leader locator and other settings of stream audit", note(listOf(stream("audit", leader).copy(typedArgumentsComplete = false))))
+    }
+
+    @Test
+    fun `a super stream partition with a refused argument adds other settings to the union`() {
+        val (decls, exchanges, bindings) = superStream("orders", 3) { arrayOf(leader) }
+        val withRefused = decls.mapIndexed { i, d -> if (i == 1) d.copy(typedArgumentsComplete = false) else d }
+        assertEquals("Left out: leader locator and other settings of super stream orders (3 partitions)", note(withRefused, exchanges, bindings))
+        val onlyRefused = superStream("orders", 2) { emptyArray() }.let { (d, e, b) -> note(d.map { it.copy(typedArgumentsComplete = false) }, e, b) }
+        assertEquals("Left out: other settings of super stream orders (2 partitions)", onlyRefused)
+    }
+
     // ---- super streams ----------------------------------------------------------------------------------------------------------
 
     private fun superStream(name: String, partitions: Int, arguments: (Int) -> Array<Pair<String, ArgumentValue>>): Triple<List<QueueDeclaration>, List<ExchangeRow>, List<BindingRow>> =

@@ -420,6 +420,17 @@ class MigrationsViewModelExportTest {
     }
 
     @Test
+    fun `a stream with a refused argument is exported, the file is written and the note says other settings`() {
+        val rig = Rig(FakeTopologyCatalog().apply { declare(declared("audit", "stream").copy(typedArgumentsComplete = false)) })
+        val file = runBlocking { rig.vm.exportCurrentTopology() }
+        assertNotNull(file, "the export was refused: ${rig.vm.state.value.errorMessage}")
+        assertEquals(listOf("audit"), file.up.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
+        assertNull(rig.vm.state.value.errorMessage)
+        assertEquals("Left out: other settings of stream audit", rig.vm.state.value.exportNote)
+        assertEquals(1, runBlocking { rig.files.listFiles() }.size)
+    }
+
+    @Test
     fun `the note shown after an export is the one line of the wording table`() {
         val rig = Rig(
             FakeTopologyCatalog().apply {
