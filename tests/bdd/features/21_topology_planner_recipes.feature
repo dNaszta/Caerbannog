@@ -13,6 +13,12 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   (O14). Since the spike M9-00c (2026-11-16) four @m9-08 scenarios carry @needs-decision again: they hold wording
   the architect proposes and the owner has not seen (the target labels and three policy notes); the numbered owner
   review list of docs/tasks/M9-00c-spike-policies-equivalence-names.md names them (items 2 to 5).
+  Since the spike M9-00a (2026-11-16) the MQTT facts (S-A, S-B) and the headers facts (S-E) are measured: the scenarios of
+  the tags m9-07b, m9-10 and m9-11 lost needs-spike and carry the measured examples; four scenarios hold wording that the
+  architect proposes (the refusals of a dot, an asterisk and an empty level, the amq.topic assumption, the sentence under
+  the correlation-id header, the headers warnings) and carry needs-decision until the owner has seen the numbered
+  Owner review list of docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md. Only the m9-09 scenarios still carry
+  needs-spike (M9-00b: S-C, S-D).
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
@@ -125,7 +131,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I tick "Also create its response stream (DLN)"
     Then both are offered and neither is ticked
 
-  @m9-07b @smoke @needs-spike @fake-broker
+  @m9-07b @smoke @fake-broker
   Scenario: Answers arrive over MQTT adds one route into the response stream
     When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
     Then the summary says "This adds 3 steps"
@@ -135,7 +141,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | MQTT route devices/+/answer to stream device-commands-dln |
     And the route is the action "declareBinding" from "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
 
-  @m9-07b @needs-spike @fake-broker
+  @m9-07b @fake-broker
   Scenario: Requests are also recorded from an MQTT topic adds one route into the request stream
     When I add a stream "device-commands" with its response stream and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
     Then the plan lists these steps in this order
@@ -143,7 +149,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Declare stream device-commands-dln              |
       | MQTT route commands/# to stream device-commands |
 
-  @m9-07b @needs-spike @fake-broker
+  @m9-07b @fake-broker
   Scenario: Both ticks add two routes, the answers route first
     When I add a stream "device-commands" with its response stream, tick "Answers arrive over MQTT" with the topic filter "devices/+/answer" and tick "Requests are also recorded from an MQTT topic" with the topic filter "commands/#"
     Then the summary says "This adds 4 steps"
@@ -158,7 +164,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add a stream "device-commands" with its response stream and tick "Answers arrive over MQTT" with the topic filter "devices/+/answer"
     Then the summary says "Your own service turns a request into an MQTT message; the planner does not plan that."
 
-  @m9-07b @needs-spike @fake-broker
+  @m9-07b @fake-broker
   Scenario: The routes of a pair are ordinary steps
     Given a plan with the stream pair "device-commands" and the answers route "devices/+/answer" added by the wizard
     When I remove the step "MQTT route devices/+/answer to stream device-commands-dln"
@@ -199,7 +205,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add an MQTT route from "sensors/#" to the stream "telemetry" with the wizard
     Then the review graph still shows no note about a service
 
-  @m9-07b @needs-spike @fake-broker
+  @m9-07b @fake-broker
   Scenario: A saved pair with its answers route is recognised again
     Given a pending migration "0005" that declares the streams "device-commands" and "device-commands-dln" and binds "amq.topic" to "device-commands-dln" with routing key "devices.*.answer"
     When I choose "Edit steps" for "0005"
@@ -207,14 +213,17 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And the planner lists "MQTT route devices/+/answer to stream device-commands-dln"
     And the review graph shows the note about the owner's service
 
-  @m9-07b @broker @needs-spike
+  # Measured (M9-00a, S-A6): an MQTT 5 user property arrives on a stream message as an APPLICATION property of the same name;
+  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data.
+  @m9-07b @broker
   Scenario: A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it
     Given a real RabbitMQ 4 broker with the MQTT plugin
     And a plan with the stream "device-commands", its response stream and the answers route "devices/+/answer"
     When the plan is saved and applied by the migration runner
     And a device "d42" publishes an MQTT message with the correlation id "c-1" to "devices/d42/answer"
     Then the stream "device-commands-dln" holds one message more and the stream "device-commands" none
-    And the message carries the correlation id where the measured rule says it appears
+    And the message carries the application property "correlation-id" with the value "c-1"
+    And the standard correlation-id property of the message is empty
 
   # ---- M9-08: policies (owner decision O7) ----
 
@@ -477,7 +486,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   # ---- M9-10: MQTT routes (owner decision O2; architect decision A10: one binding on amq.topic) ----
 
-  @m9-10 @smoke @needs-spike @fake-broker
+  @m9-10 @smoke @fake-broker
   Scenario Outline: An MQTT route is saved as a binding on amq.topic
     Given a plan that declares the stream "telemetry"
     When I add an MQTT route from "<filter>" to the stream "telemetry" with the wizard
@@ -491,6 +500,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | devices/d1/status | devices.d1.status |
       | devices/+/answer  | devices.*.answer  |
       | #                 | #                 |
+      | +                 | *                 |
+      | a/b/c             | a.b.c             |
 
   @m9-10 @fake-broker
   Scenario: An MQTT route can lead to a queue or to a stream
@@ -512,24 +523,50 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | sensors/te#    | # must be the last level        |
       | sens+/temp     | + must stand for a whole level  |
 
-  @m9-10 @negative @needs-spike @fake-broker
-  Scenario Outline: A topic filter that cannot be translated safely is refused
+  # Measured (M9-00a, S-A3): a "." in a level is read by the broker as another level (the key sensors.v1.2.temp has four words) and a
+  # subscriber of the literal filter never receives the message; a "*" inside a level is handed to subscribers as "+"; an empty level
+  # works but is almost always a typing mistake (a product choice: refuse). The refusal TEXTS are proposals, see the Owner review list
+  # of docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md (items 1 to 3), so the scenario waits for the owner.
+  @m9-10 @negative @needs-decision @fake-broker
+  Scenario Outline: A topic filter that RabbitMQ would not carry back unchanged, or that is almost surely a mistake, is refused
     When I enter the topic filter "<filter>" in the MQTT route form
-    Then the form says "This filter cannot be translated safely"
+    Then the form says "<message>"
     And "Next" is disabled
 
     Examples:
-      | filter            |
-      | sensors/v1.2/temp |
-      | sensors/*/temp    |
-      | sensors//temp     |
+      | filter            | message                                                                |
+      | sensors/v1.2/temp | A level cannot contain a dot: RabbitMQ would read it as another level  |
+      | sensors/a*b/temp  | A level cannot contain *: use + for a whole level                      |
+      | sensors/*/temp    | A level cannot contain *: use + for a whole level                      |
+      | sensors//temp     | A level cannot be empty                                                |
+      | /sensors/temp     | A level cannot be empty                                                |
+      | sensors/temp/     | A level cannot be empty                                                |
+
+  @m9-10 @fake-broker
+  Scenario Outline: A filter that works as typed is accepted
+    When I enter the topic filter "<filter>" in the MQTT route form
+    Then the form says it is saved as a binding on amq.topic with the key "<key>"
+    And "Next" is enabled
+
+    Examples:
+      | filter           | key               |
+      | sensors/a b/temp | sensors.a b.temp  |
+      | $SYS/#           | $SYS.#            |
+      | sensors/#        | sensors.#         |
 
   @m9-10 @fake-broker
   Scenario: The form shows the binding it will write and a topic that matches
     When I enter the topic filter "sensors/+/temp" in the MQTT route form
     Then the form says it is saved as a binding on amq.topic with the key "sensors.*.temp"
     And it gives "sensors/item/temp" as a topic that matches
-    And it says "Uses the broker's default MQTT exchange amq.topic."
+
+  # Measured (M9-00a, S-B1 and S-B2): the app cannot read the broker's MQTT exchange, and on a broker with another one a route on
+  # amq.topic is applied without error and receives nothing from MQTT. So the sentence is an ASSUMPTION, never a fact. Proposed
+  # wording, for the owner (Owner review list, item 4).
+  @m9-10 @needs-decision @fake-broker
+  Scenario: The form says that amq.topic is an assumption
+    When I enter the topic filter "sensors/+/temp" in the MQTT route form
+    Then it says "Assumes the MQTT plugin uses its default exchange amq.topic. The app cannot check this: on a broker with another MQTT exchange this route receives nothing from MQTT."
 
   @m9-10 @fake-broker
   Scenario: A saved MQTT route is shown as an MQTT route again
@@ -606,7 +643,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | d+42  | No + or # in a value     |
       | d#42  | No + or # in a value     |
 
-  @m9-10 @needs-spike @fake-broker
+  @m9-10 @fake-broker
   Scenario: The dialog opens with a correlation-id header that is generated and can be changed
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
@@ -616,6 +653,16 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I open the test message again and enter "d42"
     Then the generated value is a different one
     And nothing was published
+
+  # Measured (M9-00a, S-A6, S-A7): this header arrives on the stream message as the application property "correlation-id";
+  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. Proposed
+  # sentence under the header, for the owner (Owner review list, item 5).
+  @m9-10 @needs-decision @fake-broker
+  Scenario: The dialog says where the correlation id arrives
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
+    When I choose "Send a test message" for that route and enter "d42"
+    Then under the header "correlation-id" it says "In the stream message this arrives as the application property correlation-id, not as the AMQP correlation-id property."
 
   @m9-10 @negative @fake-broker
   Scenario Outline: The test message is not offered where publishing is not possible
@@ -635,7 +682,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I select "0005" on the Migrations screen
     Then "Send a test message" is not offered
 
-  @m9-10 @broker @needs-spike
+  @m9-10 @broker
   Scenario: A message published over MQTT to a planned route reaches a stream and a queue
     Given a real RabbitMQ 4 broker with the MQTT plugin
     And a plan with the stream "telemetry", the quorum queue "alarms" and the MQTT routes "sensors/+/temp" to "telemetry" and "alarms/#" to "alarms"
@@ -643,10 +690,11 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And one MQTT message is published to "sensors/room1/temp" and one to "alarms/fire/floor2"
     Then the stream "telemetry" holds one message more and the queue "alarms" holds one message
     And a message published to "sensors/room1/humidity" reaches neither
+    And a message published to "alarms" reaches the queue "alarms" as well, because a trailing hash also matches the parent topic
 
   # ---- M9-11: bindings on a headers exchange ----
 
-  @m9-11 @smoke @needs-spike @fake-broker
+  @m9-11 @smoke @fake-broker
   Scenario: A binding on a headers exchange carries its headers and the match rule
     Given a plan that declares the headers exchange "documents" and the quorum queue "pdf-reports"
     When I add a binding from "documents" to the queue "pdf-reports" that matches all of the headers
@@ -655,7 +703,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the plan lists "Bind documents to pdf-reports" with the detail "format=pdf, type=report, x-match=all"
     And the binding form showed no routing key field
 
-  @m9-11 @needs-spike @fake-broker
+  @m9-11 @fake-broker
   Scenario: Header values keep their type in the saved file
     Given a plan with a headers binding whose header "pages" is the number 10 and whose header "signed" is true
     When I choose "Save as migration"
@@ -668,11 +716,44 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And I add a binding from "documents" to "reports" that matches the header "format" "csv"
     Then the plan has both bindings and no problem
 
-  @m9-11 @negative @needs-spike @fake-broker
-  Scenario: A headers binding without a header says what it would match
+  # Measured (M9-00a, S-E2): only all, any, all-with-x and any-with-x are accepted by the broker (case sensitive); the meaning of the two
+  # "-with-x" rules was not measured, so they are offered only when an opened file already holds them.
+  @m9-11 @fake-broker
+  Scenario: Only the two measured match rules are offered, and the binding always carries one
     Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
-    When I open the binding form for "documents" and add no header
-    Then the form says what such a binding matches, as measured on a real broker
+    When I open the binding form for "documents"
+    Then the match rules offered are "all" and "any"
+    And "all" is chosen at the start
+    When I add a binding that matches the header "format" "pdf"
+    Then the step detail ends with "x-match=all"
+
+  @m9-11 @fake-broker
+  Scenario: A binding from an opened file that uses a rule the form does not offer is kept as it is
+    Given a pending migration "0005" with a binding from the headers exchange "documents" to the queue "reports" with the arguments "x-match" "all-with-x" and "format" "pdf"
+    When I choose "Edit steps" for "0005"
+    Then the step is shown as a binding with the detail "format=pdf, x-match=all-with-x"
+    And saving writes the binding back unchanged
+
+  # Measured (M9-00a, S-E4): with no header besides x-match, "all" matches EVERY message (also one with no headers) and "any" matches
+  # NO message. The two texts are proposals, for the owner (Owner review list, items 6 and 7).
+  @m9-11 @negative @needs-decision @fake-broker
+  Scenario Outline: A headers binding without a header says what it would match
+    Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
+    When I open the binding form for "documents", choose the match rule "<rule>" and add no header
+    Then the form says "<message>"
+
+    Examples:
+      | rule | message                                                          |
+      | all  | With no header, this binding matches every message               |
+      | any  | With no header, this binding matches no message at all           |
+
+  @m9-11 @fake-broker
+  Scenario: A number and the same text are different header values
+    Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
+    When I add a binding that matches the header "pages" with the number 10
+    And I add a binding that matches the header "pages" with the text "10"
+    Then the plan has both bindings and no problem
+    And the first is saved with "pages" as the number 10 and the second with "pages" as the text "10"
 
   @m9-11 @fake-broker
   Scenario: A fanout binding has no routing key field
