@@ -221,11 +221,30 @@ Feature: Check a plan against the broker
     Then every step shows "Already there"
     And the check sent GET requests only
 
-  @m9-05b @broker @needs-spike
-  Scenario: What the check calls different is what a real broker refuses
-    Given a real RabbitMQ 4 broker with a quorum queue declared with "x-delivery-limit" 3
-    And a plan that declares the same queue with "x-delivery-limit" 5
+  # Measured by M9-00c (S-G, docs/spec.md "Check against the broker"): the check predicts the broker's answer to a
+  # repeated declare AND the read-back that follows it. The broker refuses (400) a difference in an argument its queue
+  # type honours; it answers 204 and stores nothing for any other argument, and the read-back then stops the apply.
+  @m9-05b @broker
+  Scenario Outline: What the check calls different is what a real broker refuses
+    Given a real RabbitMQ 4 broker with a quorum queue "orders" declared with <on the broker>
+    And a plan that declares the quorum queue "orders" with <in the plan>
     When the plan is checked
-    Then the step shows "Exists with different settings"
+    Then the step shows "<shown>"
     When the plan is saved and applied by the migration runner
-    Then the apply stops at that step with "exists with different settings" and the queue is unchanged
+    Then <apply>
+    And the queue "orders" on the broker is unchanged
+
+    Examples:
+      | on the broker        | in the plan          | shown                          | apply                                                              |
+      | "x-delivery-limit" 3 | "x-delivery-limit" 5 | Exists with different settings | the apply stops at that step with "exists with different settings" |
+      | "x-delivery-limit" 3 | no arguments         | Exists with different settings | the apply stops at that step with "exists with different settings" |
+      | "x-delivery-limit" 3 | "x-delivery-limit" 3 | Already there                  | the apply succeeds and changes nothing                             |
+      | "x-max-priority" 3   | no arguments         | Already there                  | the apply succeeds and changes nothing                             |
+      | no arguments         | "x-max-priority" 3   | Exists with different settings | the apply stops at that step                                       |
+
+  @m9-05b @broker
+  Scenario: A name that the management API answers with a list is not read as a queue
+    Given a real RabbitMQ 4 broker
+    When the check reads the queue and the exchange named "." and ".." through the management API
+    Then every step shows "Could not be checked"
+    And the check sent GET requests only

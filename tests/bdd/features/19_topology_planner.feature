@@ -12,7 +12,7 @@ Feature: Topology planner
   PLANNED 2026-11-15, not built. The owner answered every open question on 2026-11-15 (docs/spec.md,
   "Topology planner (M9)", "Owner answers to the questions", O12 to O14); @needs-spike marks what still waits
   for a broker fact.
-  Sub-tags: @m9-01 plan core (forms, plain words, validation, naming), @m9-02 draft, save and dismiss, @m9-03 the
+  Sub-tags: @m9-01 plan core (forms, plain words, validation, naming), @m9-01b broker name rules measured by S-H, @m9-02 draft, save and dismiss, @m9-03 the
   screen and its states, @m9-04 the review graph, @m9-12 a pending file opened as steps.
   The check against the broker is in 20, streams, policies, dead-lettering and MQTT routes are in 21.
 
@@ -101,6 +101,36 @@ Feature: Topology planner
       | Exchange | an empty name                           | Give the exchange a name               |
       | Binding  | no exchange                             | Choose the exchange to bind from       |
       | Binding  | no destination                          | Choose what to bind to                 |
+
+  # Measured by M9-00c (S-H, docs/spec.md "Naming"). The messages are PROPOSED wording: owner review list item 1 (docs/tasks/M9-00c-spike-policies-equivalence-names.md).
+  @m9-01b @negative @needs-decision @fake-broker
+  Scenario Outline: A name that RabbitMQ would refuse is refused by the form
+    Given a new plan
+    When I fill the "<kind>" form with <input>
+    Then the form says "<message>"
+    And "Next" is disabled
+
+    Examples:
+      | kind     | input                     | message                                    |
+      | Queue    | the name "amq.orders"     | Names that start with "amq." are reserved  |
+      | Exchange | the name "amq.orders"     | Names that start with "amq." are reserved  |
+      | Stream   | the name "amq.orders"     | Names that start with "amq." are reserved  |
+      | Queue    | a name of 256 letters     | A queue name can be at most 255 bytes long |
+      | Queue    | a name of 128 letters "é" | A queue name can be at most 255 bytes long |
+
+  @m9-01b @fake-broker
+  Scenario Outline: A name that RabbitMQ accepts is not refused by the form
+    Given a new plan
+    When I fill the "<kind>" form with <input>
+    Then "Next" is enabled
+
+    Examples:
+      | kind     | input                 |
+      | Queue    | the name "amq"        |
+      | Queue    | a name of 255 letters |
+      | Exchange | a name of 256 letters |
+      | Stream   | a name of 256 letters |
+      | Queue    | the name "orders eu"  |
 
   @m9-01 @negative @fake-broker
   Scenario: The same thing declared twice with other settings is a problem in the plan
