@@ -93,6 +93,14 @@ class MigrationsViewModelTest {
 
         override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> =
             CatalogResult.Unexpected
+
+        // M9-14: the export reads these three; the same single queue as `queues`, and no policy.
+        override suspend fun queueDeclarations(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.QueueDeclaration>> =
+            CatalogResult.Success(listOf(dev.caerbannog.core.topology.QueueDeclaration(name = "orders", vhost = vhost, type = "quorum")))
+
+        override suspend fun policies(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.PolicyRow>> = CatalogResult.Success(emptyList())
+
+        override suspend fun operatorPolicies(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.PolicyRow>> = CatalogResult.Success(emptyList())
     }
 
     private fun sampleJson(version: String, description: String = "Test migration"): String = """

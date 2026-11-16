@@ -3,6 +3,8 @@ package dev.caerbannog.core.connections.fakes
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.topology.PolicyRow
+import dev.caerbannog.core.topology.QueueDeclaration
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
@@ -43,5 +45,8 @@ class PagedTopologyCatalog(private val inner: FakeTopologyCatalog, private val p
 
     override suspend fun exchanges(vhost: String): CatalogResult<List<ExchangeRow>> = inner.exchanges(vhost)
     override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = inner.bindings(vhost)
+    override suspend fun queueDeclarations(vhost: String): CatalogResult<List<QueueDeclaration>> = inner.queueDeclarations(vhost)
+    override suspend fun policies(vhost: String): CatalogResult<List<PolicyRow>> = inner.policies(vhost)
+    override suspend fun operatorPolicies(vhost: String): CatalogResult<List<PolicyRow>> = inner.operatorPolicies(vhost)
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = inner.queueDetail(vhost, name)
 }

@@ -4,6 +4,9 @@ import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.topology.PolicyRow
+import dev.caerbannog.core.topology.QueueDeclaration
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
@@ -27,6 +30,11 @@ import java.util.concurrent.ConcurrentHashMap
  *    [listsEveryVhost] (a `monitoring` or administrator user) it lists EVERY declared vhost, and a listed vhost the user has no permission
  *    on still answers NotFound on the queue, exchange, binding and detail calls (404, measured); no tag is NotAuthorised;
  *  - a missing queue, or a stream asked for as a queue, is NotFound on [queueDetail]; names are unique per vhost (adding again REPLACES).
+ *  - M9-14 (spike `docs/tasks/M9-14-spike-results.md`): [queueDeclarations] answers EVERY queue of the vhost, streams included, with the broker's flags and
+ *    typed arguments, name ascending, unpaged (the real catalog pages over 500 per page itself); a queue added with [addQueue] has the declaration a plain
+ *    durable queue has (no arguments) unless [declare] gives it another. [policies] and [operatorPolicies] are two separate lists (the broker keeps operator
+ *    policies out of `/api/policies`), every user with a permission on the vhost may read both (measured: management, monitoring and policymaker alike), a
+ *    vhost nobody declared is NotFound (404, also what a user with no permission on it gets).
  * Not modelled: statistics lag (a test sets the counts it wants), policy matching (a test sets [QueueRow.policy]), a real cluster's offline member
  * (a test builds a row with a shorter `online`; S-D: not measurable on a single node).
  * Every call is counted in [calls]; a test can hold the next call ([holdNext]) and make one queue page fail ([failQueuePage]) or a call
@@ -38,6 +46,9 @@ class FakeTopologyCatalog : TopologyCatalog {
 
     private val queueEntries = Collections.synchronizedList(ArrayList<QueueEntry>())
     private val exchangeRows = Collections.synchronizedList(ArrayList<ExchangeRow>())
+    private val declarations = Collections.synchronizedList(ArrayList<QueueDeclaration>())
+    private val policyRows = Collections.synchronizedList(ArrayList<PolicyRow>())
+    private val operatorPolicyRows = Collections.synchronizedList(ArrayList<PolicyRow>())
     private val bindingRows = Collections.synchronizedList(ArrayList<BindingRow>())
     private val vhosts: MutableSet<String> = Collections.synchronizedSet(hashSetOf("/"))
 
@@ -53,7 +64,7 @@ class FakeTopologyCatalog : TopologyCatalog {
     /** True: every call answers [CatalogResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
-    /** Names of the calls in order: "vhosts", "queues", "exchanges", "bindings", "queueDetail". */
+    /** Names of the calls in order: "vhosts", "queues", "exchanges", "bindings", "queueDetail", "queueDeclarations", "policies", "operatorPolicies". */
     val calls: MutableList<String> = Collections.synchronizedList(ArrayList())
 
     /**
@@ -92,16 +103,49 @@ class FakeTopologyCatalog : TopologyCatalog {
     fun addQueue(row: QueueRow): FakeTopologyCatalog = apply {
         vhosts += row.vhost
         put(QueueEntry(row.name, row.vhost, row.type, if (row.type == "stream") null else row))
+        putDeclaration(QueueDeclaration(row.name, row.vhost, row.type))
+    }
+
+    /** M9-14: what the broker stores for one queue or stream (flags, typed arguments). Replaces the declaration of the same name; a stream is not listed by [queues]. */
+    fun declare(declaration: QueueDeclaration): FakeTopologyCatalog = apply {
+        vhosts += declaration.vhost
+        if (declaration.type != "stream") {
+            put(QueueEntry(declaration.name, declaration.vhost, declaration.type, QueueRow(declaration.name, declaration.vhost, declaration.type, 0, 0, 0, null, emptyList(), emptyList(), null, "running")))
+        } else {
+            put(QueueEntry(declaration.name, declaration.vhost, "stream", null))
+        }
+        putDeclaration(declaration)
+    }
+
+    /** M9-14: a policy (`GET /api/policies/{vhost}`); the same name in the same vhost replaces it. */
+    fun addPolicy(row: PolicyRow): FakeTopologyCatalog = apply {
+        vhosts += row.vhost
+        synchronized(policyRows) { policyRows.removeAll { it.vhost == row.vhost && it.name == row.name }; policyRows += row }
+    }
+
+    /** M9-14: an operator policy (`GET /api/operator-policies/{vhost}`), a list of its own. */
+    fun addOperatorPolicy(row: PolicyRow): FakeTopologyCatalog = apply {
+        vhosts += row.vhost
+        synchronized(operatorPolicyRows) { operatorPolicyRows.removeAll { it.vhost == row.vhost && it.name == row.name }; operatorPolicyRows += row }
+    }
+
+    private fun putDeclaration(declaration: QueueDeclaration) {
+        synchronized(declarations) {
+            declarations.removeAll { it.vhost == declaration.vhost && it.name == declaration.name }
+            declarations += declaration
+        }
     }
 
     /** A stream: listed by the broker among the queues (and bound implicitly), never returned by this catalog. */
-    fun addStream(name: String, vhost: String = "/"): FakeTopologyCatalog = apply {
+    fun addStream(name: String, vhost: String = "/", arguments: Map<String, ArgumentValue> = emptyMap()): FakeTopologyCatalog = apply {
         vhosts += vhost
         put(QueueEntry(name, vhost, "stream", null))
+        putDeclaration(QueueDeclaration(name, vhost, "stream", arguments = arguments))
     }
 
     fun deleteQueue(name: String, vhost: String = "/") {
         synchronized(queueEntries) { queueEntries.removeAll { it.vhost == vhost && it.name == name } }
+        synchronized(declarations) { declarations.removeAll { it.vhost == vhost && it.name == name } }
     }
 
     /** The queue as the fake holds it now (test accessor, not a broker call: it is not recorded). Null when missing or a stream. */
@@ -197,6 +241,24 @@ class FakeTopologyCatalog : TopologyCatalog {
         return late("bindings", answer)
     }
 
+    override suspend fun queueDeclarations(vhost: String): CatalogResult<List<QueueDeclaration>> {
+        val answer: CatalogResult<List<QueueDeclaration>> = refusal("queueDeclarations", vhost)
+            ?: CatalogResult.Success(synchronized(declarations) { declarations.filter { it.vhost == vhost } }.sortedBy { it.name })
+        return late("queueDeclarations", answer)
+    }
+
+    override suspend fun policies(vhost: String): CatalogResult<List<PolicyRow>> {
+        val answer: CatalogResult<List<PolicyRow>> = refusal("policies", vhost)
+            ?: CatalogResult.Success(synchronized(policyRows) { policyRows.filter { it.vhost == vhost } })
+        return late("policies", answer)
+    }
+
+    override suspend fun operatorPolicies(vhost: String): CatalogResult<List<PolicyRow>> {
+        val answer: CatalogResult<List<PolicyRow>> = refusal("operatorPolicies", vhost)
+            ?: CatalogResult.Success(synchronized(operatorPolicyRows) { operatorPolicyRows.filter { it.vhost == vhost } })
+        return late("operatorPolicies", answer)
+    }
+
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> {
         refusal("queueDetail", vhost, "|$name")?.let { return it }
         val found = synchronized(queueEntries) { queueEntries.firstOrNull { it.vhost == vhost && it.name == name }?.row }
@@ -236,7 +298,8 @@ class FakeTopologyCatalog : TopologyCatalog {
             arguments: Map<String, String> = emptyMap(),
             internal: Boolean = false,
             superStream: Boolean = false,
-        ) = ExchangeRow(name, vhost, type, durable = true, autoDelete = false, internal = internal, arguments = arguments, superStream = superStream)
+            typedArguments: Map<String, ArgumentValue> = emptyMap(),
+        ) = ExchangeRow(name, vhost, type, durable = true, autoDelete = false, internal = internal, arguments = arguments, superStream = superStream, typedArguments = typedArguments)
 
         fun binding(
             source: String,
@@ -245,6 +308,7 @@ class FakeTopologyCatalog : TopologyCatalog {
             destinationType: BindingDestinationType = BindingDestinationType.QUEUE,
             vhost: String = "/",
             arguments: Map<String, String> = emptyMap(),
-        ) = BindingRow(source, vhost, destination, destinationType, routingKey, arguments)
+            typedArguments: Map<String, ArgumentValue> = emptyMap(),
+        ) = BindingRow(source, vhost, destination, destinationType, routingKey, arguments, typedArguments)
     }
 }
