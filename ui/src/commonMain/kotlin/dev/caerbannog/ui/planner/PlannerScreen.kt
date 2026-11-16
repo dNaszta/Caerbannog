@@ -82,7 +82,7 @@ private val SIDE_BY_SIDE_FROM = 1400.dp
 private const val STACKED_STEPS_SHARE = 0.65f
 
 /** The least the stacked review card keeps (title, check summary, graph box, note) so a long plan cannot squeeze the graph unreadable. */
-private val REVIEW_CARD_MIN = 300.dp
+private val REVIEW_CARD_MIN = 360.dp
 
 /** The step panel with its header and three rows: a short plan is never squeezed below it, so it keeps its size. */
 private val STEPS_PANEL_MIN = 224.dp
