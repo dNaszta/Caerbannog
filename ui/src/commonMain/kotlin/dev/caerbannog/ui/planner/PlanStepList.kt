@@ -91,7 +91,8 @@ internal fun PlanStepsPanel(
         if (state.isEmpty) {
             EmptyPlan(events)
         } else {
-            StepList(state, events, focusStep, onFocusDone, onFocusStep, Modifier.weight(1f, fill = false))
+            // Last in the column, so it gets what is left and no more: a short plan makes a short list.
+            StepList(state, events, focusStep, onFocusDone, onFocusStep)
         }
     }
 }
@@ -146,8 +147,8 @@ private fun StepList(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Row {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).testTag("planner:stepList")) {
+        Box {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().padding(end = 12.dp).testTag("planner:stepList")) {
                 itemsIndexed(state.plan.steps, key = { _, step -> step.id }) { index, step ->
                     StepRow(
                         index = index,
@@ -160,7 +161,9 @@ private fun StepList(
                     )
                 }
             }
-            VerticalScrollbar(rememberScrollbarAdapter(listState), Modifier.fillMaxHeight())
+            if (listState.canScrollForward || listState.canScrollBackward) {
+                VerticalScrollbar(rememberScrollbarAdapter(listState), Modifier.align(Alignment.CenterEnd).matchParentSize())
+            }
         }
     }
 }

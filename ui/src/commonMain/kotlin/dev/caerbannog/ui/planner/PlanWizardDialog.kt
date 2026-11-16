@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,9 +42,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.caerbannog.core.planner.BindingForm
@@ -62,6 +66,10 @@ internal fun androidx.compose.ui.input.key.KeyEvent.isEnterDown(): Boolean =
 /** Runs [action] on Enter before a child (a radio, a text field) can use the key itself; Back, Cancel and the other buttons are left alone. */
 internal fun Modifier.onEnter(action: () -> Unit): Modifier = onPreviewKeyEvent { if (it.isEnterDown()) { action(); true } else false }
 
+/** What the dialog needs besides the pages: padding, stepper, buttons, the gaps and the dialog's own margin. */
+private val WIZARD_CHROME: Dp = 220.dp
+private val MIN_PAGES_HEIGHT: Dp = 160.dp
+
 /**
  * The three pages of the wizard as one dialog: Kind, Details (the form of the kind) and Summary. Arrow keys move between the kinds, Enter is
  * Next (Add to plan on the last page), Esc and Cancel close it and add nothing. The content scrolls when the window is short, so the buttons
@@ -70,6 +78,10 @@ internal fun Modifier.onEnter(action: () -> Unit): Modifier = onPreviewKeyEvent 
 @Composable
 internal fun PlanWizardDialog(wizard: WizardState, events: PlannerEvents, onAddToPlan: (WizardState.Summary) -> Unit) {
     if (wizard == WizardState.Closed) return
+    // The height of the window the dialog stands over, read here: inside the dialog the constraints are the dialog's own. The pages scroll
+    // within what is left after the stepper, the buttons and the padding, so the buttons stay in reach on a short window.
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val pagesMaxHeight = (windowHeight - WIZARD_CHROME).coerceAtLeast(MIN_PAGES_HEIGHT)
     Dialog(onDismissRequest = events::cancelWizard) {
         var selectedKind by remember { mutableStateOf(PlannerTexts.BUILT_KINDS.first()) }
         val primary: () -> Unit = {
@@ -98,8 +110,9 @@ internal fun PlanWizardDialog(wizard: WizardState, events: PlannerEvents, onAddT
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Stepper(wizard)
                 val scroll = rememberScrollState()
-                Row(Modifier.weight(1f, fill = false)) {
-                    Column(Modifier.weight(1f).verticalScroll(scroll).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Box, not Row: a scrollbar that fills the height would make the content area as tall as it can be.
+                Box(Modifier.heightIn(max = pagesMaxHeight)) {
+                    Column(Modifier.fillMaxWidth().verticalScroll(scroll).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         when (wizard) {
                             WizardState.Kind -> KindPage(selectedKind, onSelect = { selectedKind = it }, onChoose = events::chooseKind)
                             is WizardState.Details -> DetailsPage(wizard, events, onNext = primary)
@@ -107,7 +120,10 @@ internal fun PlanWizardDialog(wizard: WizardState, events: PlannerEvents, onAddT
                             WizardState.Closed -> Unit
                         }
                     }
-                    VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.fillMaxHeight())
+                    // Only while there is something to scroll: the bar has a minimum length of its own, which would make a short page tall.
+                    if (scroll.canScrollForward || scroll.canScrollBackward) {
+                        VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).matchParentSize())
+                    }
                 }
                 WizardButtons(wizard, events, primary)
             }

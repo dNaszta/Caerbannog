@@ -461,8 +461,8 @@ private fun PlanReviewCard(state: PlannerState, modifier: Modifier = Modifier) {
                 )
             } else {
                 val scroll = rememberScrollState()
-                Row(Modifier.weight(1f, fill = false).fillMaxWidth()) {
-                    SelectionContainer(Modifier.weight(1f)) {
+                Box(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+                    SelectionContainer(Modifier.fillMaxWidth().padding(end = 12.dp)) {
                         Text(
                             text = state.migrationText,
                             fontFamily = FontFamily.Monospace,
@@ -470,7 +470,9 @@ private fun PlanReviewCard(state: PlannerState, modifier: Modifier = Modifier) {
                             modifier = Modifier.verticalScroll(scroll).testTag("planner:jsonView"),
                         )
                     }
-                    VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.fillMaxHeight())
+                    if (scroll.canScrollForward || scroll.canScrollBackward) {
+                        VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).matchParentSize())
+                    }
                 }
                 Text(PlannerTexts.REVIEW_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
