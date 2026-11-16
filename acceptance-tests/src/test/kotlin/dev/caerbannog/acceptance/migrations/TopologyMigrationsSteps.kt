@@ -426,6 +426,11 @@ class TopologyMigrationsSteps {
         assertTrue(actions.any { it is MigrationAction.DeclareQueue && it.name == "orders" })
         assertTrue(actions.any { it is MigrationAction.DeclareExchange && it.name == "events" })
         assertTrue(actions.any { it is MigrationAction.DeclareBinding && it.exchange == "events" && it.queue == "orders" })
+        // M9-14: the sentence says policies, so the step looks at them (the scenario's Given has one)
+        val policy = actions.filterIsInstance<MigrationAction.DeclarePolicy>().singleOrNull { it.name == "orders-limits" }
+        assertNotNull(policy, "the export has no policy \"orders-limits\": $actions")
+        assertEquals("^orders", policy!!.pattern)
+        assertEquals(mapOf("max-length" to dev.caerbannog.core.json.ArgumentValue.Whole(5000)), policy.definition)
     }
 
     @Given("a valid migration file {string} on disk")

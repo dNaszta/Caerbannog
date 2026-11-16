@@ -64,7 +64,7 @@ class TopologySteps {
     private companion object {
         const val PASSWORD = "S3cret-PW-4711"
         const val NAME = "uat-eu"
-        val READ_ONLY_CALLS = setOf("vhosts", "queues", "exchanges", "bindings", "queueDetail")
+        val READ_ONLY_CALLS = setOf("vhosts", "queues", "exchanges", "bindings", "queueDetail", "queueDeclarations", "policies", "operatorPolicies")
     }
 
     private lateinit var gateway: FakeConnectionGateway

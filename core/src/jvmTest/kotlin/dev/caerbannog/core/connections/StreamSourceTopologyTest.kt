@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * M2-08b step 2: the fourth member of the source (brief Design notes "Source"): `StreamSource.topology`, the topology of the SAME held
@@ -46,6 +47,17 @@ class StreamSourceTopologyTest {
     }
 
     @Test
+    fun `while current the export reads reach the topology of the connection`() = runBlocking<Unit> {
+        val h = Harness()
+        h.active.connect(h.uat)
+        val topology = h.active.source!!.topology
+        assertTrue(topology.queueDeclarations("/") is CatalogResult.Success)
+        assertTrue(topology.policies("/") is CatalogResult.Success)
+        assertTrue(topology.operatorPolicies("/") is CatalogResult.Success)
+        assertEquals(listOf("queueDeclarations /", "policies /", "operatorPolicies /"), h.gateway.topologyOf("uat-eu").requests.toList())
+    }
+
+    @Test
     fun `a topology of a closed or superseded connection answers Unreachable on every call and touches nothing`() = runBlocking<Unit> {
         val h = Harness()
         h.active.connect(h.uat)
@@ -59,6 +71,10 @@ class StreamSourceTopologyTest {
         assertEquals(CatalogResult.Unreachable, old.topology.exchanges("/"))
         assertEquals(CatalogResult.Unreachable, old.topology.bindings("/"))
         assertEquals(CatalogResult.Unreachable, old.topology.queueDetail("/", "q"))
+        // M9-14: the three reads of the export are guarded like the rest
+        assertEquals(CatalogResult.Unreachable, old.topology.queueDeclarations("/"))
+        assertEquals(CatalogResult.Unreachable, old.topology.policies("/"))
+        assertEquals(CatalogResult.Unreachable, old.topology.operatorPolicies("/"))
         assertEquals(emptyList(), fake.calls.toList(), "the closed connection must not be touched")
     }
 

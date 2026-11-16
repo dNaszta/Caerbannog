@@ -1,5 +1,7 @@
 package dev.caerbannog.datarabbit
 
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.json.ArgumentValueJson
 import dev.caerbannog.core.json.UntrustedJson
 import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.mqtt.MqttClientRow
@@ -16,6 +18,8 @@ import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.InspectedQueueMessage
 import dev.caerbannog.core.topology.QueueInspectionConstants
+import dev.caerbannog.core.topology.PolicyRow
+import dev.caerbannog.core.topology.QueueDeclaration
 import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.VhostRow
@@ -24,6 +28,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -39,6 +44,8 @@ internal object ManagementJson {
 
     /** Broker bodies echo user-chosen structure (queue arguments, policy definitions): real data nests below about 20, the reader fails near 10,000. */
     private const val MAX_BODY_DEPTH = 128
+
+    private const val QUEUE_TYPE_ARGUMENT = "x-queue-type"
 
     // Thrown inside the parsers only, turned into Unexpected at the public boundary.
     private class Malformed : RuntimeException()
@@ -265,6 +272,7 @@ internal object ManagementJson {
     fun parseExchanges(body: String): CatalogResult<List<ExchangeRow>> = guarded(body) { root ->
         CatalogResult.Success(
             root.asArray().map { it.asObject() }.map { e ->
+                val (typed, typedComplete) = e.tolerantTypedArguments()
                 ExchangeRow(
                     name = e.requiredString("name"),
                     vhost = e.requiredString("vhost"),
@@ -274,6 +282,8 @@ internal object ManagementJson {
                     internal = e.boolean("internal"),
                     arguments = e.argumentText(),
                     superStream = isSuperStream(e),
+                    typedArguments = typed,
+                    typedArgumentsComplete = typedComplete,
                 )
             },
         )
@@ -282,6 +292,7 @@ internal object ManagementJson {
     fun parseBindingList(body: String): CatalogResult<List<BindingRow>> = guarded(body) { root ->
         CatalogResult.Success(
             root.asArray().map { it.asObject() }.map { b ->
+                val (typed, typedComplete) = b.tolerantTypedArguments()
                 BindingRow(
                     source = b.requiredString("source"),
                     vhost = b.requiredString("vhost"),
@@ -293,6 +304,45 @@ internal object ManagementJson {
                     },
                     routingKey = b.string("routing_key").orEmpty(),
                     arguments = b.argumentText(),
+                    typedArguments = typed,
+                    typedArgumentsComplete = typedComplete,
+                )
+            },
+        )
+    }
+
+    /**
+     * M9-14: one page of the declarations (name, type, flags, typed arguments) of the list asked with the export columns; streams are KEPT. Every field is
+     * required and typed: a flag that is missing or not a JSON boolean is [CatalogResult.Unexpected], nothing is guessed. `x-queue-type` is left out of
+     * `arguments` (the type says it; measured: the broker adds no other argument).
+     */
+    fun parseQueueDeclarations(body: String, vhost: String): CatalogResult<QueueDeclarationPage> = guarded(body) { root ->
+        val obj = root.asObject()
+        val rows = obj["items"].asArray().map { it.asObject() }.map { q ->
+            QueueDeclaration(
+                name = q.requiredString("name"),
+                vhost = vhost,
+                type = q.requiredString("type"),
+                durable = q.requiredBoolean("durable"),
+                autoDelete = q.requiredBoolean("auto_delete"),
+                exclusive = q.requiredBoolean("exclusive"),
+                arguments = q.typedArguments() - QUEUE_TYPE_ARGUMENT,
+            )
+        }
+        CatalogResult.Success(QueueDeclarationPage(rows, obj.requiredInt("page"), obj.requiredInt("page_count")))
+    }
+
+    /** M9-14: the policies of `GET /api/policies/{vhost}` or the operator policies of `GET /api/operator-policies/{vhost}` (same shape); every field is required. */
+    fun parsePolicies(body: String): CatalogResult<List<PolicyRow>> = guarded(body) { root ->
+        CatalogResult.Success(
+            root.asArray().map { it.asObject() }.map { p ->
+                PolicyRow(
+                    name = p.requiredString("name"),
+                    vhost = p.requiredString("vhost"),
+                    pattern = p.requiredString("pattern"),
+                    applyTo = p.requiredString("apply-to"),
+                    priority = p.requiredInt("priority"),
+                    definition = (p["definition"].asObject()).mapValues { (_, v) -> ArgumentValueJson.parse(v) ?: malformed() },
                 )
             },
         )
@@ -479,9 +529,36 @@ internal object ManagementJson {
         state = obj.string("state"),
     )
 
+    private fun JsonObject.requiredBoolean(key: String): Boolean =
+        (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull ?: malformed()
+
+    // M9-14: the arguments with their JSON types; absent is empty, anything but an object, or a value the model refuses, is malformed.
+    private fun JsonObject.typedArguments(): Map<String, ArgumentValue> {
+        val element = this["arguments"] ?: return emptyMap()
+        if (element is JsonNull) return emptyMap()
+        return element.asObject().mapValues { (_, v) -> ArgumentValueJson.parse(v) ?: malformed() }
+    }
+
+    // The screens read exchanges and bindings too, so a value the model refuses must not fail the read: it is left out of the typed map and the row says so.
+    private fun JsonObject.tolerantTypedArguments(): Pair<Map<String, ArgumentValue>, Boolean> {
+        val element = this["arguments"]
+        if (element == null || element is JsonNull) return emptyMap<String, ArgumentValue>() to true
+        val entries = element as? JsonObject ?: return emptyMap<String, ArgumentValue>() to false
+        val typed = LinkedHashMap<String, ArgumentValue>()
+        var complete = true
+        for ((key, value) in entries) {
+            val converted = ArgumentValueJson.parse(value)
+            if (converted == null) complete = false else typed[key] = converted
+        }
+        return typed to complete
+    }
+
     private fun JsonObject.boolean(key: String): Boolean = (this[key] as? JsonPrimitive)?.booleanOrNull ?: false
 
     // A string as is, any other value as its JSON text (`true`, `1`, `[1,2]`).
     private fun JsonObject.argumentText(): Map<String, String> =
         (this["arguments"] as? JsonObject)?.mapValues { (_, v) -> if (v is JsonPrimitive && v.isString) v.content else v.toString() } ?: emptyMap()
 }
+
+/** One page of [ManagementJson.parseQueueDeclarations]: [page] and [pageCount] are the broker's, 1-based; an empty vhost has page 1 of 0. */
+internal data class QueueDeclarationPage(val rows: List<QueueDeclaration>, val page: Int, val pageCount: Int)

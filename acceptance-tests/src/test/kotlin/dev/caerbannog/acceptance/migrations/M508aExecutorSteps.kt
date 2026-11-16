@@ -1,7 +1,6 @@
 package dev.caerbannog.acceptance.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
-import dev.caerbannog.core.connections.fakes.PagedTopologyCatalog
 import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.ActionResult
 import dev.caerbannog.core.migrations.MigrationAction
@@ -412,7 +411,7 @@ class M508aExecutorSteps {
     @Given("the broker refuses to list the queues of {string} for this user")
     fun brokerRefusesToListQueues(vhost: String) {
         assertEquals("/", vhost)
-        s.fakeTopologyCatalog.failCall("queues", CatalogResult.NotAuthorised)
+        s.fakeTopologyCatalog.failCall("queueDeclarations", CatalogResult.NotAuthorised)
     }
 
     @Then("I am told the topology could not be read and no migration file was written")
@@ -422,8 +421,6 @@ class M508aExecutorSteps {
         assertTrue(s.fileRepository.listFiles().isEmpty(), "a migration file was written: ${s.fileRepository.listFiles().map { it.version }}")
     }
 
-    private var pagedCatalog: PagedTopologyCatalog? = null
-
     @Given("the broker has {int} queues in {string}")
     fun brokerHasQueues(count: Int, vhost: String) {
         assertEquals("/", vhost)
@@ -432,10 +429,8 @@ class M508aExecutorSteps {
                 dev.caerbannog.core.topology.QueueRow("queue-%03d".format(i), "/", "quorum", 0, 0, 0, "rabbit@n", listOf("rabbit@n"), listOf("rabbit@n"), null, "running"),
             )
         }
-        // the real broker pages at 500; a smaller page here makes 150 queues several pages (the reader must not assume a page size)
-        pagedCatalog = PagedTopologyCatalog(s.fakeTopologyCatalog, pageSize = 40).also { s.topologyCatalogOverride = it }
-        // The Background may already have built the view model with the plain catalog; the next getVm() builds it with the paged one.
-        s.viewModel = null
+        // M9-14: the catalog pages by itself now (ManagementTopologyCatalogTest: "the declarations of 1,200 queues come from three pages");
+        // the view model asks once, so the fake needs no small page size here.
     }
 
     @Then("the new migration declares all {int} queues")
@@ -444,7 +439,7 @@ class M508aExecutorSteps {
         val queues = s.exportedFile!!.up.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name }
         assertEquals(count, queues.size, "queues in the exported file")
         assertEquals(count, queues.toSet().size, "a queue was exported twice")
-        assertEquals(listOf(1, 2, 3, 4), pagedCatalog!!.pagesRequested.toList(), "the pages the export asked for")
+        assertEquals(1, s.fakeTopologyCatalog.calls.count { it == "queueDeclarations" }, "the export asks for the declarations once: ${s.fakeTopologyCatalog.calls}")
     }
 
     // ---- A 3.x source connection cannot apply migrations (F3, fail closed) ------------------------------------------------------
