@@ -5,6 +5,7 @@ import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerViewModel
+import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.SavedPlan
 import dev.caerbannog.core.planner.StepForm
 import dev.caerbannog.ui.planner.PlannerEvents
@@ -93,6 +94,7 @@ class PlannerEventsAdapter(
     override fun setDescription(text: String) = viewModel.setDescription(text)
     override fun setVirtualHost(vhost: String) = viewModel.setVirtualHost(vhost)
     override fun setNamingStyle(style: NamingStyle) = viewModel.setNamingStyle(style)
+    override fun selectReviewView(view: ReviewView) = viewModel.selectReviewView(view)
     override fun chooseFolder() = viewModel.chooseFolder()
     override fun saveAsMigration() = viewModel.saveAsMigration()
     override fun dismiss() = viewModel.dismiss()

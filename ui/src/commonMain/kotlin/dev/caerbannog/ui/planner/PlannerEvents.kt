@@ -1,6 +1,7 @@
 package dev.caerbannog.ui.planner
 
 import dev.caerbannog.core.planner.NamingStyle
+import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.StepForm
 
 /**
@@ -26,6 +27,9 @@ interface PlannerEvents {
     fun setDescription(text: String)
     fun setVirtualHost(vhost: String)
     fun setNamingStyle(style: NamingStyle)
+
+    /** The Graph and JSON switch of the review card: a choice of view, nothing in the plan changes. */
+    fun selectReviewView(view: ReviewView)
 
     fun chooseFolder()
     fun saveAsMigration()
