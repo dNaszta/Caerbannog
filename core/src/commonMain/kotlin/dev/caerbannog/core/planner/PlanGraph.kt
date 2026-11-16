@@ -84,9 +84,14 @@ data class PlanGraph(
  * Drawn: every exchange, queue and stream the plan declares, and the ends of the plan's bindings. The broker's other items and all its
  * bindings are not drawn. A name the plan declares and the broker already has is existing, not new (the plan adds nothing there). An end
  * of a binding that neither the plan nor the broker has is "not in this plan". [onlyThePlanCause] says why [known] is null.
- * Too large (more than `MAX_GRAPH_NODES` nodes) wins over the "only the plan" notice.
+ * While [pending] (a read is under way, [known] null) there is no notice and no "not in this plan" mark. Too large (more than `MAX_GRAPH_NODES` nodes) wins over the "only the plan" notice.
  */
-fun planPreview(plan: TopologyPlan, known: KnownTopology?, onlyThePlanCause: OnlyThePlanCause = OnlyThePlanCause.NotConnected): PlanGraph {
+fun planPreview(
+    plan: TopologyPlan,
+    known: KnownTopology?,
+    onlyThePlanCause: OnlyThePlanCause = OnlyThePlanCause.NotConnected,
+    pending: Boolean = false,
+): PlanGraph {
     val actions = plan.steps.map { it.action }
     val declaredExchanges = actions.filterIsInstance<MigrationAction.DeclareExchange>().associate { it.name to it.type }
     val declaredQueues = actions.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name }
@@ -128,12 +133,15 @@ fun planPreview(plan: TopologyPlan, known: KnownTopology?, onlyThePlanCause: Onl
         when {
             onBroker -> Unit
             declared -> isNew += node.id
+            // While the broker has not answered, an end that is not declared may well exist: no verdict yet.
+            pending && known == null -> Unit
             else -> notInPlan += node.id
         }
     }
 
     val notice = when {
         graph.isTooLarge -> PlanGraphNotice.TooLarge
+        pending && known == null -> null
         known == null -> PlanGraphNotice.OnlyThePlan(onlyThePlanCause)
         else -> null
     }

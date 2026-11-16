@@ -6,6 +6,7 @@ import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationWriteException
 import dev.caerbannog.core.migrations.folderStateOf
 import dev.caerbannog.core.streams.AppSettings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -68,6 +69,9 @@ class PlannerViewModel(
     /** The virtual host last asked for, null when nothing was asked; [readGeneration] tells a late answer from the current one. */
     private var knownVhost: String? = null
     private var readGeneration = 0
+
+    /** True from asking for the names of [knownVhost] until the answer or failure for it arrives. */
+    private var knownPending = false
 
     /** True while the description in [plan] is newer than the draft file; [debounce] is the timer that writes it. */
     private var descriptionPending = false
@@ -299,12 +303,21 @@ class PlannerViewModel(
         if (!loaded || locked() || knownVhost == vhost) return
         knownVhost = vhost
         known = null
+        knownPending = true
         val generation = ++readGeneration
         scope.launch {
-            val answer = source.read(vhost)
+            // A reader that fails is an unread broker; the plan stays usable. A cancelled read is not a failure.
+            val answer = try {
+                source.read(vhost)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
             lock.withLock {
                 if (generation == readGeneration) {
                     known = answer
+                    knownPending = false
                     publish()
                 }
             }
@@ -474,7 +487,8 @@ class PlannerViewModel(
     private fun snapshot(): PlannerState = PlannerState(
         plan = plan,
         known = known,
-        graph = planPreview(plan, known, if (reader == null) OnlyThePlanCause.NotConnected else OnlyThePlanCause.BrokerNotRead),
+        knownPending = knownPending,
+        graph = planPreview(plan, known, if (reader == null) OnlyThePlanCause.NotConnected else OnlyThePlanCause.BrokerNotRead, pending = knownPending),
         graphView = reviewView,
         wizard = if (locked()) WizardState.Closed else wizardState(),
         selectedStepId = selected,

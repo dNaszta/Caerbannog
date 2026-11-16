@@ -138,6 +138,8 @@ data class PlannerState(
     val isLoaded: Boolean = false,
     /** What the broker has for the plan's virtual host; null when nothing was read (no connection) or the read failed. */
     val known: KnownTopology? = null,
+    /** True while the names of the plan's virtual host are being read: the graph then says nothing about what exists. */
+    val knownPending: Boolean = false,
     /** The review graph: the plan, with the broker's existing ends when [known] is there. Derived on every change. */
     val graph: PlanGraph = planPreview(plan, known),
     val graphView: ReviewView = ReviewView.Graph,
