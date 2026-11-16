@@ -102,8 +102,8 @@ Feature: Topology planner
       | Binding  | no exchange                             | Choose the exchange to bind from       |
       | Binding  | no destination                          | Choose what to bind to                 |
 
-  # Measured by M9-00c (S-H, docs/spec.md "Naming"). The messages are PROPOSED wording: owner review list item 1 (docs/tasks/M9-00c-spike-policies-equivalence-names.md).
-  @m9-01b @negative @needs-decision @fake-broker
+  # Measured by M9-00c (S-H, docs/spec.md "Naming"). The messages are decided wording (owner, 2026-11-16, "do arch suggest": owner review list item 1, docs/tasks/M9-00c-spike-policies-equivalence-names.md).
+  @m9-01b @negative @fake-broker
   Scenario Outline: A name that RabbitMQ would refuse is refused by the form
     Given a new plan
     When I fill the "<kind>" form with <input>

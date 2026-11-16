@@ -79,6 +79,19 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     fun queues(vhost: String, page: Int): String =
         "$base/api/queues/${encode(vhost)}?page=$page&page_size=$QUEUE_PAGE_SIZE&columns=${encode(QUEUE_COLUMNS)}"
 
+    /**
+     * M9-14: one page of every queue AND stream of the vhost with the columns the topology export needs (flags and arguments), the broker's maximum
+     * page size. The broker honours the column list exactly (measured in `RealBrokerM9ExportSpikeTest`).
+     */
+    fun queueDeclarations(vhost: String, page: Int): String =
+        "$base/api/queues/${encode(vhost)}?page=$page&page_size=$QUEUE_PAGE_SIZE&columns=${encode(DECLARATION_COLUMNS)}"
+
+    /** M9-14: the policies of the vhost (a plain array); operator policies are NOT in it. */
+    fun policies(vhost: String): String = "$base/api/policies/${encode(vhost)}"
+
+    /** M9-14: the operator policies of the vhost (a plain array of the same shape). */
+    fun operatorPolicies(vhost: String): String = "$base/api/operator-policies/${encode(vhost)}"
+
     /** M2-08a: one queue (a plain GET of the queue object; never the message paths under it). */
     fun queueDetail(vhost: String, name: String): String = "$base/api/queues/${encode(vhost)}/${encode(name)}"
 
@@ -96,6 +109,7 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
         fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 
         private const val QUEUE_COLUMNS = "name,type,messages_ready,messages_unacknowledged,consumers,leader,members,online,policy,state"
+        private const val DECLARATION_COLUMNS = "name,type,durable,auto_delete,exclusive,arguments"
         private const val LIST_COLUMNS =
             "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"
 

@@ -81,7 +81,8 @@ Decisions on the open technical points:
 
 Tests that must change: none of the existing ones; three tests are ADDED by the test developer before step 3 (a, d, e above).
 
-## Owner review list (wording the tests fix; recommendations, not decisions)
+## Owner review list (wording the tests fix)
+ALL 11 ITEMS DECIDED (owner, 2026-11-16: "do arch suggest" = the architect's recommendation): keep as recommended in each item (item 1: the caveat line "This is how the broker looks now; it is not a promise of what applying will do."; item 3: the built order; item 10: the follow-up goes to `M9-07`), final.
 1. Caveat line under the summary (non-blank, contains "now" and "promise"): recommend "This is how the broker looks now; it is not a promise of what applying will do."
 2. Progress line suffix: "Checking step 4 of 10 against uat-eu. Only reads are sent." Recommend keep the suffix (it tells the user nothing is changed).
 3. Place of "N will be deleted" and "N already gone" in the summary. The BUILT order is the spec table order: created, already there, different, missing, could not be checked, will be deleted, already gone, blocked last (the spec table lists delete after "could not be checked", and the mockup shows no delete counts). The architect's earlier recommendation (right after created and already there) is WITHDRAWN: it conflicts with the spec table and with `PlannerCheckUiTest`. Recommend keep the built order; a change is one list in `PlannerTexts.SUMMARY_ORDER` plus the spec.

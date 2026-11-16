@@ -61,6 +61,7 @@ Feature: Topology migrations
   @fake-broker
   Scenario: Export the current topology as a migration
     Given the broker has the quorum queue "orders" and the exchange "events"
+    And the broker has the policy "orders-limits" for the pattern "^orders" with "max-length" 5000
     And the latest migration file is "0004"
     When I export the current topology
     Then a new migration file "0005" is created
@@ -259,6 +260,107 @@ Feature: Topology migrations
     When I export the current topology
     Then the new migration declares all 150 queues
 
+  # ---- M9-14: the export keeps arguments, flags, streams and policies, and leaves out what cannot be applied ----
+  # Facts: docs/tasks/M9-14-spike-results.md (rabbitmq:4-management 4.4.0).
+
+  @m9-14 @fake-broker
+  Scenario: An export keeps queue arguments, exchange arguments and binding arguments with their types
+    Given the broker has the quorum queue "orders" with the argument "x-delivery-limit" as the number 5 and "x-dead-letter-exchange" as the text "dlx"
+    And the broker has the headers exchange "hdr" with the argument "alternate-exchange" as the text "dlx"
+    And the broker has a binding from "hdr" to "orders" with the arguments "level" as the number 3, "region" as the text "eu" and "urgent" as the flag true
+    When I export the current topology
+    Then the new migration declares "orders" with "x-delivery-limit" as the number 5 and "x-dead-letter-exchange" as the text "dlx"
+    And the new migration declares the exchange "hdr" with "alternate-exchange" as the text "dlx"
+    And the binding from "hdr" to "orders" keeps "level" as the number 3, "region" as the text "eu" and "urgent" as the flag true
+    And the file writes the number 5 as a JSON number, not as text
+    And the file parses back to the same actions
+
+  @m9-14 @fake-broker
+  Scenario: An export keeps policies and operator policies exactly
+    Given the broker has the policy "limits" for the pattern "^q-" applying to "queues" with priority 7 and "max-length" 5000
+    And the broker has the operator policy "op-limits" for the pattern "^q-" with "max-length" 100000
+    When I export the current topology
+    Then the new migration declares the policy "limits" for "^q-" applying to "queues" with priority 7 and "max-length" as the number 5000
+    And the new migration declares the operator policy "op-limits" for "^q-" with "max-length" as the number 100000
+    And the policies are the last actions of the file
+
+  @m9-14 @fake-broker
+  Scenario: A super stream survives an export
+    Given the broker has a super stream "orders" with 3 partitions
+    When I export the current topology
+    Then the new migration declares the exchange "orders" with "x-super-stream" as the flag true
+    And it declares the streams "orders-0", "orders-1" and "orders-2"
+    And each partition binding keeps its "x-stream-partition-order" as a number
+
+  @m9-14 @fake-broker @safety
+  Scenario: An export leaves out queues that belong to a connection
+    Given the broker has the quorum queue "orders"
+    And the broker has an exclusive queue "session-1", a server-named queue "amq.gen-abc" and the MQTT subscription queues "mqtt-subscription-c1qos0" and "mqtt-subscription-c2qos1"
+    And all of them are bound to the exchange "events"
+    When I export the current topology
+    Then the new migration declares only the queue "orders"
+    And it declares only the binding of "orders"
+
+  @m9-14 @fake-broker
+  Scenario: An export says what it leaves out
+    Given the broker has the stream "audit" with retention "x-max-age" as the text "7D"
+    And the broker has an exclusive queue "session-1"
+    When I export the current topology
+    Then the new migration declares the stream "audit" without any retention
+    And the export result says that retention of "audit" and the exclusive queue "session-1" were left out
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A stream with only a leader locator is not called retention
+    Given the broker has the stream "audit" with the leader locator "balanced"
+    When I export the current topology
+    Then the export result reads "Left out: leader locator of stream audit"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A stream with retention and a leader locator names both
+    Given the broker has the stream "audit" with retention "x-max-age" as the text "7D" and the leader locator "balanced"
+    When I export the current topology
+    Then the export result reads "Left out: retention and leader locator of stream audit"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A super stream is one entry in the note, not one per partition
+    Given the broker has a super stream "orders" with 3 partitions
+    When I export the current topology
+    Then the export result reads "Left out: leader locator of super stream orders (3 partitions)"
+    And the export result does not name "orders-0", "orders-1" or "orders-2"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A long note stops after ten entries and says how many more there are
+    Given the broker has 12 exclusive queues named "conn-1" to "conn-12"
+    When I export the current topology
+    Then the export result names 10 entries and ends with "and 2 more"
+
+  @m9-14 @fake-broker
+  Scenario: An export that loses nothing says nothing
+    Given the broker has the quorum queue "orders" and the exchange "events"
+    When I export the current topology
+    Then the export result has no line about what was left out
+
+  @m9-14 @fake-broker @negative
+  Scenario: An export that cannot read the policies writes no file
+    Given the broker has the quorum queue "orders" and the exchange "events"
+    And the broker refuses to list the policies of "/" for this user
+    When I export the current topology
+    Then I am told the topology could not be read and no migration file was written
+
+  @m9-14 @m9-14b @fake-broker @negative
+  Scenario: An export that reads the topology but cannot write a setting of it says so and writes no file
+    Given the broker has the quorum queue "orders" with an argument that cannot be written to a migration file
+    When I export the current topology
+    Then I am told the topology was read but a setting in it cannot be written to a migration file, and no migration file was written
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: An export checks only what it writes
+    Given the broker has the quorum queue "orders" and an exclusive queue "session-1"
+    And the broker has a binding from "events" to "session-1" with an argument that cannot be written to a migration file
+    When I export the current topology
+    Then the new migration declares only the queue "orders"
+    And the export result says that the exclusive queue "session-1" was left out
+
   @m5-08 @m5-08b @fake-broker
   Scenario: Applied migrations and files survive a restart
     Given the migrations folder is "/work/migrations" and the migration "0001" was imported and applied to "uat-eu"
@@ -439,7 +541,8 @@ Feature: Topology migrations
 
   @broker @m5-08 @m5-08a @gate-M5
   Scenario: Exported topology can be applied to an empty broker
-    Given a real broker A with queues, exchanges and bindings
+    Given a real broker A with queues that have arguments, exchanges, a headers binding with typed arguments, a super stream, policies and an operator policy
     And a second empty real broker B
     When I export the topology of A and apply the resulting migration to B
-    Then B has the same queues, exchanges and bindings as A
+    Then B has the same queues, exchanges, bindings and policies as A
+    And exporting B gives the same actions as exporting A

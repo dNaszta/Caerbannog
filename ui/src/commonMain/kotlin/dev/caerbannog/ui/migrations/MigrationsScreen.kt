@@ -250,6 +250,9 @@ fun MigrationsScreen(
                 }
             }
 
+            // M9-14: what the last export could not carry (null when it lost nothing).
+            state.exportNote?.let { Advice(it, "migrations-export-note") }
+
             // Main Content Area: Left file list + Right detail
             val selectedFile = state.selectedFile
             val draftCard: @Composable () -> Unit = {

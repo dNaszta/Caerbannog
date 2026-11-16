@@ -34,9 +34,11 @@ import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.UnavailableStreamManager
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
-import dev.caerbannog.core.topology.QueuePage
+import dev.caerbannog.core.topology.PolicyRow
+import dev.caerbannog.core.topology.QueueDeclaration
 import dev.caerbannog.core.topology.QueueInspectionResult
 import dev.caerbannog.core.topology.QueueMessageInspector
+import dev.caerbannog.core.topology.QueuePage
 import dev.caerbannog.core.topology.QueueRow
 import dev.caerbannog.core.topology.TopologyCatalog
 import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
@@ -119,6 +121,12 @@ internal class GuardedTopology(private val inner: TopologyCatalog, private val i
     override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = guarded { inner.bindings(vhost) }
 
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = guarded { inner.queueDetail(vhost, name) }
+
+    override suspend fun queueDeclarations(vhost: String): CatalogResult<List<QueueDeclaration>> = guarded { inner.queueDeclarations(vhost) }
+
+    override suspend fun policies(vhost: String): CatalogResult<List<PolicyRow>> = guarded { inner.policies(vhost) }
+
+    override suspend fun operatorPolicies(vhost: String): CatalogResult<List<PolicyRow>> = guarded { inner.operatorPolicies(vhost) }
 }
 
 internal class GuardedMessageReader(

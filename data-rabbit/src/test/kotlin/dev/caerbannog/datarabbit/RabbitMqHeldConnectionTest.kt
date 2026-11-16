@@ -162,6 +162,9 @@ private object StubTopology : TopologyCatalog {
     override suspend fun exchanges(vhost: String): CatalogResult<List<ExchangeRow>> = CatalogResult.Unexpected
     override suspend fun bindings(vhost: String): CatalogResult<List<BindingRow>> = CatalogResult.Unexpected
     override suspend fun queueDetail(vhost: String, name: String): CatalogResult<QueueRow> = CatalogResult.Unexpected
+    override suspend fun queueDeclarations(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.QueueDeclaration>> = CatalogResult.Unexpected
+    override suspend fun policies(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.PolicyRow>> = CatalogResult.Unexpected
+    override suspend fun operatorPolicies(vhost: String): CatalogResult<List<dev.caerbannog.core.topology.PolicyRow>> = CatalogResult.Unexpected
 }
 
 private object StubMessageReader : StreamMessageReader {

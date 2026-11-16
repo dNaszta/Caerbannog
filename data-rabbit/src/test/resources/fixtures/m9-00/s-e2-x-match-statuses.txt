@@ -1,0 +1,8 @@
+all: POST 201; bindings listed: 1, x-match shown: ["all"]
+any: POST 201; bindings listed: 1, x-match shown: ["any"]
+all-with-x: POST 201; bindings listed: 1, x-match shown: ["all-with-x"]
+any-with-x: POST 201; bindings listed: 1, x-match shown: ["any-with-x"]
+none: POST 201; bindings listed: 1, x-match shown: [absent]
+invalid: POST 400 "Invalid x-match field value <<\"bogus\">>; expected all, any, all-with-x, or any-with-x"; bindings listed: 0, x-match shown: []
+uppercase: POST 400 "Invalid x-match field value <<\"ALL\">>; expected all, any, all-with-x, or any-with-x"; bindings listed: 0, x-match shown: []
+number: POST 400 "Invalid x-match field type long (value 1); expected longstr"; bindings listed: 0, x-match shown: []
