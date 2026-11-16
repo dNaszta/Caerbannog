@@ -49,14 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.planner.CheckState
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerBanner
 import dev.caerbannog.core.planner.PlannerState
@@ -81,11 +85,27 @@ private val SIDE_BY_SIDE_FROM = 1400.dp
 /** The most of the page the step list takes when the card is stacked under it. */
 private const val STACKED_STEPS_SHARE = 0.65f
 
-/** The least the stacked review card keeps (title, check summary, graph box, note) so a long plan cannot squeeze the graph unreadable. */
-private val REVIEW_CARD_MIN = 360.dp
-
 /** The step panel with its header and three rows: a short plan is never squeezed below it, so it keeps its size. */
 private val STEPS_PANEL_MIN = 224.dp
+
+/**
+ * The least the stacked review card keeps so a long plan cannot squeeze the graph box under [GRAPH_BOX_MIN] (measured by the layout tests):
+ * the card's own lines (title, legend, note) plus the box. The numbers are what the tests measure at 1280 x 800 to 1920 x 1080, not a formula.
+ */
+private val REVIEW_CARD_MIN = 280.dp
+
+/** After a check the card's page is shorter (the summary sits above), so the card needs a little more to keep its graph box. */
+private val REVIEW_CARD_MIN_CHECKED = 320.dp
+
+/** What the notice "Only the plan is drawn" adds to the floor: it takes room in the card, but 1280 x 800 has none to spare, so it is the margin the tests measured. */
+private val REVIEW_CARD_NOTICE = 4.dp
+
+private val GRAPH_BOX_MIN = 140.dp
+
+/** The space between the lines of the review card; tight, so the graph box gets the height (the page is short at 1280 x 800). */
+private val REVIEW_CARD_GAP = 4.dp
+
+private val STACKED_SPACING = 12.dp
 
 /**
  * The Topology planner (docs/ux/Planner.dc.html): header, step list, wizard, review card with the migration text, and the limited states.
@@ -222,12 +242,46 @@ private fun PlannerBody(
             } else {
                 // The steps hug their rows up to [STACKED_STEPS_SHARE] of the page and the review card takes what is left: with equal weights a
                 // short plan left an empty panel between the two (M9-06 item 10) and the card too little height for its graph (M9-06 F1).
-                val stepsMaxHeight = maxOf(minOf(maxHeight * STACKED_STEPS_SHARE, maxHeight - REVIEW_CARD_MIN), STEPS_PANEL_MIN)
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.fillMaxWidth().heightIn(max = stepsMaxHeight))
-                    PlanReviewCard(state, events, Modifier.weight(1f).fillMaxWidth())
+                // On a page too short for the steps and the card floor together, the page scrolls (with a bar) instead of squeezing the graph box.
+                val viewport = maxHeight
+                val cardMin = (if (state.check is CheckState.None) REVIEW_CARD_MIN else REVIEW_CARD_MIN_CHECKED) +
+                    (if (state.graph.notice != null) REVIEW_CARD_NOTICE else 0.dp)
+                val pageScroll = rememberScrollState()
+                Box(Modifier.fillMaxSize()) {
+                    Column(Modifier.fillMaxSize().verticalScroll(pageScroll).testTag("planner:stackedPage")) {
+                        StackedPage(viewport = viewport, cardMin = cardMin) {
+                            PlanStepsPanel(state, events, focusStep, onFocusDone, onFocusStep, Modifier.fillMaxWidth())
+                            PlanReviewCard(state, events, Modifier.fillMaxWidth())
+                        }
+                    }
+                    if (pageScroll.maxValue > 0) {
+                        VerticalScrollbar(rememberScrollbarAdapter(pageScroll), Modifier.align(Alignment.CenterEnd).fillMaxHeight().testTag("planner:pageScrollbar"))
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The stacked page: the steps (two children: steps, card). The steps are measured first and hug their rows up to [STACKED_STEPS_SHARE] of
+ * [viewport], but leave [cardMin] for the card and never go under [STEPS_PANEL_MIN]. The card gets the rest. When even that does not fit
+ * [viewport], the page is taller than it and the caller's scroll takes over, so the card keeps its floor.
+ */
+@Composable
+private fun StackedPage(viewport: Dp, cardMin: Dp, content: @Composable () -> Unit) {
+    Layout(content) { measurables, constraints ->
+        val spacing = STACKED_SPACING.roundToPx()
+        val view = viewport.roundToPx()
+        val stepsCap = maxOf(minOf((view * STACKED_STEPS_SHARE).toInt(), view - spacing - cardMin.roundToPx()), STEPS_PANEL_MIN.roundToPx())
+        val width = constraints.maxWidth
+        val steps = measurables[0].measure(Constraints(minWidth = width, maxWidth = width, maxHeight = stepsCap))
+        val total = maxOf(view, steps.height + spacing + cardMin.roundToPx())
+        val cardHeight = total - steps.height - spacing
+        val card = measurables[1].measure(Constraints.fixed(width, cardHeight))
+        layout(width, total) {
+            steps.place(0, 0)
+            card.place(0, steps.height + spacing)
         }
     }
 }
@@ -458,7 +512,7 @@ private fun PlanReviewCard(state: PlannerState, events: PlannerEvents, modifier:
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.testTag("planner:reviewCard"),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(REVIEW_CARD_GAP)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(PlannerTexts.REVIEW_TITLE, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 if (!state.isEmpty) {
