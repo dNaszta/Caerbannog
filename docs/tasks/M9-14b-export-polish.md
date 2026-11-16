@@ -86,6 +86,7 @@ None blocking. Wording above is final for the build unless the owner edits the l
 
 ## Status
 - Step 1 (architect, 2026-11-16, round 0, branch `m9-14b-export-polish`, base main `342b0a7`): brief CHANGED against the real code (`TopologyExport.kt`, `MigrationsViewModel.readTopologyExport`, `ManagementJson` parsers, `typedArgumentsComplete`, `MigrationsExportNoteUiTest`, feature `10` @m9-14): owner answers recorded; wording constants decided; F3 needs the two strict `data-rabbit` parsers to become tolerant (so it is not core only); F4 test named; F5 out, F6 in; 7 scenarios written in feature `10` (tag `@m9-14b`, glue missing, so they fail until step 2). Next: step 2 (test developer: glue, unit tests, parser tests, all red first).
+- Step 2 (test developer, 2026-11-16, round 0): merged main (0019083), then wrote `TopologyExportNoteTest` (core, new), additions to `MigrationsViewModelExportTest` and `ManagementExportReadsTest`, glue `M914bExportSteps` (11 steps) and changed three existing tests (see the report: F4 test renamed, 12-partition characterisation, the two incomplete exchange/binding tests now expect the new sentence). All red because production code is missing (compile errors); with a throwaway stub (not committed) all of core, data-rabbit and the `@m9-14` scenarios were green. Next: step 3 (senior developer).
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed (no spec change needed: the export's note wording is not in `docs/spec.md`).

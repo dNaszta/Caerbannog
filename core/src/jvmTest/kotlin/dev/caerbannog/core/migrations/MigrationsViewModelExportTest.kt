@@ -373,6 +373,64 @@ class MigrationsViewModelExportTest {
         assertNull(rig.vm.state.value.exportNote, "a failed export reports the error, not a note")
     }
 
+    // ---- M9-14b: a setting the file cannot carry says so, a read that fails says that ------------------------------------------
+
+    // The text is pinned here, so these tests do not depend on where the constant lives (the brief: `MigrationsViewModel.TOPOLOGY_NOT_WRITABLE`).
+    private val NOT_WRITABLE = "The topology was read, but a setting in it cannot be written to a migration file."
+
+    private fun assertNotWritable(rig: Rig, why: String) {
+        assertNull(runBlocking { rig.vm.exportCurrentTopology() }, "$why: a file was returned")
+        assertEquals(NOT_WRITABLE, rig.vm.state.value.errorMessage, why)
+        assertNull(rig.vm.state.value.exportNote, "$why: a failed export has no note")
+        assertTrue(runBlocking { rig.files.listFiles() }.isEmpty(), "$why: a file was written")
+        assertTrue(rig.vm.state.value.entries.isEmpty(), "$why: the list shows a file")
+    }
+
+    @Test
+    fun `a queue argument the model refuses says the topology was read but cannot be written, and writes no file`() {
+        val fake = FakeTopologyCatalog().apply { declare(declared("orders", "quorum").copy(typedArgumentsComplete = false)) }
+        assertNotWritable(Rig(fake), "incomplete queue argument")
+    }
+
+    @Test
+    fun `a policy definition or an operator policy definition the model refuses says the same`() {
+        val bad = PolicyRow("p", "/", ".*", "all", 0, emptyMap(), definitionComplete = false)
+        assertNotWritable(Rig(FakeTopologyCatalog().apply { declare(declared("orders", "quorum")); addPolicy(bad) }), "incomplete policy")
+        assertNotWritable(Rig(FakeTopologyCatalog().apply { declare(declared("orders", "quorum")); addOperatorPolicy(bad) }), "incomplete operator policy")
+    }
+
+    @Test
+    fun `a read that fails keeps the old sentence, not the new one, and the two sentences differ`() {
+        for (call in listOf("queueDeclarations", "exchanges", "bindings", "policies", "operatorPolicies")) {
+            val rig = Rig(FakeTopologyCatalog().apply { declare(declared("orders", "quorum")); failCall(call, CatalogResult.Unexpected) })
+            assertFailsLoudlyAndWritesNothing(rig, call)
+        }
+    }
+
+    @Test
+    fun `a not writable export clears the note of the export before it`() {
+        val fake = FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"))) }
+        val rig = Rig(fake)
+        runBlocking { rig.vm.exportCurrentTopology() }!!
+        assertNotNull(rig.vm.state.value.exportNote)
+        fake.declare(declared("orders", "quorum").copy(typedArgumentsComplete = false))
+        assertNull(runBlocking { rig.vm.exportCurrentTopology() })
+        assertNull(rig.vm.state.value.exportNote)
+        assertEquals(NOT_WRITABLE, rig.vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun `the note shown after an export is the one line of the wording table`() {
+        val rig = Rig(
+            FakeTopologyCatalog().apply {
+                addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+                declare(declared("session-1", "classic", durable = false, exclusive = true))
+            },
+        )
+        runBlocking { rig.vm.exportCurrentTopology() }!!
+        assertEquals("Left out: retention and leader locator of stream audit; exclusive queue session-1", rig.vm.state.value.exportNote)
+    }
+
     // ---- M5-08a scope 7: every page is read, a failed read writes nothing ---------------------------------------------------
 
     private class Rig(catalog: TopologyCatalog, val files: InMemoryMigrationFileRepository = InMemoryMigrationFileRepository()) {
