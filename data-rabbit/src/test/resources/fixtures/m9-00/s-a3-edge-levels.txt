@@ -1,0 +1,8 @@
+dot in a level: EdgeResult(publish=accepted, subscribeKey=sensors.v1.2.temp, keySeen=sensors.v1.2.temp, handWrittenKeyMatched=true, literalSubscriberGotIt=false, subscriberStillConnected=true)
+asterisk in a level: EdgeResult(publish=accepted, subscribeKey=sensors.a*b.temp, keySeen=sensors.a*b.temp, handWrittenKeyMatched=true, literalSubscriberGotIt=false, subscriberStillConnected=false)
+empty level: EdgeResult(publish=accepted, subscribeKey=sensors..temp, keySeen=sensors..temp, handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)
+leading slash: EdgeResult(publish=accepted, subscribeKey=.sensors.temp, keySeen=.sensors.temp, handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)
+trailing slash: EdgeResult(publish=accepted, subscribeKey=sensors.temp., keySeen=sensors.temp., handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)
+space in a level: EdgeResult(publish=accepted, subscribeKey=sensors.a b.temp, keySeen=sensors.a b.temp, handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)
+dollar SYS topic: EdgeResult(publish=accepted, subscribeKey=$SYS.x, keySeen=$SYS.x, handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)
+dollar other topic: EdgeResult(publish=accepted, subscribeKey=$foo.bar, keySeen=$foo.bar, handWrittenKeyMatched=true, literalSubscriberGotIt=true, subscriberStillConnected=true)

@@ -1,0 +1,8 @@
+stream 'with-correlation-id': properties={} applicationProperties={correlation-id=text:corr-1} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+stream 'with-other-key': properties={} applicationProperties={request-id=text:req-2} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+stream 'with-both': properties={} applicationProperties={correlation-id=text:corr-3, request-id=text:req-3} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+stream 'control': properties={} applicationProperties={} annotations={x-routing-key=text:devices.d42.answer, x-exchange=text:amq.topic}
+quorum 'with-correlation-id': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2,"headers":{"correlation-id":"corr-1"}}
+quorum 'with-other-key': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2,"headers":{"request-id":"req-2"}}
+quorum 'with-both': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2,"headers":{"correlation-id":"corr-3","request-id":"req-3"}}
+quorum 'control': routingKey=devices.d42.answer exchange=amq.topic properties={"delivery_mode":2}

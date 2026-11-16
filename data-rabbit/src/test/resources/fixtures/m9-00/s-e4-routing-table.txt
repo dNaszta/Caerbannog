@@ -1,0 +1,8 @@
+headers a=1,b=x: routed=true arrived=[all(a=1,b=x), all(only x-match), any(a=1,b=x)]
+headers a=1: routed=true arrived=[all(only x-match), any(a=1,b=x)]
+headers b=x: routed=true arrived=[all(only x-match), any(a=1,b=x)]
+headers a=2,b=y: routed=true arrived=[all(only x-match)]
+headers n=10 (number): routed=true arrived=[all(n=number 10), all(only x-match)]
+headers n="10" (text): routed=true arrived=[all(n=text 10), all(only x-match)]
+no headers at all: routed=true arrived=[all(only x-match)]
+headers z=1 (unrelated): routed=true arrived=[all(only x-match)]
