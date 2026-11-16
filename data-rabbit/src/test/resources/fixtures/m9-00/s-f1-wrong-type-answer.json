@@ -1,0 +1,8 @@
+{
+  "request": "PUT /api/policies/%2F/x {definition:{max-length:\"abc\"}}",
+  "status": 400,
+  "body": {
+    "error": "bad_request",
+    "reason": "Validation failed\n\n<<\"abc\">> is not a valid maximum length\n"
+  }
+}

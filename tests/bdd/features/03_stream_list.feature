@@ -246,3 +246,23 @@ Feature: Stream list
     And the publisher count and consumer count of "orders-events" equal those in the RabbitMQ Management UI
     And the message count equals that in the RabbitMQ Management UI
     And the message count differs from the published message count by no more than the offset tracking entries
+
+  # M9-08b. Measured by M9-00c (S-F1d): a retention set by a policy on a stream is in the stream's
+  # effective_policy_definition, not in its arguments; the list used to read the arguments only.
+  @m9-08b @needs-M9-08b @fake-broker
+  Scenario Outline: Retention set by a policy is shown like retention set when the stream was created
+    Given a stream "telemetry" with no retention of its own and a policy that sets "<key>" to <value>
+    When I open the stream list
+    Then the stream "telemetry" shows the retention <shown>
+
+    Examples:
+      | key              | value   | shown                  |
+      | max-age          | "7D"    | "7D"                   |
+      | max-length-bytes | 1000000 | 1000000 bytes          |
+
+  @m9-08b @broker
+  Scenario: Retention set by a policy on a real stream is shown
+    Given a real broker with a stream "telemetry" created without retention
+    And a policy that sets "max-age" to "7D" on "telemetry" has taken effect
+    When I open the stream list
+    Then the stream "telemetry" shows the retention "7D"

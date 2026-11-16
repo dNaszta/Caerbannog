@@ -1,0 +1,14 @@
+{
+  "arguments": {
+    "x-bar": "10",
+    "x-foo": 10.0,
+    "x-max-length": 10,
+    "x-queue-type": "quorum"
+  },
+  "auto_delete": false,
+  "durable": true,
+  "exclusive": false,
+  "name": "fx-g4",
+  "type": "quorum",
+  "vhost": "/"
+}
