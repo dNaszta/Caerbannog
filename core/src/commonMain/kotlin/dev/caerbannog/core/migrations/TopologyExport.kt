@@ -39,7 +39,9 @@ internal object TopologyExport {
         bindings: List<BindingRow>,
         policies: List<PolicyRow>,
         operatorPolicies: List<PolicyRow>,
-    ): TopologyExportResult {
+    ): TopologyExportResult? {
+        // An exchange or binding argument the model could not type would be dropped from the file silently: the export fails instead.
+        if (exchanges.any { !it.typedArgumentsComplete } || bindings.any { !it.typedArgumentsComplete }) return null
         val (streams, queues) = declarations.partition { it.type == "stream" }
         val exported = queues.filter { !isConnectionQueue(it) && it.durable }
         val keptNames = (exported + streams).map { it.name }.toSet()

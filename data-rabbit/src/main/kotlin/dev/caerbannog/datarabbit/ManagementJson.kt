@@ -272,6 +272,7 @@ internal object ManagementJson {
     fun parseExchanges(body: String): CatalogResult<List<ExchangeRow>> = guarded(body) { root ->
         CatalogResult.Success(
             root.asArray().map { it.asObject() }.map { e ->
+                val (typed, typedComplete) = e.tolerantTypedArguments()
                 ExchangeRow(
                     name = e.requiredString("name"),
                     vhost = e.requiredString("vhost"),
@@ -281,7 +282,8 @@ internal object ManagementJson {
                     internal = e.boolean("internal"),
                     arguments = e.argumentText(),
                     superStream = isSuperStream(e),
-                    typedArguments = e.typedArguments(),
+                    typedArguments = typed,
+                    typedArgumentsComplete = typedComplete,
                 )
             },
         )
@@ -290,6 +292,7 @@ internal object ManagementJson {
     fun parseBindingList(body: String): CatalogResult<List<BindingRow>> = guarded(body) { root ->
         CatalogResult.Success(
             root.asArray().map { it.asObject() }.map { b ->
+                val (typed, typedComplete) = b.tolerantTypedArguments()
                 BindingRow(
                     source = b.requiredString("source"),
                     vhost = b.requiredString("vhost"),
@@ -301,7 +304,8 @@ internal object ManagementJson {
                     },
                     routingKey = b.string("routing_key").orEmpty(),
                     arguments = b.argumentText(),
-                    typedArguments = b.typedArguments(),
+                    typedArguments = typed,
+                    typedArgumentsComplete = typedComplete,
                 )
             },
         )
@@ -533,6 +537,20 @@ internal object ManagementJson {
         val element = this["arguments"] ?: return emptyMap()
         if (element is JsonNull) return emptyMap()
         return element.asObject().mapValues { (_, v) -> ArgumentValueJson.parse(v) ?: malformed() }
+    }
+
+    // The screens read exchanges and bindings too, so a value the model refuses must not fail the read: it is left out of the typed map and the row says so.
+    private fun JsonObject.tolerantTypedArguments(): Pair<Map<String, ArgumentValue>, Boolean> {
+        val element = this["arguments"]
+        if (element == null || element is JsonNull) return emptyMap<String, ArgumentValue>() to true
+        val entries = element as? JsonObject ?: return emptyMap<String, ArgumentValue>() to false
+        val typed = LinkedHashMap<String, ArgumentValue>()
+        var complete = true
+        for ((key, value) in entries) {
+            val converted = ArgumentValueJson.parse(value)
+            if (converted == null) complete = false else typed[key] = converted
+        }
+        return typed to complete
     }
 
     private fun JsonObject.boolean(key: String): Boolean = (this[key] as? JsonPrimitive)?.booleanOrNull ?: false

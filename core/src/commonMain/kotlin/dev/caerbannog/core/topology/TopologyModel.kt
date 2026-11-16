@@ -56,6 +56,8 @@ data class ExchangeRow(
     val superStream: Boolean = false,
     /** M9-14: the same arguments with their JSON types, for the topology export; [arguments] stays display text. */
     val typedArguments: Map<String, ArgumentValue> = emptyMap(),
+    /** M9-14: false when an argument value could not be typed (too deeply nested, not finite): [typedArguments] then lacks it and an export must not trust it. */
+    val typedArgumentsComplete: Boolean = true,
 ) {
     /** The default exchange has the name `""`. */
     val isDefault: Boolean get() = name.isEmpty()
@@ -73,6 +75,8 @@ data class BindingRow(
     val arguments: Map<String, String> = emptyMap(),
     /** M9-14: the same arguments with their JSON types, for the topology export. */
     val typedArguments: Map<String, ArgumentValue> = emptyMap(),
+    /** M9-14: false when an argument value could not be typed; see [ExchangeRow.typedArgumentsComplete]. */
+    val typedArgumentsComplete: Boolean = true,
 )
 
 /**

@@ -11,7 +11,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -83,7 +82,6 @@ class ManagementExportExploratoryTest {
 
     private val tooDeep = "[".repeat(40) + "1" + "]".repeat(40)
 
-    @Disabled("M9-14 round 1 finding F1 (major): parseExchanges and parseBindingList now answer Unexpected for an argument nested deeper than 32, so the read-only Topology screen cannot open a vhost it opened before. Enable when the architect decides the screen stays tolerant.")
     @Test
     fun `an exchange or binding argument the migration model refuses does not stop the Topology screen reads`() {
         val exchange = """[{"name":"x","vhost":"/","type":"headers","durable":true,"auto_delete":false,"internal":false,"arguments":{"deep":$tooDeep}}]"""
