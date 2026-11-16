@@ -554,6 +554,7 @@ An MQTT route is a topic filter and a destination queue or stream. It is saved a
 
 ### Guardrails that stay as they are
 
+- The one broker read that is not the check (M9-04): the names of exchanges, queues and streams of the plan's virtual host, by list calls (GET) through the existing catalogs, once when the planner opens and when the virtual host changes, for the review graph and the destination lists; 4.x with a connection only, never on 3.x, never a queue message. If it fails the graph says only the plan is drawn.
 - Nothing the planner does changes a broker (A7). The check sends GET requests through the executor's allow-list only, never a path under a queue's name.
 - A RabbitMQ 3.x connection gets no planner: no check, no apply, and the planner sends it no request at all, not even a GET. With no connection a plan can be written and saved but not checked.
 - The topology control level and the configure permission are honoured by the existing runner; Read-only and "no configure" connections can plan, check and save, and are told that applying is locked, with the existing wording.
