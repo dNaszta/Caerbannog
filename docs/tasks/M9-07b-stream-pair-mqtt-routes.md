@@ -17,7 +17,7 @@ In:
 - The note in the graph: `planGraphNotes(plan, known): List<PlanGraphNote>`, a pure function over the actions (A10, A11): for every MQTT route into a stream that is recognised as a response stream, one note between the request stream and `amq.topic` (once per request stream, however many routes). So the note is also drawn for a pair that was typed by hand or reopened from a file. It goes into the `notes` field that `M9-04` added to `PlanGraph`. A route into a stream that is not a response stream draws no note.
 - `ui`: two checkboxes with a topic field each in `StreamFormView` (placeholder of the answers field `devices/+/answer`, the owner's example; the requests field has none), the note drawn by `PlanReviewGraph` as a dashed rounded box with no edge, no click and no focus action beyond reading it. Test tags: `planForm:answersOverMqtt`, `planForm:answersTopic`, `planForm:requestsOverMqtt`, `planForm:requestsTopic`, `planGraphNote:<index>`.
 
-Out: any bridge from a stream to an MQTT message; reading or writing a correlation id (the test message of `M9-10` is the only place the planner pre-fills one); retention (`M9-08`); an exchange or a routing key of the owner's own choice for the pair; MQTT 5 settings of a route.
+Out: any bridge from a stream to an MQTT message; reading or writing a correlation id (the test message of `M9-10` is the only place the planner pre-fills one, and the only place that warns about it: owner decision O16, 2026-11-17, the Publish MQTT dialog shows a warning that the service must read and write the application property `correlation-id`; the pair's tick and graph note say nothing about it); retention (`M9-08`); an exchange or a routing key of the owner's own choice for the pair; MQTT 5 settings of a route.
 
 ## Acceptance
 - BDD: `21_topology_planner_recipes.feature` / "The MQTT ticks are offered only with the response stream and are off until I tick them" (@fake-broker)
@@ -53,3 +53,5 @@ None (owner decision 2026-11-15, "no MCP"). The existing tool `caerbannog_publis
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+Note (architect, 2026-11-17): owner decision O16 item 1 (correlation-id warning) changes `M9-10`, not this task: no scenario of `M9-07b` changes. The live scenario "A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it" already asserts the measured place (application property, not the AMQP property), which is what the warning tells the owner.

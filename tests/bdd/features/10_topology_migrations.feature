@@ -361,6 +361,103 @@ Feature: Topology migrations
     Then the new migration declares only the queue "orders"
     And the export result says that the exclusive queue "session-1" was left out
 
+  # M9-14c (owner decision O16, 2026-11-17: "do it"): declareStream carries the settings of a stream end to end. These scenarios are
+  # written first and carry @needs-M9-14c and NO @fake-broker, so that no runner selects them before their steps exist (the migrations
+  # runner selects @fake-broker and excludes @broker). In step 2 the test developer adds the steps, adds @fake-broker and removes
+  # @needs-M9-14c in the same commit; the live scenario at the end keeps @broker. The scenarios of M9-14 and M9-14b that pin the
+  # old "Left out: retention ..." note change in step 2 as well (list in docs/tasks/M9-14c-stream-arguments.md).
+  @m9-14c @needs-M9-14c
+  Scenario: A stream with retention and a leader locator is declared with them
+    Given a pending migration declares the stream "audit" with "x-max-age" as the text "7D", "x-max-length-bytes" 1000000000 and "x-queue-leader-locator" as the text "balanced"
+    When I apply the pending migrations
+    Then the broker has the stream "audit" with "x-max-age" as the text "7D", "x-max-length-bytes" 1000000000 and "x-queue-leader-locator" as the text "balanced"
+    And the migration is recorded as applied
+
+  @m9-14c @needs-M9-14c
+  Scenario: A stream declared without settings is written and applied exactly as before
+    Given a pending migration declares the stream "audit" with no settings
+    Then the file of the migration holds the stream "audit" with no "arguments" key
+    When I apply the pending migrations
+    Then the broker has the stream "audit"
+
+  # The four keys are the retention keys and the leader locator measured by M9-00b/M9-00c/M9-14 (x-max-age is TEXT, the other two retention keys
+  # are numbers). The reasons are the architect's proposal in the style of the existing parser reasons, the developer may word them better;
+  # the accepted leader locator values ("balanced", "client-local") are fixed by the live rows of step 0 of M9-14c, not guessed.
+  @m9-14c @needs-M9-14c @negative
+  Scenario Outline: A stream setting that the app cannot carry is refused when the file is read
+    Given a migration file declares the stream "audit" with the setting "<key>" as <value>
+    When I validate the file
+    Then the file is refused with "<reason>"
+
+    Examples:
+      | key                       | value         | reason                                                  |
+      | x-dead-letter-exchange    | the text "x"  | stream setting "x-dead-letter-exchange" is not supported |
+      | x-queue-type              | the text "stream" | stream setting "x-queue-type" is not supported       |
+      | x-max-age                 | the number 7  | stream setting "x-max-age" must be text such as 7D      |
+      | x-max-length-bytes        | the text "1gb" | stream setting "x-max-length-bytes" must be a whole number |
+      | x-queue-leader-locator    | the text "nearest" | stream setting "x-queue-leader-locator" must be balanced or client-local |
+
+  @m9-14c @needs-M9-14c @negative
+  Scenario: A stream that exists with other retention is a conflict, never changed
+    Given the broker has the stream "audit" with "x-max-age" as the text "1D"
+    And a pending migration declares the stream "audit" with "x-max-age" as the text "7D"
+    When I apply the pending migrations
+    Then the apply stops and says "audit" exists with different settings
+    And "audit" on the broker still has "x-max-age" as the text "1D"
+    And no request deleted or recreated anything
+    And the migration is not recorded as applied
+
+  @m9-14c @needs-M9-14c
+  Scenario: A stream that exists with the same settings is a no-op
+    Given the broker has the stream "audit" with "x-max-age" as the text "7D"
+    And a pending migration declares the stream "audit" with "x-max-age" as the text "7D"
+    When I apply the pending migrations
+    Then the migration is recorded as applied and nothing on the broker changed
+
+  @m9-14c @needs-M9-14c
+  Scenario: The dry run shows the settings of a stream step
+    Given a pending migration declares the stream "audit" with "x-max-age" as the text "7D" and "x-queue-leader-locator" as the text "balanced"
+    When I run a dry run of it
+    Then the action reads "Declare stream audit" with the detail "x-max-age 7D, x-queue-leader-locator balanced"
+    And nothing is sent to the broker
+
+  @m9-14c @needs-M9-14c @negative
+  Scenario: A stream with settings still needs the configure permission
+    Given the user has no configure permission on "/"
+    And a pending migration declares the stream "audit" with "x-max-age" as the text "7D"
+    When I run a dry run of it
+    Then the action is blocked because the user cannot change topology on "uat-eu"
+    And nothing is sent to the broker
+
+  @m9-14c @needs-M9-14c
+  Scenario: An export writes the retention and the leader locator of a stream
+    Given the broker has the stream "audit" with retention "x-max-age" as the text "7D" and the leader locator "balanced"
+    When I export the current topology
+    Then the new migration declares the stream "audit" with "x-max-age" as the text "7D" and "x-queue-leader-locator" as the text "balanced"
+    And the export result has no line about what was left out
+
+  @m9-14c @needs-M9-14c
+  Scenario: An export of a super stream writes the leader locator of its partitions and says nothing about it
+    Given the broker has a super stream "orders" with 3 partitions
+    When I export the current topology
+    Then the new migration declares the streams "orders-0", "orders-1" and "orders-2" each with "x-queue-leader-locator" as the text "balanced"
+    And the export result has no line about what was left out
+
+  @m9-14c @needs-M9-14c
+  Scenario: An export still names a stream setting the file cannot carry
+    Given the broker has the stream "audit" with the argument "x-initial-cluster-size" 3 and retention "x-max-age" as the text "7D"
+    When I export the current topology
+    Then the new migration declares the stream "audit" with "x-max-age" as the text "7D" only
+    And the export result reads "Left out: other settings of stream audit"
+
+  @m9-14c @broker @negative
+  Scenario: A stream made from a migration has the retention and the leader locator it declared
+    Given a real broker and a migration that declares the stream "audit" with "x-max-age" as the text "7D", "x-max-length-bytes" 1000000000 and "x-queue-leader-locator" as the text "client-local"
+    When I apply the pending migrations
+    Then the broker lists the stream "audit" with those three arguments as the management API shows them
+    And applying the same migration again changes nothing
+    And a migration that declares "audit" with "x-max-age" as the text "1D" stops with "exists with different settings" and the stream is unchanged
+
   @m5-08 @m5-08b @fake-broker
   Scenario: Applied migrations and files survive a restart
     Given the migrations folder is "/work/migrations" and the migration "0001" was imported and applied to "uat-eu"
