@@ -145,7 +145,7 @@ class MigrationsViewModel(
                 "Warning: an applied migration was modified on disk. Caerbannog will not apply the modified file again."
             } else null
 
-            val folder = folderState(listing)
+            val folder = folderStateOf(listing, folderPorts?.store?.folder)
             val banner = bannerMessage()
             val canWrite = folder is MigrationFolderState.Ready
 
@@ -193,16 +193,6 @@ class MigrationsViewModel(
         if (folderPorts == null) fileRepository else folderPorts.store.folder?.let(folderPorts.repositoryFor)
 
     private suspend fun readListing(): FolderListing? = currentRepository()?.load()
-
-    private fun folderState(listing: FolderListing?): MigrationFolderState {
-        val path = folderPorts?.store?.folder
-        return when {
-            listing == null -> MigrationFolderState.ChooseFolder
-            listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem)
-            listing is FolderListing.Listed && listing.readOnly && path != null -> MigrationFolderState.FolderReadOnly(path)
-            else -> MigrationFolderState.Ready(path)
-        }
-    }
 
     /** A migration with an action for another virtual host can never be applied on this connection (spec V1). */
     private fun belongsToConnection(file: MigrationFile): Boolean = file.up.all { it.isBrokerLevel || it.vhost == vhost }

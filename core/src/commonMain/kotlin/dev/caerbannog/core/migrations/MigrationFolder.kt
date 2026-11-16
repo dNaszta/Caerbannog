@@ -66,6 +66,17 @@ sealed interface MigrationFolderState {
     data class Ready(val path: String?) : MigrationFolderState
 }
 
+/**
+ * The folder verdict of a listing, shared by the Migrations screen and the planner so they cannot disagree. [path] is the folder in the
+ * store; a read-only listing without a path stays [MigrationFolderState.Ready] (the old in-memory mode).
+ */
+fun folderStateOf(listing: FolderListing?, path: String?): MigrationFolderState = when {
+    listing == null -> MigrationFolderState.ChooseFolder
+    listing is FolderListing.Unavailable -> MigrationFolderState.FolderUnavailable(listing.path, listing.problem)
+    listing is FolderListing.Listed && listing.readOnly && path != null -> MigrationFolderState.FolderReadOnly(path)
+    else -> MigrationFolderState.Ready(path)
+}
+
 data class HistoryUnreadable(val path: String, val reason: String)
 
 /** The ports the view model needs once the migrations live in a user folder. */

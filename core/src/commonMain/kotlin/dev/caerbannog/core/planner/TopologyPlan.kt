@@ -30,6 +30,18 @@ data class TopologyPlan(
     fun withVhost(vhost: String): TopologyPlan =
         copy(vhost = vhost, steps = steps.map { it.copy(action = it.action.onVhost(vhost)) })
 
+    companion object {
+        /**
+         * The plan of a stored file: every action becomes a step with the id 1..n, and the plan's virtual host is that of the first action that
+         * has one (an access action is broker-level and names none), else [defaultVhost]. How a draft is loaded; opening a file uses it too.
+         */
+        fun of(description: String, actions: List<MigrationAction>, defaultVhost: String): TopologyPlan = TopologyPlan(
+            description = description,
+            vhost = actions.firstOrNull { !it.isBrokerLevel }?.vhost ?: defaultVhost,
+            steps = actions.mapIndexed { i, action -> PlanStep(i + 1, action) },
+        )
+    }
+
     private fun swap(index: Int, by: Int): TopologyPlan {
         val other = index + by
         if (index < 0 || other !in steps.indices) return this

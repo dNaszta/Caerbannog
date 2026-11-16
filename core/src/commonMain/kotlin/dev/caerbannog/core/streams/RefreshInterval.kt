@@ -1,5 +1,7 @@
 package dev.caerbannog.core.streams
 
+import dev.caerbannog.core.planner.NamingStyle
+
 /** How often the stream list reloads by itself (decision D3): a closed set, not a free number. */
 enum class RefreshInterval(val seconds: Int) {
     Off(0),
@@ -21,6 +23,14 @@ val DEFAULT_REFRESH: RefreshInterval = RefreshInterval.Every5
 /** Per-app settings of the stream list. The real implementation is the `settings.json` file in `data-rabbit`; tests use an in-memory fake. */
 interface AppSettings {
     var streamListRefresh: RefreshInterval
+
+    /**
+     * M9-02: the naming style the planner advises, per machine (spec Q8). The default getter and the ignoring setter keep every implementer that
+     * has no such setting (and every test double) compiling; the real one keeps it in `settings.json`.
+     */
+    var plannerNamingStyle: NamingStyle
+        get() = NamingStyle.KEBAB
+        set(@Suppress("UNUSED_PARAMETER") value) {}
 }
 
 /** Time source of the refresh timer and "updated N s ago"; a test passes virtual time. */
