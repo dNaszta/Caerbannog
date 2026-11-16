@@ -309,6 +309,31 @@ Feature: Topology migrations
     Then the new migration declares the stream "audit" without any retention
     And the export result says that retention of "audit" and the exclusive queue "session-1" were left out
 
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A stream with only a leader locator is not called retention
+    Given the broker has the stream "audit" with the leader locator "balanced"
+    When I export the current topology
+    Then the export result reads "Left out: leader locator of stream audit"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A stream with retention and a leader locator names both
+    Given the broker has the stream "audit" with retention "x-max-age" as the text "7D" and the leader locator "balanced"
+    When I export the current topology
+    Then the export result reads "Left out: retention and leader locator of stream audit"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A super stream is one entry in the note, not one per partition
+    Given the broker has a super stream "orders" with 3 partitions
+    When I export the current topology
+    Then the export result reads "Left out: leader locator of super stream orders (3 partitions)"
+    And the export result does not name "orders-0", "orders-1" or "orders-2"
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: A long note stops after ten entries and says how many more there are
+    Given the broker has 12 exclusive queues named "conn-1" to "conn-12"
+    When I export the current topology
+    Then the export result names 10 entries and ends with "and 2 more"
+
   @m9-14 @fake-broker
   Scenario: An export that loses nothing says nothing
     Given the broker has the quorum queue "orders" and the exchange "events"
@@ -321,6 +346,20 @@ Feature: Topology migrations
     And the broker refuses to list the policies of "/" for this user
     When I export the current topology
     Then I am told the topology could not be read and no migration file was written
+
+  @m9-14 @m9-14b @fake-broker @negative
+  Scenario: An export that reads the topology but cannot write a setting of it says so and writes no file
+    Given the broker has the quorum queue "orders" with an argument that cannot be written to a migration file
+    When I export the current topology
+    Then I am told the topology was read but a setting in it cannot be written to a migration file, and no migration file was written
+
+  @m9-14 @m9-14b @fake-broker
+  Scenario: An export checks only what it writes
+    Given the broker has the quorum queue "orders" and an exclusive queue "session-1"
+    And the broker has a binding from "events" to "session-1" with an argument that cannot be written to a migration file
+    When I export the current topology
+    Then the new migration declares only the queue "orders"
+    And the export result says that the exclusive queue "session-1" was left out
 
   @m5-08 @m5-08b @fake-broker
   Scenario: Applied migrations and files survive a restart
