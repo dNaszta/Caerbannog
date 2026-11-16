@@ -75,7 +75,7 @@ import dev.caerbannog.ui.connections.SmallIconSize
 import dev.caerbannog.ui.migrations.Pill
 
 /** Below this width the step list and the review card stand one above the other instead of side by side. */
-private val SIDE_BY_SIDE_FROM = 900.dp
+private val SIDE_BY_SIDE_FROM = 1400.dp
 
 /**
  * The Topology planner (docs/ux/Planner.dc.html): header, step list, wizard, review card with the migration text, and the limited states.
@@ -151,10 +151,10 @@ private fun PlannerActions(state: PlannerState, events: PlannerEvents) {
     }
     val checkReason = state.checkDisabledReason
     val check: @Composable () -> Unit = {
-        OutlinedButton(onClick = {}, enabled = state.checkEnabled, modifier = Modifier.testTag("planner:checkBtn")) {
+        OutlinedButton(onClick = events::check, enabled = state.checkEnabled, modifier = Modifier.testTag("planner:checkBtn")) {
             ConnectionIcon(AppIcon.FactCheck, SmallIconSize)
             Spacer(Modifier.width(8.dp))
-            Text(PlannerTexts.CHECK_LABEL)
+            Text(state.checkLabel)
         }
     }
     if (checkReason != null && !state.checkEnabled) TooltipArea(tooltip = { ReasonTooltip(checkReason) }) { check() } else check()
@@ -202,6 +202,7 @@ private fun PlannerBody(
                 )
             }
         }
+        CheckBanner(state, events)
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             if (maxWidth >= SIDE_BY_SIDE_FROM) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {

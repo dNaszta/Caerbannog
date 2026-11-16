@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeTopologyMigrationExecutor
 import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.migrations.fakes.FakeDeclareCheck
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolder
@@ -30,6 +31,7 @@ import dev.caerbannog.core.planner.TopologyPlan
 import dev.caerbannog.core.planner.WizardState
 import dev.caerbannog.core.planner.fakes.FakeKnownTopologyReader
 import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
+import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.topology.BindingDestinationType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +78,15 @@ class PlannerDriver {
     /** False: the broker answers nothing the planner can use (the read gives null), as for a virtual host the user cannot see. */
     var brokerReadable = true
 
+    /**
+     * M9-06: the check port of each connection, by profile name (the connection's own read-only port); a profile without an entry has none, as a
+     * connection that brought none. The window rebuilds the view model on a connection change, so does [restart].
+     */
+    val declareChecks = mutableMapOf<String, FakeDeclareCheck>()
+
+    /** M9-06: the virtual clock of the view model, epoch milliseconds (the time a summary shows). */
+    var nowMillis = 1_700_000_000_000L
+
     /** The one read of the broker's names (M9-04): a fake that records what it was asked. Null when not connected, as the app gives no reader then. */
     val reader: FakeKnownTopologyReader? get() = currentReader
 
@@ -97,7 +108,9 @@ class PlannerDriver {
             vhost = vhost,
             controlLevel = controlLevel,
             hasConfigurePermission = configurePermission,
-        ), scope, descriptionDebounceMillis = 0, reader = readerForNewViewModel()).also { created ->
+        ), scope, descriptionDebounceMillis = 0, reader = readerForNewViewModel(),
+            declareCheck = if (connected && unavailableReason == null) declareChecks[profile] else null, clock = RefreshClock { nowMillis },
+        ).also { created ->
             current = created
             scope.launch { created.state.collect { s -> s.question?.let { q -> if (questions.lastOrNull() != q) questions += q } } }
         }

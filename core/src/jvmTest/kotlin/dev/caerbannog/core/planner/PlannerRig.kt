@@ -1,9 +1,11 @@
 package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolder
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.planner.fakes.FakePlanDraftStore
+import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.topology.BindingDestinationType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,10 @@ internal class PlannerRig(
     val settings: FakeAppSettings = FakeAppSettings(),
     /** M9-04: the one read of the broker's names; null is no connection (or a connection with no planner). */
     val reader: KnownTopologyReader? = null,
+    /** M9-06: the connection's read-only check port; null is a connection without one. A reconnect to the same profile is [restart] with another port. */
+    var declareCheck: DeclareCheck? = null,
+    /** M9-06: the time of a check (the summary's "at 14:02"); the virtual clock of the view model. */
+    var nowMillis: Long = 1_700_000_000_000L,
 ) {
     val folders = FakeMigrationFolders(folderPath)
     val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
@@ -33,11 +39,15 @@ internal class PlannerRig(
     var vm: PlannerViewModel = build()
     val state: PlannerState get() = vm.state.value
 
-    private fun build() = PlannerViewModel(store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader)
+    private fun build() = PlannerViewModel(
+        store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis },
+    )
 
-    /** The app is closed and opened again, or the window rebuilt the view model for a changed [context]. */
-    fun restart(newContext: PlannerContext = context): PlannerViewModel {
+    /** The app is closed and opened again, or the window rebuilt the view model for a changed [context] (or, for the same profile, a new check port). */
+    fun restart(newContext: PlannerContext = context, newDeclareCheck: DeclareCheck? = declareCheck): PlannerViewModel {
         context = newContext
+        declareCheck = newDeclareCheck
         vm = build()
         return vm
     }

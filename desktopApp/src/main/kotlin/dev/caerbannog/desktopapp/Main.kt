@@ -465,10 +465,9 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
 private fun PlannerWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val connections by composition.viewModel.state.collectAsState()
     val inputs = composition.migrationsInputs(connections)
-    val context = plannerContextOf(inputs)
     val windowScope = remember { newPlannerScope() }
     val live = remember { LivePlanner() }
-    val plannerVm = remember(context) {
+    val plannerVm = remember(plannerKeyOf(inputs)) {
         live.retire(windowScope)
         val job = SupervisorJob(windowScope.coroutineContext[Job])
         composition.createPlannerViewModel(inputs, CoroutineScope(windowScope.coroutineContext + job)).also { live.vm = it; live.job = job }

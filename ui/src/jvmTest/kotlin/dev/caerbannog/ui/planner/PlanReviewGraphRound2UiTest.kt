@@ -20,7 +20,9 @@ class PlanReviewGraphRound2UiTest {
     // ---- F1 ----
 
     @Test
-    fun `at 1280 the three item plan is fully visible or the graph has a scrollbar`() = runDesktopComposeUiTest(1280, 800) {
+    fun `at 1280 the three item plan is fully visible and needs no scrollbar`() = runDesktopComposeUiTest(1280, 800) {
+        // M9-06, owner decision of 2026-11-16 (F4, option A): the side-by-side breakpoint is 1400 dp, so at 1280 the review card stacks under the
+        // step list and a small plan fits. Before, "or the graph has a scrollbar" was enough; now the graph must fit.
         val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology.None)) { threeSteps() }
         showPlanner(r)
         val box = node("planner:reviewGraph").fetchSemanticsNode().boundsInRoot
@@ -31,11 +33,8 @@ class PlanReviewGraphRound2UiTest {
             val n = node("planGraphNode:$id").fetchSemanticsNode()
             n.positionInRoot.x < box.left - 0.5f || n.positionInRoot.x + n.size.width > box.right + 0.5f
         }
-        val scrollbar = onAllNodesWithTag("planner:graphScrollbar", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        assertTrue(
-            clipped.isEmpty() || scrollbar,
-            "nodes $clipped are cut off by the graph box ($box) and no horizontal scrollbar (planner:graphScrollbar) is drawn",
-        )
+        assertEquals(emptyList(), clipped, "nodes $clipped are cut off by the graph box ($box) at 1280 px")
+        assertNotDrawn("planner:graphScrollbar")
         r.close()
     }
 

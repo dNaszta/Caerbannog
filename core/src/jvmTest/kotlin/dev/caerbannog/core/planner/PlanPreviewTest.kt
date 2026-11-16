@@ -70,7 +70,7 @@ class PlanPreviewTest {
         val g = planPreview(planOf(queue("orders"), bind("events", "orders", "order.created")), known)
         assertEquals(setOf("e:events", "q:orders"), g.ids(), "audit, other and s are not touched by a binding of the plan")
         assertEquals(setOf("q:orders"), g.newNodeIds)
-        assertEquals("(topic)", g.node("e:events").detail, "the existing exchange keeps the type the broker has")
+        assertEquals("exchange, topic", g.node("e:events").detail, "the existing exchange keeps the type the broker has, in the mockup's words")
         assertEquals(setOf("edge-0"), g.newEdgeIds, "the plan's binding is new even between an existing end and a new one")
         assertEquals(emptySet(), g.notInPlanNodeIds)
         assertNull(g.notice)

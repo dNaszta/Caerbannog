@@ -87,8 +87,13 @@ class PlannerScreenSteps {
 
     @Then("the planner says {string}")
     fun plannerSays(text: String) {
-        val banner = assertNotNull(d.state.banner, "no banner")
-        assertEquals(text, banner.title, "banner title")
+        // M9-06: the planner also says things outside the banner, in the lines of the check (stale, progress); the banner stays the first place to look.
+        val banner = d.state.banner
+        if (banner == null || banner.title != text) {
+            val lines = listOf("planner:checkStale", "planner:checkProgress").mapNotNull { screen.textOf(it) }
+            assertTrue(lines.any { it.contains(text) }, "neither the banner (${banner?.title}) nor the lines of the check say \"$text\": $lines")
+            return
+        }
         assertTrue(screen.textOf("planner:banner").orEmpty().contains(text), "the screen says: ${screen.textOf("planner:banner")}")
     }
 

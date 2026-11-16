@@ -118,6 +118,17 @@ sealed interface PlannerBanner {
     }
 }
 
+/** The check on the screen. One state at a time: a running check hides the result it replaces. */
+sealed interface CheckState {
+    data object None : CheckState
+
+    /** The check is reading [step] (1-based) of [total] steps; requests are not counted, a binding step costs up to three. */
+    data class Running(val step: Int, val total: Int) : CheckState
+
+    /** [stale]: the plan changed after the check; the results are kept, matched to steps by id. */
+    data class Done(val results: List<StepCheck>, val connectionName: String, val atMillis: Long, val stale: Boolean) : CheckState
+}
+
 /** Everything the planner screen draws. Built from one snapshot, so a state is never half of two changes. */
 data class PlannerState(
     val plan: TopologyPlan,
@@ -143,6 +154,12 @@ data class PlannerState(
     /** The review graph: the plan, with the broker's existing ends when [known] is there. Derived on every change. */
     val graph: PlanGraph = planPreview(plan, known),
     val graphView: ReviewView = ReviewView.Graph,
+    /** The check of the plan against the broker (M9-06). */
+    val check: CheckState = CheckState.None,
+    /** The held connection's name; null when not connected. */
+    val connectionName: String? = null,
+    /** Why the check cannot start, in the order of `PlanCheck.run`; null when it can. A hand-made state has no port, so it says so. */
+    val checkDisabledReason: String? = PlanCheck.NO_CHECK,
 ) {
     val description: String get() = plan.description
 
@@ -170,10 +187,14 @@ data class PlannerState(
     /** The second line of the error banner, for the one error that has it. */
     val errorDetail: String? get() = if (errorMessage == PlannerTexts.FILE_NOT_WRITTEN) PlannerTexts.FILE_NOT_WRITTEN_DETAIL else null
 
-    /** Checking is built in M9-06; until then the button is drawn disabled with a reason. */
-    val checkEnabled: Boolean get() = false
+    /** The button: usable when nothing says otherwise and no check runs. A running check has no reason; the progress banner is the explanation. */
+    val checkEnabled: Boolean get() = checkDisabledReason == null && check !is CheckState.Running
 
-    val checkDisabledReason: String? get() = PlannerTexts.CHECK_LATER
+    /** "Check against uat-eu", or "Check" while there is no connection. */
+    val checkLabel: String get() = PlannerTexts.checkLabel(connectionName)
+
+    /** The result of [stepId] in the check that is shown; null when there is none (no check, running, or a step added after it). */
+    fun stepCheck(stepId: Int): StepCheck? = (check as? CheckState.Done)?.results?.firstOrNull { it.stepId == stepId }
 
     /**
      * What the plan would be saved as, for the read-only JSON view. The version is not chosen yet (the next free one is picked at save),

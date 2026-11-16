@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.ConnectionsState
 import dev.caerbannog.core.connections.PermissionCheckStatus
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.migrations.ActionResult
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationRunner
 import dev.caerbannog.core.migrations.MigrationsViewModel
@@ -29,6 +30,8 @@ data class MigrationsInputs(
     val topology: TopologyCatalog?,
     /** The stream catalog of the same connection as [topology]; the planner reads stream names from it. */
     val streams: StreamCatalog? = null,
+    /** The read-only check port of the same connection (M9-05), already behind the closed-connection guard; null when there is none or the connection cannot run migrations. */
+    val declareCheck: DeclareCheck? = null,
 )
 
 internal const val NOT_CONNECTED = "Connect to a broker first"
@@ -57,6 +60,7 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
         },
         topology = source?.topology,
         streams = source?.catalog,
+        declareCheck = source?.declareCheck,
     )
 }
 

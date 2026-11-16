@@ -53,6 +53,12 @@ object PlannerTexts {
     const val WIZARD_KIND_TITLE: String = "What do you want to add?"
     const val NOT_IN_PLAN_NOTE: String = "Not in this plan and not seen on the broker"
     const val CHECK_LABEL: String = "Check"
+    const val BLOCKED_PILL: String = "Blocked"
+    const val CHECK_STALE: String = "The plan changed since the check. Check again."
+    const val CHECK_AGAIN: String = "Check again"
+
+    /** Under the summary: the check probes the broker as it is now, so it is never worded as a promise (owner review item 1 of M9-06). */
+    const val CHECK_CAVEAT: String = "This is how the broker looks now; it is not a promise of what applying will do."
     const val DISMISS_LABEL: String = "Dismiss"
     const val PROBLEM_PILL: String = "Problem"
 
@@ -68,7 +74,6 @@ object PlannerTexts {
     const val FILE_NOT_WRITTEN_DETAIL: String = "The plan is still here as a draft. Nothing was changed."
     const val NO_STEPS_YET: String = "No steps yet"
     const val NOTHING_TO_REVIEW: String = "Nothing to review yet"
-    const val CHECK_LATER: String = "Checking comes in a later step"
     const val DRAFT_CARD_TITLE: String = "Draft plan"
     const val DRAFT_CARD_PILL: String = "Not saved"
     const val DRAFT_NOT_SAVED: String = "The draft could not be saved on this machine; the plan is only in memory"
@@ -96,6 +101,46 @@ object PlannerTexts {
         val target = if (echo) "a connection for $planVhost" else "a connection for that virtual host"
         return "This plan is for $plan; $connection is connected to $connectionVhost. It can be saved here and applied on $target."
     }
+
+    /** "Check against uat-eu", or just "Check" while there is no connection. */
+    fun checkLabel(connection: String?): String = if (connection == null) CHECK_LABEL else "$CHECK_LABEL against $connection"
+
+    /** [step] and [total] count steps, never requests; the suffix tells the user that nothing is changed. */
+    fun checkProgress(step: Int, total: Int, connection: String): String =
+        "Checking step $step of $total against $connection. Only reads are sent."
+
+    /** The words of the result table of the spec; the reason a finding carries is drawn on its own line, never in the word. */
+    fun resultLabel(finding: StepFinding): String = when (finding) {
+        StepFinding.WillBeCreated -> "Will be created"
+        StepFinding.AlreadyThere -> "Already there"
+        StepFinding.Different -> "Exists with different settings"
+        is StepFinding.Missing -> "Needs something that is missing"
+        is StepFinding.NotChecked -> "Could not be checked"
+        StepFinding.WillBeDeleted -> "Will be deleted"
+        StepFinding.AlreadyGone -> "Already gone"
+    }
+
+    /**
+     * "Checked against uat-eu at 14:02: 5 will be created, 1 already there." Zero counts are left out and "blocked" is last (a blocked step
+     * counts under its result too). [time] is formatted by the screen: `core` has no time zone.
+     */
+    fun checkSummary(connection: String, time: String, results: List<StepCheck>): String {
+        val counts = SUMMARY_ORDER.mapNotNull { (label, matches) ->
+            results.count { matches(it.finding) }.takeIf { it > 0 }?.let { "$it $label" }
+        } + listOfNotNull(results.count { it.blocked != null }.takeIf { it > 0 }?.let { "$it blocked" })
+        return "Checked against $connection at $time: ${counts.joinToString(", ")}."
+    }
+
+    private val SUMMARY_ORDER: List<Pair<String, (StepFinding) -> Boolean>> = listOf(
+        "will be created" to { f -> f == StepFinding.WillBeCreated },
+        "already there" to { f -> f == StepFinding.AlreadyThere },
+        "exists with different settings" to { f -> f == StepFinding.Different },
+        "needs something that is missing" to { f -> f is StepFinding.Missing },
+        "could not be checked" to { f -> f is StepFinding.NotChecked },
+        // After the declare words, so the sentence of a plan without a delete step reads as in the mockup. Owner review item 3 may move them.
+        "will be deleted" to { f -> f == StepFinding.WillBeDeleted },
+        "already gone" to { f -> f == StepFinding.AlreadyGone },
+    )
 
     fun draftCardSteps(steps: Int): String = "$steps ${plural(steps, "step")} \u00b7 not a migration yet"
 
