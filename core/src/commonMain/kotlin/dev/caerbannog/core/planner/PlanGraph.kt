@@ -7,6 +7,7 @@ import dev.caerbannog.core.topology.BindingGraph
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.GraphNode
+import dev.caerbannog.core.topology.GraphNodeKind
 import dev.caerbannog.core.topology.buildBindingGraph
 
 /** The two views of the review card. Graph is first. */
@@ -94,7 +95,8 @@ fun planPreview(
 ): PlanGraph {
     val actions = plan.steps.map { it.action }
     val declaredExchanges = actions.filterIsInstance<MigrationAction.DeclareExchange>().associate { it.name to it.type }
-    val declaredQueues = actions.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name }
+    val declaredQueueTypes = actions.filterIsInstance<MigrationAction.DeclareQueue>().associate { it.name to it.type }
+    val declaredQueues = declaredQueueTypes.keys.toList()
     val declaredStreams = actions.filterIsInstance<MigrationAction.DeclareStream>().map { it.name }
     val bindings = actions.filterIsInstance<MigrationAction.DeclareBinding>()
 
@@ -112,9 +114,10 @@ fun planPreview(
     }
 
     val streamNames = (declaredStreams + queueNames.filter { it in brokerStreams }).toSet()
-    val graph = buildBindingGraph(
+    fun exchangeType(name: String): String = brokerExchanges[name] ?: declaredExchanges[name] ?: "direct"
+    val drawn = buildBindingGraph(
         exchanges = exchangeNames.map { name ->
-            ExchangeRow(name, plan.vhost, brokerExchanges[name] ?: declaredExchanges[name] ?: "direct", durable = true, autoDelete = false, internal = false)
+            ExchangeRow(name, plan.vhost, exchangeType(name), durable = true, autoDelete = false, internal = false)
         },
         queues = emptyList(),
         bindings = bindings.map { BindingRow(it.exchange, plan.vhost, it.queue, it.destinationType, it.routingKey) },
@@ -122,6 +125,8 @@ fun planPreview(
         extraExchanges = declaredExchanges.keys.toList(),
         extraQueues = declaredQueues + declaredStreams,
     )
+    // The review graph words a node as the mockup does ("exchange, direct", "queue, quorum", "stream"); the Topology screen keeps its own words.
+    val graph = drawn.copy(nodes = drawn.nodes.map { it.copy(node = it.node.copy(detail = subtitleOf(it.node, ::exchangeType, declaredQueueTypes))) })
 
     val isNew = mutableSetOf<String>()
     val notInPlan = mutableSetOf<String>()
@@ -155,3 +160,13 @@ fun planPreview(
 }
 
 private fun GraphNode.rawName(): String = id.substring(2)
+
+private fun subtitleOf(node: GraphNode, exchangeType: (String) -> String, queueTypes: Map<String, String>): String {
+    val name = node.rawName()
+    return when (node.kind) {
+        GraphNodeKind.Exchange -> "exchange, ${exchangeType(name)}"
+        GraphNodeKind.Stream -> "stream"
+        // The broker's queue list carries no type here, so a queue only the broker has is just "queue".
+        else -> queueTypes[name]?.let { "queue, $it" } ?: "queue"
+    }
+}

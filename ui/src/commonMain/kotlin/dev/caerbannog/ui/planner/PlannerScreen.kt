@@ -75,7 +75,7 @@ import dev.caerbannog.ui.connections.SmallIconSize
 import dev.caerbannog.ui.migrations.Pill
 
 /** Below this width the step list and the review card stand one above the other instead of side by side. */
-private val SIDE_BY_SIDE_FROM = 900.dp
+private val SIDE_BY_SIDE_FROM = 1400.dp
 
 /**
  * The Topology planner (docs/ux/Planner.dc.html): header, step list, wizard, review card with the migration text, and the limited states.
