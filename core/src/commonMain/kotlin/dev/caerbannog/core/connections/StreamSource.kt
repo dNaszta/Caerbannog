@@ -4,6 +4,8 @@ import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.migrations.ActionResult
+import dev.caerbannog.core.migrations.BrokerFinding
+import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.mqtt.MqttCatalog
@@ -65,6 +67,8 @@ class StreamSource(
     val queueInspector: QueueMessageInspector = UnavailableQueueMessageInspector,
     /** M5-08a: the migration executor of the same held connection, guarded like [manager]; null when the connection has none. */
     val migrationExecutor: TopologyMigrationExecutor? = null,
+    /** M9-05: the read-only check of the same held connection, guarded like [migrationExecutor]; null exactly when [migrationExecutor] is null. */
+    val declareCheck: DeclareCheck? = null,
     /** M5-08a R1: the fixed reason there is no [migrationExecutor], passed on as it is. */
     val migrationUnavailableReason: String? = null,
     /** M8-02a: the raw broker version text of the held connection; null when unknown. */
@@ -151,6 +155,15 @@ internal class GuardedMigrationExecutor(
 ) : TopologyMigrationExecutor {
     override suspend fun execute(action: MigrationAction): ActionResult =
         if (isCurrent()) inner.execute(action) else ActionResult.Failed("Connection closed")
+}
+
+/** Proxy for the check: once the connection is no longer current nothing is sent and the answer says why. */
+internal class GuardedDeclareCheck(
+    private val inner: DeclareCheck,
+    private val isCurrent: () -> Boolean,
+) : DeclareCheck {
+    override suspend fun find(action: MigrationAction): BrokerFinding =
+        if (isCurrent()) inner.find(action) else BrokerFinding.Unreadable("Connection closed")
 }
 
 internal class GuardedMqttCatalog(

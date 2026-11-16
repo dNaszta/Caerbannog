@@ -66,6 +66,9 @@ interface HeldConnection : AutoCloseable {
      */
     val migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? get() = null
 
+    /** M9-05: the read-only check of this connection's management API; null exactly when [migrationExecutor] is null (a 3.x source, an unreadable version). */
+    val declareCheck: dev.caerbannog.core.migrations.DeclareCheck? get() = null
+
     /** M5-08a R1: why [migrationExecutor] is null, a fixed text for the screen (3.x: "migration source only"; unknown version: "could not be read"); null when there is an executor. */
     val migrationUnavailableReason: String? get() = null
 

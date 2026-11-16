@@ -168,6 +168,7 @@ class ActiveConnection(
             mqttPublisher = GuardedMqttPublisher(connection.mqttPublisher, isCurrent),
             queueInspector = GuardedQueueMessageInspector(connection.queueInspector, isCurrent),
             migrationExecutor = connection.migrationExecutor?.let { GuardedMigrationExecutor(it, isCurrent) },
+            declareCheck = if (connection.migrationExecutor == null) null else connection.declareCheck?.let { GuardedDeclareCheck(it, isCurrent) },
             migrationUnavailableReason = connection.migrationUnavailableReason,
             brokerVersion = shownVersion,
             // Built for every connection: a source that is not a readable 3.x one refuses before any read (never a null to test for).
