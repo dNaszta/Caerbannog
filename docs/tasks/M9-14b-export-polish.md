@@ -1,6 +1,6 @@
 # M9-14b: Export polish (follow-ups of the M9-14 review)
 
-Milestone: M9 (follow-up)    Depends on: M9-14 merged; the owner's answers to items 3 to 6 of its Owner review list    Size: S
+Milestone: M9 (follow-up)    Depends on: M9-14 merged; the owner's answers to items 3 to 6 of its Owner review list (ANSWERED 2026-11-16, see there)    Size: S
 
 ## Goal
 The export note and the export failure text say the right thing in the right amount, and the export checks only what it writes.
@@ -31,7 +31,7 @@ Same plain note line (`migrations-export-note`).
 None (UI-only; the MCP server has no export tool).
 
 ## Open points
-Wording: owner items 3 to 6.
+Wording: DECIDED (owner, 2026-11-16, items 3 to 6 of the M9-14 list): the text of the note kept, one entry per super stream with a cap of about ten ("and N more"), the second sentence "The topology was read, but a setting in it cannot be written to a migration file.", and each setting named only when present. Nothing is open; the brief is ready to build. Not in this task (owner, 2026-11-16: "do arch suggest"): the stream's retention and leader locator in the export wait for `declareStream` arguments, a separate follow-up.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

@@ -14,7 +14,7 @@ M9-00c S-F1d (measured on 4.4.0): a policy `{max-age: 7D, max-length-bytes: 1000
 In:
 - `ManagementJson` (`data-rabbit`): the retention of a stream is read from `effective_policy_definition` (keys `max-age`, `max-length-bytes`, `stream-max-segment-size-bytes`) when the stream's own arguments do not hold the value. Which one wins when BOTH are present is NOT measured: do not decide it by guessing; first add a live row (a stream created with `x-max-age` 1D and then a policy `max-age` 7D, read `effective_policy_definition` and `arguments`, record the answer in the results file) and let the architect decide the precedence from it. Until then: both present is not a case the code may silently resolve; keep the arguments value (today's behaviour) and report it.
 - The list rows of `GET /api/queues` on 4.x: whether a row carries `effective_policy_definition` is measured by the same new live test (3.13 does, M8-00 S-R); if the list row lacks it, the detail GET per stream is used only for the visible streams (the screen already makes one statistics call per visible stream); say which in the results file.
-- `core.streams.Retention` stays as it is (three fields); the display (`RetentionDisplay`) is unchanged unless the owner wants "set by policy" shown (Owner review list item 7).
+- `core.streams.Retention` stays as it is (three fields); the display (`RetentionDisplay`) is unchanged: no "set by policy" marker (Owner review list item 7 of `M9-00c`, DECIDED by the owner on 2026-11-16, "do arch suggest").
 - The MCP stream tools (`caerbannog_list_streams`, the stream detail tool in `McpServer.kt`) read the same `StreamSummary`, so they gain the value without a schema change; the "none" text of `retention` is no longer wrong for such a stream.
 Out: showing the policy name; editing retention; operator policies; classic or quorum queue limits.
 
@@ -35,7 +35,7 @@ Evaluated: no new tool, no schema change. The result of the two existing read-on
 
 ## Open points
 - Precedence when a stream has retention both as argument and by policy: unmeasured, see Scope.
-- Wording: whether the column marks "set by policy" (Owner review list item 7); default: no marker.
+- Wording: DECIDED (owner, 2026-11-16, item 7 of `M9-00c`): the column does not mark "set by policy".
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec updated (A5 sentence about the gap removed), the `@broker` scenario RUN or reported as not run.

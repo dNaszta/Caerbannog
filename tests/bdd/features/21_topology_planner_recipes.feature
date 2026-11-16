@@ -10,15 +10,14 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   behaviour and are corrected to the measured one. The owner answered the open questions Q1 to Q16 on
   2026-11-15 (docs/spec.md, "Topology planner (M9)", "Owner answers to the questions"), confirmed the
   revised Q3 (his IoT flow, @m9-07b) and answered Q17 (the key of the correlation-id header) the same day
-  (O14). Since the spike M9-00c (2026-11-16) four @m9-08 scenarios carry @needs-decision again: they hold wording
-  the architect proposes and the owner has not seen (the target labels and three policy notes); the numbered owner
-  review list of docs/tasks/M9-00c-spike-policies-equivalence-names.md names them (items 2 to 5).
-  Since the spike M9-00a (2026-11-16) the MQTT facts (S-A, S-B) and the headers facts (S-E) are measured: the scenarios of
-  the tags m9-07b, m9-10 and m9-11 lost needs-spike and carry the measured examples; four scenarios hold wording that the
-  architect proposes (the refusals of a dot, an asterisk and an empty level, the amq.topic assumption, the sentence under
-  the correlation-id header, the headers warnings) and carry needs-decision until the owner has seen the numbered
-  Owner review list of docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md. Only the m9-09 scenarios still carry
-  needs-spike (M9-00b: S-C, S-D).
+  (O14). Since the spikes M9-00a and M9-00c (2026-11-16) the wording the architect proposed (the target labels and the
+  three policy notes of @m9-08; the refusals of a dot, an asterisk and an empty level, the amq.topic assumption and the
+  sentence under the correlation-id header of @m9-10; the headers warnings of @m9-11) is DECIDED: the owner answered
+  "do arch suggest" on 2026-11-16, which accepts the architect's recommendation for every item of the Owner review lists of
+  docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md and docs/tasks/M9-00c-spike-policies-equivalence-names.md. The
+  scenarios carry the decided text word for word and no scenario of 19, 20 or 21 carries needs-decision any more. The
+  MQTT facts (S-A, S-B) and the headers facts (S-E) are measured: the tags m9-07b, m9-10 and m9-11 lost needs-spike.
+  Only the m9-09 scenarios still carry needs-spike (M9-00b: S-C, S-D).
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
@@ -261,8 +260,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | Classic queues | Maximum number of messages | Delivery limit            |
       | Classic queues | Dead-letter exchange       | Keep messages for         |
 
-  # The labels of the targets "Queues" and "All" and the sentence under the list are wording: owner review list item 2 (M9-00c brief).
-  @m9-08 @needs-decision @fake-broker
+  # The labels of the targets "Queues" and "All" and the sentence under the list: decided 2026-11-16 (owner review list item 2, M9-00c brief).
+  @m9-08 @fake-broker
   Scenario Outline: A policy that applies to more than one kind of target offers only what all of them honour
     When I open the policy form and choose that it applies to "<target>"
     Then the settings offered are exactly "<offered>"
@@ -324,8 +323,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | quorum queues  | streams        |
       | streams        | quorum queues  |
 
-  # Proposed wording: owner review list item 3.
-  @m9-08 @needs-decision @fake-broker
+  # Wording decided 2026-11-16 (owner review list item 3, M9-00c brief).
+  @m9-08 @fake-broker
   Scenario: A policy whose settings one kind of queue ignores is said to have no effect on it
     Given a plan that declares the quorum queue "orders" and the policy "orders-old" on "^orders$" with the settings "max-length" and "max-age"
     Then the policy step shows the note "This policy has no effect on orders: a quorum queue ignores Keep messages for, and RabbitMQ then applies none of the policy's settings."
@@ -338,16 +337,16 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the step "Declare policy orders-dlx" shows "Will be created"
     And it shows the note "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
 
-  # The two notes below are PROPOSED wording (S-F2a: the higher priority wins and nothing is merged; with equal priority
-  # exactly one applies and which one is not predictable): owner review list items 4 and 5.
-  @m9-08 @needs-decision @fake-broker
+  # The two notes below: wording decided 2026-11-16 (S-F2a: the higher priority wins and nothing is merged; with equal priority
+  # exactly one applies and which one is not predictable; owner review list items 4 and 5, M9-00c brief).
+  @m9-08 @fake-broker
   Scenario: A policy that would never apply because the broker's policy has the higher priority is pointed out by the check
     Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 10
     And a plan that declares the policy "orders-dlx" on "^orders$" with priority 0
     When I check the plan against "uat-eu"
     Then it shows the note "The broker applies the policy limits to orders, which has a higher priority. Only one policy applies to a queue: this one would not apply."
 
-  @m9-08 @needs-decision @fake-broker
+  @m9-08 @fake-broker
   Scenario: A policy with the same priority as the broker's policy is pointed out by the check
     Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 0
     And a plan that declares the policy "orders-dlx" on "^orders$" with priority 0
@@ -525,9 +524,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   # Measured (M9-00a, S-A3): a "." in a level is read by the broker as another level (the key sensors.v1.2.temp has four words) and a
   # subscriber of the literal filter never receives the message; a "*" inside a level is handed to subscribers as "+"; an empty level
-  # works but is almost always a typing mistake (a product choice: refuse). The refusal TEXTS are proposals, see the Owner review list
-  # of docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md (items 1 to 3), so the scenario waits for the owner.
-  @m9-10 @negative @needs-decision @fake-broker
+  # works but is almost always a typing mistake (a product choice: refuse). The refusal TEXTS are decided (owner, 2026-11-16, "do arch suggest",
+  # items 1 to 3 of the Owner review list of docs/tasks/M9-00a-spike-mqtt-routes-and-headers.md).
+  @m9-10 @negative @fake-broker
   Scenario Outline: A topic filter that RabbitMQ would not carry back unchanged, or that is almost surely a mistake, is refused
     When I enter the topic filter "<filter>" in the MQTT route form
     Then the form says "<message>"
@@ -561,9 +560,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And it gives "sensors/item/temp" as a topic that matches
 
   # Measured (M9-00a, S-B1 and S-B2): the app cannot read the broker's MQTT exchange, and on a broker with another one a route on
-  # amq.topic is applied without error and receives nothing from MQTT. So the sentence is an ASSUMPTION, never a fact. Proposed
-  # wording, for the owner (Owner review list, item 4).
-  @m9-10 @needs-decision @fake-broker
+  # amq.topic is applied without error and receives nothing from MQTT. So the sentence is an ASSUMPTION, never a fact. Wording
+  # decided 2026-11-16 (Owner review list of M9-00a, item 4).
+  @m9-10 @fake-broker
   Scenario: The form says that amq.topic is an assumption
     When I enter the topic filter "sensors/+/temp" in the MQTT route form
     Then it says "Assumes the MQTT plugin uses its default exchange amq.topic. The app cannot check this: on a broker with another MQTT exchange this route receives nothing from MQTT."
@@ -655,9 +654,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And nothing was published
 
   # Measured (M9-00a, S-A6, S-A7): this header arrives on the stream message as the application property "correlation-id";
-  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. Proposed
-  # sentence under the header, for the owner (Owner review list, item 5).
-  @m9-10 @needs-decision @fake-broker
+  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. Sentence
+  # under the header decided 2026-11-16 (Owner review list of M9-00a, item 5; item 8: no correlation data field for now).
+  @m9-10 @fake-broker
   Scenario: The dialog says where the correlation id arrives
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
@@ -735,8 +734,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And saving writes the binding back unchanged
 
   # Measured (M9-00a, S-E4): with no header besides x-match, "all" matches EVERY message (also one with no headers) and "any" matches
-  # NO message. The two texts are proposals, for the owner (Owner review list, items 6 and 7).
-  @m9-11 @negative @needs-decision @fake-broker
+  # NO message. The two texts are decided 2026-11-16 (Owner review list of M9-00a, items 6 and 7).
+  @m9-11 @negative @fake-broker
   Scenario Outline: A headers binding without a header says what it would match
     Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
     When I open the binding form for "documents", choose the match rule "<rule>" and add no header
