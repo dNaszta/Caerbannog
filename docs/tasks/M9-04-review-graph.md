@@ -56,6 +56,7 @@ Out: the dead-letter edge (`M9-09`), the response-stream link (`M9-07`), the MQT
 None (owner decision 2026-11-15).
 
 ## Open points
+- Follow-up from the M9-03 review (2026-11-16, R1/R2): `PlannerWindowContent` in `desktopApp/Main.kt` builds the new `PlannerViewModel` before the old one's dispose-flush runs, so a description typed in the last 500 ms before a connection or permission change can be lost, and an open wizard is dropped. Fix while touching the planner window: one planner scope per window, call `old.flush()` before creating the new view model (`PlannerViewModelHandoverTest.orderedHandOver` shows it works; change `raceHandOver` to expect the text). Optionally carry the open wizard across. Not part of the graph; do it only if this task edits `PlannerWindowContent`, otherwise it waits for the next planner task that does.
 None that blocks. The dashed and dotted link styles are drawn in the mockup; they are built with `M9-07` and `M9-09`.
 
 ## Definition of done
