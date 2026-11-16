@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
+import kotlin.test.assertIs
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 
@@ -248,7 +249,7 @@ class PlannerDraftSteps {
     fun offers(label: String, steps: Int) {
         val entry = d.entry()
         assertEquals(label, entry.label)
-        assertEquals(PlannerEntry.ContinuePlan(steps), entry)
+        assertEquals(steps, assertIs<PlannerEntry.ContinuePlan>(entry).stepCount)
     }
 
     @Then("the button reads {string}, not {string}")

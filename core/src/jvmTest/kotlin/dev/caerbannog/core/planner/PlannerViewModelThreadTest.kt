@@ -62,7 +62,7 @@ class PlannerViewModelThreadTest {
         @Volatile
         var recording = false
 
-        val vm = PlannerViewModel(store, folders.ports, settings, PlannerContext(), scope)
+        val vm = PlannerViewModel(store, folders.ports, settings, PlannerContext(), scope, descriptionDebounceMillis = 0)
 
         init {
             watcher.launch {

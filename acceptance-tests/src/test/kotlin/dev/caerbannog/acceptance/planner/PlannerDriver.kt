@@ -55,6 +55,12 @@ class PlannerDriver {
     var profile = "uat-eu"
     var vhost = "/"
     var configurePermission = false
+
+    /** Not connected: the planner is built with no connection name (mockup 12e). */
+    var connected = true
+
+    /** Why the connection cannot run migrations (a 3.x broker), as its gateway reports it; null for a 4.x broker. */
+    var unavailableReason: String? = null
     var controlLevel = TopologyControlLevel.FULL_CONTROL
     var migrationsFolder = ""
     var latestMigration = ""
@@ -74,12 +80,13 @@ class PlannerDriver {
     private var current: PlannerViewModel? = null
     val vm: PlannerViewModel
         get() = current ?: PlannerViewModel(store, folders.ports, settings, PlannerContext(
-            connectionName = profile,
+            connectionName = profile.takeIf { connected },
+            unavailableReason = unavailableReason,
             vhost = vhost,
             controlLevel = controlLevel,
             hasConfigurePermission = configurePermission,
             known = known,
-        ), scope).also { created ->
+        ), scope, descriptionDebounceMillis = 0).also { created ->
             current = created
             scope.launch { created.state.collect { s -> s.question?.let { q -> if (questions.lastOrNull() != q) questions += q } } }
         }
