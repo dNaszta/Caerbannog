@@ -124,6 +124,13 @@ object PlannerTexts {
         return "$named is declared later, in step $place. Move this step below it."
     }
 
+    /** The legend of the review graph, in the order of the mockup. The dashed and dotted links join it with M9-07 and M9-09. */
+    val GRAPH_LEGEND: List<String> = listOf(
+        "Thick outline, \"new\": added by this plan",
+        "Thin outline: already on the broker",
+        "Dotted outline, \"not in this plan\": the broker has no such item and the plan does not declare it",
+    )
+
     private fun subject(name: String, fallback: String): String = if (echoableName(name)) name else fallback
 
     private fun plural(n: Int, word: String): String = if (n == 1) word else "${word}s"

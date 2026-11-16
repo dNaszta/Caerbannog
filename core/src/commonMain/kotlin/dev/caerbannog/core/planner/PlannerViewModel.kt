@@ -37,6 +37,8 @@ class PlannerViewModel(
     private val scope: CoroutineScope,
     /** Quiet time before a typed description is written to the draft file; 0 writes at once. */
     private val descriptionDebounceMillis: Long = DESCRIPTION_DEBOUNCE_MILLIS,
+    /** The one read of the broker's names for the review graph; null: not connected, or a connection that gets no planner. */
+    private val reader: KnownTopologyReader? = null,
 ) {
     /** The pages of the wizard; the screen sees [WizardState], derived from this and the current plan. */
     private sealed interface Page {
@@ -58,6 +60,14 @@ class PlannerViewModel(
     private var error: String? = null
     private var dismissed = false
     private var loaded = false
+    private var reviewView: ReviewView = ReviewView.Graph
+
+    /** What the broker has for [knownVhost]; null before an answer and after a failed read. */
+    private var known: KnownTopology? = null
+
+    /** The virtual host last asked for, null when nothing was asked; [readGeneration] tells a late answer from the current one. */
+    private var knownVhost: String? = null
+    private var readGeneration = 0
 
     /** True while the description in [plan] is newer than the draft file; [debounce] is the timer that writes it. */
     private var descriptionPending = false
@@ -183,6 +193,9 @@ class PlannerViewModel(
     /** Writes a description that is still waiting for its quiet time. The screen calls it when the user leaves. */
     fun flush() = act(allowedWhenLocked = true) { writePending() }
 
+    /** Changes what the review card shows. Nothing in the plan, the draft or the saved text changes. */
+    fun selectReviewView(view: ReviewView) = act(allowedWhenLocked = true) { reviewView = view }
+
     fun setVirtualHost(vhost: String) = act { changePlan(plan.withVhost(vhost)) }
 
     /** The style is per machine and advice only: nothing in the plan or the draft is renamed or written. */
@@ -264,6 +277,7 @@ class PlannerViewModel(
         scope.launch {
             lock.withLock {
                 if (allowedWhenLocked || !locked()) block()
+                syncKnown()
                 publish()
             }
         }
@@ -271,7 +285,31 @@ class PlannerViewModel(
 
     private fun locked(): Boolean = context.unavailableReason != null || unreadable != null
 
-    private fun formContext() = FormContext(plan = plan, namingStyle = namingStyle, known = context.known)
+    private fun formContext() = FormContext(plan = plan, namingStyle = namingStyle, known = known ?: KnownTopology.None)
+
+    /**
+     * Keeps the broker's names for the plan's virtual host: one read when the planner first can (after the draft is read, so the draft's
+     * virtual host is the one asked for) and one more each time that virtual host changes. It never reads while locked, so a 3.x connection
+     * gets no request of any kind. The read runs outside the lock (a slow broker must not freeze the plan); an answer for a virtual host
+     * the plan has left is dropped.
+     */
+    private fun syncKnown() {
+        val source = reader ?: return
+        val vhost = plan.vhost
+        if (!loaded || locked() || knownVhost == vhost) return
+        knownVhost = vhost
+        known = null
+        val generation = ++readGeneration
+        scope.launch {
+            val answer = source.read(vhost)
+            lock.withLock {
+                if (generation == readGeneration) {
+                    known = answer
+                    publish()
+                }
+            }
+        }
+    }
 
     /**
      * The one place the plan changes: the notice of a saved plan and any waiting question belong to the old plan, and ids that are gone are
@@ -435,6 +473,9 @@ class PlannerViewModel(
 
     private fun snapshot(): PlannerState = PlannerState(
         plan = plan,
+        known = known,
+        graph = planPreview(plan, known, if (reader == null) OnlyThePlanCause.NotConnected else OnlyThePlanCause.BrokerNotRead),
+        graphView = reviewView,
         wizard = if (locked()) WizardState.Closed else wizardState(),
         selectedStepId = selected,
         namingStyle = namingStyle,
