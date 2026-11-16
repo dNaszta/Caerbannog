@@ -72,9 +72,44 @@ class ManagementDeclareCheckTest {
     }
 
     @Test
-    fun `an extra argument on the broker is ignored today, the measured rule is M9-05b`() {
+    fun `an extra argument that the queue type does not honour is ignored`() {
+        broker.addQueue("/", "orders", arguments = mapOf("x-delivery-limit" to JsonPrimitive(5), "x-max-priority" to JsonPrimitive(3)))
+        assertEquals(BrokerFinding.Same, find(MigrationAction.DeclareQueue("orders", arguments = limit5)), "x-max-priority means nothing on a quorum queue")
+    }
+
+    @Test
+    fun `an honoured argument on the broker that the declare lacks is different, because the broker would answer 400 (M9-05b rule 3)`() {
         broker.addQueue("/", "orders", arguments = mapOf("x-delivery-limit" to JsonPrimitive(5), "x-max-length" to JsonPrimitive(10)))
-        assertEquals(BrokerFinding.Same, find(MigrationAction.DeclareQueue("orders", arguments = limit5)))
+        assertEquals(BrokerFinding.Different, find(MigrationAction.DeclareQueue("orders", arguments = limit5)), "x-max-length is honoured by a quorum queue")
+        broker.addQueue("/", "bare", arguments = mapOf("x-delivery-limit" to JsonPrimitive(3)))
+        assertEquals(BrokerFinding.Different, find(MigrationAction.DeclareQueue("bare")), "no arguments declared, one honoured on the broker")
+        broker.addExchange("/", "events", arguments = mapOf("alternate-exchange" to JsonPrimitive("ae")))
+        assertEquals(BrokerFinding.Different, find(MigrationAction.DeclareExchange("events")), "alternate-exchange is the one argument an exchange compares")
+        broker.addExchange("/", "audit", arguments = mapOf("x-foo" to JsonPrimitive("ae")))
+        assertEquals(BrokerFinding.Same, find(MigrationAction.DeclareExchange("audit")), "any other exchange argument is ignored")
+        assertTrue(wire().all { it.startsWith("GET ") }, "still one GET per step: ${wire()}")
+    }
+
+    @Test
+    fun `a bare queue declare against a product-made stream is different, a stream step is still only the type`() {
+        broker.addQueue("/", "telemetry", type = "stream", arguments = mapOf("x-queue-leader-locator" to JsonPrimitive("balanced")))
+        assertEquals(BrokerFinding.Different, find(MigrationAction.DeclareQueue("telemetry", "stream")), "the broker's 400 says so")
+        assertEquals(BrokerFinding.Same, find(MigrationAction.DeclareStream("telemetry")), "a stream step does not compare arguments")
+    }
+
+    @Test
+    fun `a classic, a quorum and a stream queue made by the executor read same right after the apply`() {
+        val executor = M508a.executor(broker)
+        val made = listOf(
+            MigrationAction.DeclareQueue("c1", "classic", arguments = mapOf("x-max-length" to ArgumentValue.Whole(10))),
+            MigrationAction.DeclareQueue("c2", "classic"),
+            MigrationAction.DeclareQueue("q1", "quorum", arguments = limit5),
+            MigrationAction.DeclareQueue("q2", "quorum"),
+            MigrationAction.DeclareQueue("s1", "stream", arguments = mapOf("x-max-length-bytes" to ArgumentValue.Whole(1000))),
+            MigrationAction.DeclareStream("s2"),
+        )
+        for (action in made) assertEquals(dev.caerbannog.core.migrations.ActionResult.Success, runBlocking { executor.execute(action) }, action.description)
+        for (action in made) assertEquals(BrokerFinding.Same, find(action), "${action.description} after the apply")
     }
 
     // ---- streams ----
@@ -196,6 +231,50 @@ class ManagementDeclareCheckTest {
         assertEquals(BrokerFinding.Absent, find(drop), "another key")
         broker.addBinding("/", "events", "orders", routingKey = "order.created")
         assertEquals(BrokerFinding.Same, find(drop))
+    }
+
+    // ---- a 200 with a JSON list is not an item (M9-05b): the answer for the names "." and ".." ----
+
+    private val listBody = """[{"name":"orders","vhost":"/"},{"name":"invoices","vhost":"/"}]"""
+
+    private val itemActions = listOf(
+        MigrationAction.DeclareQueue("orders"), MigrationAction.DeclareExchange("events"), MigrationAction.DeclareStream("telemetry"),
+        MigrationAction.DeclarePolicy("limits", "^orders"), MigrationAction.DeclareOperatorPolicy("caps", "^orders"),
+        MigrationAction.DeleteQueue("q"), MigrationAction.DeleteExchange("x"), MigrationAction.DeleteStream("s"), MigrationAction.DeletePolicy("p"),
+    )
+
+    @Test
+    fun `a 200 with a JSON list on an item path is unreadable with the broker did not answer, for every declare kind and every delete`() {
+        for (action in itemActions) for (body in listOf(listBody, "[]")) {
+            assertEquals(unreadableNoAnswer, find(action, M508a.answering(200, body)), "${action.description} with [$body]")
+        }
+    }
+
+    @Test
+    fun `the names dot and dot dot answered by the honest fake are unreadable for a queue, an exchange and a stream, with GET only`() {
+        broker.addQueue("/", "orders"); broker.addExchange("/", "events")
+        for (name in listOf(".", "..")) {
+            for (action in listOf(MigrationAction.DeclareQueue(name), MigrationAction.DeclareExchange(name), MigrationAction.DeclareStream(name),
+                MigrationAction.DeleteQueue(name), MigrationAction.DeleteExchange(name), MigrationAction.DeleteStream(name))) {
+                assertEquals(unreadableNoAnswer, find(action), "${action.description}")
+            }
+        }
+        assertTrue(wire().isNotEmpty() && wire().all { it.startsWith("GET ") }, "GET only: ${wire()}")
+        assertTrue(broker.writes.isEmpty())
+    }
+
+    @Test
+    fun `a list is still the normal answer for a binding, and the list of a binding never reads as unreadable`() {
+        broker.addExchange("/", "events"); broker.addQueue("/", "orders")
+        broker.addBinding("/", "events", "orders", routingKey = "order.created")
+        assertEquals(BrokerFinding.Same, find(bind))
+        assertEquals(BrokerFinding.Same, find(MigrationAction.DeleteBinding("events", "orders", "order.created")))
+    }
+
+    @Test
+    fun `an object that is not a list on an item path is still compared, never unreadable`() {
+        val object200 = """{"name":"orders","vhost":"/","type":"quorum","durable":true,"auto_delete":false,"arguments":{"x-queue-type":"quorum"}}"""
+        assertEquals(BrokerFinding.Same, find(MigrationAction.DeclareQueue("orders"), M508a.answering(200, object200)))
     }
 
     // ---- the status table ----

@@ -27,7 +27,9 @@ import java.util.Collections
  * the properties key of a binding is its routing key quoted like a form (`~` for the empty one); a binding DELETE resolves its last segment the way
  * the real plugin does (see the comment at the DELETE); a path the migration executor must never send (more segments than the API has for a
  * resource, a path outside the five collections) is NOT answered with a status: [handle] throws, so the test fails loudly.
- * Honest limits: no statistics, no pagination, no permission model (use [answer] to script a 401 or 403), one node.
+ * M9-05b: a repeated PUT of a queue or exchange compares `durable`, `auto_delete`, the type (and `internal` for an exchange) and ONLY the arguments
+ * of [DeclareEquivalenceTable] (400 for a difference there, 204 and nothing stored for any other argument); `GET` of a queue or exchange named `.` or
+ * `..` answers 200 with a JSON list. Honest limits: no statistics, no pagination, no permission model (use [answer] to script a 401 or 403), one node.
  */
 class FakeManagementBroker {
 
@@ -193,6 +195,12 @@ class FakeManagementBroker {
     private fun precondition(what: String, name: String, vhost: String, arg: String, received: String, current: String) =
         ManagementStatusTable.reply("$what.put.other-settings", "'$arg' for $what '$name' in vhost '$vhost': received '$received' but current is '$current'")
 
+    /** MEASURED (M9-00c S-H): the broker drops the dot segments, so `GET .../.` and `.../..` answer 200 with the vhost LISTING, never 404. */
+    private fun vhostListing(vhost: String, items: List<JsonObject>): Reply =
+        if (vhost !in vhosts) t("vhost.get.queue.missing-vhost") else Reply(200, JsonArray(items).toString())
+
+    private fun queueType(arguments: JsonObject): String = (arguments["x-queue-type"] as? JsonPrimitive)?.contentOrNull ?: "classic"
+
     private fun t(id: String) = ManagementStatusTable.reply(id)
 
     private fun queue(method: String, vhost: String, name: String, body: String?): Reply {
@@ -208,14 +216,19 @@ class FakeManagementBroker {
                     existing == null -> { if (key !in silent) queues[key] = wanted; t("queue.put.created") }
                     existing.durable != wanted.durable -> precondition("queue", name, vhost, "durable", wanted.durable.toString(), existing.durable.toString())
                     existing.autoDelete != wanted.autoDelete -> precondition("queue", name, vhost, "auto_delete", wanted.autoDelete.toString(), existing.autoDelete.toString())
-                    existing.arguments != wanted.arguments -> {
-                        val differing = (existing.arguments.keys + wanted.arguments.keys).first { existing.arguments[it] != wanted.arguments[it] }
-                        precondition("queue", name, vhost, differing, wanted.arguments[differing].toString(), existing.arguments[differing].toString())
+                    queueType(existing.arguments) != queueType(wanted.arguments) ->
+                        precondition("queue", name, vhost, "x-queue-type", queueType(wanted.arguments), queueType(existing.arguments))
+                    else -> {
+                        // M9-05b: MEASURED (DeclareEquivalenceTable): only the arguments the queue type honours are compared; any other argument is ignored (204)
+                        val honoured = DeclareEquivalenceTable.queueComparedArguments[queueType(existing.arguments)].orEmpty()
+                        val differing = honoured.sorted().firstOrNull { existing.arguments[it] != wanted.arguments[it] }
+                        if (differing != null) precondition("queue", name, vhost, differing, wanted.arguments[differing].toString(), existing.arguments[differing].toString())
+                        else t("queue.put.repeated")
                     }
-                    else -> t("queue.put.repeated")
                 }
             }
-            "GET" -> queues[key]?.let {
+            "GET" -> if (name == "." || name == "..") vhostListing(vhost, queues.filterKeys { it.vhost == vhost }.map { (k, q) -> buildJsonObject { put("name", k.name); put("vhost", vhost); put("durable", q.durable); put("auto_delete", q.autoDelete); put("arguments", q.arguments) } })
+            else queues[key]?.let {
                 Reply(200, buildJsonObject {
                     put("name", name); put("vhost", vhost); put("type", (it.arguments["x-queue-type"] as? JsonPrimitive)?.contentOrNull ?: "classic")
                     put("durable", it.durable); put("auto_delete", it.autoDelete); put("arguments", it.arguments)
@@ -248,11 +261,16 @@ class FakeManagementBroker {
                     existing.durable != wanted.durable -> precondition("exchange", name, vhost, "durable", wanted.durable.toString(), existing.durable.toString())
                     existing.autoDelete != wanted.autoDelete -> precondition("exchange", name, vhost, "auto_delete", wanted.autoDelete.toString(), existing.autoDelete.toString())
                     existing.internal != wanted.internal -> precondition("exchange", name, vhost, "internal", wanted.internal.toString(), existing.internal.toString())
-                    existing.arguments != wanted.arguments -> precondition("exchange", name, vhost, "arguments", wanted.arguments.toString(), existing.arguments.toString())
-                    else -> t("exchange.put.repeated")
+                    else -> {
+                        // M9-05b: MEASURED: only `alternate-exchange` is compared, any other argument is ignored (204)
+                        val differing = DeclareEquivalenceTable.exchangeComparedArguments.sorted().firstOrNull { existing.arguments[it] != wanted.arguments[it] }
+                        if (differing != null) precondition("exchange", name, vhost, differing, wanted.arguments[differing].toString(), existing.arguments[differing].toString())
+                        else t("exchange.put.repeated")
+                    }
                 }
             }
-            "GET" -> exchanges[key]?.let {
+            "GET" -> if (name == "." || name == "..") vhostListing(vhost, exchanges.filterKeys { it.vhost == vhost }.map { (k, e) -> buildJsonObject { put("name", k.name); put("vhost", vhost); put("type", e.type); put("durable", e.durable); put("auto_delete", e.autoDelete); put("internal", e.internal); put("arguments", e.arguments) } })
+            else exchanges[key]?.let {
                 Reply(200, buildJsonObject {
                     put("name", name); put("vhost", vhost); put("type", it.type); put("durable", it.durable)
                     put("auto_delete", it.autoDelete); put("internal", it.internal); put("arguments", it.arguments)
