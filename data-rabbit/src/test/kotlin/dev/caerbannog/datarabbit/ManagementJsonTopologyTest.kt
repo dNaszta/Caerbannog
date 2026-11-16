@@ -247,7 +247,7 @@ class ManagementJsonTopologyTest {
         assertEquals(16, rows.size)
         assertEquals(BindingRow("", "/", "dev-audit", BindingDestinationType.QUEUE, "dev-audit"), rows.first())
         val partition = rows.single { it.source == "orders" && it.destination == "orders-1" }
-        assertEquals(BindingRow("orders", "/", "orders-1", BindingDestinationType.QUEUE, "1", mapOf("x-stream-partition-order" to "1")), partition)
+        assertEquals(BindingRow("orders", "/", "orders-1", BindingDestinationType.QUEUE, "1", mapOf("x-stream-partition-order" to "1"), mapOf("x-stream-partition-order" to dev.caerbannog.core.json.ArgumentValue.Whole(1))), partition)
         assertEquals("", rows.single { it.source == "dev.fanout" && it.destination == "dev-retry" }.routingKey)
     }
 
