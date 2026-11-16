@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: none (the owner answered the open questions on 2026-11-15)    Size: M
 
-PLANNED 2026-11-15. Not started. One of three spikes (`M9-00a`, `M9-00b`, `M9-00c`) that can run in parallel; each is the first step of the tasks named in its "Used by" column.
+PLANNED 2026-11-15, confirmed for the live run 2026-11-16 (a container runtime exists now). One of three spikes (`M9-00a`, `M9-00b`, `M9-00c`) that can run in parallel with each other; see "How the spike is run" for how many brokers may run at once.
 
 ## Goal
 The items S-A1 to S-A8, S-B and S-E of `docs/spec.md` "Topology planner (M9)", "Facts to verify first" are measured on a real RabbitMQ 4.x broker by live tests that stay as proof, and the spec, the `@needs-spike` scenarios of `@m9-07b`, `@m9-10` and `@m9-11` and the briefs `M9-07b`, `M9-10` and `M9-11` are corrected to what was measured.
@@ -11,7 +11,7 @@ The items S-A1 to S-A8, S-B and S-E of `docs/spec.md` "Topology planner (M9)", "
 An MQTT route is saved as a binding key computed by the app, and a headers binding as arguments chosen in a form. If the translation or the argument shape is wrong, the migration applies cleanly and routes nothing, or routes too much, and no check can see it. Today only a literal topic into a stream is verified (`RealBrokerM5GateTest`, `RealBrokerMqttHeadersTest`: topic `sensors/room1`, key `sensors.room1`).
 
 ## Scope
-In: `@broker` spike tests in `data-rabbit` (JUnit tag `broker`, Testcontainers, `rabbitmq:4-management`, the MQTT plugin enabled through exec as `RealBrokerMqttHeadersTest` does), fixtures in `data-rabbit/src/test/resources/fixtures/m9-00/`, the results file `docs/tasks/M9-00-spike-results.md` (shared by the three spikes, one section per item), spec and scenario corrections.
+In: `@broker` spike tests in `data-rabbit` (JUnit tag `broker`, Testcontainers, `rabbitmq:4-management`, the MQTT plugin enabled through exec as `RealBrokerMqttHeadersTest` does), fixtures in `data-rabbit/src/test/resources/fixtures/m9-00/`, the results file `docs/tasks/M9-00a-spike-results.md` (one file per spike so the three branches never edit the same file; one section per item), spec and scenario corrections.
 
 | Item | Question | Output | Used by |
 | --- | --- | --- | --- |
@@ -55,4 +55,25 @@ None (spike, no product capability).
 - The spike grows by about half a day with S-A5 to S-A8; it stays one task of size M.
 
 ## Definition of done
-Spike tests pass on a machine with Docker or rootless Podman; fixtures committed; `docs/tasks/M9-00-spike-results.md` written (what was measured, the floated image version, what could not be measured); spec, scenarios and the briefs `M9-07b`, `M9-10`, `M9-11` corrected by the architect; no product code changed.
+Spike tests pass on a machine with Docker or rootless Podman; fixtures committed; `docs/tasks/M9-00a-spike-results.md` written (what was measured, the floated image version, what could not be measured); spec, scenarios and the briefs `M9-07b`, `M9-10`, `M9-11` corrected by the architect; no product code changed.
+
+## How the spike is run (added at step 1, 2026-11-16)
+- **Broker image:** the literal `rabbitmq:4-management` (the repo has no image constant: every live test writes the literal, as `RealBrokerMqttHeadersTest` and `RealBrokerM8SpikeDefinitionsTest` do). Plugins through `brokerWithPlugins(image, "rabbitmq_stream", "rabbitmq_stream_management", "rabbitmq_mqtt")` in `RabbitContainers.kt`; `MgmtApi` and `awaitUntil` of `M8SpikeSupport.kt` are reused as they are. The tag floats: the first test of each class asserts that `GET /api/overview` `rabbitmq_version` starts with `4.`, and the results file records the exact RabbitMQ and Erlang version, the CPU architecture and the date (as `M8-00-spike-results.md` does).
+- **Throwaway brokers only.** Testcontainers containers with the default guest user; never a user's broker, no profile of the app. No password or token reaches a log or a fixture except the container's own default `guest`.
+- **MQTT login and the port:** the plain MQTT port 1883 is used (a throwaway container; the product's TLS default is not under test here). Copy from `RealBrokerMqttHeadersTest` whatever it needs so that the Paho client may log in (its `tls/rabbitmq.conf`); S-B2 needs its own configuration file with `mqtt.exchange = custom.mqtt`, kept in `data-rabbit/src/test/resources/fixtures/m9-00/` and passed with `withRabbitMQConfig`, keeping the lines that let the login work.
+- **Resources:** S-B2 starts a second broker, so this spike peaks at two containers. Put S-B2 in its own test class so the others run on one container. The coordinator runs at most two broker tests at a time across all five tasks (see the plan in the `M9-00c` Status).
+- **Helpers stay private** to the new test files (names prefixed `M9SpikeMqtt...`): three branches run in parallel and a shared new `M9SpikeSupport.kt` would conflict on merge. Duplicated helper code is accepted for the spike; the architect decides on a shared helper when the spikes are merged.
+- **Fixtures:** `data-rabbit/src/test/resources/fixtures/m9-00/` with files named `s-a1-...`, `s-e1-...` (item prefix) so no other spike writes the same file name. Fixtures hold broker answers of a throwaway container only.
+- **Every item ends in one of three states** in the results file: measured (test method named), not measurable (why), or measured with a surprise (what differs from the spec's expectation, and which scenario or brief it contradicts). Nothing is dropped silently.
+
+## What the follow-on tasks may rely on (the contract of this spike)
+- `M9-10` may rely on: the translation table of S-A1 (including the named row `devices/+/answer`), the match table S-A2 for a stream and a quorum queue, the refusal list of S-A3 (what the form blocks), S-A6 and S-A7 (where the correlation id, correlation data and response topic land), S-B1 and S-B2 (the sentence about `amq.topic`).
+- `M9-07b` may rely on: S-A5 (yes or no feed from a stream), S-A6, S-A7, S-A8 (fan-out).
+- `M9-11` may rely on: S-E1 to S-E5 (types kept, `x-match` values and the status of an invalid one, two bindings differing only in arguments, routing behaviour, routing key of a fanout or headers binding).
+- Not relied on until measured: anything marked UNVERIFIED in the rows above. The test classes `RealBrokerM9SpikeMqttRouteTest`, `RealBrokerM9SpikeMqttRequestResponseTest`, `RealBrokerM9SpikeMqttExchangeTest` (S-B, new: its own class for the second container) and `RealBrokerM9SpikeHeadersBindingTest` pin each fact, so a later 4.x that answers differently fails them on purpose.
+
+## Product questions
+None. (Open points above are technical; if S-A5 finds a feed from a stream, the architect asks the owner then, as the open point says.)
+
+## Status
+- Step 1 (architect, 2026-11-16, round 0, branch `m9-00a-spike-mqtt-routes-and-headers`, base main `652c42a`): brief checked against the spec ("Facts to verify first", S-A to S-E; A10, O13, O14), the code (`RealBrokerMqttHeadersTest`, `RabbitContainers.kt`, `M8SpikeSupport.kt`) and the scenarios of `@m9-07b`, `@m9-10`, `@m9-11`. Brief CHANGED: results go to `M9-00a-spike-results.md` (one file per spike, no shared file, to avoid merge conflicts); section "How the spike is run" (image literal, version recording, throwaway brokers, MQTT login, two-container peak, private helpers, fixture names, three end states per item); section "What the follow-on tasks may rely on"; S-B gets its own class `RealBrokerM9SpikeMqttExchangeTest`. No scenario or spec change at this step: the spec rows are replaced after the run. No product code is allowed to change. No open product question. Next: step 2 (test developer writes the spike tests, red until each fact is asserted), then the run on Docker.
