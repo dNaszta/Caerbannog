@@ -210,8 +210,8 @@ class PayloadFormatter(
         val isCapped = !showAll && canShowAll
         val displayText = if (isCapped) fullContent.take(capLimit) else fullContent
 
-        val standardProps = message.properties.mapValues { it.value?.toString().orEmpty() }
-        val appProps = message.applicationProperties.mapValues { it.value?.toString().orEmpty() }
+        val standardProps = message.properties.mapValues { PropertyValueText.of(it.value) }
+        val appProps = message.applicationProperties.mapValues { PropertyValueText.of(it.value) }
 
         return PayloadInspection(
             offset = message.offset,
@@ -260,14 +260,14 @@ class PayloadFormatter(
             appendLine()
             appendLine("Properties:")
             for ((k, v) in message.properties) {
-                appendLine("  $k: ${v ?: ""}")
+                appendLine("  $k: ${PropertyValueText.of(v)}")
             }
         }
         if (message.applicationProperties.isNotEmpty()) {
             appendLine()
             appendLine("Headers / Application Properties:")
             for ((k, v) in message.applicationProperties) {
-                appendLine("  $k: ${v ?: ""}")
+                appendLine("  $k: ${PropertyValueText.of(v)}")
             }
         }
     }.trimEnd()

@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.ConnectionCheckResult
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
+import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.connections.fakes.FakeMqttCatalog
@@ -43,6 +44,7 @@ class McpSteps {
     private val reachabilityChecker = FakeBrokerReachabilityChecker()
     private val fakeStreamCatalog = FakeStreamCatalog()
     private val fakeStreamOffsets = FakeStreamOffsets()
+    private val fakeStreamReader = FakeStreamMessageReader()
     private val fakeTopologyCatalog = FakeTopologyCatalog()
     private val fakeMqttCatalog = FakeMqttCatalog()
     private val fakeMqttPublisher = FakeMqttMessagePublisher()
@@ -60,6 +62,7 @@ class McpSteps {
             connectionChecker = reachabilityChecker,
             streamCatalogProvider = { _, _ -> fakeStreamCatalog },
             streamOffsetsProvider = { _, _ -> fakeStreamOffsets },
+            streamMessageReaderProvider = { _, _ -> fakeStreamReader },
             topologyCatalogProvider = { _, _ -> fakeTopologyCatalog },
             mqttCatalogProvider = { _, _ -> fakeMqttCatalog },
             mqttMessagePublisherProvider = { _, _ -> fakeMqttPublisher },
@@ -432,5 +435,44 @@ class McpSteps {
         assertFalse(lastToolIsError, "Expected success but was error: $lastToolResultText")
         assertTrue(lastToolResultText.contains("\"success\":true") || lastToolResultText.contains("\"success\": true"))
         assertTrue(lastToolResultText.contains(topic))
+    }
+
+    // --- M9-00b-c: the stream message tool returns list and map values as readable strings ---
+
+    @Given("^the stream \"(.*)\" on vhost \"(.*)\" holds a dead letter with the annotation \"(.*)\" holding one death entry$")
+    fun streamHoldsDeadLetter(stream: String, vhost: String, annotation: String, table: DataTable) {
+        val entry = LinkedHashMap<String, Any?>()
+        for ((k, v) in table.asMap(String::class.java, String::class.java)) entry[k] = v.toLongOrNull() ?: v
+        // an Object[] holding one map: what the stream client hands over for x-opt-deaths
+        fakeStreamReader.addMessage(
+            vhost = vhost, stream = stream, offset = 0L, timestamp = 1700000000000L,
+            payload = "to-the-stream".encodeToByteArray(),
+            properties = mapOf(annotation to arrayOf<Any?>(entry)),
+        )
+    }
+
+    @When("the client calls MCP tool {string} with profile {string} and stream {string}")
+    fun callToolWithProfileAndStream(toolName: String, profile: String, stream: String) {
+        callTool(toolName, """{"profile": "$profile", "stream": "$stream"}""")
+    }
+
+    private fun firstMessageProperties(): JsonObject {
+        assertFalse(lastToolIsError, "the tool reported an error: $lastToolResultText")
+        val messages = json.parseToJsonElement(lastToolResultText).jsonObject["messages"]?.jsonArray
+        assertNotNull(messages, "no messages in $lastToolResultText")
+        return messages.first().jsonObject["properties"]!!.jsonObject
+    }
+
+    @Then("the tool result shows property {string} of the first message as a string containing {string}")
+    fun assertPropertyStringContaining(name: String, fragment: String) {
+        val value = firstMessageProperties()[name]?.jsonPrimitive
+        assertNotNull(value, "no property $name in ${firstMessageProperties()}")
+        assertTrue(value.isString, "property $name is not a JSON string: $value")
+        assertTrue(value.content.contains(fragment), "expected property $name to contain '$fragment' but it was '${value.content}'")
+    }
+
+    @Then("no property value of the tool result contains {string}")
+    fun assertNoPropertyValueContains(text: String) {
+        assertFalse(lastToolResultText.contains(text), "the tool result contains '$text': $lastToolResultText")
     }
 }

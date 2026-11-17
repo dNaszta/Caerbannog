@@ -246,6 +246,66 @@ class McpServerTest {
         assertFalse(text.contains("INV-10"))
     }
 
+    private fun browseDeadLetterMessages(filterArgs: String = ""): kotlinx.serialization.json.JsonArray {
+        repo.add(ConnectionProfile(name = "dl-prof", host = "localhost", virtualHost = "/", username = "guest", tls = true))
+        streamReader.seed(
+            "/",
+            "dead-letters",
+            listOf(
+                StreamMessage(
+                    offset = 0L,
+                    timestamp = 1700000000000L,
+                    payload = "to-the-stream".toByteArray(),
+                    properties = mapOf(
+                        "x-first-death-reason" to "rejected",
+                        "x-opt-deaths" to arrayOf<Any?>(linkedMapOf<String, Any?>("queue" to "orders", "reason" to "rejected", "count" to 1L)),
+                    ),
+                    applicationProperties = mapOf("order" to 42, "tags" to listOf("a", "b"), "meta" to mapOf("k" to "v")),
+                ),
+            ),
+        )
+        val req = """{"jsonrpc": "2.0", "id": 30, "method": "tools/call", "params": {"name": "caerbannog_browse_stream", "arguments": {"profile": "dl-prof", "stream": "dead-letters"$filterArgs}}}"""
+        val text = json.parseToJsonElement(server.handleRequest(req)!!).jsonObject["result"]!!.jsonObject["content"]!!.jsonArray.first().jsonObject["text"]!!.jsonPrimitive.content
+        return json.parseToJsonElement(text).jsonObject["messages"]!!.jsonArray
+    }
+
+    private fun browseDeadLetterProperties(): JsonObject = browseDeadLetterMessages().single().jsonObject
+
+    @Test
+    fun `browse stream returns a list annotation as readable text in a string, never an array identity`() {
+        val message = browseDeadLetterProperties()
+        val properties = message["properties"]!!.jsonObject
+
+        val deaths = properties["x-opt-deaths"]!!.jsonPrimitive
+        assertTrue(deaths.isString, "x-opt-deaths must stay a JSON string, got $deaths")
+        assertEquals("[{queue: orders, reason: rejected, count: 1}]", deaths.content)
+        assertEquals("rejected", properties["x-first-death-reason"]!!.jsonPrimitive.content)
+        assertFalse(message.toString().contains("[Ljava"), "no array identity anywhere in $message")
+    }
+
+    @Test
+    fun `browse stream returns list and map application properties as readable strings`() {
+        val application = browseDeadLetterProperties()["applicationProperties"]!!.jsonObject
+
+        assertEquals("42", application["order"]!!.jsonPrimitive.content)
+        assertEquals("[a, b]", application["tags"]!!.jsonPrimitive.content)
+        assertEquals("{k: v}", application["meta"]!!.jsonPrimitive.content)
+        assertTrue(application.values.all { it.jsonPrimitive.isString }, "every value stays a string: $application")
+    }
+
+    @Test
+    fun `browse stream with an application property filter equal to the whole rendered list finds the message`() {
+        val found = browseDeadLetterMessages(""","appPropertyKey": "tags", "appPropertyValue": "[a, b]"""")
+        assertEquals(1, found.size)
+        assertEquals("0", found.single().jsonObject["offset"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `browse stream with an application property filter on a part of a list finds nothing`() {
+        val found = browseDeadLetterMessages(""","appPropertyKey": "tags", "appPropertyValue": "a"""")
+        assertEquals(0, found.size, "a part of a list value must not match: $found")
+    }
+
     @Test
     fun `browse stream with offset outside range returns error`() {
         repo.add(

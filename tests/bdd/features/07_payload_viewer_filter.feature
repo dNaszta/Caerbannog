@@ -105,6 +105,36 @@ Feature: Payload viewer and filter
     Then the scan stops at once
     And the messages found so far stay on screen
 
+  # M9-00b-c: a list or a map value of a property or annotation is shown as text, the same text the filter compares (owner item 11).
+  @m9-00b-c @fake-broker
+  Scenario: A dead letter in a stream shows its death information as text
+    Given the message at offset 1210 has the annotation "x-opt-deaths" holding one death entry
+      | queue  | orders   |
+      | reason | rejected |
+      | count  | 1        |
+    When I select the message at offset 1210
+    Then the properties show "x-opt-deaths" containing "queue: orders"
+    And the properties show "x-opt-deaths" containing "reason: rejected"
+    And no property text starts with "[Ljava"
+
+  @m9-00b-c @fake-broker
+  Scenario Outline: The property filter matches a list property by its whole rendered text only
+    Given the stream holds a dead letter at offset 3000 with the annotation "x-opt-deaths" holding one death entry
+      | queue  | orders   |
+      | reason | rejected |
+      | count  | 1        |
+    And the stream holds a message at offset 3001 without that annotation
+    When I filter by the property "x-opt-deaths" equal to "<filter>"
+    Then the list shows <found> messages
+
+    Examples: the whole rendered text finds it, a part of it finds nothing
+      | filter                                        | found |
+      | [{queue: orders, reason: rejected, count: 1}] | 1     |
+      | rejected                                      | 0     |
+      | queue: orders                                 | 0     |
+      | {queue: orders, reason: rejected, count: 1}   | 0     |
+      | [Ljava.lang.Object;                           | 0     |
+
   @broker @safety
   Scenario: Filtering is read-only on the broker
     Given a real broker with a stream "orders-events"
