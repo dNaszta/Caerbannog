@@ -32,7 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -250,6 +252,8 @@ fun PublishMqttDialog(
                     }
                 }
 
+                state.headerNoticeText?.let { text -> HeaderNoticeBanner(text) }
+
                 // Feedback Banners
                 state.confirmation?.let { msg ->
                     BannerBox(text = msg, isError = false, testTag = "publishMqttConfirmation")
@@ -294,6 +298,32 @@ private fun WarningBanner(text: String) {
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth().testTag("publishMqttWarningBanner"),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ConnectionIcon(AppIcon.Warning, IconSize)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
+/** The warning under the headers list. It appears and disappears with the header, so a polite live region lets a screen reader announce it. */
+@Composable
+private fun HeaderNoticeBanner(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("publishMqttHeaderNotice")
+            .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
