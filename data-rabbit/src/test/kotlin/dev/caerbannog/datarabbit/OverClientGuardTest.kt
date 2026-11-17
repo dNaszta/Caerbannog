@@ -10,7 +10,7 @@ import java.io.File
  */
 class OverClientGuardTest {
 
-    private val allowedDefinition = setOf("ManagementTopologyMigrationExecutor.kt", "M508aTestStubs.kt", "ManagementDeclareCheck.kt")
+    private val allowedDefinition = setOf("ManagementTopologyMigrationExecutor.kt", "M508aTestStubs.kt", "ManagementDeclareCheck.kt", "ManagementBrokerPolicyReader.kt") // M9-08: the same seam for the one-policy reader
 
     @Test
     fun `no production file calls overClient`() {

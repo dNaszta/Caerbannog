@@ -56,6 +56,7 @@ import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.MqttRouteWords
 import dev.caerbannog.core.planner.PlannerTexts
+import dev.caerbannog.core.planner.PolicyForm
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.StreamForm
 import dev.caerbannog.core.planner.WizardState
@@ -248,6 +249,7 @@ private fun kindIcon(kind: String): AppIcon = when (kind) {
     "Queue" -> AppIcon.Queue
     "Exchange" -> AppIcon.SwapHoriz
     "Stream" -> AppIcon.Stream
+    "Policy" -> AppIcon.Rule
     else -> AppIcon.Link
 }
 
@@ -260,6 +262,7 @@ private fun DetailsPage(details: WizardState.Details, events: PlannerEvents, onN
         is ExchangeForm -> ExchangeFormView(form, details, events, onNext)
         is BindingForm -> BindingFormView(form, details, events, onNext)
         is StreamForm -> StreamFormView(form, details, events, onNext)
+        is PolicyForm -> PolicyFormView(form, details, events, onNext)
         is MqttRouteForm -> MqttRouteFormView(form, details, events, onNext)
     }
 }

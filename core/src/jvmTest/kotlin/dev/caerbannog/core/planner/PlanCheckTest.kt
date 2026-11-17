@@ -50,7 +50,7 @@ class PlanCheckTest {
     private fun plan(vararg actions: MigrationAction) = TopologyPlan.of("", actions.toList(), "/")
 
     private fun run(plan: TopologyPlan, context: PlannerContext = context(), check: DeclareCheck?, onStep: (Int, Int) -> Unit = { _, _ -> }): PlanCheckResult =
-        runBlocking { PlanCheck.run(plan, context, check, onStep) }
+        runBlocking { PlanCheck.run(plan, context, check, onStep = onStep) }
 
     private fun steps(result: PlanCheckResult): List<StepCheck> = assertIs<PlanCheckResult.Checked>(result).steps
 

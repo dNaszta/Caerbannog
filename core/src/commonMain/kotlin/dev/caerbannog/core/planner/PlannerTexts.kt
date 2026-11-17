@@ -13,7 +13,7 @@ object PlannerTexts {
     )
 
     /** The kinds that have a form today, in wizard order. The others of [WIZARD_KINDS] are drawn when the task that builds their form lands. */
-    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream", "MQTT route")
+    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "MQTT route")
 
     fun mqttRefusal(reason: MqttFilterRefusal): String = when (reason) {
         MqttFilterRefusal.Empty -> "Enter a topic filter"
@@ -44,6 +44,7 @@ object PlannerTexts {
         "Exchange" -> "Fanout, direct, topic or headers"
         "Binding" -> "From an exchange to a queue or an exchange"
         "Stream" -> "Optionally with its response stream (DLN)"
+        "Policy" -> "Limits and other settings by name pattern"
         "MQTT route" -> "A topic filter to a queue or stream, saved as a binding on amq.topic"
         else -> ""
     }
@@ -250,6 +251,88 @@ object PlannerTexts {
     const val NEW_MARK: String = "new"
     const val NOT_IN_THIS_PLAN: String = "not in this plan"
     const val GRAPH_NOTE: String = "Read only. Nothing on the graph changes the plan."
+
+    // ---- the policy step (M9-08) ----
+
+    const val POLICY_NAME_MISSING: String = "Give the policy a name"
+    const val POLICY_PATTERN_MISSING: String = "Enter a pattern"
+    const val POLICY_SETTINGS_MISSING: String = "Add at least one setting"
+    const val POLICY_WHOLE_NUMBER: String = "Enter a whole number"
+    const val POLICY_DURATION: String = "Enter a number and a unit, for example 7D"
+    const val POLICY_SETTING_TWICE: String = "Each setting can be added once"
+    const val POLICY_CHOICE: String = "Choose one of the offered values"
+    const val POLICY_SETTING_NOT_OFFERED: String = "This setting is not offered for what the policy applies to"
+    const val POLICY_SHORT_LIST: String = "Only settings that every kind of queue honours are offered here"
+    const val POLICY_PATTERN_UNEVALUABLE: String = "The app cannot tell which names this pattern matches"
+    const val POLICY_MATCHES_NOTHING: String = "Matches no name yet"
+    const val POLICY_ADD_SETTING: String = "Add setting"
+
+    /** Most names of one source the match line spells out; the rest is a count. */
+    const val MATCH_LINE_MAX_NAMES: Int = 10
+
+    /**
+     * The match line under the pattern: `matches "orders" in this plan and "orders-archive" on "uat-eu"`. [broker] is empty (and [connection] blank)
+     * when the broker was not read, so no claim is made about it. A name that cannot be echoed is counted, never printed.
+     */
+    fun policyMatchLine(inPlan: List<String>, broker: List<String>, connection: String?): String {
+        val parts = listOfNotNull(
+            nameList(inPlan)?.let { "$it in this plan" },
+            if (connection.isNullOrBlank()) null else nameList(broker)?.let { "$it on \"$connection\"" },
+        )
+        return if (parts.isEmpty()) POLICY_MATCHES_NOTHING else "matches " + parts.joinToString(" and ")
+    }
+
+    /** `"a"`, `"a" and "b"`, `"a", "b" and "c"`; ten names at most, then `and N more`; null for no name at all. */
+    private fun nameList(names: List<String>): String? {
+        if (names.isEmpty()) return null
+        val shown = names.filter { echoableName(it) }.take(MATCH_LINE_MAX_NAMES)
+        val more = names.size - shown.size
+        val quoted = shown.map { "\"$it\"" }
+        return when {
+            more > 0 && quoted.isEmpty() -> "$more ${plural(more, "name")}"
+            more > 0 -> quoted.joinToString(", ") + " and $more more"
+            quoted.size == 1 -> quoted.single()
+            else -> quoted.dropLast(1).joinToString(", ") + " and " + quoted.last()
+        }
+    }
+
+    /** The page message after a change of target removed rows: the new target's [targetLabel] and the labels of the removed rows, in row order. */
+    fun settingsRemoved(targetLabel: String, labels: List<String>): String =
+        "Removed because \"$targetLabel\" does not offer them: ${labels.joinToString(", ")}."
+
+    fun policiesOverlap(first: String, second: String, on: String): String =
+        "The policies ${named(first, "a policy")} and ${named(second, "another policy")} both match ${named(on, "a queue")}. " +
+            "RabbitMQ applies only one policy to a queue: put the settings into one policy."
+
+    /** [typeWords] is `quorum queue`, `classic queue` or `stream`; [ignoredLabel] the label (or the echoable broker key) of the first key the type ignores. */
+    fun policyNoEffect(on: String, typeWords: String, ignoredLabel: String): String =
+        "This policy has no effect on ${named(on, "a queue")}: a $typeWords ignores $ignoredLabel, " +
+            "and RabbitMQ then applies none of the policy's settings."
+
+    const val AT_LEAST_ONCE_WITHOUT_REJECT: String =
+        "RabbitMQ accepts this but would not keep a message it cannot pass on: at least once only holds together with the setting that refuses publishers when the queue is full."
+
+    fun deadLetterExchangeMissing(exchange: String): String =
+        "The exchange ${if (echoableName(exchange)) "$exchange " else ""}does not exist yet. RabbitMQ accepts the policy and then loses the dead letters."
+
+    /** The three decided sentences of the check, for a step that would bind to a queue the broker already applies [policy] to. */
+    fun brokerPolicyTakenPlace(policy: String, queue: String): String =
+        "The broker applies ${policyWords(policy)} to ${named(queue, "a queue")}. Only one policy applies to a queue: this one would take its place."
+
+    fun brokerPolicyWins(policy: String, queue: String): String =
+        "The broker applies ${policyWords(policy)} to ${named(queue, "a queue")}, which has a higher priority. Only one policy applies to a queue: this one would not apply."
+
+    fun brokerPolicySamePriority(policy: String, queue: String): String =
+        "The broker applies ${policyWords(policy)} to ${named(queue, "a queue")} at the same priority. Only one of the two will apply, and RabbitMQ does not say which."
+
+    private fun policyWords(policy: String): String = if (echoableName(policy)) "the policy $policy" else "a policy"
+
+    /** The retention block of the stream form. */
+    const val KEEP_FOR_LABEL: String = "Keep messages for"
+    const val KEEP_AT_MOST_LABEL: String = "Keep at most (bytes)"
+    const val RETENTION_RESPONSE_TICK: String = "Same retention for the response stream"
+
+    private fun named(name: String, fallback: String): String = if (echoableName(name)) name else fallback
 
     private fun subject(name: String, fallback: String): String = if (echoableName(name)) name else fallback
 

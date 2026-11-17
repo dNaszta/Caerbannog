@@ -2,6 +2,8 @@
 
 Milestone: M9    Depends on: M9-00c (done)    Size: S
 
+FOLDED INTO `M9-08` SLICE 1 (architect, 2026-11-17, loop step 1). This is no longer a task of its own: the exact scope, the acceptance and the live test (the single class `RealBrokerM9PolicyStepTest`) are in `docs/tasks/M9-08-policy-step.md`, "Slice 1". What changed against the text below: the pure rule is named `RetentionSources.merge`; `max-length-bytes` is read from the policy first (measured, S-14c-4), the other two keys keep the argument (unmeasured, stated); a scenario for the precedence is added in `03`; the `@m9-08b` tag stays. The text below is kept as the record of the facts.
+
 NEW 2026-11-16, written at step 3 of `M9-00c`. No dependency on a planner task; it must be done BEFORE the retention block of `M9-08` is released (the planner saves retention as a policy, and without this task the stream list would show an empty Retention column for exactly the streams the planner configured).
 
 ## Goal
@@ -39,3 +41,12 @@ Evaluated: no new tool, no schema change. The result of the two existing read-on
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec updated (A5 sentence about the gap removed), the `@broker` scenario RUN or reported as not run.
+
+## Measured answers (test developer, M9-08 step 2, 2026-11-17, RabbitMQ 4.4.0 through `rabbitmq:4-management`, `RealBrokerM9PolicyStepTest` 5 of 5 green)
+1. `GET /api/queues/{vhost}?...&columns=<the list's columns today>` returns NO `effective_policy_definition` for a stream with a policy (the broker honours the column list exactly). With `effective_policy_definition` ADDED to the column list the same row carries it (`{"max-age":"7D","max-length-bytes":1000000}`). The detail GET carries it with or without a column list. So the stream list needs no detail call: add the column (`ManagementRequests.LIST_COLUMNS`), one request as before. Fixtures: `fixtures/m9-00/s-f1d-stream-detail-with-policy.json` and `s-f1d-stream-list-row-with-policy.json` (captured by the live class with `M9_08_CAPTURE_DIR`).
+2. `alternate-exchange` set by a POLICY (`apply-to: exchanges`) acts on an exchange: a message published through the management API to an exchange with no matching binding is `routed: false` before the policy and `routed: true` after it (the alternate exchange is a fanout bound to a queue); an exchange with no policy still answers `routed: false`. The Exchanges target stays.
+3. The `max-age` units `M`, `h` and `m`: `1M`, `1h` and `1m` each answered 201. `MaxAgeUnits.measured` is `Y`, `M`, `D`, `h`, `m`, `s` (with `7d`, `7`, `abc` still 400, S-F1c).
+4. The list row of `GET /api/queues/{vhost}` with the columns the planner's reader uses carries `type` (`quorum`) and `policy` (the name of the policy that applies); the item `GET /api/policies/{vhost}/{name}` answers one policy that `ManagementJson.parsePolicies` reads (priority, apply-to, definition).
+
+## Status
+Folded into `M9-08` slice 1; reviewed with it on 2026-11-17 (architect, step 5): ACCEPTED WITH FOLLOW-UPS (see "Status" of `M9-08-policy-step.md`). Slice 1 is built (`RetentionSources.merge`, both parse sites of `ManagementJson`, `effective_policy_definition` added to `LIST_COLUMNS`, no detail fallback) and its scenarios in `03` and `14` run green; the `@broker` scenario is bound to `RealBrokerM9PolicyStepTest` (green on 4.4.0). It merges with the slice 2 commits, not alone. Open: showing the byte limit is `M9-08d` (owner decision); the precedence for `max-age` and the segment size is `M9-08e` row 1.

@@ -11,6 +11,8 @@ import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog
 import dev.caerbannog.core.connections.fakes.FakeStreamCatalog.Companion.stream
+import dev.caerbannog.core.json.ArgumentValue
+import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.AppSettings
 import dev.caerbannog.core.streams.CatalogMessages
 import dev.caerbannog.core.streams.DEFAULT_REFRESH
@@ -18,6 +20,8 @@ import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshInterval
 import dev.caerbannog.core.streams.StreamKindFilter
+import dev.caerbannog.core.streams.Retention
+import dev.caerbannog.core.streams.RetentionSources
 import dev.caerbannog.core.streams.StreamListScreen
 import dev.caerbannog.core.streams.StreamListState
 import dev.caerbannog.core.streams.StreamListViewModel
@@ -193,6 +197,28 @@ class StreamListSteps {
 
     @Given("a stream {string} with {int} publishers")
     fun aStreamWithPublishers(name: String, publishers: Int) = addStream(name, 0, 10, publishers = publishers)
+
+    // M9-08 slice 1 (brief docs/tasks/M9-08-policy-step.md): the stream as the broker's management answer describes it, a retention of its own (an
+    // argument) and/or a policy's effective definition. The summary is built the way the data-rabbit parser builds it: through the ONE pure rule of core,
+    // RetentionSources.merge. (ManagementJson is internal to data-rabbit; its two parse sites are pinned by ManagementJsonStreamTest and the live class.)
+    // A policy value is written as in the scenario: "7D" in quotes is text, 1000000 is a whole number.
+    private fun policyValue(text: String): ArgumentValue =
+        if (text.startsWith("\"")) ArgumentValue.Text(text.trim('"')) else ArgumentValue.Whole(text.toLong())
+
+    private fun addStreamWithRetention(name: String, own: Retention, policyKey: String, policyValue: String) {
+        val merged = RetentionSources.merge(own, mapOf(policyKey to policyValue(policyValue)))
+        catalog.addStream(stream(name, retention = merged))
+        gateway.offsetsOf(NAME).setFirst("/", name, 0)
+    }
+
+    @Given("^a stream \"([^\"]*)\" with no retention of its own and a policy that sets \"([^\"]*)\" to (.+)$")
+    fun aStreamWithRetentionFromAPolicy(name: String, key: String, value: String) = addStreamWithRetention(name, Retention(), key, value)
+
+    @Given("a stream {string} declared with {string} {long} and a policy that sets {string} to {long}")
+    fun aStreamWithAnArgumentAndAPolicy(name: String, argument: String, own: Long, key: String, value: Long) {
+        assertEquals("x-max-length-bytes", argument, "this step knows the argument x-max-length-bytes (the one precedence that was measured, S-14c-4)")
+        addStreamWithRetention(name, Retention(maxLengthBytes = own), key, value.toString())
+    }
 
     @Given("a stream {string} exists")
     fun aStreamExists(name: String) = addStream(name, 0, 10)
@@ -429,6 +455,24 @@ class StreamListSteps {
 
     @Then("^the stream \"([^\"]*)\" shows about (.+) messages$")
     fun theStreamShowsAboutMessages(name: String, count: String) = assertEquals(count, row(name).messages)
+
+    /** The Retention column shows the age: a text such as "7D" is read from the row. */
+    @Then("^the stream \"([^\"]*)\" shows the retention \"([^\"]*)\"$")
+    fun theStreamShowsTheRetention(name: String, shown: String) {
+        assertEquals(shown, row(name).retention, "Retention cell of $name")
+        assertEquals(shown, summaryOf(name).retention.maxAge, "maxAge of the summary the list is built from")
+    }
+
+    /**
+     * Only the age has a cell (StreamRow.retention is displayMaxAge()), and the MCP tools print the age only: a size limit is carried by the summary
+     * and shown nowhere yet (decided in M9-08, step 2). The step therefore reads the summary the list is built from.
+     */
+    @Then("^the stream \"([^\"]*)\" has the maximum size (\\d+) bytes$")
+    fun theStreamHasTheMaximumSize(name: String, bytes: Long) {
+        assertEquals(bytes, summaryOf(name).retention.maxLengthBytes, "maxLengthBytes of the summary the list is built from")
+    }
+
+    private fun summaryOf(name: String) = (runBlocking { catalog.streamDetail("/", name) } as CatalogResult.Success).value
 
     @Then("the stream {string} shows {string} publishers and {string} consumers")
     fun theStreamShowsPublishersAndConsumers(name: String, publishers: String, consumers: String) {

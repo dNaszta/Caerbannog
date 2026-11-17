@@ -1,0 +1,1 @@
+{"vhost":"/","name":"m9p-lst-pol-18066f","pattern":"^m9p-lst-18066f$","apply-to":"quorum_queues","definition":{"max-length":10},"priority":3}

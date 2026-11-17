@@ -4,6 +4,7 @@ import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationFolderPorts
 import dev.caerbannog.core.migrations.MigrationFolderState
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationWriteException
 import dev.caerbannog.core.migrations.folderStateOf
 import dev.caerbannog.core.streams.AppSettings
@@ -53,11 +54,17 @@ class PlannerViewModel(
      * The time of a finished check. The default is for the older constructions of tests only; the app passes the system clock.
      */
     private val clock: RefreshClock = RefreshClock { 0L },
+    /**
+     * The read port for one policy of the broker (M9-08, notes of the check); null: none. The window gives it with [declareCheck] and never
+     * to a 3.x connection.
+     */
+    private val policies: BrokerPolicyReader? = null,
 ) {
     /** The pages of the wizard; the screen sees [WizardState], derived from this and the current plan. */
     private sealed interface Page {
         data object Kinds : Page
-        data class Form(val form: StepForm, val editing: Int?) : Page
+        /** [message] is a line of the page that belongs to the last change only (rows a new target removed); the next change replaces it. */
+        data class Form(val form: StepForm, val editing: Int?, val message: String? = null) : Page
         data class Summary(val form: StepForm, val editing: Int?) : Page
     }
 
@@ -136,6 +143,7 @@ class PlannerViewModel(
             "Exchange" -> ExchangeForm(name = "")
             "Binding" -> BindingForm(exchange = "", destination = "")
             "Stream" -> StreamForm(name = "")
+            "Policy" -> PolicyForm(name = "", pattern = "")
             "MQTT route" -> MqttRouteForm(filter = "", destination = "")
             else -> return@act
         }
@@ -144,7 +152,16 @@ class PlannerViewModel(
 
     fun updateForm(form: StepForm) = act {
         val current = page as? Page.Form ?: return@act
-        page = current.copy(form = form)
+        page = current.copy(form = form, message = removedRowsMessage(current.form, form))
+    }
+
+    /** The page says which rows a change of target removed; any other change says nothing. */
+    private fun removedRowsMessage(before: StepForm, after: StepForm): String? {
+        if (before !is PolicyForm || after !is PolicyForm || before.target == after.target) return null
+        val removed = before.settings.filter { s -> after.settings.none { it.key == s.key } }
+        if (removed.isEmpty()) return null
+        val labels = removed.map { PolicyKeyCatalog.entry(it.key)?.label ?: it.key }
+        return PlannerTexts.settingsRemoved(after.target.label, labels)
     }
 
     /** Page 2 to page 3; refused while the form has a problem. */
@@ -312,13 +329,15 @@ class PlannerViewModel(
         val connection = context.connectionName
         if (port == null || connection == null || checkDisabledReason() != null || check is CheckState.Running) return@act
         val started = plan
+        val knownAtStart = known
         val generation = ++checkGeneration
         runStepIds = started.steps.map { it.id }.toSet()
         runStale = false
         check = CheckState.Running(step = 1, total = started.steps.size)
         checkJob = scope.launch {
             val outcome = try {
-                PlanCheck.run(started, context, port) { position, total -> reportStep(generation, position, total) }
+                val fresh = if (started.steps.any { it.action is MigrationAction.DeclarePolicy }) readNamesAgain(started.vhost, generation) else knownAtStart
+                PlanCheck.run(started, context, port, policies, fresh ?: KnownTopology.None) { position, total -> reportStep(generation, position, total) }
             } catch (e: CancellationException) {
                 // Cancelled with the scope or by a dismiss: nothing to publish. One thrown by the port's own call is a failed read.
                 currentCoroutineContext().ensureActive()
@@ -342,6 +361,30 @@ class PlannerViewModel(
                 publish()
             }
         }
+    }
+
+    /**
+     * A plan with a policy step reads the broker's names again when the check starts, because the copy in [known] is as old as the screen (a
+     * user-started read, not polling). The graph takes the fresh value too, unless the start-up read is still on its way (it then answers last).
+     * A failed read is an unread broker: the check goes on without the notes that need it.
+     */
+    private suspend fun readNamesAgain(vhost: String, generation: Int): KnownTopology? {
+        val source = reader ?: return null
+        val answer = try {
+            source.read(vhost)
+        } catch (e: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            null
+        } catch (_: Exception) {
+            null
+        }
+        lock.withLock {
+            if (generation == checkGeneration && !knownPending && plan.vhost == vhost) {
+                known = answer
+                publish()
+            }
+        }
+        return answer
     }
 
     /** Progress comes from the job, so it hops onto the lock; the step only grows, so a late hop cannot move it back. */
@@ -407,7 +450,13 @@ class PlannerViewModel(
 
     private fun locked(): Boolean = context.unavailableReason != null || unreadable != null
 
-    private fun formContext() = FormContext(plan = plan, namingStyle = namingStyle, known = known ?: KnownTopology.None)
+    private fun formContext() = FormContext(
+        plan = plan,
+        namingStyle = namingStyle,
+        known = known ?: KnownTopology.None,
+        // The match line speaks of the broker only when its names were read.
+        connectionName = context.connectionName.takeIf { known != null },
+    )
 
     /**
      * Keeps the broker's names for the plan's virtual host: one read when the planner first can (after the draft is read, so the draft's
@@ -587,7 +636,7 @@ class PlannerViewModel(
         Page.Kinds -> WizardState.Kind
         is Page.Form -> {
             val ctx = formContext()
-            detailsOf(p.form, p.editing, ctx)
+            detailsOf(p.form, p.editing, ctx, p.message)
         }
         is Page.Summary -> summaryOf(p)
     }
@@ -602,7 +651,7 @@ class PlannerViewModel(
         return WizardState.Summary(p.form, actions, p.editing, note)
     }
 
-    private fun detailsOf(form: StepForm, editing: Int?, ctx: FormContext): WizardState.Details {
+    private fun detailsOf(form: StepForm, editing: Int?, ctx: FormContext, message: String?): WizardState.Details {
         val problems = form.problems(ctx)
         val binding = form as? BindingForm
         return WizardState.Details(
@@ -610,7 +659,7 @@ class PlannerViewModel(
             problems = problems,
             hints = form.hints(ctx),
             editingStepId = editing,
-            pageMessage = if (binding != null) problems.firstOrNull()?.message else null,
+            pageMessage = if (binding != null) problems.firstOrNull()?.message else message,
             exchangeSuggestions = if (binding != null) ctx.exchangeSuggestions() else emptyList(),
             destinationSuggestions = when (form) {
                 is BindingForm -> ctx.destinationSuggestions(form.destinationKind)
@@ -635,7 +684,7 @@ class PlannerViewModel(
         wizard = if (locked()) WizardState.Closed else wizardState(),
         selectedStepId = selected,
         namingStyle = namingStyle,
-        problems = PlanValidation.problems(plan),
+        problems = PlanValidation.problems(plan, known ?: KnownTopology.None),
         saveGate = gate(),
         banner = banner(),
         draftUnreadable = unreadable,

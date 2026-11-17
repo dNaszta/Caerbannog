@@ -72,6 +72,8 @@ class StreamSource(
     val migrationExecutor: TopologyMigrationExecutor? = null,
     /** M9-05: the read-only check of the same held connection, guarded like [migrationExecutor]; null exactly when [migrationExecutor] is null. */
     val declareCheck: DeclareCheck? = null,
+    /** M9-08: the planner's one-policy read of the same held connection, guarded like [declareCheck]; null exactly when [migrationExecutor] is null. */
+    val policyReader: dev.caerbannog.core.planner.BrokerPolicyReader? = null,
     /** M5-08a R1: the fixed reason there is no [migrationExecutor], passed on as it is. */
     val migrationUnavailableReason: String? = null,
     /** M8-02a: the raw broker version text of the held connection; null when unknown. */
@@ -174,6 +176,15 @@ internal class GuardedDeclareCheck(
 ) : DeclareCheck {
     override suspend fun find(action: MigrationAction): BrokerFinding =
         if (isCurrent()) inner.find(action) else BrokerFinding.Unreadable("Connection closed")
+}
+
+/** Proxy for the policy read of the check: once the connection is no longer current nothing is sent and the policy is unreadable. */
+internal class GuardedPolicyReader(
+    private val inner: dev.caerbannog.core.planner.BrokerPolicyReader,
+    private val isCurrent: () -> Boolean,
+) : dev.caerbannog.core.planner.BrokerPolicyReader {
+    override suspend fun read(vhost: String, name: String): dev.caerbannog.core.planner.PolicyReadResult =
+        if (isCurrent()) inner.read(vhost, name) else dev.caerbannog.core.planner.PolicyReadResult.Unreadable
 }
 
 internal class GuardedMqttCatalog(

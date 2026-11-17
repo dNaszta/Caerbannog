@@ -31,6 +31,8 @@ internal class PlannerRig(
     var declareCheck: DeclareCheck? = null,
     /** M9-06: the time of a check (the summary's "at 14:02"); the virtual clock of the view model. */
     var nowMillis: Long = 1_700_000_000_000L,
+    /** M9-08: the read port for one policy of the broker (the check notes); null is a connection that gets none (a 3.x broker, or not connected). */
+    val policies: BrokerPolicyReader? = null,
 ) {
     val folders = FakeMigrationFolders(folderPath)
     val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
@@ -41,7 +43,7 @@ internal class PlannerRig(
 
     private fun build() = PlannerViewModel(
         store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
-        declareCheck = declareCheck, clock = RefreshClock { nowMillis },
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies,
     )
 
     /** The app is closed and opened again, or the window rebuilt the view model for a changed [context] (or, for the same profile, a new check port). */
@@ -88,6 +90,7 @@ internal class PlannerRig(
             is ExchangeForm -> "Exchange"
             is BindingForm -> "Binding"
             is StreamForm -> "Stream"
+            is PolicyForm -> "Policy"
             is MqttRouteForm -> "MQTT route"
         }
     }

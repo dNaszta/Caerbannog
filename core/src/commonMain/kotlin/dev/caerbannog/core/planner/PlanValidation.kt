@@ -10,8 +10,9 @@ import dev.caerbannog.core.topology.BindingDestinationType
 data class PlanProblem(val stepId: Int?, val message: String, val blocking: Boolean)
 
 object PlanValidation {
-    fun problems(plan: TopologyPlan): List<PlanProblem> =
-        duplicates(plan) + bindingsBeforeTheirTargets(plan) + parserRoundTrip(plan)
+    /** [known] is only read by the notes about policy steps (a dead-letter exchange nowhere); the default keeps every caller. */
+    fun problems(plan: TopologyPlan, known: KnownTopology = KnownTopology.None): List<PlanProblem> =
+        duplicates(plan) + bindingsBeforeTheirTargets(plan) + parserRoundTrip(plan) + PlanPolicyNotes.of(plan, known)
 
     /** The same queue, exchange or stream declared again, and a queue and a stream of one name. The later step carries the problem. */
     private fun duplicates(plan: TopologyPlan): List<PlanProblem> {

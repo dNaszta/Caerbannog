@@ -72,6 +72,14 @@ import kotlinx.coroutines.cancel
  *    ticked), the field tags `planForm:hint:responseName` and `planForm:error:responseName`; the step list: `planStepPair:<i>` (the second line
  *    of a response stream's row, "Response stream (DLN) of <name>"); the review graph: `planGraphLink:<source id>:<target id>` (the dotted link,
  *    its text `PlannerTexts.RESPONSE_LINK_LABEL`).
+ *  - (M9-08) the policy form (kind card `planWizard:kind:Policy`, described `PlannerTexts.kindDescription("Policy")`): `planForm:name`, `planForm:pattern` (text fields),
+ *    `planForm:policyTarget` (the dropdown, its text the label of the target) with the menu items `planForm:policyTarget:<wire>`, `planForm:priority` (text field, shows "0"),
+ *    `planForm:policyMatches` (the match line or the unevaluable line, drawn while the pattern is not empty), `planForm:policyShortList` (the sentence for Queues and All, drawn
+ *    only then), the rows `planForm:setting:<i>:name` (the key dropdown, its text the label of the key), `planForm:setting:<i>:value` (a text field for a number, text or duration;
+ *    a dropdown for a choice) and `planForm:setting:<i>:remove`, the menu items of a key dropdown `planForm:settingOption:<key>` (only the keys offered for the target and not used
+ *    by another row), `planForm:addSetting`; errors `planForm:error:name`, `:pattern`, `:priority`, `:settings`, `:setting:<i>`. The retention block of the stream form
+ *    (drawn while the form ADDS a stream, not while it edits one): `planForm:keepFor`, `planForm:keepAtMost` (text fields), `planForm:retentionResponseTick` (a toggle, drawn
+ *    only while the response stream is ticked, on by default), errors `planForm:error:keepFor` and `planForm:error:keepAtMost`. Notes of the plan sit in `planStepNote:<i>`.
  *  - (M9-10) the MQTT route form (kind card `planWizard:kind:MQTT route`): `planForm:filter` and `planForm:destination` (text fields),
  *    `planForm:destinationKind:queue|stream` (radio, `selected` semantics), `planForm:error:filter` / `planForm:error:destination`, `planForm:mqttKey`
  *    (`PlannerTexts.mqttRouteSaves(key)`, drawn only while the filter is accepted), `planForm:mqttTopic` (the matching topic, drawn only while the
@@ -94,6 +102,8 @@ internal class UiRig(
     val declareCheck: DeclareCheck? = null,
     /** M9-06: the time of a check, epoch milliseconds (the virtual clock of the view model). */
     var nowMillis: Long = CHECK_TIME,
+    /** M9-08: the read port for one policy of the broker (the check notes); null is a connection that gets none. */
+    val policies: dev.caerbannog.core.planner.BrokerPolicyReader? = null,
     prepare: UiRig.() -> Unit = {},
 ) {
     val folders = FakeMigrationFolders(folderPath)
@@ -102,7 +112,7 @@ internal class UiRig(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private fun build() = PlannerViewModel(
         store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
-        declareCheck = declareCheck, clock = RefreshClock { nowMillis },
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies,
     )
 
     private var current: PlannerViewModel = build()
@@ -144,6 +154,7 @@ internal class UiRig(
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
+        is dev.caerbannog.core.planner.PolicyForm -> "Policy"
         is MqttRouteForm -> "MQTT route"
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.MqttDestinationKind
@@ -114,7 +115,8 @@ class MqttRouteLayoutExploratoryUiTest {
             node("planner:addStepBtn").performClick()
             seen += "page 1 Next drawn=${drawn("planWizard:next")}"
             if (drawn("planWizard:kind:$kind")) {
-                node("planWizard:kind:$kind").performClick()
+                // M9-08: Policy is a sixth card, so on a short window the last card is below the fold of page 1 and scrolls into reach, as in M9-07c
+                node("planWizard:kind:$kind").performScrollTo().performClick()
                 if (drawn("planWizard:next")) node("planWizard:next").performClick()
             }
             seen += "form Next drawn=${drawn("planWizard:next")}"

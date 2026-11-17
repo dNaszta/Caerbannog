@@ -10,6 +10,7 @@ import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.streams.ConsumerRow
 import dev.caerbannog.core.streams.PublisherRow
 import dev.caerbannog.core.streams.Retention
+import dev.caerbannog.core.streams.RetentionSources
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.SuperStreamLayout
@@ -221,14 +222,20 @@ internal object ManagementJson {
         node = obj.string("node"),
         members = obj.strings("members"),
         online = obj.strings("online"),
-        retention = retention(obj["arguments"] as? JsonObject),
+        retention = retention(obj),
     )
 
-    private fun retention(arguments: JsonObject?): Retention = Retention(
-        maxAge = arguments?.string("x-max-age"),
-        maxLengthBytes = arguments?.long("x-max-length-bytes"),
-        segmentSizeBytes = arguments?.long("x-stream-max-segment-size-bytes"),
-    )
+    // The own arguments and the policy that applies (S-F1d); a policy value that cannot be typed is treated as absent.
+    private fun retention(row: JsonObject): Retention {
+        val arguments = row["arguments"] as? JsonObject
+        val own = Retention(
+            maxAge = arguments?.string("x-max-age"),
+            maxLengthBytes = arguments?.long("x-max-length-bytes"),
+            segmentSizeBytes = arguments?.long("x-stream-max-segment-size-bytes"),
+        )
+        val policy = (row["effective_policy_definition"] as? JsonObject)?.let { tolerantValues(it).first } ?: emptyMap()
+        return RetentionSources.merge(own, policy)
+    }
 
     private fun JsonElement?.asObject(): JsonObject = this as? JsonObject ?: malformed()
 
@@ -340,19 +347,22 @@ internal object ManagementJson {
      * required and `definition` must be an object. M9-14b: a definition VALUE the model refuses is left out and the row says `definitionComplete = false`.
      */
     fun parsePolicies(body: String): CatalogResult<List<PolicyRow>> = guarded(body) { root ->
-        CatalogResult.Success(
-            root.asArray().map { it.asObject() }.map { p ->
-                val (definition, definitionComplete) = tolerantValues(p["definition"].asObject())
-                PolicyRow(
-                    name = p.requiredString("name"),
-                    vhost = p.requiredString("vhost"),
-                    pattern = p.requiredString("pattern"),
-                    applyTo = p.requiredString("apply-to"),
-                    priority = p.requiredInt("priority"),
-                    definition = definition,
-                    definitionComplete = definitionComplete,
-                )
-            },
+        CatalogResult.Success(root.asArray().map { policyRow(it.asObject()) })
+    }
+
+    /** M9-08: the answer of `GET /api/policies/{vhost}/{name}`, one object of the same shape as a row of [parsePolicies]; a list is not the item. */
+    fun parsePolicy(body: String): CatalogResult<PolicyRow> = guarded(body) { root -> CatalogResult.Success(policyRow(root.asObject())) }
+
+    private fun policyRow(p: JsonObject): PolicyRow {
+        val (definition, definitionComplete) = tolerantValues(p["definition"].asObject())
+        return PolicyRow(
+            name = p.requiredString("name"),
+            vhost = p.requiredString("vhost"),
+            pattern = p.requiredString("pattern"),
+            applyTo = p.requiredString("apply-to"),
+            priority = p.requiredInt("priority"),
+            definition = definition,
+            definitionComplete = definitionComplete,
         )
     }
 

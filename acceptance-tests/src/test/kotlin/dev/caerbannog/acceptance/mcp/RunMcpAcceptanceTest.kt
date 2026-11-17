@@ -12,5 +12,5 @@ import org.junit.platform.suite.api.Suite
 @SelectClasspathResource("14_mcp_server.feature")
 @SelectClasspathResource("16_migrate_from_3x.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.mcp")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@fake-broker and (@m8-10 or not @migrate-3x) and not @needs-M9-08b")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@fake-broker and (@m8-10 or not @migrate-3x)")
 class RunMcpAcceptanceTest

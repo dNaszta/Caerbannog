@@ -84,6 +84,7 @@ class RabbitMqConnectionGateway(
                 queueInspector = ManagementQueueMessageInspector(http, requests),
                 migrationExecutor = access.executor,
                 declareCheck = access.declareCheck,
+                policyReader = access.policyReader,
                 migrationUnavailableReason = access.unavailableReason,
             ),
         )

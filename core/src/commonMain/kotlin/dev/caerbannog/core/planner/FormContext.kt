@@ -11,11 +11,16 @@ data class KnownTopology(
     val exchanges: Map<String, String> = emptyMap(),
     val queues: Set<String> = emptySet(),
     val streams: Set<String> = emptySet(),
+    /** Type and applied policy of the queues and streams the broker has, by name; filled where the reader has them (M9-08, check notes). */
+    val queueDetails: Map<String, KnownQueue> = emptyMap(),
 ) {
     companion object {
         val None: KnownTopology = KnownTopology()
     }
 }
+
+/** One queue or stream of the broker: its [type] (`quorum`, `classic`, `stream`) and the name of the policy that applies to it, null for none or unknown. */
+data class KnownQueue(val type: String, val policy: String?)
 
 enum class SuggestionSource { PLAN, BROKER }
 
@@ -26,6 +31,8 @@ data class FormContext(
     val plan: TopologyPlan,
     val namingStyle: NamingStyle,
     val known: KnownTopology = KnownTopology.None,
+    /** The profile's display name, for the match line (`on "uat-eu"`); null or blank when the broker was not read, so no claim is made about it. */
+    val connectionName: String? = null,
 ) {
     /** Queues and streams (or exchanges) for a binding destination: this plan first, then the broker, no name twice. */
     fun destinationSuggestions(kind: BindingDestinationType): List<Suggestion> = when (kind) {

@@ -20,7 +20,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   The dead-lettering facts (S-C, S-D, M9-00b, measured 2026-11-16 on RabbitMQ 4.4.0) are in docs/spec.md "Measured facts of
   M9-00b": the m9-09 scenarios lost needs-spike, no scenario carries it any more. The scenarios that carry NEW wording from
   that spike (the at-least-once explanation and its slow delivery, the note for a queue with its own dead-letter argument,
-  the two policy notes) carry @needs-decision until the owner answers the Owner review list of
+  the two policy notes of @m9-09) carry @needs-decision until the owner answers the Owner review list of
   docs/tasks/M9-00b-spike-dead-lettering-and-streams.md; the planner runner (@m9-01 to @m9-07, not @needs-decision) does not
   select them, and no other runner selects the m9-09 or m9-08 tags.
 
@@ -376,8 +376,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I check the plan against "uat-eu"
     Then the step "Declare policy orders-dlx" shows no note about another policy
 
-  # Two notes that come from M9-00b (S-C4, S-C6): wording proposed, owner review list items 4 and 5 of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md.
-  @m9-08 @fake-broker @needs-decision
+  # Two notes that come from M9-00b (S-C4, S-C6): wording decided by the owner on 2026-11-17 ("all recommended are ok").
+  @m9-08 @fake-broker
   Scenario Outline: A policy that asks for at least once without the setting that makes it hold is pointed out
     Given a plan that declares the policy "orders-dlx" on "^orders$" with <settings>
     Then the step "Declare policy orders-dlx" shows the note "RabbitMQ accepts this but would not keep a message it cannot pass on: at least once only holds together with the setting that refuses publishers when the queue is full."
@@ -392,7 +392,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx" and "dead-letter-strategy" "at-least-once" and "overflow" "reject-publish"
     Then the step "Declare policy orders-dlx" shows no note about at least once
 
-  @m9-08 @fake-broker @needs-decision
+  @m9-08 @fake-broker
   Scenario: A policy that names a dead-letter exchange that is nowhere is pointed out
     Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx"
     And neither the broker nor the plan has the exchange "orders-dlx"
@@ -427,6 +427,73 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   Scenario: Operator policies are not built by the wizard
     When I open the wizard
     Then there is no way to add an operator policy
+
+  # ---- M9-08, added 2026-11-17 when M9-08b was folded into M9-08 (unified brief docs/tasks/M9-08-policy-step.md) ----
+
+  @m9-08 @fake-broker
+  Scenario: Keep at most is saved as a number
+    When I add a stream "telemetry" with the wizard and set "Keep at most (bytes)" to "1000000"
+    Then the policy "telemetry-retention" holds "max-length-bytes" as the number 1000000
+    And the saved file holds "max-length-bytes" as the number 1000000, not as text
+
+  @m9-08 @fake-broker
+  Scenario: A stream with no retention typed adds no policy
+    When I add a stream "telemetry" with the wizard and leave both retention fields empty
+    Then the plan lists these steps in this order
+      | Declare stream telemetry |
+
+  # The wording of the refusal was decided by the owner on 2026-11-17.
+  @m9-08 @negative @fake-broker
+  Scenario Outline: A retention value the broker would refuse is refused by the form
+    When I add a stream "telemetry" with the wizard and set "Keep messages for" to "<value>"
+    Then the form says "Enter a number and a unit, for example 7D"
+    And "Next" is disabled
+
+    Examples:
+      | value |
+      | 7     |
+      | 7d    |
+      | D     |
+      | -1D   |
+      | 7 D   |
+
+  @m9-08 @fake-broker
+  Scenario: A retention policy that meets another policy of the plan is pointed out
+    Given a plan that declares the policy "all-streams" on "^telemetry" that applies to streams
+    When I add a stream "telemetry" with the wizard and set "Keep messages for" to "7D"
+    Then both policy steps show the note "The policies all-streams and telemetry-retention both match telemetry. RabbitMQ applies only one policy to a queue: put the settings into one policy."
+
+  @m9-08 @fake-broker
+  Scenario: A policy on a queue whose policy the broker would not tell is not pointed out
+    Given the broker has the quorum queue "orders" with a policy that cannot be read
+    And a plan that declares the policy "orders-dlx" on "^orders$"
+    When I check the plan against "uat-eu"
+    Then the step "Declare policy orders-dlx" shows no note about another policy
+    And the check still gives every step its result
+
+  @m9-08 @fake-broker
+  Scenario: A plan with a policy step reads the names of the broker once more when it is checked
+    Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 0
+    And the planner was opened before the broker applied "limits" to "orders"
+    And a plan that declares the policy "orders-dlx" on "^orders$" with priority 10
+    When I check the plan against "uat-eu"
+    Then it shows the note "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
+    And the check only read from the broker
+
+  @m9-08 @fake-broker
+  Scenario: A policy with a key outside the offered list stays a read-only step
+    Given a plan opened from a file with the policy "odd" that holds "x-made-up" "1"
+    Then the step "Declare policy odd" is shown read-only
+    And the file keeps the policy as it was written
+
+  # Unmeasured facts of M9-08 (docs/tasks/M9-08-policy-step.md, "Live test"): alternate-exchange acting on an exchange (read from the
+  # management publish answer "routed", no queue message is read), and the max-age units M, h and m. One class: RealBrokerM9PolicyStepTest.
+  @m9-08 @broker
+  Scenario: The settings the form offers for exchanges and the units of Keep messages for are what a real broker accepts
+    Given a real broker with the exchange "main" and the exchange "spare" bound to the queue "spare-q"
+    When I apply the policy that the form builds for exchanges with "alternate-exchange" "spare" on "main"
+    Then a message published to "main" with no matching binding is reported as routed once the policy has taken effect
+    And the broker's answer for each of "1M", "1h" and "1m" as "max-age" is recorded, and the form accepts exactly the units that were answered 201
 
   # ---- M9-09: dead-lettering for a queue ("DLX"; architect decision A4: by policy) ----
 
