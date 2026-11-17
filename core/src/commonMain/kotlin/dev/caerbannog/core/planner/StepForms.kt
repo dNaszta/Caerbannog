@@ -167,6 +167,17 @@ data class HeaderMatch(val name: String, val type: HeaderValueType = HeaderValue
         }
     }
 
+    /**
+     * The same header with another type. The value follows what the new type can hold: a boolean starts at `true`, and the words `true` and
+     * `false` are not carried into a text or number field (they were a choice, not typing).
+     */
+    fun withType(newType: HeaderValueType): HeaderMatch = when {
+        newType == type -> this
+        newType == HeaderValueType.FLAG -> copy(type = newType, value = "true")
+        type == HeaderValueType.FLAG -> copy(type = newType, value = "")
+        else -> copy(type = newType)
+    }
+
     private fun isWholeNumber(text: String): Boolean {
         val digits = text.removePrefix("-")
         return digits.isNotEmpty() && digits.all { it in '0'..'9' }

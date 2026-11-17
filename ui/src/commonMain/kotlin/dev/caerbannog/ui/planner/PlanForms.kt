@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
@@ -16,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +34,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
+import dev.caerbannog.core.planner.HeaderMatch
+import dev.caerbannog.core.planner.HeaderValueType
+import dev.caerbannog.core.planner.MatchRule
 import dev.caerbannog.core.planner.MqttDestinationKind
 import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.PlannerTexts
@@ -107,6 +113,97 @@ internal fun BindingFormView(initial: BindingForm, details: WizardState.Details,
     ) { change(form.copy(destination = it)) }
     if (details.asksRoutingKey) {
         FormField("routingKey", "Routing key", form.routingKey, details, onNext) { change(form.copy(routingKey = it)) }
+    }
+    if (details.asksHeaders) HeadersSection(form, details, change)
+}
+
+/**
+ * The match rule and the header rows of a binding on a headers exchange. A rule the form does not offer (`all-with-x` of an opened file) leaves
+ * both choices unselected until the user picks one. The problem or warning of the rows is drawn once, under them: it has no row of its own.
+ */
+@Composable
+private fun HeadersSection(form: BindingForm, details: WizardState.Details, change: (BindingForm) -> Unit) {
+    Text("A message matches when", style = MaterialTheme.typography.titleSmall)
+    ChoiceGroup(
+        tagPrefix = "planForm:matchRule:",
+        options = listOf(MatchRule.ALL to "all headers match", MatchRule.ANY to "any header matches").map { (rule, label) -> rule.wire to label },
+        selected = if (form.heldRule != null) "" else form.matchRule.wire,
+        note = null,
+        horizontal = true,
+    ) { wire -> MatchRule.entries.firstOrNull { it.wire == wire }?.let { change(form.withRule(it)) } }
+    form.headers.forEachIndexed { index, header ->
+        HeaderRow(index, header, onChange = { new -> change(form.copy(headers = form.headers.mapIndexed { i, old -> if (i == index) new else old })) }) {
+            change(form.copy(headers = form.headers.filterIndexed { i, _ -> i != index }))
+        }
+    }
+    TextButton(
+        onClick = { change(form.copy(headers = form.headers + HeaderMatch(""))) },
+        modifier = Modifier.testTag("planForm:addHeader"),
+    ) {
+        ConnectionIcon(AppIcon.Add, SmallIconSize)
+        Spacer(Modifier.width(8.dp))
+        Text("Add header")
+    }
+    val error = details.problem("headers")
+    val hint = details.hint("headers")
+    if (error != null) {
+        Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp).testTag("planForm:error:headers"))
+    } else if (hint != null) {
+        Row(Modifier.padding(start = 16.dp).testTag("planForm:hint:headers"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ConnectionIcon(AppIcon.Lightbulb, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Name and value side by side with the remove button, the type chips under them (they would not fit one line at the narrow dialog width). */
+@Composable
+private fun HeaderRow(index: Int, header: HeaderMatch, onChange: (HeaderMatch) -> Unit, onRemove: () -> Unit) {
+    val tag = "planForm:header:$index"
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = header.name,
+                onValueChange = { onChange(header.copy(name = it)) },
+                label = { Text("Header") },
+                singleLine = true,
+                modifier = Modifier.weight(1f).testTag("$tag:name"),
+            )
+            if (header.type == HeaderValueType.FLAG) {
+                ChoiceGroup(
+                    tagPrefix = "$tag:value:",
+                    options = listOf("true" to "true", "false" to "false"),
+                    selected = header.value,
+                    note = null,
+                    horizontal = true,
+                    modifier = Modifier.weight(1f),
+                ) { onChange(header.copy(value = it)) }
+            } else {
+                OutlinedTextField(
+                    value = header.value,
+                    onValueChange = { onChange(header.copy(value = it)) },
+                    label = { Text("Value") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).testTag("$tag:value"),
+                )
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.testTag("$tag:remove")) {
+                ConnectionIcon(AppIcon.Close, 24.dp, contentDescription = "Remove header ${header.name}")
+            }
+        }
+        ChoiceGroup(
+            tagPrefix = "$tag:type:",
+            options = listOf("text" to "text", "number" to "number", "flag" to "true or false"),
+            selected = when (header.type) {
+                HeaderValueType.TEXT -> "text"
+                HeaderValueType.WHOLE -> "number"
+                HeaderValueType.FLAG -> "flag"
+            },
+            note = null,
+            horizontal = true,
+        ) { chosen ->
+            onChange(header.withType(when (chosen) { "number" -> HeaderValueType.WHOLE; "flag" -> HeaderValueType.FLAG; else -> HeaderValueType.TEXT }))
+        }
     }
 }
 
@@ -330,6 +427,7 @@ private fun ChoiceGroup(
     selected: String,
     note: ((String) -> String)?,
     horizontal: Boolean = false,
+    modifier: Modifier = Modifier,
     onSelect: (String) -> Unit,
 ) {
     val content: @Composable (Pair<String, String>) -> Unit = { (value, label) ->
@@ -351,8 +449,8 @@ private fun ChoiceGroup(
         }
     }
     if (horizontal) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) { options.forEach { content(it) } }
+        Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) { options.forEach { content(it) } }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { options.forEach { content(it) } }
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) { options.forEach { content(it) } }
     }
 }
