@@ -60,6 +60,11 @@ data class StreamForm(
     val responseName: String? = null,
     val answersTopic: String? = null,
     val requestsTopic: String? = null,
+    /** The retention block (Q4): `Keep messages for` (digits and a unit) and `Keep at most (bytes)`; both empty adds no policy. */
+    val keepFor: String = "",
+    val keepAtMost: String = "",
+    /** Whether the retention policy also covers the response stream; means nothing without the pair. */
+    val sameRetentionForResponse: Boolean = true,
 ) : StepForm {
     /** Switches the pair. Off clears both ticks (they exist only with the pair) and keeps a typed [responseName] for the next time. */
     fun withPair(on: Boolean): StreamForm = when {
@@ -76,10 +81,11 @@ data class StreamForm(
     override fun problems(ctx: FormContext): List<FieldProblem> {
         val own = FormChecks.nameProblem(name, PlannerTexts.STREAM_NAME_MISSING, "name") { build(name, ctx) }
             .ifEmpty { queueConflict(name, "name", ctx) }
-        if (!withResponse) return own
+        val retention = retentionProblems()
+        if (!withResponse) return own + retention
         val response = effectiveResponseName(ctx)
         // A response name that follows an empty stream name is not a second problem: the first one says what to do.
-        if (responseName == null && name.isEmpty()) return own + topicProblems()
+        if (responseName == null && name.isEmpty()) return own + topicProblems() + retention
         val theirs = FormChecks.nameProblem(response, PlannerTexts.RESPONSE_NAME_MISSING, "responseName") { build(response, ctx) }
             .ifEmpty {
                 if (response == name) {
@@ -88,7 +94,7 @@ data class StreamForm(
                     queueConflict(response, "responseName", ctx)
                 }
             }
-        return own + theirs + topicProblems()
+        return own + theirs + topicProblems() + retention
     }
 
     /** The binding key the answers filter is saved as; null while that tick is off or its filter is refused. */
@@ -115,9 +121,40 @@ data class StreamForm(
             val response = effectiveResponseName(ctx)
             // Each route is what the MQTT route form gives for it, so the pair and the route step cannot drift apart.
             listOf(build(name, ctx), build(response, ctx)) +
-                routeInto(answersTopic, response, ctx) + routeInto(requestsTopic, name, ctx)
+                routeInto(answersTopic, response, ctx) + routeInto(requestsTopic, name, ctx) +
+                retentionPolicy(listOf(name) + if (sameRetentionForResponse) listOf(response) else emptyList(), ctx)
         }
-        else -> listOf(build(name, ctx))
+        else -> listOf(build(name, ctx)) + retentionPolicy(listOf(name), ctx)
+    }
+
+    /** The two retention fields are checked whenever they hold text, whatever the pair says. */
+    private fun retentionProblems(): List<FieldProblem> = buildList {
+        if (keepFor.isNotEmpty() && PolicySetting("max-age", keepFor).typedValue() == null) add(FieldProblem("keepFor", PlannerTexts.POLICY_DURATION))
+        if (keepAtMost.isNotEmpty() && PolicySetting("max-length-bytes", keepAtMost).typedValue() == null) {
+            add(FieldProblem("keepAtMost", PlannerTexts.POLICY_WHOLE_NUMBER))
+        }
+    }
+
+    /**
+     * Retention is one policy (Q4) that matches exactly [covered] and comes after every stream and route step; none while both fields are empty.
+     * Its name is derived from the stream name in the plan's naming style.
+     */
+    private fun retentionPolicy(covered: List<String>, ctx: FormContext): List<MigrationAction> {
+        val definition = buildMap {
+            if (keepFor.isNotEmpty()) put("max-age", ArgumentValue.Text(keepFor))
+            PolicySetting("max-length-bytes", keepAtMost).typedValue()?.takeIf { keepAtMost.isNotEmpty() }?.let { put("max-length-bytes", it) }
+        }
+        if (definition.isEmpty()) return emptyList()
+        return listOf(
+            MigrationAction.DeclarePolicy(
+                name = PlanNaming.derived(name, DerivedWord.RETENTION, ctx.namingStyle),
+                pattern = ExactPattern.of(covered),
+                definition = definition,
+                vhost = ctx.plan.vhost,
+                applyTo = PolicyTarget.STREAMS.wire,
+                priority = 0,
+            ),
+        )
     }
 
     private fun routeInto(filter: String?, destination: String, ctx: FormContext): List<MigrationAction> =
@@ -319,7 +356,28 @@ object StepForms {
         // The form writes a name only, so a stream with settings has no form (read-only step, kept as written): editing it would drop them.
         // A response stream of a pair is edited as an ordinary stream.
         is MigrationAction.DeclareStream -> if (action.arguments.isEmpty()) StreamForm(name = action.name) else null
+        is MigrationAction.DeclarePolicy -> policyFormOf(action)
         else -> null
+    }
+
+    /**
+     * The policy form of a policy whose target is one of the six, whose keys are all offered for that target and whose values have the type the
+     * catalog says (the type, not the range: the form shows its own problem for a negative size). A choice must hold one of the offered values:
+     * the dropdown cannot hold another without changing the file. Anything else is read-only (A2).
+     */
+    private fun policyFormOf(action: MigrationAction.DeclarePolicy): PolicyForm? {
+        val target = PolicyTarget.fromWire(action.applyTo) ?: return null
+        val rows = action.definition.map { (key, value) ->
+            val entry = PolicyKeyCatalog.entry(key)?.takeIf { target in it.targets } ?: return null
+            PolicySetting(key, textOfValue(entry.kind, value) ?: return null)
+        }
+        return PolicyForm(action.name, action.pattern, target, action.priority.toString(), rows)
+    }
+
+    private fun textOfValue(kind: PolicyValueKind, value: ArgumentValue): String? = when (kind) {
+        is PolicyValueKind.WholeNumber -> (value as? ArgumentValue.Whole)?.value?.toString()
+        PolicyValueKind.Duration, PolicyValueKind.Text -> (value as? ArgumentValue.Text)?.value
+        is PolicyValueKind.Choice -> (value as? ArgumentValue.Text)?.value?.takeIf { text -> kind.values.any { it.wire == text } }
     }
 }
 
@@ -328,10 +386,17 @@ internal object FormChecks {
      * One message per field, in this order: empty, "." or "..", the `amq.` prefix, a queue name over 255 bytes,
      * then whatever the parser round trip refuses, with the parser's own reason.
      */
-    fun nameProblem(name: String, missing: String, field: String, isQueue: Boolean = false, build: () -> MigrationAction): List<FieldProblem> = when {
+    fun nameProblem(
+        name: String,
+        missing: String,
+        field: String,
+        isQueue: Boolean = false,
+        reservedPrefix: Boolean = true,
+        build: () -> MigrationAction,
+    ): List<FieldProblem> = when {
         name.isEmpty() -> listOf(FieldProblem(field, missing))
         name == "." || name == ".." -> listOf(FieldProblem(field, DOT_NAME))
-        BrokerNameRules.reservedPrefix(name) -> listOf(FieldProblem(field, PlannerTexts.NAME_RESERVED))
+        reservedPrefix && BrokerNameRules.reservedPrefix(name) -> listOf(FieldProblem(field, PlannerTexts.NAME_RESERVED))
         isQueue && BrokerNameRules.queueNameTooLong(name) -> listOf(FieldProblem(field, PlannerTexts.QUEUE_NAME_TOO_LONG))
         else -> parserReason(build())?.let { listOf(FieldProblem(field, it)) }.orEmpty()
     }

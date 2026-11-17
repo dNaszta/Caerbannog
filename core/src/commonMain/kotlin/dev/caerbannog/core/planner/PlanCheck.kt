@@ -56,11 +56,20 @@ object PlanCheck {
     const val OTHER_VHOST: String = "A step for another virtual host is not read."
     const val NOT_READ: String = "This kind of step is not checked."
 
-    /** [onStep] is told the 1-based position and the total before each step is read. */
+    /** Most policies the check reads from the broker (one item each); beyond it a note is left out, never guessed. */
+    const val MAX_POLICY_READS: Int = 20
+
+    /**
+     * [policies] and [known] (M9-08) give a policy step its notes about a policy the broker already applies to a queue: [known] names the queues
+     * with the policy that binds, [policies] reads those policies one by one. Without [policies] there is no such note. [onStep] is told the
+     * 1-based position and the total before each step is read.
+     */
     suspend fun run(
         plan: TopologyPlan,
         context: PlannerContext,
         check: DeclareCheck?,
+        policies: BrokerPolicyReader? = null,
+        known: KnownTopology = KnownTopology.None,
         onStep: (position: Int, total: Int) -> Unit = { _, _ -> },
     ): PlanCheckResult {
         context.unavailableReason?.let { return PlanCheckResult.Refused(it) }
@@ -70,6 +79,7 @@ object PlanCheck {
         val verdict = MigrationDryRunRules.evaluate(
             plan.steps.map { it.action }, context.hasConfigurePermission, context.controlLevel, context.vhost,
         )
+        val brokerPolicies = policies?.let { BrokerPolicyNotes(it, known) }
         val declaredBefore = mutableSetOf<Pair<Kind, String>>()
         val total = plan.steps.size
         val results = plan.steps.mapIndexed { index, step ->
@@ -77,10 +87,15 @@ object PlanCheck {
             val blocked = verdict.actions[index].reason
             val finding = findingOf(step.action, context, check, declaredBefore)
             declaredBefore += declaredBy(step.action)
-            StepCheck(step.id, finding, blocked, if (finding == StepFinding.Different) listOf(DIFFERENT_NOTE) else emptyList())
+            val notes = listOfNotNull(DIFFERENT_NOTE.takeIf { finding == StepFinding.Different }) + policyNotes(step.action, context, brokerPolicies)
+            StepCheck(step.id, finding, blocked, notes)
         }
         return PlanCheckResult.Checked(results)
     }
+
+    /** Only a policy step of the connection's virtual host is judged; a read that fails says nothing. */
+    private suspend fun policyNotes(action: MigrationAction, context: PlannerContext, brokerPolicies: BrokerPolicyNotes?): List<String> =
+        if (brokerPolicies != null && action is MigrationAction.DeclarePolicy && action.vhost == context.vhost) brokerPolicies.notesFor(action) else emptyList()
 
     private enum class Kind { Exchange, Queue }
 
