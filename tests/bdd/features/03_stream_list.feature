@@ -255,8 +255,8 @@ Feature: Stream list
     When I open the stream list
     Then the stream "telemetry" shows the retention "7D"
 
-  # The Retention column and the MCP tools print the age only (decided in M9-08, step 2: the byte limit is read, not shown yet),
-  # so this scenario asserts what the list is built from, the summary of the stream.
+  # This scenario asserts what the list is built from, the summary of the stream; M9-08d (owner, 2026-11-17, option b)
+  # shows the byte limit in the Retention cell too, see the three @m9-08d scenarios at the end of this feature.
   @m9-08b @fake-broker
   Scenario: A maximum size set by a policy is read like one set when the stream was created
     Given a stream "telemetry" with no retention of its own and a policy that sets "max-length-bytes" to 1000000
@@ -274,5 +274,25 @@ Feature: Stream list
   Scenario: Retention set by a policy on a real stream is shown
     Given a real broker with a stream "telemetry" created without retention
     And a policy that sets "max-age" to "7D" on "telemetry" has taken effect
+    When I open the stream list
+    Then the stream "telemetry" shows the retention "7D"
+
+  # M9-08d, owner decision 2026-11-17 (option b): one Retention cell shows the age, the byte limit, or both
+  # ("7D, 1 MB": age first), the byte limit in the compact decimal format (1000000 is "1 MB", 1500000 is "1.5 MB").
+  @m9-08d @fake-broker
+  Scenario: A stream with a maximum size and no age shows the size as its retention
+    Given a stream "telemetry" with no retention of its own and a policy that sets "max-length-bytes" to 1000000
+    When I open the stream list
+    Then the stream "telemetry" shows the retention "1 MB"
+
+  @m9-08d @fake-broker
+  Scenario: A stream with an age and a maximum size shows both in one cell
+    Given a stream "telemetry" declared with "x-max-age" "7D" and "x-max-length-bytes" 1000000
+    When I open the stream list
+    Then the stream "telemetry" shows the retention "7D, 1 MB"
+
+  @m9-08d @fake-broker
+  Scenario: A stream with an age only still shows the age alone
+    Given a stream "telemetry" declared with "x-max-age" "7D" and no maximum size
     When I open the stream list
     Then the stream "telemetry" shows the retention "7D"
