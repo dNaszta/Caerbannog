@@ -24,7 +24,10 @@ internal data class TopologyExportResult(val actions: List<MigrationAction>, val
  *    exclusive ones are named in the note whatever their name, a non-exclusive `amq.gen-` or `mqtt-subscription-` queue is left out silently;
  *    a non-durable queue cannot be applied to a default 4.x broker and is left out as "transient";
  *  - the bindings of a left-out queue go with it; a binding on a built-in exchange is kept, the exchange itself is not declared;
- *  - `declareStream` carries no arguments, so a stream's own arguments (retention, leader locator) are named in the note;
+ *  - `declareStream` carries the four stream settings of [StreamSettingRules] (M9-14c), written with their typed values, the leader locator
+ *    always (the owner's working default: the file says what the broker had); a stream argument that is none of the four, or whose value
+ *    the rules refuse, or that could not be typed, is not written and the note names it as "other settings", so the export never writes
+ *    a file the parser refuses;
  *  - order: queues, exchanges (today's order, so a topology without streams, policies or arguments gives today's bytes), streams, bindings,
  *    policies, operator policies; the broker only needs both ends of a binding first.
  */
@@ -36,8 +39,6 @@ internal object TopologyExport {
     const val NOTE_PREFIX = "Left out: "
     const val NOTE_SEPARATOR = "; "
     const val MAX_NOTE_ENTRIES = 10
-    const val RETENTION_WORD = "retention"
-    const val LEADER_LOCATOR_WORD = "leader locator"
     const val OTHER_SETTINGS_WORD = "other settings"
     private const val WORDS_LAST_JOINER = " and "
     private const val WORDS_JOINER = ", "
@@ -49,9 +50,6 @@ internal object TopologyExport {
     fun moreNote(count: Int) = "and $count more"
     fun exclusiveQueueNote(name: String) = "exclusive queue $name"
     fun transientQueueNote(name: String) = "transient queue $name (cannot be applied)"
-
-    private val retentionKeys = setOf("x-max-age", "x-max-length-bytes", "x-stream-max-segment-size-bytes")
-    private const val LEADER_LOCATOR_KEY = "x-queue-leader-locator"
 
     private fun joinWords(words: List<String>): String =
         if (words.size <= 1) words.joinToString("") else words.dropLast(1).joinToString(WORDS_JOINER) + WORDS_LAST_JOINER + words.last()
@@ -70,7 +68,7 @@ internal object TopologyExport {
         val leftOut = queues.filter { it !in exported }
 
         // Only what the file carries is checked: a setting the model refused would be dropped from it silently, so the export fails instead.
-        // A stream carries no arguments (the note names them), a left-out queue is not written, and neither is a built-in exchange.
+        // A stream carries its four settings (what else it holds is named in the note), a left-out queue is not written, and neither is a built-in exchange.
         val writtenBindings = bindings.filter { it.keepsBothEnds(keptNames) && it.source.isNotEmpty() && it.destination.isNotEmpty() }
         val writtenExchanges = exchanges.filter { it.name.isNotEmpty() && !it.name.startsWith("amq.") }
         val incomplete = exported.any { !it.typedArgumentsComplete } || writtenExchanges.any { !it.typedArgumentsComplete } ||
@@ -79,7 +77,7 @@ internal object TopologyExport {
 
         val bindingActions = writtenBindings.mapNotNull { bindingAction(it, vhost) }
         val actions = exported.map { queueAction(it, vhost) } + writtenExchanges.mapNotNull { exchangeAction(it, vhost) } +
-            streams.map { MigrationAction.DeclareStream(name = it.name, vhost = vhost) } + bindingActions + policies.map { policyAction(it, vhost) } +
+            streams.map { MigrationAction.DeclareStream(name = it.name, vhost = vhost, arguments = writtenSettings(it)) } + bindingActions + policies.map { policyAction(it, vhost) } +
             operatorPolicies.map { operatorPolicyAction(it, vhost) }
         return TopologyExportOutcome.Written(TopologyExportResult(actions, note(streams, exchanges, bindings, leftOut)))
     }
@@ -93,15 +91,16 @@ internal object TopologyExport {
     private fun ownArguments(arguments: Map<String, ArgumentValue>): Map<String, ArgumentValue> =
         arguments.filterKeys { it != QUEUE_TYPE_ARGUMENT }
 
-    /** The words for what a stream's arguments say, in the fixed order retention, leader locator, other settings. */
+    /** The stream's settings the file can carry: the four keys with a value [StreamSettingRules] accepts, so the parser accepts the file again. */
+    private fun writtenSettings(stream: QueueDeclaration): Map<String, ArgumentValue> =
+        ownArguments(stream.arguments).filter { (key, value) -> key in StreamSettingRules.keys && StreamSettingRules.refusal(key, value) == null }
+
+    /** The words for what a stream's arguments say that the file cannot carry: only "other settings", or none. */
     private fun words(streams: List<QueueDeclaration>): List<String> {
-        val own = streams.flatMap { ownArguments(it.arguments).keys }
-        val other = own.any { it !in retentionKeys && it != LEADER_LOCATOR_KEY } || streams.any { !it.typedArgumentsComplete }
-        return listOfNotNull(
-            RETENTION_WORD.takeIf { own.any { it in retentionKeys } },
-            LEADER_LOCATOR_WORD.takeIf { LEADER_LOCATOR_KEY in own },
-            OTHER_SETTINGS_WORD.takeIf { other },
-        )
+        val other = streams.any { stream ->
+            ownArguments(stream.arguments).size != writtenSettings(stream).size || !stream.typedArgumentsComplete
+        }
+        return listOfNotNull(OTHER_SETTINGS_WORD.takeIf { other })
     }
 
     private fun note(streams: List<QueueDeclaration>, exchanges: List<ExchangeRow>, bindings: List<BindingRow>, leftOut: List<QueueDeclaration>): String? {

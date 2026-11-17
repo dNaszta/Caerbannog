@@ -38,9 +38,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
  */
 class M508aExecutorSteps {
 
+    /** M9-14c: the stream steps (`M914cStreamSteps`) work on THIS scenario's broker and real executor; Cucumber has no DI here. */
+    companion object {
+        @Volatile
+        internal var current: M508aExecutorSteps? = null
+    }
+
     private val s: TopologyMigrationsSteps get() = checkNotNull(TopologyMigrationsSteps.current) { "no scenario state" }
 
-    private var broker = FakeManagementBroker()
+    internal var broker = FakeManagementBroker()
+        private set
     private var executor: TopologyMigrationExecutor? = null
     private var installed = false
     private val sentinel = "SENTINEL-broker-text-31c7"
@@ -53,6 +60,7 @@ class M508aExecutorSteps {
 
     @Before
     fun reset() {
+        current = this
         broker = FakeManagementBroker()
         executor = null
         installed = false
@@ -62,7 +70,7 @@ class M508aExecutorSteps {
     }
 
     /** Puts the real runner and executor in front of the scripted broker. Must run before the view model is built. */
-    private fun real(): TopologyMigrationExecutor {
+    internal fun real(): TopologyMigrationExecutor {
         executor?.let { return it }
         val engine = MockEngine { request ->
             val body = String(request.body.toByteArray())
@@ -87,13 +95,13 @@ class M508aExecutorSteps {
         return """{ "version": "$version", "description": "m5-08a", "up": [ $actions ] }"""
     }
 
-    private fun import(json: String) = runBlocking {
+    internal fun import(json: String) = runBlocking {
         val result = s.fileRepository.importFile(json)
         assertTrue(result is MigrationValidationResult.Valid, "the scenario's own file was refused: $result")
         s.getVm().loadMigrations()
     }
 
-    private fun failed(): MigrationApplyResult.ActionFailed =
+    internal fun failed(): MigrationApplyResult.ActionFailed =
         s.lastApplyResult as? MigrationApplyResult.ActionFailed ?: error("expected the apply to fail at an action but it gave ${s.lastApplyResult}")
 
     private fun requestsSince(mark: Int) = broker.requests.drop(mark)
@@ -264,6 +272,8 @@ class M508aExecutorSteps {
         assertTrue(broker.deletes.isEmpty(), "something was deleted: ${broker.deletes}")
         val puts = broker.requests.filter { it.method == "PUT" }.groupBy { it.path }
         assertTrue(puts.values.all { it.size == 1 }, "a resource was sent more than once: ${puts.filterValues { it.size > 1 }.keys}")
+        // M9-14c: a stream goes through the stream manager, not over HTTP: the manager's own calls count too.
+        assertTrue(broker.streamCreateCalls.isEmpty() && broker.streamDeleteCalls.isEmpty(), "a stream was created or deleted: ${broker.streamCreateCalls} ${broker.streamDeleteCalls}")
     }
 
     @Then("the migration is not recorded as applied")

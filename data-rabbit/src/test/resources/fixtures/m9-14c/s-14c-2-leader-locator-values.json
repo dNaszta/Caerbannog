@@ -1,0 +1,42 @@
+{
+    "R queue-leader-locator 'balanced'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-leader-locator 'client-local'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "client-local",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-leader-locator 'random'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "random",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-leader-locator 'least-leaders'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "least-leaders",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-leader-locator 'nearest'": {
+        "outcome": "refused StreamException code=17"
+    },
+    "R queue-leader-locator 'Balanced'": {
+        "outcome": "refused StreamException code=17"
+    },
+    "R queue-leader-locator ''": {
+        "outcome": "refused StreamException code=17"
+    },
+    "R queue-leader-locator '7'": {
+        "outcome": "refused StreamException code=17"
+    }
+}

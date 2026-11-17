@@ -5,6 +5,7 @@ import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
+import dev.caerbannog.core.streams.StreamSettings
 import io.ktor.client.HttpClient
 
 /**
@@ -34,7 +35,7 @@ class ManagementTopologyMigrationExecutor internal constructor(
             is MigrationAction.DeclareVhost, is MigrationAction.DeclareUser, is MigrationAction.SetPermissions, is MigrationAction.SetTopicPermissions ->
                 access.execute(action)
             is MigrationAction.DeleteBinding -> bindingDelete.delete(action)
-            is MigrationAction.DeclareStream -> streamOutcome(streams.createStream(action.vhost, action.name), action)
+            is MigrationAction.DeclareStream -> declareStream(action)
             is MigrationAction.DeleteStream -> streamOutcome(streams.deleteStream(action.vhost, action.name), action)
             else -> writeAndVerify(action)
         }
@@ -74,6 +75,37 @@ class ManagementTopologyMigrationExecutor internal constructor(
             else -> ExecutorReasons.forReply(reply)
         }
     }
+
+    /**
+     * A stream WITHOUT settings keeps the path of old: create (idempotent), read back. One WITH settings is read first, like a policy:
+     * absent is created and read back, the same is a no-op, other settings are a conflict; the broker is never asked to create over an
+     * existing stream and nothing is altered or deleted. Settings that [StreamSettings.from] refuses (an action built without the parser) never
+     * reach the manager. After a refused create (the stream may have appeared between the read and the create) one more read decides by facts.
+     */
+    private suspend fun declareStream(action: MigrationAction.DeclareStream): ActionResult {
+        if (action.arguments.isEmpty()) return streamOutcome(streams.createStream(action.vhost, action.name), action)
+        val settings = StreamSettings.from(action.arguments) ?: return ExecutorReasons.failed(ExecutorReasons.REFUSED)
+        val reply = reader.read(action)
+        if (reply !is ManagementReply.Response) return ExecutorReasons.forReply(reply)
+        return when (reply.status) {
+            NOT_FOUND -> createWithSettings(action, settings)
+            OK -> sameOrConflict(action, reply.body)
+            else -> ExecutorReasons.forReply(reply)
+        }
+    }
+
+    private suspend fun createWithSettings(action: MigrationAction.DeclareStream, settings: StreamSettings): ActionResult =
+        when (val created = streams.createStream(action.vhost, action.name, settings)) {
+            is StreamManagementResult.Refused -> {
+                val again = reader.read(action)
+                if (again is ManagementReply.Response && again.status == OK) sameOrConflict(action, again.body)
+                else ExecutorReasons.failed(ExecutorReasons.REFUSED)
+            }
+            else -> streamOutcome(created, action)
+        }
+
+    private fun sameOrConflict(action: MigrationAction, body: String): ActionResult =
+        if (DeclaredResourceMatcher.matches(action, body)) ActionResult.Success else ExecutorReasons.conflict(action)
 
     /**
      * A stream is created or deleted by the stream manager; the typed answer decides, never its text. Created: read back as a queue of type

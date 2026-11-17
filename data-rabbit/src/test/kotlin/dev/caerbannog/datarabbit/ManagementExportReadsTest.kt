@@ -184,6 +184,28 @@ class ManagementExportReadsTest {
         assertEquals(x.arguments, rows.getValue("y").arguments)
     }
 
+    // M9-14c step 2b (brief table): the writer needs the TYPED values of the four stream settings (S-14c-1: x-max-age is TEXT, the other numbers).
+    @Test
+    fun `the four stream settings survive the read with their JSON types, the text 7D and the two numbers and the locator`() {
+        val stream = """{"name":"s","type":"stream","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"stream","x-max-age":"7D","x-max-length-bytes":1000000000,"x-stream-max-segment-size-bytes":100000000,"x-queue-leader-locator":"client-local"}}"""
+        val row = (ManagementJson.parseQueueDeclarations(declarationsPage(stream), "/") as CatalogResult.Success<QueueDeclarationPage>).value.rows.single()
+        assertEquals(
+            mapOf(
+                "x-max-age" to ArgumentValue.Text("7D"), "x-max-length-bytes" to ArgumentValue.Whole(1_000_000_000),
+                "x-stream-max-segment-size-bytes" to ArgumentValue.Whole(100_000_000), "x-queue-leader-locator" to ArgumentValue.Text("client-local"),
+            ),
+            row.arguments,
+        )
+        assertTrue(row.typedArgumentsComplete)
+    }
+
+    @Test
+    fun `a stream setting the broker shows as another JSON type is kept as that type, nothing is converted`() {
+        val stream = """{"name":"s","type":"stream","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"stream","x-max-age":604800,"x-max-length-bytes":"1000"}}"""
+        val row = (ManagementJson.parseQueueDeclarations(declarationsPage(stream), "/") as CatalogResult.Success<QueueDeclarationPage>).value.rows.single()
+        assertEquals(mapOf("x-max-age" to ArgumentValue.Whole(604800), "x-max-length-bytes" to ArgumentValue.Text("1000")), row.arguments)
+    }
+
     @Test
     fun `a stream or exclusive queue with a refused argument is marked too, the page still succeeds`() {
         val stream = """{"name":"s","type":"stream","durable":true,"auto_delete":false,"exclusive":false,"arguments":{"x-queue-type":"stream","deep":$tooDeep}}"""

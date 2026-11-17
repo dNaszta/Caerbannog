@@ -254,9 +254,9 @@ Feature: Check a plan against the broker
 
   # M9-14c (owner decision O16, 2026-11-17): what "Already there" compares for a stream. Only what the step declares counts, as for a queue:
   # a step with no settings is the same whatever the broker holds (a stream the product made carries x-queue-leader-locator balanced);
-  # every declared setting must be on the broker with the same value. Carries @needs-M9-14c and no @fake-broker until step 2 (the planner
-  # runner selects m9-01 to m9-07 with @fake-broker, so nothing selects these before then).
-  @m9-14c @needs-M9-14c
+  # every declared setting must be on the broker with the same value. Step 2b (2026-11-17): @fake-broker is added and the glue exists in
+  # PlannerCheckSteps; the tag @m9-05 puts it in the planner runner (which selects @m9-01 to @m9-07 with @fake-broker); it is RED until the build.
+  @m9-05 @m9-14c @fake-broker
   Scenario Outline: A stream is compared on the settings its step declares
     Given the broker has the stream "audit" with "x-max-age" as the text "1D" and "x-queue-leader-locator" as the text "balanced"
     And a plan with the step <step>

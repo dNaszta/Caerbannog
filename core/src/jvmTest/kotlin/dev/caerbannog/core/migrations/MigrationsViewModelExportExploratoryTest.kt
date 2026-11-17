@@ -55,14 +55,15 @@ class MigrationsViewModelExportExploratoryTest {
     }
 
     @Test
-    fun `CHARACTERISATION twelve streams that are not a super stream give ten entries and and 2 more, a leader locator is not called retention`() {
+    fun `CHARACTERISATION twelve streams that are not a super stream give ten entries and and 2 more, the settings are other settings`() {
+        // M9-14c step 2b: the leader locator is written now, so it cannot be the example any more; x-initial-cluster-size stays unwritable.
         val rig = Rig(FakeTopologyCatalog().apply {
-            for (i in 0 until 12) addStream("orders-%02d".format(i), arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+            for (i in 0 until 12) addStream("orders-%02d".format(i), arguments = mapOf("x-initial-cluster-size" to ArgumentValue.Whole(3)))
         })
         rig.export()
         val note = assertNotNull(rig.vm.state.value.exportNote)
-        assertEquals(10, Regex("leader locator of stream").findAll(note).count(), note)
-        assertEquals(0, Regex("retention").findAll(note).count(), note)
+        assertEquals(10, Regex("other settings of stream").findAll(note).count(), note)
+        assertEquals(0, Regex("retention|leader locator").findAll(note).count(), note)
         assertTrue(note.endsWith("; and 2 more"), note)
         println("M9-14b note length for 12 streams: ${note.length}")
     }
@@ -72,12 +73,12 @@ class MigrationsViewModelExportExploratoryTest {
         val rig = Rig(FakeTopologyCatalog().apply {
             addExchange(FakeTopologyCatalog.exchange("orders", superStream = true, typedArguments = mapOf("x-super-stream" to ArgumentValue.Flag(true))))
             for (i in 0 until 12) {
-                addStream("orders-$i", arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+                addStream("orders-$i", arguments = mapOf("x-initial-cluster-size" to ArgumentValue.Whole(3)))
                 addBinding(BindingRow("orders", "/", "orders-$i", BindingDestinationType.QUEUE, "$i"))
             }
         })
         rig.export()
-        assertEquals("Left out: leader locator of super stream orders (12 partitions)", rig.vm.state.value.exportNote)
+        assertEquals("Left out: other settings of super stream orders (12 partitions)", rig.vm.state.value.exportNote)
     }
 
     @Test

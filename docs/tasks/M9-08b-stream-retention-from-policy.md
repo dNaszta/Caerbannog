@@ -34,7 +34,7 @@ The parser change is small and pure; no new request. The live test is the only n
 Evaluated: no new tool, no schema change. The result of the two existing read-only tools becomes correct for policy-set retention. Safety unchanged (read only, same GETs).
 
 ## Open points
-- Precedence when a stream has retention both as argument and by policy: unmeasured, see Scope.
+- Precedence when a stream has retention both as argument and by policy: MEASURED by M9-14c S-14c-4 (`max-length-bytes` only, `docs/tasks/M9-14c-spike-results.md`): the policy decides in both directions and the argument still shows its declared value. Read the policy value first for `max-length-bytes`; the other keys stay unmeasured. Related, by design: the migration check (M9-14c) judges a stream step that declares retention as an argument by the broker's `arguments` alone, so a stream whose retention comes only from a policy is `Different` for such a step (it reads no `effective_policy_definition`).
 - Wording: DECIDED (owner, 2026-11-16, item 7 of `M9-00c`): the column does not mark "set by policy".
 
 ## Definition of done

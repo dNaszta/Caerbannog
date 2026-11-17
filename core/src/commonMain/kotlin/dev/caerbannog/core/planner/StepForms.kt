@@ -163,8 +163,9 @@ object StepForms {
             } else {
                 null
             }
-        // A stream has no arguments here, so every one is editable; a response stream of a pair is edited as an ordinary stream.
-        is MigrationAction.DeclareStream -> StreamForm(name = action.name)
+        // The form writes a name only, so a stream with settings has no form (read-only step, kept as written): editing it would drop them.
+        // A response stream of a pair is edited as an ordinary stream.
+        is MigrationAction.DeclareStream -> if (action.arguments.isEmpty()) StreamForm(name = action.name) else null
         else -> null
     }
 }

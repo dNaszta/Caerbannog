@@ -2,6 +2,7 @@ package dev.caerbannog.core.migrations.fakes
 
 import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
+import dev.caerbannog.core.streams.StreamSettings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -136,17 +137,46 @@ class FakeManagementBroker {
     val writes: List<Request> get() = synchronized(requests) { requests.filter { it.isWrite } }
     val deletes: List<Request> get() = synchronized(requests) { requests.filter { it.method == "DELETE" } }
 
-    /** A stream manager that works on the same queues: a stream is a queue of type `stream`, as on the real broker. */
+    /** M9-14c: every create and delete the stream manager of this broker was asked for (the stream protocol is not an HTTP request, so [requests] does not show them). */
+    val streamCreateCalls: MutableList<Triple<String, String, StreamSettings>> = Collections.synchronizedList(ArrayList())
+    val streamDeleteCalls: MutableList<Pair<String, String>> = Collections.synchronizedList(ArrayList())
+
+    /**
+     * A stream manager that works on the same queues: a stream is a queue of type `stream`, as on the real broker. M9-14c, pinned to the measured rows
+     * of `DeclareEquivalenceTable.streamAnswers` (RabbitMQ 4.4.0): the declared settings are stored as the stream's `arguments` under their `x-` names
+     * (`x-max-age` text as given, the two byte keys numbers), `x-queue-leader-locator: balanced` is added when no locator is declared (S-14c-5) and
+     * `x-queue-type: stream` always. A repeat create is `Success` and changes nothing when every declared setting equals the held one (a declared
+     * subset counts for the locator only: the held `balanced` is the default; a held retention left out is a difference); any other repeat, and a name that is not a stream, is `Refused` with `PRECONDITION_FAILED`
+     * and changes nothing (S-14c-3). The fake never models route T text equality (the product never uses it).
+     */
     fun streamManager(): StreamManager = object : StreamManager {
-        override suspend fun createStream(vhost: String, name: String): StreamManagementResult {
-            // The real stream client treats STREAM_ALREADY_EXISTS (code 5) as success: creating again is Success.
-            if (Key(vhost, name) !in queues) addQueue(vhost, name, type = "stream")
-            return StreamManagementResult.Success
+        override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult {
+            streamCreateCalls += Triple(vhost, name, settings)
+            val declared = declaredArguments(settings)
+            val held = queues[Key(vhost, name)]
+            if (held == null) {
+                addQueue(vhost, name, type = "stream", arguments = declared + ("x-queue-leader-locator" to (declared["x-queue-leader-locator"] ?: JsonPrimitive("balanced"))))
+                return StreamManagementResult.Success
+            }
+            // The real stream client treats STREAM_ALREADY_EXISTS (code 5) as success only for an equal stream; a different one is code 17.
+            val omitted = held.arguments.keys - declared.keys - setOf("x-queue-type", "x-queue-leader-locator") // a held setting the repeat leaves out (S-14c-3 (c))
+            val sameStream = held.arguments["x-queue-type"] == JsonPrimitive("stream") && omitted.isEmpty() &&
+                declared.all { (key, value) -> held.arguments[key] == value }
+            return if (sameStream) StreamManagementResult.Success
+            else StreamManagementResult.Refused("Broker refused to create stream '$name': PRECONDITION_FAILED")
         }
 
-        override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
-            if (queues.remove(Key(vhost, name)) != null) StreamManagementResult.Success
-            else StreamManagementResult.NotFound
+        private fun declaredArguments(settings: StreamSettings): Map<String, JsonElement> = buildMap {
+            settings.maxAge?.let { put("x-max-age", JsonPrimitive(it)) }
+            settings.maxLengthBytes?.let { put("x-max-length-bytes", JsonPrimitive(it)) }
+            settings.segmentSizeBytes?.let { put("x-stream-max-segment-size-bytes", JsonPrimitive(it)) }
+            settings.leaderLocator?.let { put("x-queue-leader-locator", JsonPrimitive(it)) }
+        }
+
+        override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult {
+            streamDeleteCalls += vhost to name
+            return if (queues.remove(Key(vhost, name)) != null) StreamManagementResult.Success else StreamManagementResult.NotFound
+        }
     }
 
     // ---- the API ---------------------------------------------------------------------------------------------

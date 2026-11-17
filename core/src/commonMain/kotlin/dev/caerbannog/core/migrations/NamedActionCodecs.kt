@@ -19,6 +19,25 @@ internal inline fun <reified A : MigrationAction> namedCodec(
 
 internal val deleteQueueCodec = namedCodec("deleteQueue", "queue name is required", MigrationAction::DeleteQueue, MigrationAction.DeleteQueue::name)
 internal val deleteExchangeCodec = namedCodec("deleteExchange", "exchange name is required", MigrationAction::DeleteExchange, MigrationAction.DeleteExchange::name)
-internal val declareStreamCodec = namedCodec("declareStream", "stream name is required", MigrationAction::DeclareStream, MigrationAction.DeclareStream::name)
 internal val deleteStreamCodec = namedCodec("deleteStream", "stream name is required", MigrationAction::DeleteStream, MigrationAction.DeleteStream::name)
 internal val deletePolicyCodec = namedCodec("deletePolicy", "policy name is required", MigrationAction::DeletePolicy, MigrationAction.DeletePolicy::name)
+
+/** `declareStream` carries the four settings of [StreamSettingRules] as typed arguments; a file without `arguments` is read and written as before. */
+internal val declareStreamCodec = codec<MigrationAction.DeclareStream>(
+    name = "declareStream",
+    read = { entry ->
+        val name = entry.identifier("name")
+        val arguments = entry.typedEntries("arguments")
+        val refusal = arguments?.let { StreamSettingRules.refusal(it) }
+        when {
+            name.isNullOrBlank() -> refused("stream name is required")
+            arguments == null -> refused(ARGUMENTS_INVALID)
+            refusal != null -> refused(refusal)
+            else -> accepted(MigrationAction.DeclareStream(name = name, vhost = entry.vhost(), arguments = arguments))
+        }
+    },
+    write = { action, out ->
+        out.putText("name", action.name)
+        out.putTyped("arguments", action.arguments)
+    },
+)

@@ -201,18 +201,33 @@ class M914ExportSteps {
         assertEquals(listOf(queue), file.up.filterIsInstance<MigrationAction.DeclareBinding>().map { it.queue })
     }
 
-    @Then("the new migration declares the stream {string} without any retention")
-    fun streamWithoutRetention(name: String) {
-        assertEquals(listOf(name), file.up.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
-        assertFalse(file.rawJson.contains("x-max-age") || file.rawJson.contains("max-age"), "nothing may be invented: ${file.rawJson}")
+    // ---- M9-14c: the settings of a stream are written ----
+
+    @Given("the broker has the stream {string} with the argument {string} {int} and retention {string} as the text {string}")
+    fun streamWithOtherArgument(name: String, key: String, value: Int, retentionKey: String, retention: String) {
+        catalog.addStream(name, arguments = mapOf(key to ArgumentValue.Whole(value.toLong()), retentionKey to ArgumentValue.Text(retention)))
     }
 
-    @Then("the export result says that retention of {string} and the exclusive queue {string} were left out")
-    fun noteSays(stream: String, queue: String) {
-        val note = s.getVm().state.value.exportNote
-        assertNotNull(note, "the export said nothing about what it left out")
-        assertTrue(note!!.contains(stream) && note.contains("retention", ignoreCase = true), "the note does not name the retention of $stream: $note")
-        assertTrue(note.contains(queue) && note.contains("exclusive", ignoreCase = true), "the note does not name the exclusive queue $queue: $note")
+    @Given("the broker has a super stream {string} with {int} partitions that also hold the argument {string} {int}")
+    fun superStreamWithOtherArgument(name: String, partitions: Int, key: String, value: Int) {
+        superStream(name, partitions)
+        for (i in 0 until partitions) {
+            catalog.deleteQueue("$name-$i")
+            catalog.addStream("$name-$i", arguments = mapOf("x-queue-leader-locator" to ArgumentValue.Text("balanced"), key to ArgumentValue.Whole(value.toLong())))
+        }
+    }
+
+    /** The settings the file carries for a stream, exactly: `only` is the same sentence, the arguments must EQUAL what the scenario names. */
+    @Then("^the new migration declares the stream \"([^\"]*)\" with (.+?)(?: only)?$")
+    fun declaresStreamWith(name: String, clause: String) {
+        val stream = file.up.filterIsInstance<MigrationAction.DeclareStream>().singleOrNull { it.name == name } ?: error("no stream $name in ${file.up}")
+        assertEquals(parseStreamSettings(clause), stream.arguments, "the settings written for $name")
+    }
+
+    @Then("^the new migration declares the streams \"([^\"]*)\", \"([^\"]*)\" and \"([^\"]*)\" each with (.+)$")
+    fun declaresStreamsEachWith(a: String, b: String, c: String, clause: String) {
+        val declared = file.up.filterIsInstance<MigrationAction.DeclareStream>().associateBy { it.name }
+        for (name in listOf(a, b, c)) assertEquals(parseStreamSettings(clause), (declared[name] ?: error("no stream $name in ${file.up}")).arguments, "the settings written for $name")
     }
 
     @Then("the export result has no line about what was left out")

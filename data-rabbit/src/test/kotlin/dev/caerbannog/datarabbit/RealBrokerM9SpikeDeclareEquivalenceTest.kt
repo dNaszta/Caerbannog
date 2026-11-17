@@ -5,6 +5,7 @@ import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.fakes.DeclareEquivalenceTable
 import dev.caerbannog.core.streams.StreamManagementResult
+import dev.caerbannog.core.streams.StreamSettings
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -261,6 +262,24 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
             found += DeclareEquivalenceTable.StreamAnswer("stream.create.new", answerOf(created))
             found += DeclareEquivalenceTable.StreamAnswer("stream.arguments.after-create", "Arguments " + M9c.queueDetail(api, stream).args().toString())
             found += DeclareEquivalenceTable.StreamAnswer("stream.create.again", answerOf(runBlocking { manager.createStream("/", stream) }))
+            // M9-14c: the rows with settings, through the REAL manager (the raw route, protocol names): the arguments never change on a repeat.
+            val withSettings = cleanup.queue(unique("g3w"))
+            val sevenDays = StreamSettings(maxAge = "7D", leaderLocator = "balanced")
+            assertEquals(StreamManagementResult.Success, runBlocking { manager.createStream("/", withSettings, sevenDays) })
+            val argsAfterCreate = M9c.queueDetail(api, withSettings).args()
+            found += DeclareEquivalenceTable.StreamAnswer("stream.arguments.after-create-with-settings", "Arguments " + argsAfterCreate.toString())
+            val repeats = listOf(
+                "stream.create.again-same" to sevenDays,
+                "stream.create.again-subset-locator" to StreamSettings(maxAge = "7D"),
+                "stream.create.again-other-retention" to StreamSettings(maxAge = "1D", leaderLocator = "balanced"),
+                "stream.create.again-other-locator" to StreamSettings(maxAge = "7D", leaderLocator = "client-local"),
+                "stream.create.again-no-settings" to StreamSettings.NONE,
+                "stream.create.again-superset" to StreamSettings(maxAge = "7D", maxLengthBytes = 1_000_000_000, leaderLocator = "balanced"),
+            )
+            for ((id, settings) in repeats) {
+                found += DeclareEquivalenceTable.StreamAnswer(id, answerOf(runBlocking { manager.createStream("/", withSettings, settings) }))
+                assertEquals(argsAfterCreate, M9c.queueDetail(api, withSettings).args(), "$id altered the stream (S-14c-3: a repeat never does)")
+            }
             val quorum = cleanup.queue(unique("g3q"))
             assertEquals(201, send(queue(quorum, "quorum")).status)
             found += DeclareEquivalenceTable.StreamAnswer("stream.create.on-quorum-queue", answerOf(runBlocking { manager.createStream("/", quorum) }))

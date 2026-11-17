@@ -1,0 +1,10 @@
+{
+    "plain": {
+        "x-queue-leader-locator": "balanced",
+        "x-queue-type": "stream"
+    },
+    "balanced": {
+        "x-queue-leader-locator": "balanced",
+        "x-queue-type": "stream"
+    }
+}

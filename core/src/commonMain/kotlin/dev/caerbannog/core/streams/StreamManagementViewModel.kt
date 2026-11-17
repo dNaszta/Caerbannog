@@ -89,6 +89,7 @@ class StreamManagementViewModel(
         }
 
         _createState.update { it.copy(isCreating = true, error = null) }
+        // The default settings on purpose: this dialog makes plain streams (retention is a policy or a migration file, M9-14c).
         return when (val outcome = manager.createStream(vhost, name)) {
             is StreamManagementResult.Success -> {
                 _createState.value = CreateStreamState(isOpen = false)

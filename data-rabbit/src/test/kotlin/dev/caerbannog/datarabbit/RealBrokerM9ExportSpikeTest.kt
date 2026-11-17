@@ -546,7 +546,8 @@ class RealBrokerM9ExportSpikeTest {
         put("/api/queues/$v/q-classic", """{"durable":true,"arguments":{"x-queue-type":"classic","x-message-ttl":60000,"x-max-length":1000,"x-dead-letter-exchange":"dlx","x-overflow":"reject-publish"}}""")
         put("/api/queues/$v/q-quorum", """{"durable":true,"arguments":{"x-queue-type":"quorum","x-delivery-limit":5,"x-dead-letter-exchange":"dlx","x-max-length":100}}""")
         put("/api/queues/$v/q-plain", """{"durable":true,"arguments":{"x-queue-type":"quorum"}}""")
-        put("/api/queues/$v/q-stream", """{"durable":true,"arguments":{"x-queue-type":"stream","x-max-age":"7D","x-max-length-bytes":1000000000}}""")
+        // M9-14c (brief table, E7): a stream with retention AND a non-default leader locator, so "B equals A" includes a stream's arguments.
+        put("/api/queues/$v/q-stream", """{"durable":true,"arguments":{"x-queue-type":"stream","x-max-age":"7D","x-max-length-bytes":1000000000,"x-queue-leader-locator":"client-local"}}""")
         ctlOn(broker, "rabbitmq-streams", "add_super_stream", "orders-ss", "--vhost", vhost, "--partitions", "3")
         assertTrue(brokerApi.post("/api/bindings/$v/e/events/q/q-quorum", """{"routing_key":"order.#"}""").ok)
         assertTrue(brokerApi.post("/api/bindings/$v/e/hdr/q/q-classic", """{"routing_key":"","arguments":{"x-match":"all","region":"eu","level":3,"urgent":true}}""").ok)
@@ -582,7 +583,7 @@ class RealBrokerM9ExportSpikeTest {
 
     private fun arguments(o: JsonObject): JsonObject = (o["arguments"] as? JsonObject) ?: JsonObject(emptyMap())
 
-    /** The broker's own view of a vhost, reduced to what the export promises to keep. Streams: name and type only (retention is left out). */
+    /** The broker's own view of a vhost, reduced to what the export promises to keep. M9-14c: a stream's arguments (retention, leader locator) are part of "the same". */
     private data class Snapshot(
         val queues: Map<String, JsonObject>, val exchanges: Map<String, JsonObject>, val bindings: Set<JsonObject>,
         val policies: Map<String, JsonObject>, val operatorPolicies: Map<String, JsonObject>,
@@ -594,7 +595,7 @@ class RealBrokerM9ExportSpikeTest {
             val type = prim(q, "type").content
             prim(q, "name").content to buildJsonObject {
                 put("type", type); put("durable", prim(q, "durable").booleanOrNull!!); put("auto_delete", prim(q, "auto_delete").booleanOrNull!!)
-                if (type != "stream") put("arguments", JsonObject(arguments(q) - "x-queue-type"))
+                put("arguments", JsonObject(arguments(q) - "x-queue-type"))
             }
         }
         val exchanges = a.get("/api/exchanges/$v").arr.map { it.jsonObject }.filter { prim(it, "name").content.let { n -> n.isNotEmpty() && !n.startsWith("amq.") } }.associate { e ->
@@ -642,7 +643,7 @@ class RealBrokerM9ExportSpikeTest {
         val excluded = queueRows.filter { leftOut(prim(it, "name").content, it) }.map { prim(it, "name").content }.toSet()
         val queues = queueRows.filterNot { prim(it, "name").content in excluded }.map { q ->
             val name = prim(q, "name").content; val type = prim(q, "type").content
-            if (type == "stream") MigrationAction.DeclareStream(name, to)
+            if (type == "stream") MigrationAction.DeclareStream(name, to, typed(JsonObject(arguments(q) - "x-queue-type")))
             else MigrationAction.DeclareQueue(name, type, to, prim(q, "durable").booleanOrNull!!, typed(JsonObject(arguments(q) - "x-queue-type")), prim(q, "auto_delete").booleanOrNull!!)
         }
         val exchanges = api.get("/api/exchanges/$v").arr.map { it.jsonObject }.filter { prim(it, "name").content.let { n -> n.isNotEmpty() && !n.startsWith("amq.") } }.map { e ->

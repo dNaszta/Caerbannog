@@ -29,7 +29,7 @@ internal object DeclaredResourceMatcher {
         return when (action) {
             is MigrationAction.DeclareQueue -> root is JsonObject && queueMatches(action, root)
             is MigrationAction.DeclareExchange -> root is JsonObject && exchangeMatches(action, root)
-            is MigrationAction.DeclareStream -> root is JsonObject && root.text("type") == "stream"
+            is MigrationAction.DeclareStream -> root is JsonObject && root.text("type") == "stream" && argumentsContained(action.arguments, root["arguments"])
             is MigrationAction.DeclareBinding -> root is JsonArray && root.any { it is JsonObject && bindingMatches(action, it) }
             else -> false
         }

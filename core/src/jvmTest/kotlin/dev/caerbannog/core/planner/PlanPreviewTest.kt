@@ -211,4 +211,17 @@ class PlanPreviewTest {
         val plan = planOf(queue("orders"), exchange("events"), bind("events", "orders", "k"))
         assertEquals(planPreview(plan, none), planPreview(plan, none))
     }
+
+    @Test
+    fun `M9-14c a stream with settings is still a stream node, drawn like any stream the plan declares`() {
+        val withSettings = MigrationAction.DeclareStream(
+            name = "audit-log",
+            arguments = mapOf("x-max-age" to dev.caerbannog.core.json.ArgumentValue.Text("7D"), "x-queue-leader-locator" to dev.caerbannog.core.json.ArgumentValue.Text("balanced")),
+        )
+        val plain = planPreview(planOf(MigrationAction.DeclareStream(name = "audit-log")), none)
+        val g = planPreview(planOf(withSettings), none)
+        assertEquals(plain.ids(), g.ids(), "the settings do not change the picture")
+        assertEquals(GraphNodeKind.Stream, g.node("q:audit-log").kind)
+        assertEquals("Declare stream audit-log", withSettings.description)
+    }
 }
