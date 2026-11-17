@@ -282,6 +282,8 @@ class PlannerSteps {
 
     @Then("{string} is disabled and says {string}")
     fun saveDisabled(button: String, text: String) {
+        // M9-10b: the same sentence is used for the test message button of the Migrations screen; one step, dispatched on the button.
+        if (button == "Send a test message") return PlannerTestMessageSteps.disabledAndSaysOnCurrent(button, text)
         assertEquals("Save as migration", button)
         assertFalse(d.saveEnabled(), "Save as migration should be disabled")
         assertEquals(text, d.saveHint())

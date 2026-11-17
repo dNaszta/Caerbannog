@@ -111,6 +111,8 @@ internal class TestMessageDriver(private val host: TestMessageHost) : ScreenDriv
         }
     }
 }) {
+    fun dismissPublishDialog() = exec { host.vm = null; waitForIdle() }
+
     fun replaceText(tag: String, text: String) = exec { waitForIdle(); onNodeWithTag(tag).performTextReplacement(text); waitForIdle() }
 
     /** What is typed in the field with [tag]. */
@@ -223,7 +225,8 @@ class PlannerTestMessageSteps {
     // ---- choosing the button ----
 
     private fun chooseButton() {
-        if (driver.isDrawn("publishMqttDialog")) driver.click("publishMqttCancelButton")
+        // The window closes the dialog; the glue does it directly, so this step does not depend on where the Cancel button is on screen.
+        if (driver.isDrawn("publishMqttDialog")) driver.dismissPublishDialog()
         driver.click("migrations:testMessageBtn:$routeRow")
     }
 
@@ -272,6 +275,9 @@ class PlannerTestMessageSteps {
 
         /** True while the value dialog of a test message is drawn: then "it says" (PlannerGraphSteps) is the message under its field. */
         val valueDialogOpen: Boolean get() = current?.driverOrNull?.isDrawn("testMessageDialog") == true
+
+        fun disabledAndSaysOnCurrent(button: String, reason: String) =
+            checkNotNull(current) { "no test message scenario is running" }.disabledAndSays(button, reason)
 
         fun saysUnderField(message: String) {
             val steps = checkNotNull(current) { "no test message scenario is running" }
@@ -359,7 +365,7 @@ class PlannerTestMessageSteps {
 
     // ---- the button's states ----
 
-    @Then("{string} is disabled and says {string}")
+    /** Called from `PlannerSteps.saveDisabled`, which owns the one `{string} is disabled and says {string}` step and dispatches on the button text. */
     fun disabledAndSays(button: String, reason: String) {
         assertEquals("Send a test message", button)
         assertTrue(driver.isDrawn("migrations:testMessageBtn:$routeRow"), "the button is not drawn")
