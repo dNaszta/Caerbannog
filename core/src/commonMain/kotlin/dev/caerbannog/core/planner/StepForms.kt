@@ -25,7 +25,7 @@ sealed interface StepForm {
 
 data class QueueForm(val name: String, val type: String = "quorum") : StepForm {
     override fun problems(ctx: FormContext): List<FieldProblem> =
-        FormChecks.nameProblem(name, PlannerTexts.QUEUE_NAME_MISSING, "name") { build(ctx) }
+        FormChecks.nameProblem(name, PlannerTexts.QUEUE_NAME_MISSING, "name", isQueue = true) { build(ctx) }
 
     override fun actions(ctx: FormContext): List<MigrationAction> = if (problems(ctx).isEmpty()) listOf(build(ctx)) else emptyList()
 
@@ -324,10 +324,15 @@ object StepForms {
 }
 
 internal object FormChecks {
-    /** An empty name and "." or ".." first, then whatever the parser round trip refuses, with the parser's own reason. */
-    fun nameProblem(name: String, missing: String, field: String, build: () -> MigrationAction): List<FieldProblem> = when {
+    /**
+     * One message per field, in this order: empty, "." or "..", the `amq.` prefix, a queue name over 255 bytes,
+     * then whatever the parser round trip refuses, with the parser's own reason.
+     */
+    fun nameProblem(name: String, missing: String, field: String, isQueue: Boolean = false, build: () -> MigrationAction): List<FieldProblem> = when {
         name.isEmpty() -> listOf(FieldProblem(field, missing))
         name == "." || name == ".." -> listOf(FieldProblem(field, DOT_NAME))
+        BrokerNameRules.reservedPrefix(name) -> listOf(FieldProblem(field, PlannerTexts.NAME_RESERVED))
+        isQueue && BrokerNameRules.queueNameTooLong(name) -> listOf(FieldProblem(field, PlannerTexts.QUEUE_NAME_TOO_LONG))
         else -> parserReason(build())?.let { listOf(FieldProblem(field, it)) }.orEmpty()
     }
 
