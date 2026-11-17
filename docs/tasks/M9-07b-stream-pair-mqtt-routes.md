@@ -72,3 +72,20 @@ Product wording that is new is in the Owner review list of the architect's repor
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
 
 Note (architect, 2026-11-17): owner decision O16 item 1 (correlation-id warning) changes `M9-10`, not this task: no scenario of `M9-07b` changes. The live scenario "A device answer published over MQTT lands in the response stream, with its correlation id where the processing can read it" already asserts the measured place (application property, not the AMQP property), which is what the warning tells the owner.
+
+## Status
+- Step 1 (architect, 2026-11-17): brief confirmed against the code on main 1f469607 (see "Decisions of step 1").
+- Step 2 (test developer, 2026-11-17, round 0, branch `m9-07b-stream-pair-mqtt-routes`): tests first, RED by compile (no production code: `StreamForm.answersTopic/requestsTopic/withPair`, `PlanPairs.responseIndexes/requestsAnsweredOverMqtt`, `planGraphNotes`, `PlannerTexts.SERVICE_NOT_PLANNED`, `WizardState.Summary.note`, the tick views, the summary note and the canvas note do not exist). Written: unit `StreamFormMqttTicksTest`, `PlanPairsMqttRuleTest`, `PlanGraphNotesTest`, `PlanPreviewDeviceFlowTest`, `PlannerViewModelStreamMqttTest` (core); Compose `StreamFormMqttTicksUiTest`, `PlanReviewGraphNoteUiTest`; BDD glue in `PlannerStreamSteps` (the 11 `@fake-broker` scenarios; runner filter widened by `@m9-07b`; one stand-in Given for M9-12 through `PendingStandIn`); live `RealBrokerPlannerIotRouteTest` (binds the `@broker` scenario, 1 of 1 on RabbitMQ 4.4.0 already, it needs no production code). Proof the tests are consistent: a throwaway reference (outside the repo) made all of `:core:jvmTest`, the 11 scenarios of the planner runner and both new UI classes pass, except that the crude reference note box overlapped a node (see the report: layout risk). Topology screenshots BEFORE (12 `topology-*.png`, `./gradlew :ui:screenshotTest --tests '*Topology*'`, stable over two runs on this machine), sha256:
+  - `topology-01-queues.png` `5327c5e64478baff81888c6c14562e94d54040674f680ef7fcc0d65a0084c5f0`
+  - `topology-02-exchanges.png` `e28e2291b4c3ee7179e492ce01eed73735f6632692f7196ec44007e545a90b47`
+  - `topology-03-bindings.png` `03dd27d0d79a8e44f8a4327ae82054028570baabc4f70d8a491b71083b5a891b`
+  - `topology-04-vhost-menu.png` `a904619482d93759e10f45133e5b8230f2232c923eb57c7c7640ce46b3b0fa0a`
+  - `topology-05-empty.png` `3722d4e041191aa0d174ac2516d3d10f8cce267171fcc0709718d0a46b4f6ac4`
+  - `topology-06-unavailable.png` `f00a66e986382a7dd70bc0bdb8a2219d9b21654a78ad1b11329a6a56812f4b72`
+  - `topology-07-stale.png` `7b849ee0e0ff1ffba06cd4e4d63e54ced08b6ace0ed7f31e84473e982b0f20dc`
+  - `topology-08-no-tag.png` `6c4a0658741ab1d323e1a5c4a2cb98dc3005fbf148f9a50d5bb185b9ca14f4c8`
+  - `topology-09-banner-read-only.png` `a3b8784c17ad3284dc712167048377c26cf1faf1782247e3cb754879eded51af`
+  - `topology-10-banner-other-vhost.png` `59579e78df20ad690bf52661d44a6e5938cca282a084006af2081f849e4746c5`
+  - `topology-11-loading.png` `f493f561023ba4cef5e9cac437aa1b9dc998531d2fada7bd779bc966f9baf20b`
+  - `topology-12-bindings-graph.png` `f826ec51b66b0df6353b81c9dd10d211881000b996952dd57ce5ea2c8dc6e4ca`
+  After the build the same command must give the same twelve hashes (the reference build gave them identical).
