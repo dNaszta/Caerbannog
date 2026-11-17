@@ -174,4 +174,59 @@ class PayloadFormatterTest {
         val copy = formatter.copyBody(msg)
         assertTrue(copy.contains("00 1f 8b"))
     }
+
+    // --- M9-00b-c: list and map property values are readable text ---
+
+    private fun deadLetter() = StreamMessage(
+        offset = 5L,
+        timestamp = 1700000000000L,
+        payload = "x".encodeToByteArray(),
+        properties = mapOf(
+            "contentType" to "text/plain",
+            "x-opt-deaths" to arrayOf<Any?>(linkedMapOf<String, Any?>("queue" to "orders", "reason" to "rejected", "count" to 1L)),
+            "x-first-death-reason" to "rejected",
+        ),
+        applicationProperties = mapOf("order" to 42, "tags" to listOf("a", "b"), "meta" to mapOf("k" to "v")),
+    )
+
+    @Test
+    fun `inspect shows a list annotation as text and never as an array identity`() {
+        val insp = formatter.inspect(deadLetter())
+
+        assertEquals("[{queue: orders, reason: rejected, count: 1}]", insp.properties["x-opt-deaths"])
+        assertEquals("rejected", insp.properties["x-first-death-reason"], "plain text values stay as they are")
+        assertTrue(insp.properties.values.none { it.startsWith("[Ljava") || it.startsWith("[B@") }, "got ${insp.properties}")
+    }
+
+    @Test
+    fun `inspect shows list and map application properties as text`() {
+        val insp = formatter.inspect(deadLetter())
+
+        assertEquals("42", insp.applicationProperties["order"])
+        assertEquals("[a, b]", insp.applicationProperties["tags"])
+        assertEquals("{k: v}", insp.applicationProperties["meta"])
+    }
+
+    @Test
+    fun `inspect shows an empty list annotation as two brackets`() {
+        val insp = formatter.inspect(deadLetter().copy(properties = mapOf("x-opt-deaths" to arrayOf<Any?>())))
+        assertEquals("[]", insp.properties["x-opt-deaths"])
+    }
+
+    @Test
+    fun `copy properties writes the same text the screen shows`() {
+        val copied = formatter.copyHeadersAndProperties(deadLetter())
+
+        assertTrue(copied.contains("  x-opt-deaths: [{queue: orders, reason: rejected, count: 1}]"), copied)
+        assertTrue(copied.contains("  tags: [a, b]"), copied)
+        assertFalse(copied.contains("[Ljava"), copied)
+        assertFalse(copied.contains("@"), "no array identity in $copied")
+    }
+
+    @Test
+    fun `the screen text of a property equals the copy text of the same property`() {
+        val msg = deadLetter()
+        val onScreen = formatter.inspect(msg).properties.getValue("x-opt-deaths")
+        assertTrue(formatter.copyHeadersAndProperties(msg).contains("x-opt-deaths: $onScreen"))
+    }
 }

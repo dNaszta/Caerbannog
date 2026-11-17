@@ -1,6 +1,7 @@
 package dev.caerbannog.datarabbit
 
 import com.rabbitmq.stream.Environment
+import dev.caerbannog.core.browser.PropertyValueText
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -91,6 +92,13 @@ class RealBrokerM9SpikeStreamDeadLetterTest {
         M9SpikeDl.note("S-C7 at-most-once app reader: exchange=${app.exchange} routingKey=${app.routingKey} properties=${app.properties} applicationProperties=${app.applicationProperties}")
         assertEquals("to-the-stream", raw.single().body)
         assertEquals("to-the-stream", app.payload.decodeToString())
+        // M9-00b-c: through the app's reader, every annotation and property reads as text, and x-opt-deaths names the queue and the reason
+        for ((key, value) in app.properties + app.applicationProperties) {
+            val text = PropertyValueText.of(value)
+            assertTrue(!text.startsWith("[L") && !text.startsWith("[B@") && !text.contains("java.lang.Object"), "property $key reads as an array identity: $text")
+        }
+        val deaths = PropertyValueText.of(app.properties["x-opt-deaths"])
+        assertTrue(deaths.contains("queue: $src") && deaths.contains("reason: rejected"), "x-opt-deaths text was: $deaths")
         // the fixture is the measured shape of one dead letter in a stream
         val fixture = kotlinx.serialization.json.Json.parseToJsonElement(M9SpikeDl.fixture("s-c7-stream-message.json")).jsonObject
         assertEquals(fixture["annotationKeys"]!!.toString(), raw.single().annotations.keys.sorted().joinToString(prefix = "[", postfix = "]", separator = ",") { "\"$it\"" }, "annotation keys differ from the fixture")
@@ -116,6 +124,9 @@ class RealBrokerM9SpikeStreamDeadLetterTest {
         val raw = M9SpikeDl.readRaw(container, stream, 1)
         M9SpikeDl.note("S-C7 expired raw: ${describe(raw.single())}")
         assertEquals("expires", raw.single().body)
+        awaitUntil("the stream shows one message in the management statistics", 40) { M9SpikeDl.messages(api, stream) == 1 }
+        val deaths = PropertyValueText.of(M9SpikeDl.readWithApp(container, stream).single().properties["x-opt-deaths"])
+        assertTrue(deaths.contains("reason: expired") && deaths.contains("ttl: "), "M9-00b-c: x-opt-deaths text was: $deaths")
     }
 
     // ---- S-D1: a stream declared with x-dead-letter-exchange ----

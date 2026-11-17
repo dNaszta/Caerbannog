@@ -503,4 +503,67 @@ class PayloadViewerSteps {
         assertNotNull(loaded)
         assertTrue(loaded!!.messages.isNotEmpty())
     }
+
+    // --- M9-00b-c: list and map property values as text (dead letters in a stream) ---
+
+    /** One death entry as the stream client hands it over: a map whose numbers are numbers, inside an `Object[]` (what the reader gets for `x-opt-deaths`). */
+    private fun deathAnnotation(table: DataTable): Array<Any?> {
+        val entry = LinkedHashMap<String, Any?>()
+        for ((k, v) in table.asMap(String::class.java, String::class.java)) entry[k] = v.toLongOrNull() ?: v
+        return arrayOf(entry)
+    }
+
+    @Given("^the message at offset (\\d+) has the annotation \"(.*)\" holding one death entry$")
+    fun messageHasDeathAnnotation(offset: Long, annotation: String, table: DataTable) {
+        messages[offset] = StreamMessage(
+            offset = offset,
+            timestamp = 1700000000000L,
+            payload = "to-the-stream".encodeToByteArray(),
+            properties = mapOf(annotation to deathAnnotation(table)),
+        )
+    }
+
+    @Then("^the properties show \"(.*)\" containing \"(.*)\"$")
+    fun propertiesShowContaining(name: String, fragment: String) {
+        val value = checkNotNull(lastInspection).properties[name]
+        assertNotNull(value, "no property $name in ${lastInspection?.properties}")
+        assertTrue(value!!.contains(fragment), "expected property $name to contain '$fragment' but it was '$value'")
+    }
+
+    @Then("^no property text starts with \"(.*)\"$")
+    fun noPropertyTextStartsWith(prefix: String) {
+        val inspection = checkNotNull(lastInspection)
+        val all = inspection.properties + inspection.applicationProperties
+        assertTrue(all.values.none { it.startsWith(prefix) }, "a property text starts with '$prefix': $all")
+    }
+
+    @Given("^the stream holds a dead letter at offset (\\d+) with the annotation \"(.*)\" holding one death entry$")
+    fun streamHoldsDeadLetter(offset: Long, annotation: String, table: DataTable) {
+        reader.addMessage(stream = "orders-events", offset = offset, timestamp = 1700000000000L, payload = "to-the-stream".encodeToByteArray(), properties = mapOf(annotation to deathAnnotation(table)))
+        viewModel = null
+        ensureViewModel("orders-events")
+    }
+
+    @Given("^the stream holds a message at offset (\\d+) without that annotation$")
+    fun streamHoldsPlainMessage(offset: Long) {
+        reader.addMessage(stream = "orders-events", offset = offset, timestamp = 1700000000001L, payload = "plain".encodeToByteArray(), properties = mapOf("contentType" to "text/plain"))
+        viewModel = null
+        ensureViewModel("orders-events")
+    }
+
+    @When("^I filter by the property \"(.*)\" equal to \"(.*)\"$")
+    fun iFilterByProperty(name: String, value: String) = runBlocking {
+        val vm = ensureViewModel("orders-events")
+        vm.filter(MessageFilterCriteria.Property(name, value))
+        kotlinx.coroutines.withTimeout(5000) {
+            vm.scanProgress.filterNotNull().first { !it.isRunning }
+        }
+        listedMessages = (vm.state.value as? MessageBrowserState.Loaded)?.messages ?: emptyList()
+        lastScanProgress = vm.scanProgress.value
+    }
+
+    @Then("^the list shows (\\d+) messages?$")
+    fun listShowsMessages(count: Int) {
+        assertEquals(count, listedMessages.size, "listed offsets: ${listedMessages.map { it.offset }}")
+    }
 }

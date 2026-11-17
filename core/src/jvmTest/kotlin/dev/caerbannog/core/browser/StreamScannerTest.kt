@@ -137,4 +137,58 @@ class StreamScannerTest {
         assertEquals(0, final.matches.size)
         assertFalse(final.limitReached)
     }
+
+    // --- M9-00b-c: a property filter on a list value matches the whole rendered text only (owner item 11) ---
+
+    private val deathText = "[{queue: orders, reason: rejected, count: 1}]"
+
+    private fun seedDeadLetters() {
+        reader.seed("/", "dead", listOf(
+            StreamMessage(0L, 1L, "a".encodeToByteArray(), properties = mapOf(
+                "x-opt-deaths" to arrayOf<Any?>(linkedMapOf<String, Any?>("queue" to "orders", "reason" to "rejected", "count" to 1L)),
+            )),
+            StreamMessage(1L, 2L, "b".encodeToByteArray(), properties = mapOf(
+                "x-opt-deaths" to arrayOf<Any?>(linkedMapOf<String, Any?>("queue" to "other", "reason" to "expired")),
+            )),
+        ))
+    }
+
+    private suspend fun propertyMatches(name: String, value: String): List<Long> =
+        scanner.scan("/", "dead", 0L, MessageFilterCriteria.Property(name, value), scanLimit = 100).toList().last().matches.map { it.offset }
+
+    @Test
+    fun `a property filter equal to the whole rendered text of a list value finds the message`() = runTest {
+        seedDeadLetters()
+        assertEquals(listOf(0L), propertyMatches("x-opt-deaths", deathText))
+    }
+
+    @Test
+    fun `a property filter on a part of a list value finds nothing`() = runTest {
+        seedDeadLetters()
+        for (part in listOf("rejected", "queue: orders", "orders", "reason: rejected", "{queue: orders, reason: rejected, count: 1}", "[{queue: orders")) {
+            assertEquals(emptyList(), propertyMatches("x-opt-deaths", part), "filter on the part '$part' must not match")
+        }
+    }
+
+    @Test
+    fun `a property filter on the array identity text finds nothing`() = runTest {
+        seedDeadLetters()
+        assertEquals(emptyList(), propertyMatches("x-opt-deaths", "[Ljava.lang.Object;"))
+    }
+
+    @Test
+    fun `a property filter on a plain text value still matches exactly`() = runTest {
+        reader.seed("/", "dead", listOf(StreamMessage(0L, 1L, "a".encodeToByteArray(), properties = mapOf("x-first-death-reason" to "rejected"))))
+        assertEquals(listOf(0L), propertyMatches("x-first-death-reason", "rejected"))
+        assertEquals(emptyList(), propertyMatches("x-first-death-reason", "reject"))
+    }
+
+    @Test
+    fun `an application property filter on a list value matches the whole rendered text only`() = runTest {
+        reader.seed("/", "dead", listOf(StreamMessage(0L, 1L, "a".encodeToByteArray(), applicationProperties = mapOf("tags" to listOf("a", "b")))))
+        val whole = scanner.scan("/", "dead", 0L, MessageFilterCriteria.ApplicationProperty("tags", "[a, b]"), scanLimit = 100).toList().last()
+        val part = scanner.scan("/", "dead", 0L, MessageFilterCriteria.ApplicationProperty("tags", "a"), scanLimit = 100).toList().last()
+        assertEquals(1, whole.matches.size)
+        assertEquals(0, part.matches.size)
+    }
 }

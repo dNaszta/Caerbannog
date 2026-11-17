@@ -91,6 +91,18 @@ Feature: Model Context Protocol (MCP) server
     And the error message does not contain any part of the request
     And the server answers the next valid request
 
+  # M9-00b-c: the values stay strings; a list or a map is its readable text (a list of maps was `[Ljava.lang.Object;@...`).
+  @m9-00b-c @fake-broker
+  Scenario: The MCP stream message tool returns the death information as text
+    Given the stream "dead-letters" on vhost "/" holds a dead letter with the annotation "x-opt-deaths" holding one death entry
+      | queue  | orders   |
+      | reason | rejected |
+      | count  | 1        |
+    When the client calls MCP tool "caerbannog_browse_stream" with profile "dev-local" and stream "dead-letters"
+    Then the tool result shows property "x-opt-deaths" of the first message as a string containing "reason: rejected"
+    And the tool result shows property "x-opt-deaths" of the first message as a string containing "queue: orders"
+    And no property value of the tool result contains "[Ljava"
+
   # M9-08b: the same read feeds the MCP stream tools (see 03_stream_list.feature).
   @m9-08b @needs-M9-08b
   Scenario: MCP server shows retention that a policy sets on a stream
