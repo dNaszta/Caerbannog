@@ -111,7 +111,7 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
         private const val QUEUE_COLUMNS = "name,type,messages_ready,messages_unacknowledged,consumers,leader,members,online,policy,state"
         private const val DECLARATION_COLUMNS = "name,type,durable,auto_delete,exclusive,arguments"
         private const val LIST_COLUMNS =
-            "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments"
+            "name,vhost,type,messages,consumers,segments,first_timestamp,leader,node,members,online,arguments,effective_policy_definition"
 
         /**
          * Formats a host for use in a URI authority (RFC 3986 section 3.2.2). IPv6 literal addresses containing
