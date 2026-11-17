@@ -2,7 +2,7 @@ package dev.caerbannog.ui.topology
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -152,7 +152,7 @@ private fun CardRect.overlaps(other: CardRect, gap: Float): Boolean =
 
 /**
  * The rough rectangle of a label block for [placeNotes], centred on [centre] at [top]: the real width is known only when the block is measured,
- * so it is estimated from the text it holds ([textLength] characters of the longest line, about 6.6 dp each in the small monospace font, plus the pill's
+ * so it is estimated from the text it holds ([textLength] characters of the longest line, about 7.3 dp each, 7.5 is used in the small monospace font, plus the pill's
  * padding). A little too wide is safe (the note moves to the next free slot); far too wide would push it away from its two nodes.
  */
 internal fun labelRectOf(centre: Float, top: Float, height: Float, textLength: Int): CardRect {
@@ -160,7 +160,7 @@ internal fun labelRectOf(centre: Float, top: Float, height: Float, textLength: I
     return CardRect(centre - half, top, centre + half, top + height)
 }
 
-private const val LABEL_CHAR_WIDTH = 6.6f
+private const val LABEL_CHAR_WIDTH = 7.5f
 
 /**
  * One note: a dashed rounded box with the sentence, drawn under the nodes and the labels. Read-only: no click, no long click, no focus and no
@@ -174,7 +174,7 @@ internal fun PlanGraphNoteBox(index: Int, text: String, rect: CardRect) {
         Modifier
             .offset(x = rect.left.dp, y = rect.top.dp)
             .width(NOTE_WIDTH.dp)
-            .height(NOTE_HEIGHT.dp)
+            .heightIn(min = NOTE_HEIGHT.dp)
             .background(MaterialTheme.colorScheme.surfaceContainer, shape)
             .drawBehind {
                 val width = 1.5.dp.toPx()

@@ -201,3 +201,4 @@ Behaviour check: none of the eleven items changes what a plan does. The two tick
 
 ### Not decided here, for later
 `M9-07d` (brief `docs/tasks/M9-07d-graph-notes-out-of-view.md`): optional, XS to S. The coordinator adds its row to `docs/tasks/README.md` when this task is merged (this step edits only the row of `M9-07b`).
+- Step 3 (senior developer, 2026-11-17, round 2): F1 `PlanGraphNoteBox` uses `heightIn(min = NOTE_HEIGHT)`; F2 `LABEL_CHAR_WIDTH` 7.5. `PlanReviewGraphNoteScaleUiTest` and the estimate test of `PlanReviewGraphNoteSweepUiTest` green; `PlanGraphNotesLayoutTest`, the other `PlanReviewGraph*` and `StreamFormMqttTicksUiTest` green; the two same-column tests stay red until the test developer relaxes them (F3). Twelve `topology-*.png` hashes identical to BEFORE.
