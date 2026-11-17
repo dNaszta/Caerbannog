@@ -53,10 +53,11 @@ data class FormContext(
     fun exchangeSuggestions(): List<Suggestion> = suggestions(planExchanges().map { it.name }, known.exchanges.keys)
 
     /** The routing key is asked unless the exchange is a fanout or headers exchange whose type is known (the plan's own count as known). */
-    fun asksRoutingKey(exchange: String): Boolean {
-        val type = planExchanges().lastOrNull { it.name == exchange }?.type ?: known.exchanges[exchange]
-        return type != "fanout" && type != "headers"
-    }
+    fun asksRoutingKey(exchange: String): Boolean = exchangeType(exchange).let { it != "fanout" && it != "headers" }
+
+    /** The type of [exchange]: the last declaration in this plan wins, then the broker's; null when neither knows it. The one place that reads it. */
+    fun exchangeType(exchange: String): String? =
+        planExchanges().lastOrNull { it.name == exchange }?.type ?: known.exchanges[exchange]
 
     private fun planExchanges(): List<MigrationAction.DeclareExchange> =
         plan.steps.mapNotNull { it.action as? MigrationAction.DeclareExchange }

@@ -126,6 +126,16 @@ object PlannerTexts {
     const val BINDING_EXCHANGE_MISSING: String = "Choose the exchange to bind from"
     const val BINDING_DESTINATION_MISSING: String = "Choose what to bind to"
 
+    /** The two warnings of a headers binding with no header (measured, S-E4); owner wording of 2026-11-16. */
+    const val HEADERS_NONE_ALL: String = "With no header, this binding matches every message"
+    const val HEADERS_NONE_ANY: String = "With no header, this binding matches no message at all"
+
+    /** Working wording of the architect for the four header refusals; the owner may reword them. */
+    const val HEADER_NAME_MISSING: String = "Give the header a name"
+    const val HEADER_NAME_IS_MATCH_RULE: String = "x-match is the match rule, not a header"
+    const val HEADER_LISTED_TWICE: String = "A header can be listed once"
+    const val HEADER_WHOLE_DIGITS_ONLY: String = "A whole number has digits only"
+
     const val ADD_A_STEP_FIRST: String = "Add a step first"
     const val NO_FOLDER: String = "Choose a migrations folder first"
     const val DRAFT_LABEL: String = "Draft, not saved as a migration"
