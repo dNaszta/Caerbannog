@@ -5,6 +5,9 @@ Milestone: M9 (follow-up)    Depends on: M9-10b (merged)    Size: S
 Proposed 2026-11-17 by the architect at step 5 of `M9-10b`. QUEUED (owner, 2026-11-17, "accept all", spec O18). Brief made exact at step 1 on 2026-11-17 (below, "Step 1 record").
 
 ## Status
+Step 3 done (senior developer, 2026-11-17): built test-first, no test edited. `./gradlew test --continue` green (core 3333, ui 1240, desktopApp 194, acceptance 2008 runs with 1234 skipped as before; feature 15: 17 runs, 0 failed). Ready for step 4 (verification) and review. Banner max height kept at 136 dp (test developer's hint; the brief proposed 160 dp).
+
+Earlier:
 Step 2 done (test developer, 2026-11-17): tests written and red for the right reason, no production code. API fixed by the tests, see "Step 2 record" at the end. AMQP `PublishTestMessageDialog` fold check: FAILS (red by assertion, real bug).
 
 ## Goal
