@@ -79,7 +79,7 @@ class MqttRouteLayoutExploratoryUiTest {
 
     @Test
     fun `how amq topic reads in the graph for a route, by what the planner knows of the broker`() {
-        // Pinned as measured at step 4 (finding F1): amq.topic is a built-in exchange the author of a route never declares, so "not in this plan"
+        // Round 2 (finding F2, decided as a general rule): a built-in amq.* exchange that the plan does not declare is existing. At step 4 this read "not in this plan" for a hand-made list or no read:
         // is true but reads as a defect for a route when the broker was read and does not list it (a hand-made KnownTopology) or when nothing was read.
         runDesktopComposeUiTest(1280, 800) {
             val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology(exchanges = mapOf("amq.topic" to "topic")))) { stream("telemetry"); mqttRoute("a/#", "telemetry") }
@@ -90,13 +90,13 @@ class MqttRouteLayoutExploratoryUiTest {
         runDesktopComposeUiTest(1280, 800) {
             val r = UiRig(reader = FakeKnownTopologyReader(KnownTopology(exchanges = mapOf("other" to "topic")))) { stream("telemetry"); mqttRoute("a/#", "telemetry") }
             showPlanner(r)
-            assertEquals("exchange amq.topic, not in this plan", nodeSays("e:amq.topic"))
+            assertEquals("exchange amq.topic, already on the broker", nodeSays("e:amq.topic"))
             r.close()
         }
         runDesktopComposeUiTest(1280, 800) {
             val r = UiRig { stream("telemetry"); mqttRoute("a/#", "telemetry") }
             showPlanner(r)
-            assertEquals("exchange amq.topic, not in this plan", nodeSays("e:amq.topic"))
+            assertEquals("exchange amq.topic, already on the broker", nodeSays("e:amq.topic"))
             r.close()
         }
     }

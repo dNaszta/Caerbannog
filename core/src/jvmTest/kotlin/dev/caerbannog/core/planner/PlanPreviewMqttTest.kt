@@ -55,4 +55,46 @@ class PlanPreviewMqttTest {
         val g = planPreview(planOf(route("sensors.#", "ghost")), KnownTopology.None)
         assertEquals(setOf("sensors/#"), g.edgeLabels.values.toSet())
     }
+
+    // ---- F2 (round 2): built-in amq.* exchanges ----
+
+    private fun streamRoute() = planOf(MigrationAction.DeclareStream("telemetry"), route("sensors.#"))
+
+    @Test
+    fun `amq topic that the plan does not declare is existing whether or not the broker was read`() {
+        val lacking = KnownTopology(exchanges = mapOf("events" to "topic"), streams = setOf("other"))
+        for ((label, known) in listOf("null" to null, "None" to KnownTopology.None, "a list without amq.topic" to lacking)) {
+            val g = planPreview(streamRoute(), known)
+            assertEquals(PlanMark.Existing, g.markOf("e:amq.topic"), "known = $label")
+            assertEquals(PlanMark.New, g.markOf("q:telemetry"), "the stream stays new, known = $label")
+        }
+    }
+
+    @Test
+    fun `reading nothing keeps the notice that only the plan is drawn`() {
+        assertEquals(PlanGraphNotice.OnlyThePlan(OnlyThePlanCause.NotConnected), planPreview(streamRoute(), null).notice)
+        assertEquals(PlanGraphNotice.OnlyThePlan(OnlyThePlanCause.BrokerNotRead), planPreview(streamRoute(), null, OnlyThePlanCause.BrokerNotRead).notice)
+    }
+
+    @Test
+    fun `the rule is general, a plain binding on amq direct reads the same`() {
+        val plan = planOf(MigrationAction.DeclareQueue("orders"), MigrationAction.DeclareBinding("amq.direct", "orders", "k"))
+        for (known in listOf(null, KnownTopology.None)) assertEquals(PlanMark.Existing, planPreview(plan, known).markOf("e:amq.direct"), "known = $known")
+    }
+
+    @Test
+    fun `a declared exchange whose name starts with amq is new, an undeclared one that is not built in stays not in this plan`() {
+        val declared = planOf(MigrationAction.DeclareExchange("amq.custom", "topic"), MigrationAction.DeclareQueue("q"), MigrationAction.DeclareBinding("amq.custom", "q", "k"))
+        assertEquals(PlanMark.New, planPreview(declared, KnownTopology.None).markOf("e:amq.custom"))
+        val plain = planOf(MigrationAction.DeclareQueue("q"), MigrationAction.DeclareBinding("events", "q", "k"))
+        assertEquals(PlanMark.NotInPlan, planPreview(plain, KnownTopology.None).markOf("e:events"))
+        assertEquals(PlanMark.NotInPlan, planPreview(plain, null).markOf("e:events"))
+    }
+
+    @Test
+    fun `while a read is pending an undeclared exchange has no verdict, but a built-in one is existing`() {
+        val g = planPreview(planOf(MigrationAction.DeclareQueue("q"), MigrationAction.DeclareBinding("events", "q", "k"), MigrationAction.DeclareBinding("amq.topic", "q", "a.b")), null, pending = true)
+        assertEquals(PlanMark.Existing, g.markOf("e:amq.topic"))
+        assertEquals(PlanMark.Existing, g.markOf("e:events"), "pending with no read: no verdict means the default mark")
+    }
 }

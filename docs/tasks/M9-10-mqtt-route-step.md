@@ -149,3 +149,17 @@ Items 6 to 11 stay as in "Step 2: contract confirmed".
 1. Test developer: the RED tests of F1 (`PlanReviewLabelLayoutUiTest`) and F2 (core and the one UI update); record the Topology screenshot hashes BEFORE.
 2. Senior developer: F2 clause in `planPreview`; F1 label block and stacking in the plan path of `BindingGraphCanvas`; run `:core:jvmTest`, `:ui:jvmTest` (planner, topology), the planner acceptance suite; no live test needed (no broker request changed).
 3. Test developer: re-verify, compare the hashes, run the screenshots of `MqttRouteScreenshotTest`, report.
+- Step 2, round 2 (test developer, 2026-11-17, branch head before the fix 0ef6f497): RED tests written, no production code. NEW `ui/.../planner/PlanReviewLabelLayoutUiTest` (7 plan shapes x 1280 x 800 and 1024 x 768 = 14 tests, plus one test each for one route and one plain binding: order and centre); core `PlanPreviewMqttTest` (+5 tests: built-in `amq.*` exchange) and `PlanPreviewTest` (+1 control row: an undeclared `events` stays NotInPlan); one existing test changed with the architect's word: `MqttRouteLayoutExploratoryUiTest` "how amq topic reads in the graph for a route" (2nd and 3rd expectation now "exchange amq.topic, already on the broker"). Red today by assertion: all 14 shape tests (overlaps of "new" pill, key pill, filter and tag of different edges; the five-route shapes have 30 to 40 overlaps; the plain shapes already overlap), the two order/centre tests (they fail first on `planner:reviewGraphContent is not drawn`, the tag the fix adds), the two core F2 tests (`markOf("e:amq.topic")` is NotInPlan for `known = null`). The two red tests of step 4 stay as they are.
+- BEFORE hashes of the 12 `topology-*.png` (sha256 of `./gradlew :ui:screenshotTest --tests '*Topology*'` at 0ef6f497, run twice, identical; to compare after the fix, same command, same `ui/build/screenshots`):
+  5327c5e64478baff81888c6c14562e94d54040674f680ef7fcc0d65a0084c5f0  topology-01-queues.png
+  e28e2291b4c3ee7179e492ce01eed73735f6632692f7196ec44007e545a90b47  topology-02-exchanges.png
+  03dd27d0d79a8e44f8a4327ae82054028570baabc4f70d8a491b71083b5a891b  topology-03-bindings.png
+  a904619482d93759e10f45133e5b8230f2232c923eb57c7c7640ce46b3b0fa0a  topology-04-vhost-menu.png
+  3722d4e041191aa0d174ac2516d3d10f8cce267171fcc0709718d0a46b4f6ac4  topology-05-empty.png
+  f00a66e986382a7dd70bc0bdb8a2219d9b21654a78ad1b11329a6a56812f4b72  topology-06-unavailable.png
+  7b849ee0e0ff1ffba06cd4e4d63e54ced08b6ace0ed7f31e84473e982b0f20dc  topology-07-stale.png
+  6c4a0658741ab1d323e1a5c4a2cb98dc3005fbf148f9a50d5bb185b9ca14f4c8  topology-08-no-tag.png
+  a3b8784c17ad3284dc712167048377c26cf1faf1782247e3cb754879eded51af  topology-09-banner-read-only.png
+  59579e78df20ad690bf52661d44a6e5938cca282a084006af2081f849e4746c5  topology-10-banner-other-vhost.png
+  f493f561023ba4cef5e9cac437aa1b9dc998531d2fada7bd779bc966f9baf20b  topology-11-loading.png
+  f826ec51b66b0df6353b81c9dd10d211881000b996952dd57ce5ea2c8dc6e4ca  topology-12-bindings-graph.png
