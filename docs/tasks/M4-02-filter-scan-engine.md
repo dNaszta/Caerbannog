@@ -59,6 +59,7 @@ Implement a bounded client-side stream scanner and filtering engine in `core` th
 4. `./gradlew test` passes cleanly with zero regressions.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (5c2c919, 2026-11-07); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - **Step 1 (Brief):** Written and confirmed.
 - **Step 2 (Tests first):** `StreamScannerTest` written; red state confirmed on missing domain classes.
 - **Step 3 (Build):**

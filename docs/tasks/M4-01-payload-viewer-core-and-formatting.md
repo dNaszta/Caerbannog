@@ -58,6 +58,7 @@ Implement the core domain logic, formatters, and state model for inspecting stre
 4. `./gradlew test` passes with zero regressions across all modules.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (ca8ffe6, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - **Step 1 (Brief):** Written and confirmed.
 - **Step 2 (Tests first):** `PayloadFormatterTest` and `RunPayloadViewerAcceptanceTest` written; red state confirmed on missing domain classes.
 - **Step 3 (Build):**

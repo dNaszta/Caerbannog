@@ -28,6 +28,7 @@ Whether the profile form accepts an IPv6 literal today (not checked).
 Tests first and passing, no unrelated changes, README row updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (6283995, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 ### Step 1: Architect brief confirmed (2026-11-06)
 - **MCP check:** None required. Fixing IPv6 literal formatting in `data-rabbit` transparently enables all existing profile tools in `mcp-server` to work with IPv6 hosts.

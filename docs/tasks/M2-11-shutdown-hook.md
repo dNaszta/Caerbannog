@@ -29,6 +29,7 @@ Whether Cmd+Q really bypasses `onCloseRequest` on the Compose version in use was
 Tests first and passing, no unrelated changes, README row added.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (b2c6894, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 ### Step 1: Architect brief confirmed (2026-11-06)
 - **MCP check:** None required. This is desktopApp JVM lifecycle management. The stdio MCP server (`M-MCP-01`) runs as an independent CLI process managing its own lifecycle.

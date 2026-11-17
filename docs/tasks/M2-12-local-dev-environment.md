@@ -101,6 +101,7 @@ The test developer does these in this order; each answer is written in Status, a
 Product decisions needed: none. Open facts (spikes S-A to S-C) have fallbacks that do not change the product.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (0a387c9, 2026-11-05); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 Briefed 2026-11-04 (architect). Three open questions answered by the product owner 2026-11-05 and closed (see Open points); real-broker helper survey added (reuse table). Step 1 done (architect, 2026-11-05, branch `m2-12-local-dev-environment`): brief confirmed against `main`; corrections (no `data-rabbit` dependency because its TLS and management classes are `internal`; `stream-client` declared in `dev-seed`; fixtures stay where they are), the first acceptance A1/A2 and the checks C1 to C9, and the spike order S-A to S-C written above. No product decision needed. Next: step 2 test developer (spikes, then seed unit tests). Not started in code.
 
 Step 2 (test developer, 2026-11-05): spikes S-A to S-C done against `rabbitmq:4-management` (Docker, the fixture files of `data-rabbit/src/test/resources/tls`), then the seed unit tests, red. Spike scratch files stayed outside the repo.

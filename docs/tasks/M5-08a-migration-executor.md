@@ -56,6 +56,7 @@ None here (`M5-09`).
 Tests first and passing, live test run once, no unrelated change, no new dependency (the existing HTTP client), the spec subsection "Running migrations for real" still true, mutation checks recorded.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (4ef754b, 2026-11-10); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Step 1 (architect): DONE 2026-11-09. Not started.
 - Step 2 round 0 (test developer, 2026-11-09): DONE. Tests first, RED for the right reason on compile stubs; production behaviour not implemented.
   - Scenarios: 13 `@m5-08a` scenarios of `10` plus 1 in `16` (tagged `@fake-broker @m5-08 @m5-08a` now) = 14 in all (the brief's "14 plus the 16 one" counts 15; `10` has 13 `@fake-broker @m5-08a`), glue `M508aExecutorSteps` (REAL runner and executor over a Ktor mock engine in front of `FakeManagementBroker`); the two `@broker @m5-08a` scenarios = `RealBrokerM5MigrationTest` (compiled, NOT run). `RunTopologyMigrationsAcceptanceTest` excludes only `@m5-08b`, `@m5-08c`, `@m8-02` now; `RunMigrate3xMigrationModelAcceptanceTest` filter is `(@m8-04 or @m5-08a) and @fake-broker`.

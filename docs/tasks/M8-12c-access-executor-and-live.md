@@ -24,6 +24,7 @@ Limits: `:data-rabbit:test --tests '*Executor*' --tests '*Access*' --tests '*Man
 None.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (1418028, 2026-11-11); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Step 1 (architect, 2026-11-11): briefed; D5 = B made exact (owner 2026-11-11), `/` exempt.
 - Step 5 of `M8-12a` (architect, 2026-11-11) added items 6 (whoami and `userTags` in the permission check) and 7 (the three stubs).
 - Step 2 (test developer, 2026-11-11, round 0, branch `m8-12c-access-executor`, base main `af2b9e7`): tests first, red on compile stubs marked `M8-12c STUB`. Owner decisions final (D1 A, D2 A, D3/D4 approved, D5 B, `/` exemption confirmed).

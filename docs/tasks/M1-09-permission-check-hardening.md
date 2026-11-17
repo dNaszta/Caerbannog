@@ -104,6 +104,7 @@ enum class UnreadableCause { NOT_AUTHORIZED, NOT_FOUND, TIMEOUT, UNREACHABLE, BA
 Tests first and failing for the right reason, no unrelated changes, M1-03 brief Final contract updated if a cause is added.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (79e32a3, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Round: 0, step 1 done (architect): brief confirmed and sharpened against `main`. Next: step 2 tests (test developer).
 - Round: 0, step 2 done (test developer). Tests written, red as expected; next: step 3 build (senior developer).
   - Red, core: `:core:jvmTest` does not compile, `Unresolved reference 'UNEXPECTED'` (ConnectionSessionTest, PermissionDecisionTest,

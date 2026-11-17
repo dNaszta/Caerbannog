@@ -57,6 +57,7 @@ None. This is an internal UI component refactoring. Caerbannog's headless `:mcp-
 - Status and README row updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (fb045d1, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 Step 1: brief written by solution-architect (2026-11-06, commit `84761b0`).
 Step 2: tests first guard check & shared components test written (test-developer, 2026-11-06, commit `919bcb1`). Added `SharedComponentsUiTest` testing `SearchField` and `CenteredMessage`.

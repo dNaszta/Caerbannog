@@ -60,6 +60,7 @@ None.
 Unit and UI tests written first (red), then implementation in `core` and `ui` (green), screenshot regenerated and inspected, full test suite green.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (d7faf81, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - **Step 1 (Brief, solution-architect, 2026-11-06):** Brief written (`docs/tasks/M2-08d1-bindings-graph-fixes.md`), branch `m2-08d1-bindings-graph-fixes`. Rulings R1–R4 specified. Next: Step 2 (`test-developer`) to write red unit and UI tests for R1–R4.
 - **Step 2 (Tests first, test-developer, 2026-11-06):** Added 6 red tests across `TopologyGraphLayoutTest.kt`, `TopologyViewModelTabsTest.kt`, and `BindingsGraphUiTest.kt` (plus compile stub `labelX`/`labelY` on `PositionedEdge`). Verified all 6 fail for the right reasons.
 - **Step 3 (Build, senior-developer, 2026-11-06):** Implemented R1 (`dp.toPx()` in `BindingsGraphView.kt` `Canvas`), R2 (`resolveEdgeLabelPositions` in `BindingGraph.kt` + centered pills via `.layout` in `BindingsGraphView.kt`), R3 (empty detail for non-queue/stream destinations + digit grouping + single-line card centering), and R4 (hide `TopologyFooter` in Graph view in `TopologyScreen.kt` + filter graph bindings by search in `TopologyViewModel.kt`).

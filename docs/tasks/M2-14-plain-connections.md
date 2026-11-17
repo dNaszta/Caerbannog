@@ -81,6 +81,7 @@ Order: step 1 (this brief, spec, mockups) then S-D, S-E, then tests first (14a),
 Tests written first and failing for the right reason, then passing; `./gradlew test` and `brokerTest` green; no unrelated changes; spec, `tests/bdd/README.md`, scenarios and mockups updated as listed; the two replaced scenarios have no leftover step definitions; no password in logs; `.claude/agents/architect.md` rule line updated by the architect at acceptance.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (de6cd9a, 2026-11-05); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 Step 1 (architect, 2026-11-05): brief written. Spec and mockup edits listed above are the first build commits of 14a (step 1b), not done in this commit.
 
 Step 2, spikes (test developer, 2026-11-05), answers for S-D and S-E:

@@ -61,6 +61,7 @@ Screen `docs/ux/Streams.dc.html` is built in M2-05. Here: the state names and di
 Tests written first and failing for the right reason, then passing: `./gradlew test --rerun-tasks --continue` green including `verifyTestDiscovery`; `brokerTest` for `publisherCounts` green on a real broker; no unrelated changes; Status records calls per tick and the page size constant; README row and spec updated if behaviour changed.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (4332cf3, 2026-11-05); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 Step 2, tests first (test developer, 2026-11-04). Red at COMPILE level on purpose: the production types do not exist yet. To prove the tests can be satisfied (and are not contradictory), a throwaway view model and accessor were written outside the commit; with them all new core unit tests (333 core tests) and all 20 selected `03` scenario runs (14 scenarios and 6 outline examples) passed. That code is NOT delivered and is not a design to copy.
 
