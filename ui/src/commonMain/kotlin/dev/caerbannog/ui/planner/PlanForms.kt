@@ -120,7 +120,7 @@ internal fun StreamFormView(initial: StreamForm, details: WizardState.Details, e
     if (details.editingStepId == null) {
         Row(
             modifier = Modifier
-                .toggleable(value = form.withResponse, role = Role.Checkbox, onValueChange = { change(form.copy(withResponse = it)) })
+                .toggleable(value = form.withResponse, role = Role.Checkbox, onValueChange = { change(form.withPair(it)) })
                 .padding(vertical = 4.dp)
                 .testTag("planForm:responseTick"),
             verticalAlignment = Alignment.CenterVertically,
@@ -140,8 +140,68 @@ internal fun StreamFormView(initial: StreamForm, details: WizardState.Details, e
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("planForm:responseNote"),
             )
+            MqttTick("answers", PlannerTexts.ANSWERS_OVER_MQTT_TICK, PlannerTexts.ANSWERS_OVER_MQTT_SUBLINE, form.answersTopic != null) {
+                change(form.copy(answersTopic = if (it) "" else null))
+            }
+            form.answersTopic?.let { filter ->
+                FormField(
+                    "answersTopic", PlannerTexts.ANSWERS_TOPIC_LABEL, filter, details, onNext,
+                    placeholder = PlannerTexts.ANSWERS_TOPIC_PLACEHOLDER,
+                ) { change(form.copy(answersTopic = it)) }
+                form.answersKey()?.let { KeyLine("answersKey", it) }
+            }
+            MqttTick("requests", PlannerTexts.REQUESTS_OVER_MQTT_TICK, PlannerTexts.REQUESTS_OVER_MQTT_SUBLINE, form.requestsTopic != null) {
+                change(form.copy(requestsTopic = if (it) "" else null))
+            }
+            form.requestsTopic?.let { filter ->
+                FormField("requestsTopic", PlannerTexts.REQUESTS_TOPIC_LABEL, filter, details, onNext) { change(form.copy(requestsTopic = it)) }
+                form.requestsKey()?.let { KeyLine("requestsKey", it) }
+            }
+            // One sentence for both ticks: either route is an MQTT route and the app cannot read the broker's MQTT exchange.
+            if (form.answersTopic != null || form.requestsTopic != null) {
+                Text(
+                    PlannerTexts.MQTT_EXCHANGE_ASSUMPTION,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("planForm:mqttAssumption"),
+                )
+            }
         }
     }
+}
+
+/** One of the two MQTT ticks of a pair: the checkbox row, then its sub-line, which says which stream the route points at. */
+@Composable
+private fun MqttTick(name: String, label: String, subline: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier
+                .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange)
+                .padding(vertical = 4.dp)
+                .testTag("planForm:${name}OverMqtt"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(checked = checked, onCheckedChange = null)
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+        }
+        Text(
+            subline,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 32.dp).testTag("planForm:${name}Subline"),
+        )
+    }
+}
+
+@Composable
+private fun KeyLine(tagName: String, key: String) {
+    Text(
+        PlannerTexts.mqttRouteSaves(key),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp).testTag("planForm:$tagName"),
+    )
 }
 
 @Composable
@@ -192,6 +252,7 @@ private fun FormField(
     onNext: () -> Unit,
     autoFocus: Boolean = false,
     suggestions: List<Suggestion>? = null,
+    placeholder: String? = null,
     onChange: (String) -> Unit,
 ) {
     val error = details.problem(field)
@@ -204,6 +265,8 @@ private fun FormField(
                 value = value,
                 onValueChange = onChange,
                 label = { Text(label) },
+                // Material shows it only while the field is focused and empty; it is a hint and never the value.
+                placeholder = placeholder?.let { { Text(it) } },
                 singleLine = true,
                 isError = error != null,
                 modifier = Modifier.weight(1f).focusRequester(focus).onEnter(onNext).testTag("planForm:$field"),

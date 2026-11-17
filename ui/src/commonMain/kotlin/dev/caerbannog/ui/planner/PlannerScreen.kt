@@ -158,7 +158,8 @@ fun PlannerScreen(
     PlanWizardDialog(
         wizard = state.wizard,
         events = events,
-        wordsOf = state::wordsOf,
+        // On the summary page the steps are not in the plan yet; they are worded together so a route reads "to stream ..." there as well.
+        wordsOf = { action -> state.wordsOf(action, (state.wizard as? WizardState.Summary)?.actions.orEmpty()) },
         onAddToPlan = { summary ->
             addMarker = state.plan.steps.map { it.id }.toSet() to summary.editingStepId
             events.addToPlan()

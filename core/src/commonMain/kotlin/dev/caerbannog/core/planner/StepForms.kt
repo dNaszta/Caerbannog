@@ -90,6 +90,14 @@ data class StreamForm(
         return own + theirs + topicProblems()
     }
 
+    /** The binding key the answers filter is saved as; null while that tick is off or its filter is refused. */
+    fun answersKey(): String? = answersTopic?.let(::keyOf)
+
+    /** The binding key the requests filter is saved as; null while that tick is off or its filter is refused. */
+    fun requestsKey(): String? = requestsTopic?.let(::keyOf)
+
+    private fun keyOf(filter: String): String? = (MqttTopicTranslation.toBindingKey(filter) as? Translation.Key)?.text
+
     /** Only the filter check of the route form: its destination is a stream name this form already checks, so one mistake gets one message. */
     private fun topicProblems(): List<FieldProblem> = buildList {
         answersTopic?.let { addAll(topicProblem(it, "answersTopic")) }
