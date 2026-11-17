@@ -292,7 +292,10 @@ class PlannerPolicySteps {
         MigrationAction.DeclarePolicy(name, pattern, linkedMapOf(k1 to ArgumentValue.Text(v1), k2 to ArgumentValue.Text(v2)), vhost = d.vhost),
     )
 
-    /** The scenario says the exchange is nowhere: the plan has none of that name and the planner knows no broker names. */
+    /**
+     * The scenario says the exchange is nowhere: the plan has none of that name and the planner has read the broker (it lists the default exchange and the
+     * `amq.*` ones, as a real read always does) and the broker lacks the name. A planner that has read nothing makes no claim about the broker (ruling 2).
+     */
     @Given("neither the broker nor the plan has the exchange {string}")
     fun noSuchExchange(exchange: String) {
         assertEquals(
@@ -300,8 +303,12 @@ class PlannerPolicySteps {
             d.plan.steps.map { it.action }.filterIsInstance<MigrationAction.DeclareExchange>().map { it.name }.filter { it == exchange },
             "the plan declares the exchange: ${d.titles()}",
         )
-        assertEquals(KnownTopology.None, d.known, "the planner knows names of the broker")
+        require(exchange !in readBrokerExchanges) { "the read broker must lack \"$exchange\"" }
+        d.known = KnownTopology(exchanges = readBrokerExchanges)
+        d.restart() // the planner reads the broker names when it opens
     }
+
+    private val readBrokerExchanges = mapOf("" to "direct", "amq.direct" to "direct", "amq.fanout" to "fanout", "amq.topic" to "topic")
 
     /** A note of the plan itself (no check run), shown on the step. */
     @Then("the step {string} shows the note {string}")

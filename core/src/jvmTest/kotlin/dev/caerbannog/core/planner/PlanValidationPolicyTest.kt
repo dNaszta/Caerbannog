@@ -212,4 +212,39 @@ class PlanValidationPolicyTest {
         val messages = notes(p).map { it.second }
         assertEquals(listOf(noEffect("orders", "quorum queue", "Keep messages for")), messages)
     }
+
+    // ---- the missing dead-letter exchange note (ruling 2: no claim when the broker names were not read) ----
+
+    private fun missingExchange(plan: TopologyPlan, known: KnownTopology) =
+        PlanValidation.problems(plan, known).filter { !it.blocking && "does not exist yet" in it.message }.map { it.message }
+
+    private fun dlxPolicy() = MigrationAction.DeclarePolicy(
+        "dlx-policy", "^orders$", mapOf("dead-letter-exchange" to ArgumentValue.Text("orders-dlx")), "/", "all", 0,
+    )
+
+    private val readBroker = KnownTopology(exchanges = mapOf("" to "direct", "amq.direct" to "direct", "amq.topic" to "topic"))
+
+    @Test
+    fun `no missing exchange note when the broker names were not read`() {
+        assertEquals(emptyList(), missingExchange(plan(queue("orders"), dlxPolicy()), KnownTopology.None))
+    }
+
+    @Test
+    fun `missing exchange note when the broker was read and lacks the name`() {
+        val messages = missingExchange(plan(queue("orders"), dlxPolicy()), readBroker)
+        assertEquals(1, messages.size, "messages: $messages")
+        assertTrue("orders-dlx" in messages.single(), messages.single())
+    }
+
+    @Test
+    fun `no missing exchange note when the read broker has the name`() {
+        assertEquals(emptyList(), missingExchange(plan(queue("orders"), dlxPolicy()), KnownTopology(exchanges = readBroker.exchanges + ("orders-dlx" to "fanout"))))
+    }
+
+    @Test
+    fun `no missing exchange note when an earlier step of the plan declares the exchange`() {
+        val p = plan(MigrationAction.DeclareExchange("orders-dlx", vhost = "/"), queue("orders"), dlxPolicy())
+        assertEquals(emptyList(), missingExchange(p, readBroker))
+        assertEquals(emptyList(), missingExchange(p, KnownTopology.None))
+    }
 }
