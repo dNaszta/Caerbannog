@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: M9-00a (S-E), M9-03    Size: S
 
-PLANNED 2026-11-15. Not started. Decided 2026-11-15 (Q1): headers and topic exchanges are in the first version.
+PLANNED 2026-11-15. Status: step 3 built (senior developer, 2026-11-17), waiting for step 4 (verify) and review. Decided 2026-11-15 (Q1): headers and topic exchanges are in the first version.
 
 ## Goal
 When the source of a binding is a headers exchange, the binding form asks for headers (name, value, value type) and the match rule (all or any) instead of a routing key, and writes them as binding arguments. Two bindings that differ only in their headers are two steps.
@@ -107,3 +107,6 @@ Architect, 2026-11-17, branch `m9-11-headers-bindings`, head 2b3494f0. Read: thi
 3. Contradictions with the spec or CLAUDE.md: none found. No broker path, no queue read, no TLS path, no secret, no new dependency in the tests; the live probe publishes to a test broker only and is `@broker`. MCP stays "None".
 
 Go for step 3 (senior developer): the contract is closed; implement against the tests, make the throwaway-reference-proven names real, and run core, ui and the planner acceptance suite.
+
+## Step 3 record
+Senior developer, 2026-11-17, branch `m9-11-headers-bindings`. Built against the step 2 tests: `StepForms.kt` (`MatchRule`, `HeaderValueType`, `HeaderMatch` with `argumentValue()` and `withType()`, `BindingForm.headers/matchRule/heldRule/withRule`, `formOf` opens headers bindings, `x-match` alone is read-only), `FormContext.exchangeType`, `WizardState.Details.asksHeaders`, `PlannerTexts` (two warnings, four refusals), `PlanForms.kt` (`HeadersSection`, `HeaderRow`). Graph, check and dry run untouched. Not done by me (not mine to edit): the mockup title in `docs/ux/Planner.dc.html` still says "S-E pending".
