@@ -19,6 +19,7 @@ import dev.caerbannog.core.planner.MqttDestinationKind
 import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlanProblem
+import dev.caerbannog.core.planner.PolicyForm
 import dev.caerbannog.core.planner.PlanStep
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerEntry
@@ -87,6 +88,13 @@ class PlannerDriver {
      */
     val declareChecks = mutableMapOf<String, FakeDeclareCheck>()
 
+    /**
+     * M9-08: the REAL check port and the REAL one-policy read port over the honest management API (`CheckWorld`), used when a scenario of the policy notes needs
+     * them; the view model is built with them (a change rebuilds it, [restart]). Null for every other scenario, which keeps its scripted [declareChecks].
+     */
+    var realDeclareCheck: dev.caerbannog.core.migrations.DeclareCheck? = null
+    var policyReader: dev.caerbannog.core.planner.BrokerPolicyReader? = null
+
     /** M9-06: the virtual clock of the view model, epoch milliseconds (the time a summary shows). */
     var nowMillis = 1_700_000_000_000L
 
@@ -112,7 +120,8 @@ class PlannerDriver {
             controlLevel = controlLevel,
             hasConfigurePermission = configurePermission,
         ), scope, descriptionDebounceMillis = 0, reader = readerForNewViewModel(),
-            declareCheck = if (connected && unavailableReason == null) declareChecks[profile] else null, clock = RefreshClock { nowMillis },
+            declareCheck = if (connected && unavailableReason == null) (declareChecks[profile] ?: realDeclareCheck) else null, clock = RefreshClock { nowMillis },
+            policies = if (connected && unavailableReason == null) policyReader else null,
         ).also { created ->
             current = created
             scope.launch { created.state.collect { s -> s.question?.let { q -> if (questions.lastOrNull() != q) questions += q } } }
@@ -255,6 +264,7 @@ class PlannerDriver {
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
+        is PolicyForm -> "Policy"
         is MqttRouteForm -> "MQTT route"
     }
 }

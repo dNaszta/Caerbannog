@@ -22,10 +22,11 @@ class PlannerTextsStreamTest {
 
     @Test
     fun `Stream is a built kind, in the order of the wizard, with a description`() {
-        assertEquals(listOf("Queue", "Exchange", "Binding", "Stream", "MQTT route"), PlannerTexts.BUILT_KINDS)
+        assertEquals(listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "MQTT route"), PlannerTexts.BUILT_KINDS) // M9-08: Policy has its form now
         assertEquals(PlannerTexts.WIZARD_KINDS.filter { it in PlannerTexts.BUILT_KINDS }, PlannerTexts.BUILT_KINDS, "built kinds keep the wizard order")
         assertEquals("Optionally with its response stream (DLN)", PlannerTexts.kindDescription("Stream"))
-        assertEquals("", PlannerTexts.kindDescription("Policy"), "the others still have none")
+        assertEquals("Limits and other settings by name pattern", PlannerTexts.kindDescription("Policy"), "M9-08: the mockup's words")
+        assertEquals("", PlannerTexts.kindDescription("Dead-lettering for a queue"), "the others still have none")
     }
 
     @Test

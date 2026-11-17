@@ -237,6 +237,8 @@ class PlannerSteps {
     fun formSays(message: String) {
         // M9-07: the fixed note of the stream form is also "said" by the form; it is a text of the page, not a problem.
         if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
+        // M9-08: the match line and the sentence of the policy form are hints, not problems.
+        if (PlannerPolicySteps.isPolicyHint(message)) return PlannerPolicySteps.hintSaid(message)
         // M9-11: the two warnings of a headers binding are hints, not problems.
         if (message == PlannerTexts.HEADERS_NONE_ALL || message == PlannerTexts.HEADERS_NONE_ANY) return PlannerHeadersSteps.warningSaid(message)
         assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")

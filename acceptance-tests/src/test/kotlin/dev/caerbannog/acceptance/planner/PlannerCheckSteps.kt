@@ -72,6 +72,10 @@ object CheckWorld {
     /** The real check over the honest broker. */
     fun realCheck(): DeclareCheck = ManagementDeclareCheck.overClient(HttpClient(engine()), "http://broker.test:15672", "svc", "pw")
 
+    /** M9-08: the real one-policy read port of the planner over the same honest broker; its requests are recorded in [seen] like the check's. */
+    fun realPolicyReader(): dev.caerbannog.core.planner.BrokerPolicyReader =
+        dev.caerbannog.datarabbit.ManagementBrokerPolicyReader.overClient(HttpClient(engine()), "http://broker.test:15672", "svc", "pw")
+
     /** The real executor over the same broker, for "applied on the Migrations screen"; its requests are not the check's, they are not recorded. */
     fun realExecutor(): TopologyMigrationExecutor = ManagementTopologyMigrationExecutor.overClient(
         client = HttpClient(MockEngine { request ->
@@ -266,6 +270,8 @@ class PlannerCheckSteps {
     @When("I check the plan against {string}")
     fun check(profile: String) {
         assertEquals(d.profile, profile)
+        // M9-08: a scenario of the policy notes is checked through the view model, which reads the broker's names again and passes the read ports.
+        if (PolicyWorld.active) return PolicyWorld.check(d)
         CheckWorld.snapshotBeforeCheck = CheckWorld.broker.snapshot()
         CheckWorld.result = runBlocking { PlanCheck.run(currentPlan(), context(), CheckWorld.realCheck()) { _, _ -> } }
     }

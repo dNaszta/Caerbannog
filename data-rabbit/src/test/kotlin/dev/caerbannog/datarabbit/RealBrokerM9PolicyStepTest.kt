@@ -128,7 +128,7 @@ class RealBrokerM9PolicyStepTest {
         Json.parseToJsonElement(listBody).jsonObject["items"]!!.jsonArray.map { it.jsonObject }.single { it["name"]!!.jsonPrimitive.content == name }
 
     @Test
-    fun `Claim 2 alternate-exchange set by a policy acts on an exchange, read from the publish answer`() {
+    fun `M9-08-alternate-exchange-on-exchange claim 2, alternate-exchange set by a policy acts on an exchange, read from the publish answer`() {
         val main = cleanup.exchange(unique("main")); val spare = cleanup.exchange(unique("spare")); val queue = cleanup.queue(unique("spare-q"))
         assertEquals(201, api.put("/api/exchanges/%2F/$spare", """{"type":"fanout","durable":true}""").status)
         assertEquals(201, api.put("/api/exchanges/%2F/$main", """{"type":"direct","durable":true}""").status)
@@ -144,7 +144,7 @@ class RealBrokerM9PolicyStepTest {
     }
 
     @Test
-    fun `Claim 3 the max-age units M, h and m, status of the policy PUT`() {
+    fun `M9-08-max-age-units claim 3, the units M, h and m of max-age, status of the policy PUT`() {
         val answers = listOf("1M", "1h", "1m").associateWith { value ->
             putPolicy(unique("age-${value}"), "^$run-nomatch$", """{"max-age":"$value"}""", applyTo = "streams").status
         }

@@ -73,7 +73,7 @@ class StreamFormUiTest {
     }
 
     @Test
-    fun `Down from Binding selects Stream, and Policy is still not offered`() = runDesktopComposeUiTest(1280, 800) {
+    fun `Down from Binding selects Stream, and Down again selects Policy (M9-08)`() = runDesktopComposeUiTest(1280, 800) {
         val r = UiRig()
         showPlanner(r)
         node("planner:addStepBtn").performClick()
@@ -81,7 +81,9 @@ class StreamFormUiTest {
         node("planWizard:kind:Binding").requestFocus()
         node("planWizard:kind:Binding").performKeyInput { pressKey(Key.DirectionDown) }
         assertEquals(true, node("planWizard:kind:Stream").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
-        assertNotDrawn("planWizard:kind:Policy")
+        node("planWizard:kind:Stream").requestFocus()
+        node("planWizard:kind:Stream").performKeyInput { pressKey(Key.DirectionDown) }
+        assertEquals(true, node("planWizard:kind:Policy").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         r.close()
     }
 
