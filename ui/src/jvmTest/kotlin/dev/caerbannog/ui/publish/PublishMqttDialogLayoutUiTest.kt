@@ -222,4 +222,44 @@ class PublishMqttDialogLayoutUiTest {
 
     @Test
     fun `a confirmation after Publish is inside the window with no scroll at 1000x600`() = confirmationInside(1000, 600)
+
+    // ---- M9-10e: an error of any length scrolls inside its own banner; it never squeezes the body out ----
+
+    private fun hugeErrorKeepsBodyAndButtons(width: Int, height: Int, errorLength: Int) = runDesktopComposeUiTest(width, height) {
+        val h = host().also { show(it) }
+        try {
+            h.publisher.refuseNextWith = "The broker refused the message and explains why at length. ".repeat(errorLength / 58 + 1).take(errorLength)
+            h.vm.publish()
+            waitForIdle()
+            assertTrue(drawn("publishMqttError"), "the error banner is shown")
+            for (tag in listOf("publishMqttPublishButton", "publishMqttCancelButton", "publishMqttError")) {
+                assertInside(tag, bounds(tag), width, height)
+            }
+            onNodeWithTag("publishMqttPublishButton").assertIsDisplayed()
+            onNodeWithTag("publishMqttCancelButton").assertIsDisplayed()
+            val body = bounds("publishMqttBody")
+            assertTrue(body.bottom.value - body.top.value >= 120f, "a $errorLength-character error left the body only ${body.bottom - body.top} high (expected at least 120dp)")
+            assertTrue(drawn("publishMqttErrorScrollbar"), "an error that overflows its banner shows publishMqttErrorScrollbar")
+        } finally { h.scope.cancel() }
+    }
+
+    @Test
+    fun `a 2000-character error at 1000x600 keeps both buttons and 120dp of body, and the banner shows its own scrollbar`() =
+        hugeErrorKeepsBodyAndButtons(1000, 600, 2000)
+
+    @Test
+    fun `a 2000-character error at 1280x800 keeps both buttons and 120dp of body, and the banner shows its own scrollbar`() =
+        hugeErrorKeepsBodyAndButtons(1280, 800, 2000)
+
+    @Test
+    fun `a short error has no banner scrollbar`() = runDesktopComposeUiTest(1000, 600) {
+        val h = host().also { show(it) }
+        try {
+            h.publisher.refuseNextWith = "Refused: no such exchange."
+            h.vm.publish()
+            waitForIdle()
+            assertTrue(drawn("publishMqttError"), "the error banner is shown")
+            assertTrue(!drawn("publishMqttErrorScrollbar"), "no overflow, so no scrollbar")
+        } finally { h.scope.cancel() }
+    }
 }

@@ -6,6 +6,7 @@ import dev.caerbannog.core.connections.fakes.FakeStreamMessageReader
 import dev.caerbannog.core.connections.fakes.FakeStreamOffsets
 import dev.caerbannog.core.connections.fakes.FakeTopologyCatalog
 import dev.caerbannog.core.mqtt.StreamInboundRoute
+import dev.caerbannog.core.publish.MqttPublishAccess
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
 import org.junit.jupiter.api.Test
@@ -17,8 +18,8 @@ import kotlin.test.assertTrue
 /** The decisions of the screens' wiring in Main.kt, tested without a window: what is offered, what is refreshed, which routes feed a stream. */
 class StreamWiringTest {
 
-    private fun source(hasMqtt: Boolean) = StreamSource(
-        catalog = FakeStreamCatalog(), offsets = FakeStreamOffsets(), vhost = "/", topology = FakeTopologyCatalog(),
+    private fun source(hasMqtt: Boolean, vhost: String = "/") = StreamSource(
+        catalog = FakeStreamCatalog(), offsets = FakeStreamOffsets(), vhost = vhost, topology = FakeTopologyCatalog(),
         messages = FakeStreamMessageReader(), hasMqtt = hasMqtt,
     )
 
@@ -55,25 +56,56 @@ class StreamWiringTest {
         assertEquals(emptyList(), inboundRoutesFor(emptyList(), "telemetry"))
     }
 
-    // --- is MQTT publishing offered ---
+    // --- is MQTT publishing offered, and may it be used (M9-10e) ---
+
+    private val noWriteText = "Test publishing is disabled: no write permission on virtual host /."
 
     @Test
-    fun `MQTT publishing is offered only for a source whose profile has an MQTT port`() {
-        assertEquals(true, offersMqttPublishing(source(hasMqtt = true)))
-        assertEquals(false, offersMqttPublishing(source(hasMqtt = false)))
-        assertEquals(false, offersMqttPublishing(null), "not connected")
+    fun `MQTT publish access is NoMqttPort without a port or a connection, whatever the permission`() {
+        for (publishing in listOf(true, false)) {
+            assertEquals(MqttPublishAccess.NoMqttPort, mqttPublishAccess(source(hasMqtt = false), publishing))
+            assertEquals(MqttPublishAccess.NoMqttPort, mqttPublishAccess(null, publishing), "not connected")
+        }
     }
 
     @Test
-    fun `the stream screen action is absent without MQTT or a connection`() {
-        assertNull(streamMqttOpener(source(hasMqtt = false), setTopic = { error("no") }, openDialog = { error("no") }))
-        assertNull(streamMqttOpener(null, setTopic = { error("no") }, openDialog = { error("no") }))
+    fun `MQTT publish access without write permission names the virtual host of the source`() {
+        assertEquals(MqttPublishAccess.NoWritePermission(noWriteText), mqttPublishAccess(source(hasMqtt = true), publishingEnabled = false))
+        assertEquals(
+            MqttPublishAccess.NoWritePermission("Test publishing is disabled: no write permission on virtual host orders."),
+            mqttPublishAccess(source(hasMqtt = true, vhost = "orders"), publishingEnabled = false),
+        )
+    }
+
+    @Test
+    fun `MQTT publish access is Allowed with a port and write permission`() {
+        assertEquals(MqttPublishAccess.Allowed, mqttPublishAccess(source(hasMqtt = true), publishingEnabled = true))
+    }
+
+    @Test
+    fun `the stream screen action is absent without MQTT or a connection, whatever the permission`() {
+        for (publishing in listOf(true, false)) {
+            for (src in listOf(source(hasMqtt = false), null)) {
+                val entry = streamMqttOpener(src, publishing, setTopic = { error("no") }, openDialog = { error("no") })
+                assertNull(entry.open)
+                assertNull(entry.disabledReason)
+            }
+        }
+    }
+
+    @Test
+    fun `the stream screen action is disabled with the reason and calls nothing without write permission`() {
+        val entry = streamMqttOpener(source(hasMqtt = true), publishingEnabled = false, setTopic = { error("no topic") }, openDialog = { error("no dialog") })
+        assertNull(entry.open, "a disabled action has no callback")
+        assertEquals(noWriteText, entry.disabledReason)
     }
 
     @Test
     fun `the stream screen action pre-fills the suggested topic and opens the dialog`() {
         val calls = mutableListOf<String>()
-        val open = assertNotNull(streamMqttOpener(source(hasMqtt = true), setTopic = { calls += "topic:$it" }, openDialog = { calls += "open" }))
+        val entry = streamMqttOpener(source(hasMqtt = true), publishingEnabled = true, setTopic = { calls += "topic:$it" }, openDialog = { calls += "open" })
+        assertNull(entry.disabledReason, "an enabled action carries no reason")
+        val open = assertNotNull(entry.open)
 
         open("sensors/#")
         open(null)
@@ -82,12 +114,29 @@ class StreamWiringTest {
     }
 
     @Test
-    fun `the topology screen action is absent without MQTT and opens the dialog with it`() {
-        assertNull(topologyMqttOpener(source(hasMqtt = false)) { error("no") })
-        assertNull(topologyMqttOpener(null) { error("no") })
+    fun `the topology screen action is absent without MQTT, whatever the permission`() {
+        for (publishing in listOf(true, false)) {
+            for (src in listOf(source(hasMqtt = false), null)) {
+                val entry = topologyMqttOpener(src, publishing) { error("no") }
+                assertNull(entry.open)
+                assertNull(entry.disabledReason)
+            }
+        }
+    }
 
+    @Test
+    fun `the topology screen action is disabled with the reason and opens nothing without write permission`() {
+        val entry = topologyMqttOpener(source(hasMqtt = true, vhost = "orders"), publishingEnabled = false) { error("no dialog") }
+        assertNull(entry.open)
+        assertEquals("Test publishing is disabled: no write permission on virtual host orders.", entry.disabledReason)
+    }
+
+    @Test
+    fun `the topology screen action opens the dialog with MQTT and write permission`() {
         var opened = 0
-        assertNotNull(topologyMqttOpener(source(hasMqtt = true)) { opened++ }).invoke()
+        val entry = topologyMqttOpener(source(hasMqtt = true), publishingEnabled = true) { opened++ }
+        assertNull(entry.disabledReason)
+        assertNotNull(entry.open).invoke()
         assertEquals(1, opened)
     }
 

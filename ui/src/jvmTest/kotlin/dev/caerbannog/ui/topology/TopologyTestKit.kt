@@ -156,6 +156,7 @@ internal fun DesktopComposeUiTest.screen(
     publishMqttState: PublishMqttState? = null,
     publishMqttEvents: PublishMqttEvents? = null,
     onOpenPublishMqttDialog: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     wrap: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ): Shown {
     val shown = Shown(state, nowMillis, events)
@@ -172,6 +173,7 @@ internal fun DesktopComposeUiTest.screen(
                 publishMqttState = publishMqttState,
                 publishMqttEvents = publishMqttEvents,
                 onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                publishMqttDisabledReason = publishMqttDisabledReason,
             )
         }
     }

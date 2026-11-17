@@ -4,6 +4,9 @@ Milestone: M9 (follow-up)    Depends on: M9-10b (merged)    Size: S
 
 Proposed 2026-11-17 by the architect at step 5 of `M9-10b`. QUEUED (owner, 2026-11-17, "accept all", spec O18). Brief made exact at step 1 on 2026-11-17 (below, "Step 1 record").
 
+## Status
+Step 2 done (test developer, 2026-11-17): tests written and red for the right reason, no production code. API fixed by the tests, see "Step 2 record" at the end. AMQP `PublishTestMessageDialog` fold check: FAILS (red by assertion, real bug).
+
 ## Goal
 Every control that opens the Publish MQTT dialog respects the profile's declared write permission the way "Send a test message" does, the AMQP Publish dialog keeps Publish and Cancel on screen in a small window, and an error in the Publish MQTT dialog can never squeeze the body out.
 
@@ -73,3 +76,11 @@ Tests written first and failing for the right reason, then passing; `./gradlew :
 - Confirmed against `docs/spec.md` (O18 item 6, nothing contradicts), CLAUDE.md (publishing respects permissions), `PublishMqttDialog` footer, `core.publish.noWritePermission`, `MqttTestMessage.offer` and `Main.kt` `canWrite`.
 - Corrections to the proposal: four controls not three; no-MQTT-port stays absent; the AMQP dialog very likely fails the fold check (footer inside the scroll).
 - Scenarios written: 8 in `15_mqtt_publishing.feature`; steps to bind at step 2 (glue package `dev.caerbannog.acceptance.mqtt`, real screens through the Compose UI test API like `PlannerScreens`): `the user has no write permission on {string}`, `the user may publish on {string}`, `the permission check of {string} has not finished`, `I open the stream {string} that is fed by the MQTT topic {string}`, `I open the MQTT tab of the topology screen`, the action/route-node enabled, disabled, absent and says assertions, `I try to press {string}`, `the Publish MQTT dialog is not open`, `nothing was published over MQTT`.
+
+## Step 2 record (test developer, 2026-11-17)
+- Red: compile errors on the missing API (`MqttPublishAccess`, `publishMqttDisabledReason`, the new wiring signatures); the AMQP layout test is red by assertion (see below); the rest goes green with a throwaway reference implementation kept outside the repo (core, ui, desktopApp and the 17 runs of `15_mqtt_publishing.feature` all green there).
+- AMQP fold check: the Publish button of `PublishTestMessageDialog` is at top 990 dp in a 600 dp window (and in an 800 dp window too) with 8 application properties and a 400-character error; a confirmation alone pushes it to 918 dp at 1000x600. So the fix of scope item 3 is needed.
+- Fixed names the tests rely on: body tag `publishDialogBody`, scrollbar tag `publishDialogBodyScrollbar` (AMQP); banners `publishError`, `publishConfirmation` and the footer stay pinned below the body. Publish MQTT: `publishMqttErrorScrollbar` (and `publishMqttConfirmationScrollbar` for the confirmation, same `BannerBox`).
+- Hint from the reference: in `BannerBox` the scrollbar must use `matchParentSize()` and the height limit belongs on the Box that holds the text (`heightIn(max = 136.dp)` on the Box, text with `verticalScroll`), otherwise the scrollbar fills the whole remaining height and the banner swallows the footer. Material buttons keep an OnClick action when disabled, so only `assertIsNotEnabled()` is asserted for them; the route pill and the node must have no click action.
+- `core` `jvmTest` does not compile on `main` f9c0b69b: `BrokerNameRulesTest` (M9-01b step 2) references constants that M9-01b has not added yet. The new `MqttPublishAccessTest` cannot run in this branch until M9-01b is merged; run it after the merge, or delete that file locally for a quick run.
+
