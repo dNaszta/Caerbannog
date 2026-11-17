@@ -7,11 +7,18 @@ import dev.caerbannog.core.migrations.ActionResult
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationRunner
+import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationsViewModel
+import dev.caerbannog.core.mqtt.CorrelationIdSource
+import dev.caerbannog.core.mqtt.PublishMqttViewModel
+import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
+import dev.caerbannog.core.planner.TestMessageOpening
+import dev.caerbannog.ui.mqtt.PublishMqttEvents
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
 import dev.caerbannog.core.streams.StreamCatalog
 import dev.caerbannog.core.topology.TopologyCatalog
 import kotlinx.coroutines.CoroutineScope
+import java.util.UUID
 
 /**
  * What one Migrations screen is built from. The window rebuilds the view model when this value changes, so it is a value: equal inputs are
@@ -32,6 +39,10 @@ data class MigrationsInputs(
     val streams: StreamCatalog? = null,
     /** The read-only check port of the same connection (M9-05), already behind the closed-connection guard; null when there is none or the connection cannot run migrations. */
     val declareCheck: DeclareCheck? = null,
+    /** M9-10b: the held source has an MQTT port (the same function as [offersMqttPublishing]). */
+    val hasMqtt: Boolean = false,
+    /** M9-10b: the finished permission check says test publishing is enabled; an unfinished check or no connection is false (as `canWrite` in Main.kt). */
+    val publishingEnabled: Boolean = false,
 )
 
 internal const val NOT_CONNECTED = "Connect to a broker first"
@@ -61,7 +72,37 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
         topology = source?.topology,
         streams = source?.catalog,
         declareCheck = source?.declareCheck,
+        hasMqtt = offersMqttPublishing(source),
+        publishingEnabled = (current?.status as? PermissionCheckStatus.Done)?.result?.publishingEnabled ?: false,
     )
+}
+
+/** The screen state with the two inputs of "Send a test message"; they come from the connection, not from the view model's own state. */
+fun MigrationsScreenState.withTestMessageGates(inputs: MigrationsInputs): MigrationsScreenState =
+    copy(hasMqtt = inputs.hasMqtt, publishingEnabled = inputs.publishingEnabled)
+
+/** A UUID per test message. Lives here so that `core` stays free of `java.*`. */
+object UuidCorrelationIds : CorrelationIdSource {
+    override fun next(): String = UUID.randomUUID().toString()
+}
+
+/** One open Publish MQTT dialog of a test message: a fresh view model per opening, so no earlier topic, header or feedback leaks into it. */
+class TestMessageSession(val vm: PublishMqttViewModel, val events: PublishMqttEvents)
+
+/**
+ * Builds the session for [opening]. Only the existing publisher publishes, and only when the user presses Publish; opening sends nothing.
+ * [onClose] runs when the dialog is cancelled.
+ */
+fun AppComposition.openTestMessage(opening: TestMessageOpening, connectionName: String, scope: CoroutineScope, onClose: () -> Unit): TestMessageSession {
+    val vm = PublishMqttViewModel(
+        publisher = active.source?.mqttPublisher ?: UnavailableMqttMessagePublisher,
+        connectionName = connectionName,
+        scope = scope,
+        initialTopic = opening.topic,
+        initialHeaders = opening.headers,
+        headerNotice = opening.notice,
+    )
+    return TestMessageSession(vm, PublishMqttEventsAdapter(vm, onClose = onClose))
 }
 
 /** The Migrations view model for [inputs]: the real runner over [migrationHistory] and the connection's executor (a refusing one when there is none). */

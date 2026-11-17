@@ -43,6 +43,7 @@ import dev.caerbannog.ui.appframe.LocalNavigationFeatures
 import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.migrations.MigrationsScreen
+import dev.caerbannog.ui.mqtt.PublishMqttDialog
 import dev.caerbannog.ui.planner.PlannerScreen
 import dev.caerbannog.ui.publish.PublishEvents
 import dev.caerbannog.ui.streams.EmptyMessageBrowserEvents
@@ -420,8 +421,11 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         }
     }
 
+    // M9-10b: one Publish MQTT dialog at a time, opened by "Send a test message"; dropped with the connection it was opened for.
+    var testMessage by remember(inputs.connectionName) { mutableStateOf<TestMessageSession?>(null) }
+
     MigrationsScreen(
-        state = state,
+        state = state.withTestMessageGates(inputs),
         onSelectVersion = { current.selectVersion(it) },
         onApplyPending = { scope.launch { current.applyPending() } },
         onApplySingle = { scope.launch { current.applySingle(it) } },
@@ -451,7 +455,15 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         },
         plannerNotice = plannerNotice,
         onDismissPlannerNotice = { plannerNotice = null },
+        onSendTestMessage = { opening ->
+            testMessage = composition.openTestMessage(opening, inputs.connectionName, scope, onClose = { testMessage = null })
+        },
+        correlationIds = UuidCorrelationIds,
     )
+    testMessage?.let { session ->
+        val publishState by session.vm.state.collectAsState()
+        PublishMqttDialog(state = publishState, events = session.events)
+    }
 }
 
 /**
