@@ -5,6 +5,9 @@ Milestone: M9 (follow-up)    Depends on: M9-10b (merged)    Size: S
 Proposed 2026-11-17 by the architect at step 5 of `M9-10b`. QUEUED (owner, 2026-11-17, "accept all", spec O18). Brief made exact at step 1 on 2026-11-17 (below, "Step 1 record").
 
 ## Status
+Step 5 done (architect, 2026-11-17): ACCEPTED WITH FOLLOW-UPS. No blocker, no major. Findings: AMQP error banner unbounded and the always-reserved 12 dp gutter go to follow-up `M9-10f`; an already open Publish MQTT dialog is out of scope (see Open points); node click not asserted in BDD, accepted. Branch `m9-10e-mqtt-publish-gates` is merge-ready (main f9c0b69b had not moved, `git merge main` said up to date; the full suite of step 4 ran on the current code, only docs changed since, so it was not rerun). Merge to main waits for the owner.
+
+Earlier:
 Step 4 done (test developer, 2026-11-17): PASS WITH FINDINGS, no blocker, no major. `./gradlew test --continue --rerun-tasks` green (core 3333, ui 1393, desktopApp 194, acceptance 2008 with 1234 skipped, tag-excluded only, data-rabbit 1008, mcp-server 45, dev-seed 90; `verifyTestDiscovery` green); the 9 `@m9-10e` runs ran and passed (checked with a temporary `pretty` run, runner restored). Five mutations (rule ignores publishingEnabled; no `disabled()` on the route pill; click action left on the disabled pipeline node; Publish/Cancel back in the scrolling body; no max height on the MQTT banner) each turned named tests red, all reverted. Screenshots: all 167 files of `ui/build/screenshots` are byte-identical to main f9c0b69b (fresh runs on both); the three `migrations-export-note-*.png` come from the normal (non-screenshot) `MigrationsExportNoteUiTest`, which main's build dir had not run yet (stale build dir; re-running it on main wrote them). Minors: (1) the AMQP dialog still has an unbounded error banner, a 2000-character error squeezes the whole body out at 1000x600; (2) the 12 dp scrollbar gutter is always reserved, so the AMQP fields and warning banner are 12 dp narrower than before even in a tall window and no longer line up with the error banner and the footer; (3) a Publish MQTT dialog that is already open stays usable when the permission check later turns negative. Details in the test report. Ready for the architect's verdict.
 
 Earlier:
@@ -64,7 +67,7 @@ Out: any new wording (the write text is reused); hiding instead of disabling (se
 - Safety: this is tightening only, no new request kind, no new read path, no new dependency. The Publish MQTT view model is unchanged.
 
 ## UX
-No new screen. Disabled control plus the reason as `contentDescription`, in the style of the AMQP publish button (`docs/ux/Publish.dc.html`). Error banner: scrolls inside itself above a maximum height (recommended 160 dp, about 8 lines of `bodySmall`; fix at step 2 so the 1000x600 test holds). The AMQP dialog: only if the check fails.
+No new screen. Disabled control plus the reason as `contentDescription`, in the style of the AMQP publish button (`docs/ux/Publish.dc.html`). Error banner: scrolls inside itself above a maximum height (built: 136 dp, about 7 lines of `bodySmall`, the number the 1000x600 test needs; the first proposal was 160 dp). The AMQP dialog: only if the check fails.
 
 ## MCP
 None (UI-only). The MCP server has no tool that publishes over MQTT or AMQP (`mcp-server` only wires `mqttMessagePublisherProvider` for the existing tools; no change here). This task adds no capability, it only disables UI controls and fixes layout.
@@ -73,7 +76,10 @@ None (UI-only). The MCP server has no tool that publishes over MQTT or AMQP (`mc
 - Hide or disable without permission: disabled with the reason (as the AMQP button, the stream "Publish test message" and the test message). Not a new decision: wording is the decided `noWritePermission(vhost)`. If the owner prefers hiding, the only change is `open = null, reason = null`; ask only if he objects at review.
 - Visible reason text: only a `contentDescription` today (as the AMQP button; no visible tooltip). A visible tooltip would be new UX; not part of this task. NEW OPTIONAL decision for the owner: (a) keep as the AMQP button, recommended, consistent; (b) add a hover tooltip to all publish buttons in one later task. Nothing is blocked.
 - No MQTT port stays absent, unlike the test message on the Migrations screen, which shows it disabled with `NO_MQTT_PORT`. Recorded inconsistency, not changed here; owner may ask for a follow-up to align.
-- Error banner maximum height of 160 dp is the architect's proposal; the senior developer may change it if the 1000x600 test needs it.
+- Error banner maximum height: 136 dp (decided at step 3, replaces the proposed 160 dp).
+- An already open Publish MQTT dialog stays publishable if a later permission check turns negative (step 5 ruling): out of scope. The gate controls the opening controls only; the view model has no write check, the check runs once before the connection is used, and the broker refuses an unauthorised publish. No follow-up unless the owner asks.
+- Follow-up `M9-10f`: bounded error banner and gutter only when needed in the AMQP Publish dialog.
+- Owner review (step 5): greyed controls with no visible tooltip (recommend keep, as the AMQP button); AMQP dialog pinned footer plus scrollbar (recommend yes, same as Publish MQTT); banner scroll (recommend yes).
 
 ## Definition of done
 Tests written first and failing for the right reason, then passing; `./gradlew :core:jvmTest :ui:jvmTest :desktopApp:test :acceptance-tests:test` run; no unrelated changes; `tests/bdd/README.md` row for `@m9-10e` added; task index row updated.
