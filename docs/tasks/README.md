@@ -12,26 +12,27 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 
 ### Open work
 
+Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9-01b` and `M9-10e` (`main` after the M9-10e merge).
+
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-10` MQTT route step | M | in progress (branch `m9-10-mqtt-route-step`, step 2 tests first) |
-| M9 | `M9-07b` stream pair with MQTT routes | S | `M9-10` (one scenario also `M9-12`) |
-| M9 | `M9-11` headers bindings | S | nothing |
-| M9 | `M9-01b` broker name rules | S | nothing |
 | M9 | `M9-08b` stream retention from policy | S | nothing |
 | M9 | `M9-08` policy step | M | `M9-08b` (retention block) |
 | M9 | `M9-09` dead-lettering recipe | M | `M9-08` |
 | M9 | `M9-12` open a pending file as steps | M | nothing |
 | M9 | `M9-13` gate on a real broker | M | last: after `M9-08` to `M9-12` |
+| M9 | `M9-10f` AMQP publish dialog: bounded banners, gutter only on overflow | S | nothing (briefed) |
+| M9 | `M9-10d` radio label `Kind (optional, narrows the list)` | XS | nothing (decided yes) |
 | M9 | `M9-14c-f1` executor pre-read of a non-stream body | XS | nothing (no brief) |
 | M9 | `M9-00a-b` spike test hardening | S | nothing |
 | M9 | `M9-00b-d` undecodable property types | S | spike first (no brief file) |
-| M9 | `M9-10c` MQTT exchange hint | S | optional, unscheduled; owner item 9 decided "only the assumption sentence now" |
-| M8 | `M8-06f` review view model cleanup | M | nothing (made exact 2026-11-11; `M8-06d` it was ordered before is superseded) |
-| M5 | `M5-09` read-only migration MCP tools (list, dry run) | S | nothing (`M5-08b` is merged; scenarios not yet tagged) |
-| M1 | `M1-13` unreadable `connections.json` (owner chose option B, 2026-11-09) | M | nothing; no code, no scenarios yet |
+| M9 | `M9-10c` MQTT exchange hint | S | optional, unscheduled |
+| M9 | `M9-07d` | S | optional |
+| M8 | `M8-06f` review view model cleanup | M | nothing |
+| M5 | `M5-09` read-only migration MCP tools (list, dry run) | S | nothing |
+| M1 | `M1-13` unreadable `connections.json` (owner chose option B, 2026-11-09) | M | nothing |
 | M2 | `F-C2` lazy stream list | S/M | nothing (spike first) |
-| M2 | `M2-10` Testcontainers 2.x | S | owner approval of the bump (data-rabbit is on 1.21.4) |
+| M2 | `M2-10` Testcontainers 2.x | S | owner approval of the bump |
 | Ideas, no brief | `M2-17e`, `M2-17f`, `M2-TESTHYGIENE-05`, `M2-TESTHYGIENE-06`, `M8-05c`, `M8-09b`, `M8-12b-polish` | S | a trigger named in the old status text (see `STATUS-HISTORY.md`) |
 
 ### Open owner decisions
@@ -227,7 +228,7 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 | M9-00b-c-readable-death-annotations | The Messages screen, copy text, property filter and the MCP stream tools show a list or map annotation such as `x-opt-deaths` as text, not `[Ljava.lang.Object;@...` | M3 | S | done (merged, 34504f5, 2026-11-17) |
 | M9-00c-spike-policies-equivalence-names | Spike: policy keys per target and which take effect (S-F1), one policy per queue (S-F2), what a repeated declare answers so a read can predict it (S-G), name rules (S-H) | M9 | M | done (merged, ace9e9c, 2026-11-16) |
 | M9-01-plan-core-forms-and-naming | Plan model (a plan is the content of a migration), queue, exchange and binding forms (all four exchange types), plain words, plan validation, naming style with hints and derived names; pure `core` | M9 | M | done (merged, bafe1dd, 2026-11-16) |
-| M9-01b-broker-name-rules | The queue, exchange and stream forms refuse `amq.` names and a queue name over 255 bytes (measured, S-H), the response stream name too, one small live row for built-in exchanges | M9 | S | reviewed ACCEPTED (step 5, 2026-11-17, no blocker or major; ready to merge); was: built and test-verified (step 4, 2026-11-17: all green, 5 mutations red, live 4 of 4, 72 planner screenshots identical to main; next: review; was: built, step 3; tests written, step 2, 2026-11-17: red, the 11 `@m9-01b` runs bound, unit tests and the live row `RealBrokerM9BuiltInExchangeDeclareTest` written; the built-in redeclare answers 204) |
+| M9-01b-broker-name-rules | The queue, exchange and stream forms refuse `amq.` names and a queue name over 255 bytes (measured, S-H), the response stream name too, one small live row for built-in exchanges | M9 | S | done, merged 2026-11-17 (accepted; full suite, 11 `@m9-01b` runs, live `RealBrokerM9BuiltInExchangeDeclareTest` 4/4: a repeat declare of a built-in exchange answers 204) |
 | M9-02-planner-view-model-draft-and-save | `PlannerViewModel`: wizard flow, the draft in the app's own data (migration format, version `draft`), save as the next migration through the existing repository, dismiss, banners; `FilePlanDraftStore`; guard: no write path | M9 | M | done (merged, c1ce94b, 2026-11-16) |
 | M9-03-planner-screen-and-wizard | Planner screen, three-page wizard dialog, step list, JSON view, entry and draft card on the Migrations screen, every limited state, navigation wiring; its suite also binds the `@m9-03` outline in `09` (the Topology screen stays read-only) | M9 | M | done (merged, a583488, 2026-11-16) |
 | M9-04-review-graph | `planPreview` in core on top of `buildBindingGraph`, the graph drawing extracted from `BindingsGraphView` as a pure move, new parts marked, read only, a `notes` field for the later service note | M9 | M | done (merged, afd263b, 2026-11-16) |
@@ -242,7 +243,7 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 | M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | briefed (blocked: M9-08) |
 |  M9-10-mqtt-route-step | MQTT route kind: topic filter to a queue or stream as one binding on `amq.topic`, exact two-way translation, shown as a route again when a file is opened, "Send a test message" on an applied route that asks a sample value for every wildcard (a device id for the `+`) and opens the Publish MQTT dialog with a pre-filled correlation-id header, live test | M9 | M | done (merged, c014ea8b, 2026-11-17; accepted with follow-ups, round 3; owner review items 6 to 12 decided "yes to all" 2026-11-17; open: radio label item 12 to build as a small follow-up M9-10d) |
 | M9-10b-mqtt-test-message | The "Send a test message" with sample values dialog for an applied route (cut out of M9-10 on 2026-11-17) | M9 | M | done, merged 2026-11-17 (accepted with follow-ups after round 3; full suite, live MqttRoute 6/6, IoT 1/1, M5 14/14, mutation checks and screenshots re-verified; real-window checks still manual before the release tag) |
-| M9-10e-mqtt-publish-gates-and-dialog-fold | Write-permission gate on the older MQTT entry points, AMQP `PublishDialog` fold check, max height with own scrollbar for the Publish MQTT error banner | M9 | S | step 5 done (architect: accepted with follow-ups `M9-10f`; branch `m9-10e-mqtt-publish-gates` merge-ready, waits for the owner), QUEUED (owner, 2026-11-17: yes; follow-up of M9-10b) | docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md |
+| M9-10e-mqtt-publish-gates-and-dialog-fold | Write-permission gate on the older MQTT entry points, AMQP `PublishDialog` fold check, max height with own scrollbar for the Publish MQTT error banner | M9 | S | done, merged 2026-11-17 (accepted with follow-ups: `M9-10f`) | docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md |
 | M9-10f-amq-publish-dialog-banner-and-gutter | AMQP `PublishDialog`: error and confirmation banners bounded with their own scrollbar (as the Publish MQTT `BannerBox`), the 12 dp scrollbar gutter only when the body overflows | M9 | S | briefed (ready); follow-up of M9-10e | docs/tasks/M9-10f-amq-publish-dialog-banner-and-gutter.md |
 | M9-10d-route-kind-radio-label | Label over the Queue/Stream radios of the MQTT route form: `Kind (optional, narrows the list)` (owner item 12, decided "yes to all" 2026-11-17) | M9 (follow-up) | XS | idea, decided wording; no brief |
 | M9-10c-mqtt-exchange-hint | Optional note when the broker's MQTT subscriber queues show an exchange other than `amq.topic` (S-B2 risk: a route on `amq.topic` routes nothing) | M9 | S | briefed (blocked: optional and unscheduled; owner item 9: only the assumption sentence now) |
