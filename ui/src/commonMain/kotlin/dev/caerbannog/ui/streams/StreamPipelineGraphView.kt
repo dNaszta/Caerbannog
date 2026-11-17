@@ -35,7 +35,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +66,7 @@ fun StreamPipelineGraphCard(
     graph: StreamPipelineGraph,
     modifier: Modifier = Modifier,
     onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     onSeekToOffset: ((Long) -> Unit)? = null,
 ) {
     DisableSelection {
@@ -133,6 +138,7 @@ fun StreamPipelineGraphCard(
                         PipelineNodeCard(
                             node = node,
                             onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                            publishMqttDisabledReason = publishMqttDisabledReason,
                             onSeekToOffset = onSeekToOffset,
                         )
                     }
@@ -146,6 +152,7 @@ fun StreamPipelineGraphCard(
 private fun PipelineNodeCard(
     node: PipelineNode,
     onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)?,
+    publishMqttDisabledReason: String?,
     onSeekToOffset: ((Long) -> Unit)?,
 ) {
     val icon = when (node.kind) {
@@ -175,6 +182,8 @@ private fun PipelineNodeCard(
         else -> null
     }
 
+    val disabledMqttRoute = node.kind == PipelineNodeKind.MqttRoute && clickAction == null && publishMqttDisabledReason != null
+
     Card(
         modifier = Modifier
             .offset(x = node.x.dp, y = node.y.dp)
@@ -182,10 +191,13 @@ private fun PipelineNodeCard(
             .height(PIPELINE_NODE_HEIGHT.dp)
             .testTag("pipelineNode:${node.id}")
             .then(
-                if (clickAction != null) {
-                    Modifier.clickable(role = Role.Button, onClick = clickAction)
-                } else {
-                    Modifier
+                when {
+                    clickAction != null -> Modifier.clickable(role = Role.Button, onClick = clickAction)
+                    disabledMqttRoute -> Modifier.alpha(DISABLED_ALPHA).semantics {
+                        disabled()
+                        publishMqttDisabledReason?.let { contentDescription = it }
+                    }
+                    else -> Modifier
                 }
             ),
         shape = RoundedCornerShape(8.dp),

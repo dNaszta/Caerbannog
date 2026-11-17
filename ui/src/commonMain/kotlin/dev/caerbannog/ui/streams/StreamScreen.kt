@@ -61,7 +61,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -148,6 +151,7 @@ fun StreamScreen(
     publishMqttState: PublishMqttState? = null,
     publishMqttEvents: PublishMqttEvents? = null,
     onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(stream) {
@@ -190,6 +194,7 @@ fun StreamScreen(
                     publishState = publishState,
                     onOpenPublishDialog = onOpenPublishDialog,
                     onOpenPublishMqttDialog = onOpenPublishMqttDialog?.let { cb -> { cb(defaultMqttSuggestion) } },
+                    publishMqttDisabledReason = publishMqttDisabledReason,
                     deleteStreamState = deleteStreamState,
                     deleteStreamGate = deleteStreamGate,
                     onOpenDeleteDialog = onOpenDeleteDialog,
@@ -203,6 +208,7 @@ fun StreamScreen(
                         state = state,
                         routes = inboundRoutes,
                         onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                        publishMqttDisabledReason = publishMqttDisabledReason,
                         onSeekToOffset = if (browserState != null) {
                             { offset ->
                                 selected = 0
@@ -246,6 +252,7 @@ private fun StreamInboundRoutesBar(
     state: StreamClientsState,
     routes: List<StreamInboundRoute>,
     onOpenPublishMqttDialog: ((suggestedTopic: String?) -> Unit)?,
+    publishMqttDisabledReason: String?,
     onSeekToOffset: ((Long) -> Unit)? = null,
 ) {
     var showPipeline by remember(stream) { mutableStateOf(true) }
@@ -317,13 +324,23 @@ private fun StreamInboundRoutesBar(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                     .testTag("mqttTopicFilterPill:${route.routingKey}"),
                             )
-                            if (onOpenPublishMqttDialog != null) {
+                            if (onOpenPublishMqttDialog != null || publishMqttDisabledReason != null) {
+                                // No enabled flag on a clickable Row: disabled means no click action plus the disabled semantics.
+                                val pillClick = onOpenPublishMqttDialog?.let { open -> { open(route.suggestedPublishTopic) } }
                                 Row(
                                     modifier = Modifier
                                         .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
-                                        .clickable(role = Role.Button) {
-                                            onOpenPublishMqttDialog(route.suggestedPublishTopic)
-                                        }
+                                        .then(
+                                            if (pillClick != null) {
+                                                Modifier.clickable(role = Role.Button, onClick = pillClick)
+                                            } else {
+                                                Modifier.alpha(DISABLED_ALPHA).semantics {
+                                                    role = Role.Button
+                                                    disabled()
+                                                    publishMqttDisabledReason?.let { contentDescription = it }
+                                                }
+                                            }
+                                        )
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                         .testTag("publishMqttRouteButton:${route.routingKey}"),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -369,6 +386,7 @@ private fun StreamInboundRoutesBar(
                 StreamPipelineGraphCard(
                     graph = pipelineGraph,
                     onOpenPublishMqttDialog = onOpenPublishMqttDialog,
+                    publishMqttDisabledReason = publishMqttDisabledReason,
                     onSeekToOffset = onSeekToOffset,
                 )
             }
@@ -385,14 +403,18 @@ private fun RowScope.ClientsActions(
     publishState: PublishMessageState?,
     onOpenPublishDialog: () -> Unit,
     onOpenPublishMqttDialog: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     deleteStreamState: DeleteStreamState? = null,
     deleteStreamGate: DeleteStreamGate = DeleteStreamGate.Enabled,
     onOpenDeleteDialog: () -> Unit = {},
 ) {
-    if (onOpenPublishMqttDialog != null) {
+    if (onOpenPublishMqttDialog != null || publishMqttDisabledReason != null) {
         FilledTonalButton(
-            onClick = onOpenPublishMqttDialog,
-            modifier = Modifier.testTag("publishMqttStreamButton"),
+            onClick = { onOpenPublishMqttDialog?.invoke() },
+            enabled = onOpenPublishMqttDialog != null,
+            modifier = Modifier.testTag("publishMqttStreamButton").semantics {
+                publishMqttDisabledReason?.let { contentDescription = it }
+            },
         ) {
             ConnectionIcon(AppIcon.Hub, SmallIconSize)
             Spacer(Modifier.width(8.dp))
@@ -612,3 +634,6 @@ private fun ClientsSections(state: StreamClientsState, loading: Boolean, events:
         }
     }
 }
+
+/** The alpha of a control that is shown but switched off, where it has no `enabled` flag of its own (the route pill and the graph node). */
+internal const val DISABLED_ALPHA = 0.38f

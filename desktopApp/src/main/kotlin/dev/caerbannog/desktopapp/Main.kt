@@ -208,6 +208,12 @@ internal fun StreamWindowContent(composition: AppComposition, control: Connectio
         )
     }
     val now = rememberNowMillis()
+    val streamMqtt = streamMqttOpener(
+        source,
+        publishingEnabled = canWrite,
+        setTopic = publishMqttVm::setTopic,
+        openDialog = { showPublishMqttDialog = true },
+    )
     StreamScreen(
         stream = stream,
         state = clients,
@@ -238,7 +244,8 @@ internal fun StreamWindowContent(composition: AppComposition, control: Connectio
         showPublishMqttDialog = showPublishMqttDialog,
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
-        onOpenPublishMqttDialog = streamMqttOpener(source, setTopic = publishMqttVm::setTopic, openDialog = { showPublishMqttDialog = true }),
+        onOpenPublishMqttDialog = streamMqtt.open,
+        publishMqttDisabledReason = streamMqtt.disabledReason,
     )
 }
 
@@ -372,6 +379,11 @@ internal fun TopologyWindowContent(composition: AppComposition, control: Connect
             EmptyQueueInspectionEvents
         }
     }
+    val topologyMqtt = topologyMqttOpener(
+        source,
+        publishingEnabled = (currentConn?.status as? PermissionCheckStatus.Done)?.result?.publishingEnabled ?: false,
+        openDialog = { showPublishMqttDialog = true },
+    )
     TopologyScreen(
         state = topology,
         nowMillis = now,
@@ -382,7 +394,8 @@ internal fun TopologyWindowContent(composition: AppComposition, control: Connect
         showPublishMqttDialog = showPublishMqttDialog,
         publishMqttState = publishMqttState,
         publishMqttEvents = publishMqttEvents,
-        onOpenPublishMqttDialog = topologyMqttOpener(source, openDialog = { showPublishMqttDialog = true }),
+        onOpenPublishMqttDialog = topologyMqtt.open,
+        publishMqttDisabledReason = topologyMqtt.disabledReason,
         onOpenStream = { streamName ->
             composition.navigation.open(AppDestination.Streams)
             composition.navigation.openStream(streamName)

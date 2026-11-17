@@ -61,6 +61,7 @@ fun TopologyScreen(
     publishMqttState: PublishMqttState? = null,
     publishMqttEvents: PublishMqttEvents? = null,
     onOpenPublishMqttDialog: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     onOpenStream: ((String) -> Unit)? = null,
     queueInspectionState: QueueInspectionState? = null,
     queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
@@ -77,7 +78,7 @@ fun TopologyScreen(
         onNavigate = onNavigate,
         actions = { TopologyActions(state, nowMillis, events) },
     ) {
-        TopologyBody(state, events, onOpenPublishMqttDialog, onOpenStream, queueInspectionState, queueInspectionEvents)
+        TopologyBody(state, events, onOpenPublishMqttDialog, publishMqttDisabledReason, onOpenStream, queueInspectionState, queueInspectionEvents)
     }
     if (showPublishMqttDialog && publishMqttState != null && publishMqttEvents != null) {
         PublishMqttDialog(
@@ -115,6 +116,7 @@ private fun TopologyBody(
     state: TopologyState,
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     onOpenStream: ((String) -> Unit)? = null,
     queueInspectionState: QueueInspectionState? = null,
     queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
@@ -127,7 +129,7 @@ private fun TopologyBody(
             Button(onClick = events::retry, modifier = Modifier.testTag("retryButton").semantics { text = AnnotatedString(label) }) { Text(label) }
         }
         Screen.Loading, Screen.Ready, Screen.Empty, is Screen.VhostUnavailable ->
-            TabbedBody(state, events, onOpenPublishMqtt, onOpenStream, queueInspectionState, queueInspectionEvents)
+            TabbedBody(state, events, onOpenPublishMqtt, publishMqttDisabledReason, onOpenStream, queueInspectionState, queueInspectionEvents)
     }
 }
 
@@ -137,6 +139,7 @@ private fun TabbedBody(
     state: TopologyState,
     events: TopologyEvents,
     onOpenPublishMqtt: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
     onOpenStream: ((String) -> Unit)? = null,
     queueInspectionState: QueueInspectionState? = null,
     queueInspectionEvents: QueueInspectionEvents = EmptyQueueInspectionEvents,
@@ -148,15 +151,15 @@ private fun TabbedBody(
         TopologyTabs(state.tab, events::setTab, state.hasMqtt)
         when (val screen = state.screen) {
             is Screen.VhostUnavailable -> {
-                TopologyControls(state, events, searchAndFilters = false, onOpenPublishMqtt = onOpenPublishMqtt)
+                TopologyControls(state, events, searchAndFilters = false, onOpenPublishMqtt = onOpenPublishMqtt, publishMqttDisabledReason = publishMqttDisabledReason)
                 TopologyMessage(state.message ?: TopologyTexts.vhostUnavailable(screen.vhost), AppIcon.Block, Modifier.weight(1f))
             }
             Screen.Empty -> {
-                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt, publishMqttDisabledReason = publishMqttDisabledReason)
                 TopologyMessage(state.message, AppIcon.Inbox, Modifier.weight(1f))
             }
             Screen.Loading -> {
-                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt, publishMqttDisabledReason = publishMqttDisabledReason)
                 Box(Modifier.weight(1f)) {
                     TopologyTableFor(
                         state = state,
@@ -169,7 +172,7 @@ private fun TabbedBody(
                 }
             }
             else -> {
-                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt)
+                TopologyControls(state, events, searchAndFilters = true, onOpenPublishMqtt = onOpenPublishMqtt, publishMqttDisabledReason = publishMqttDisabledReason)
                 Box(Modifier.weight(1f)) {
                     TopologyTableFor(
                         state = state,

@@ -359,8 +359,13 @@ private fun HeaderNoticeBanner(text: String) {
     }
 }
 
+/**
+ * A feedback banner that never takes more than [BANNER_MAX_HEIGHT]: a long broker error scrolls inside itself with its own scrollbar, so the
+ * dialog body above keeps its room and the buttons stay on screen. The scroll sits on the text, which is where the content overflows.
+ */
 @Composable
 private fun BannerBox(text: String, isError: Boolean, testTag: String) {
+    val textScroll = rememberScrollState()
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
@@ -372,11 +377,22 @@ private fun BannerBox(text: String, isError: Boolean, testTag: String) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ConnectionIcon(if (isError) AppIcon.Error else AppIcon.CheckCircle, IconSize)
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-            )
+            Box(modifier = Modifier.weight(1f).heightIn(max = BANNER_MAX_HEIGHT)) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.fillMaxWidth().padding(end = 12.dp).verticalScroll(textScroll),
+                )
+                if (textScroll.maxValue > 0) {
+                    VerticalScrollbar(
+                        rememberScrollbarAdapter(textScroll),
+                        Modifier.align(Alignment.CenterEnd).matchParentSize().testTag(testTag + "Scrollbar"),
+                    )
+                }
+            }
         }
     }
 }
+
+private val BANNER_MAX_HEIGHT = 136.dp

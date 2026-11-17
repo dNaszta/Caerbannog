@@ -105,6 +105,7 @@ internal fun TopologyControls(
     events: TopologyEvents,
     searchAndFilters: Boolean,
     onOpenPublishMqtt: (() -> Unit)? = null,
+    publishMqttDisabledReason: String? = null,
 ) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.showVhostSwitch) VhostSwitch(state.vhost, state.vhosts, state.homeVhost, events::selectVhost)
@@ -122,10 +123,13 @@ internal fun TopologyControls(
                 }
                 TopologyTab.Mqtt -> {
                     TopologySearchField("mqttSearch", "Search MQTT clients", state.search, events::setSearch)
-                    if (onOpenPublishMqtt != null) {
+                    if (onOpenPublishMqtt != null || publishMqttDisabledReason != null) {
                         Button(
-                            onClick = onOpenPublishMqtt,
-                            modifier = Modifier.testTag("publishMqttButton"),
+                            onClick = { onOpenPublishMqtt?.invoke() },
+                            enabled = onOpenPublishMqtt != null,
+                            modifier = Modifier.testTag("publishMqttButton").semantics {
+                                publishMqttDisabledReason?.let { contentDescription = it }
+                            },
                         ) {
                             ConnectionIcon(AppIcon.Add, SmallIconSize)
                             Spacer(Modifier.width(6.dp))

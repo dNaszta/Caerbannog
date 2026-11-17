@@ -36,6 +36,7 @@ class MqttPublishingSteps {
     fun iAmConnectedToWithMqttPort(name: String, port: Int) {
         connectionName = name
         mqttPort = port
+        MqttGateWorld.mqttPort = port // M9-10e: the entry-point scenarios read the port from here
     }
 
     @Given("the MQTT broker will refuse publication with {string}")

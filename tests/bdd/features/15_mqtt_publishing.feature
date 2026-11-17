@@ -81,3 +81,75 @@ Feature: Publish an MQTT message
     When I change the dialog payload to "21.5"
     And I publish the dialog message
     Then the MQTT broker receives the message on "sensors/room1" with payload "21.5"
+
+  # M9-10e (docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md): the older Publish MQTT entry points obey the write permission like
+  # "Publish test message" and "Send a test message" do. Same text everywhere: core.publish.noWritePermission(vhost). Without an MQTT port the
+  # entry points stay absent, as before. The MQTT port is checked first, then the permission. An unfinished permission check counts as no permission.
+  @m9-10e @negative @fake-broker
+  Scenario: Publishing to MQTT is disabled without write permission on the stream screen
+    Given the user has no write permission on "/"
+    When I open the stream "orders-events" that is fed by the MQTT topic "orders/#"
+    Then the "Publish MQTT" action of the stream is disabled
+    And the "Publish MQTT" action of the route "orders/#" is disabled
+    And each of them says "Test publishing is disabled: no write permission on virtual host /."
+
+  @m9-10e @negative @fake-broker
+  Scenario: Publishing to MQTT is disabled without write permission on the topology screen
+    Given the user has no write permission on "/"
+    When I open the MQTT tab of the topology screen
+    Then the "Publish message" action is disabled
+    And it says "Test publishing is disabled: no write permission on virtual host /."
+
+  @m9-10e @negative @fake-broker
+  Scenario: Publishing to MQTT is disabled without write permission on the pipeline graph
+    Given the user has no write permission on "/"
+    When I open the stream "orders-events" that is fed by the MQTT topic "orders/#"
+    Then the MQTT route node of the pipeline graph is disabled
+    And it says "Test publishing is disabled: no write permission on virtual host /."
+
+  @m9-10e @negative @fake-broker
+  Scenario Outline: The reason names the virtual host
+    Given the user has no write permission on "<vhost>"
+    When I open the MQTT tab of the topology screen
+    Then the "Publish message" action is disabled
+    And it says "Test publishing is disabled: no write permission on virtual host <vhost>."
+
+    Examples:
+      | vhost  |
+      | /      |
+      | orders |
+
+  @m9-10e @negative @fake-broker
+  Scenario: An unfinished permission check disables it
+    Given the permission check of "prod-eu" has not finished
+    When I open the MQTT tab of the topology screen
+    Then the "Publish message" action is disabled
+    And it says "Test publishing is disabled: no write permission on virtual host /."
+
+  @m9-10e @fake-broker
+  Scenario: With write permission and an MQTT port the entry points open the dialog
+    Given the user may publish on "/"
+    When I open the stream "orders-events" that is fed by the MQTT topic "orders/#"
+    Then the "Publish MQTT" action of the stream is enabled
+    And the "Publish MQTT" action of the route "orders/#" is enabled
+    And the MQTT route node of the pipeline graph is enabled
+    When I open the MQTT tab of the topology screen
+    Then the "Publish message" action is enabled
+
+  @m9-10e @fake-broker
+  Scenario: Without an MQTT port the entry points are absent, whatever the permission
+    Given I am connected to "prod-eu" with MQTT port 0
+    And the user may publish on "/"
+    When I open the stream "orders-events" that is fed by the MQTT topic "orders/#"
+    Then there is no "Publish MQTT" action on the stream screen
+    When I open the MQTT tab of the topology screen
+    Then there is no "Publish message" action
+
+  @m9-10e @negative @fake-broker
+  Scenario: A disabled entry point does not open the dialog
+    Given the user has no write permission on "/"
+    When I open the MQTT tab of the topology screen
+    And I try to press "Publish message"
+    Then the Publish MQTT dialog is not open
+    And nothing was published over MQTT
+

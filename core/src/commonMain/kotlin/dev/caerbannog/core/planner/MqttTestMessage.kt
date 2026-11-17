@@ -4,7 +4,7 @@ import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.mqtt.CorrelationIdSource
 import dev.caerbannog.core.mqtt.HeaderNotice
 import dev.caerbannog.core.mqtt.MqttHeader
-import dev.caerbannog.core.publish.noWritePermission
+import dev.caerbannog.core.publish.MqttPublishAccess
 
 /** The decided wording of the test message (owner decisions O16 and O17, and the refusals of the sample dialog). Never inline in a composable. */
 object MqttTestMessageTexts {
@@ -55,11 +55,13 @@ object MqttTestMessage {
     const val CORRELATION_KEY: String = "correlation-id"
 
     /** Applied, then the MQTT port, then the write permission. An unfinished permission check arrives as `publishingEnabled = false`. */
-    fun offer(status: MigrationStatus, route: MqttRoute, hasMqtt: Boolean, publishingEnabled: Boolean, vhost: String): TestMessageOffer = when {
-        status !is MigrationStatus.Applied -> TestMessageOffer.NotOffered
-        !hasMqtt -> TestMessageOffer.Disabled(MqttTestMessageTexts.NO_MQTT_PORT)
-        !publishingEnabled -> TestMessageOffer.Disabled(noWritePermission(vhost))
-        else -> TestMessageOffer.Available
+    fun offer(status: MigrationStatus, route: MqttRoute, hasMqtt: Boolean, publishingEnabled: Boolean, vhost: String): TestMessageOffer {
+        if (status !is MigrationStatus.Applied) return TestMessageOffer.NotOffered
+        return when (val access = MqttPublishAccess.of(hasMqtt, publishingEnabled, vhost)) {
+            MqttPublishAccess.NoMqttPort -> TestMessageOffer.Disabled(MqttTestMessageTexts.NO_MQTT_PORT)
+            is MqttPublishAccess.NoWritePermission -> TestMessageOffer.Disabled(access.reason)
+            MqttPublishAccess.Allowed -> TestMessageOffer.Available
+        }
     }
 
     /**
