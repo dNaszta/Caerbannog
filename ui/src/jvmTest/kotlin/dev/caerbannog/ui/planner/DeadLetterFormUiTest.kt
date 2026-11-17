@@ -219,6 +219,19 @@ class DeadLetterFormUiTest {
         r.close()
     }
 
+    @Test
+    fun `the suggestions menu lists queues without streams and picking one fills the field`() = runDesktopComposeUiTest(1280, 800) {
+        val r = rigWithBroker()
+        toForm(r)
+        node("planForm:suggestionsBtn:queue").performClick()
+        node("planForm:suggestion:queue:orders").assertIsDisplayed()
+        assertEquals(0, count("planForm:suggestion:queue:telemetry"), "a stream is never offered as the source")
+        node("planForm:suggestion:queue:orders").performClick()
+        assertEquals("orders", r.form().queue)
+        assertEquals("orders", fieldText("planWizard:deadLetter:queue"))
+        r.close()
+    }
+
     // ---- the target ----
 
     @Test

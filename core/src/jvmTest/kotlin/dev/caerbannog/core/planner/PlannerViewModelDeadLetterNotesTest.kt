@@ -232,6 +232,53 @@ class PlannerViewModelDeadLetterNotesTest {
         assertEquals("This adds 4 steps", PlannerTexts.summaryTitle(summary.actions.size))
     }
 
+    @Test
+    fun `changing the queue from quorum to classic takes At least once and the tick away`() {
+        val r = rig(policies = null)
+        r.show(DeadLetterForm("orders").withStrategy(DeadLetterStrategy.AtLeastOnce).copy(publishersRefusedAccepted = true))
+        assertEquals(DeadLetterStrategy.AtLeastOnce, (r.details().form as DeadLetterForm).strategy)
+        r.vm.updateForm((r.details().form as DeadLetterForm).copy(queue = "invoices"))
+        val form = r.details().form as DeadLetterForm
+        assertEquals("invoices", form.queue)
+        assertEquals(DeadLetterStrategy.AtMostOnce, form.strategy, "invoices is a classic queue")
+        assertEquals(false, form.publishersRefusedAccepted)
+        assertEquals(emptyList(), r.details().problems)
+    }
+
+    @Test
+    fun `changing to another quorum queue keeps At least once and the tick`() {
+        val known = KnownTopology(
+            queues = setOf("orders", "audit"),
+            queueDetails = mapOf("orders" to KnownQueue("quorum", null), "audit" to KnownQueue("quorum", null)),
+        )
+        val r = rig(policies = null, known = known)
+        r.show(DeadLetterForm("orders").withStrategy(DeadLetterStrategy.AtLeastOnce).copy(publishersRefusedAccepted = true))
+        r.vm.updateForm((r.details().form as DeadLetterForm).copy(queue = "audit"))
+        val form = r.details().form as DeadLetterForm
+        assertEquals(DeadLetterStrategy.AtLeastOnce, form.strategy)
+        assertEquals(true, form.publishersRefusedAccepted)
+    }
+
+    @Test
+    fun `the details carry the queue suggestions, this plan first, no stream, none for another kind`() {
+        val known = KnownTopology(queues = setOf("audit", "orders"), streams = setOf("telemetry"))
+        val r = rig(policies = null, known = known)
+        r.queue("planned")
+        r.stream("planned-stream")
+        r.show(DeadLetterForm(""))
+        assertEquals(
+            listOf(
+                Suggestion("planned", SuggestionSource.PLAN), Suggestion("audit", SuggestionSource.BROKER), Suggestion("orders", SuggestionSource.BROKER),
+            ),
+            r.details().queueSuggestions,
+        )
+        r.vm.cancelWizard()
+        r.vm.openWizard()
+        r.vm.chooseKind("Queue")
+        r.vm.updateForm(QueueForm("x"))
+        assertEquals(emptyList(), r.details().queueSuggestions)
+    }
+
     /** A reader whose answers the test gives, one gate per policy name; it records when a read starts and when it is cancelled. */
     private class GateReader : BrokerPolicyReader {
         val started: MutableList<String> = Collections.synchronizedList(ArrayList())

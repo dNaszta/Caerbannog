@@ -69,6 +69,13 @@ class PlanPreviewDeadLetterTest {
     }
 
     @Test
+    fun `a pattern of the empty name gives no link and no node for the empty name`() {
+        val g = planPreview(planOf(MigrationAction.DeclareExchange("x", "fanout"), policy("p", "^$", dlx("x"))), KnownTopology.None)
+        assertEquals(emptyList(), g.links)
+        assertTrue(g.graph.nodes.none { it.node.id == "q:" }, "no queue node for the empty name: ${g.graph.nodes.map { it.node.id }}")
+    }
+
+    @Test
     fun `a policy without a dead-letter exchange, or with a non-text one, gives no link`() {
         assertEquals(emptyList(), planPreview(planOf(policy("p", "^orders$", "max-length" to ArgumentValue.Whole(5))), KnownTopology.None).links)
         assertEquals(emptyList(), planPreview(planOf(policy("p", "^orders$", "dead-letter-exchange" to ArgumentValue.Whole(5))), KnownTopology.None).links)

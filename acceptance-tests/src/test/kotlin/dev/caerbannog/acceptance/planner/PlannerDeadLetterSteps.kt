@@ -94,7 +94,7 @@ class PlannerDeadLetterSteps {
 
     // ---- the broker the scenario describes ----
 
-    @Given("the broker has the quorum queue {string} with the policy {string} applied")
+    @Given("the broker has the quorum queue {string} with the policy {string} applied at a priority lower than 0")
     fun brokerQueueWithPolicy(queue: String, policy: String) {
         PolicyWorld.activate(d)
         CheckWorld.seedQueue(queue)

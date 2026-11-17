@@ -47,6 +47,46 @@ class PlannerTextsDeadLetterTest {
     }
 
     @Test
+    fun `each name is judged alone in the own-argument sentence`() {
+        assertEquals(
+            "The queue names its own dead-letter exchange legacy-dlx. RabbitMQ uses that one and ignores this policy's exchange.",
+            PlannerTexts.deadLetterOwnArgument("or ders", "legacy-dlx"),
+        )
+        assertEquals(
+            "The queue orders names its own dead-letter exchange. RabbitMQ uses that one and ignores this policy's exchange.",
+            PlannerTexts.deadLetterOwnArgument("orders", "le\"gacy"),
+        )
+    }
+
+    @Test
+    fun `the labels and headings of the form, as written`() {
+        assertEquals("Publishers are refused when the queue is full", PlannerTexts.DEAD_LETTER_REFUSED_TICK_LABEL)
+        assertEquals("default", PlannerTexts.DEAD_LETTER_DEFAULT_PILL)
+        assertEquals("Queue", PlannerTexts.DEAD_LETTER_QUEUE_LABEL)
+        assertEquals("Dead-letter exchange", PlannerTexts.DEAD_LETTER_EXCHANGE_LABEL)
+        assertEquals("Dead-letter queue", PlannerTexts.DEAD_LETTER_TARGET_QUEUE_LABEL)
+        assertEquals("Dead-letter stream", PlannerTexts.DEAD_LETTER_TARGET_STREAM_LABEL)
+        assertEquals("Dead letters go to", PlannerTexts.DEAD_LETTER_TARGET_HEADING)
+        assertEquals("How sure", PlannerTexts.DEAD_LETTER_STRATEGY_HEADING)
+        assertEquals("At least once is only for a queue known to be a quorum queue.", PlannerTexts.DEAD_LETTER_AT_LEAST_ONCE_UNAVAILABLE)
+    }
+
+    @Test
+    fun `the tick reason is built from the tick label`() {
+        assertEquals("Tick \"" + PlannerTexts.DEAD_LETTER_REFUSED_TICK_LABEL + "\" to use At least once", PlannerTexts.DEAD_LETTER_TICK_REQUIRED)
+    }
+
+    @Test
+    fun `the target lines name the target, a refused name is left out`() {
+        assertEquals("Quorum queue orders-dlq", PlannerTexts.deadLetterTargetQueueLine("orders-dlq"))
+        assertEquals("Stream orders-dlq: dead letters are kept and can be browsed.", PlannerTexts.deadLetterTargetStreamLine("orders-dlq"))
+        for (refused in listOf("or ders", "", "a\"b", "<b>", "a".repeat(65))) {
+            assertEquals("Quorum queue", PlannerTexts.deadLetterTargetQueueLine(refused), "<$refused>")
+            assertEquals("Stream: dead letters are kept and can be browsed.", PlannerTexts.deadLetterTargetStreamLine(refused), "<$refused>")
+        }
+    }
+
+    @Test
     fun `the summary sentence about the queue, and its fallback`() {
         assertEquals("The queue orders itself is not changed.", PlannerTexts.deadLetterQueueUntouched("orders"))
         assertEquals("The queue itself is not changed.", PlannerTexts.deadLetterQueueUntouched("or ders"))
@@ -79,6 +119,8 @@ class PlannerTextsDeadLetterTest {
             PlannerTexts.DEAD_LETTER_DEFAULT_NOTE, PlannerTexts.DEAD_LETTER_AT_LEAST_ONCE_NOTE, PlannerTexts.DEAD_LETTER_FULL_QUEUE_NOTE, PlannerTexts.DEAD_LETTER_SUMMARY_CAUSES,
             PlannerTexts.DEAD_LETTER_KIND_DESCRIPTION, PlannerTexts.DEAD_LETTER_TICK_REQUIRED, PlannerTexts.DEAD_LETTER_SOURCE_IS_STREAM, PlannerTexts.DEAD_LETTER_QUEUE_MISSING,
             PlannerTexts.deadLetterOwnArgument("orders", "x"), PlannerTexts.deadLetterQueueUntouched("orders"),
+            PlannerTexts.DEAD_LETTER_AT_LEAST_ONCE_UNAVAILABLE, PlannerTexts.deadLetterTargetQueueLine("orders-dlq"), PlannerTexts.deadLetterTargetStreamLine("orders-dlq"),
+            PlannerTexts.DEAD_LETTER_TARGET_HEADING, PlannerTexts.DEAD_LETTER_STRATEGY_HEADING, PlannerTexts.DEAD_LETTER_REFUSED_TICK_LABEL,
         )
         for (t in texts) {
             assertFalse(Regex("\\d+\\s*(minutes?|min|seconds?|s)\\b", RegexOption.IGNORE_CASE).containsMatchIn(t), "a number of minutes in \"$t\"")

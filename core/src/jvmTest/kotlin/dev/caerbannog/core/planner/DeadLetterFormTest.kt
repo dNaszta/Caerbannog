@@ -236,6 +236,47 @@ class DeadLetterFormTest {
     }
 
     @Test
+    fun `at least once with the tick for a queue that is not a known quorum queue is one problem of the strategy`() {
+        val f = DeadLetterForm("orders", strategy = DeadLetterStrategy.AtLeastOnce, publishersRefusedAccepted = true)
+        val contexts = mapOf(
+            "classic on the broker" to ctx(known = known("classic")),
+            "unknown" to ctx(),
+            "classic in the plan" to ctx(plan = planOf(MigrationAction.DeclareQueue(name = "orders", type = "classic"))),
+        )
+        contexts.forEach { (why, c) ->
+            assertEquals(
+                listOf(FieldProblem("strategy", PlannerTexts.DEAD_LETTER_AT_LEAST_ONCE_UNAVAILABLE)), f.problems(c), why,
+            )
+            assertEquals(emptyList(), f.actions(c), why)
+        }
+        assertEquals("At least once is only for a queue known to be a quorum queue.", PlannerTexts.DEAD_LETTER_AT_LEAST_ONCE_UNAVAILABLE)
+    }
+
+    @Test
+    fun `without the tick on a classic queue the strategy is the problem and the tick is not asked`() {
+        val f = DeadLetterForm("orders", strategy = DeadLetterStrategy.AtLeastOnce)
+        assertEquals(listOf("strategy"), fields(f, ctx(known = known("classic"))))
+    }
+
+    @Test
+    fun `the problems come in the order queue, exchange, targetName, strategy, refusedTick`() {
+        val f = DeadLetterForm("", exchangeName = "", targetName = "", strategy = DeadLetterStrategy.AtLeastOnce)
+        // an empty queue: the typed names still raise theirs, the strategy and the tick follow
+        assertEquals(listOf("queue", "exchange", "targetName", "strategy"), fields(f, ctx()))
+        val g = DeadLetterForm("orders", exchangeName = "", targetName = "", strategy = DeadLetterStrategy.AtLeastOnce)
+        assertEquals(listOf("exchange", "targetName", "strategy"), fields(g, ctx()))
+        assertEquals(listOf("exchange", "targetName", "refusedTick"), fields(g, quorum))
+    }
+
+    @Test
+    fun `while the queue is empty a name that follows it raises no problem, a typed name does, even empty`() {
+        assertEquals(listOf("queue"), fields(DeadLetterForm(""), ctx()))
+        assertEquals(listOf("queue", "exchange"), fields(DeadLetterForm("", exchangeName = ""), ctx()))
+        assertEquals(listOf("queue", "targetName"), fields(DeadLetterForm("", targetName = ""), ctx()))
+        assertEquals(listOf("queue"), fields(DeadLetterForm("", exchangeName = "x-dlx", targetName = "x-dlq"), ctx()))
+    }
+
+    @Test
     fun `switching back to at most once clears the tick, so a later switch asks again`() {
         val on = DeadLetterForm("orders").withStrategy(DeadLetterStrategy.AtLeastOnce).copy(publishersRefusedAccepted = true)
         val back = on.withStrategy(DeadLetterStrategy.AtMostOnce)
