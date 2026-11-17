@@ -176,9 +176,13 @@ class RealBrokerM9SpikeDeadLetterTest {
         val inArgument = M9SpikeDl.peekFull(api, both.dlq).size
         val inPolicy = M9SpikeDl.peekFull(api, otherDlq).size
         M9SpikeDl.note("S-C2 both: arrived in the ARGUMENT's exchange queue=$inArgument, in the POLICY's exchange queue=$inPolicy")
-        assertEquals(1, inArgument + inPolicy, "exactly one of the two exchanges got the dead letter")
-        // the same thing in the other direction for the report: which one is in effect for the argument
         assertEquals(1, inArgument, "an argument beats a policy of the same key (the dead letter went to the argument's exchange)")
+        // B stays empty for a settle window, THEN the positive control shows B's route is alive (a message sent straight into B's exchange arrives in B's queue); a dead letter that had been routed to B would have shown in the window
+        assertEquals(0, inPolicy, "the policy's exchange must not get the dead letter when the argument names another exchange")
+        M9SpikeDl.assertStaysEmpty(api, otherDlq, "settle window: the policy's exchange B gets no dead letter while the argument names A")
+        assertTrue(api.post("/api/exchanges/%2F/$otherDlx/publish", """{"properties":{},"routing_key":"","payload":"control-b","payload_encoding":"string"}""").body.contains("\"routed\":true"))
+        assertEquals(listOf("control-b"), M9SpikeDl.awaitPeek(api, otherDlq).map { it["payload"].toString().trim('"') }, "B's route works and holds only the control")
+        assertEquals(1, M9SpikeDl.peekFull(api, both.dlq).size, "A still holds exactly the one dead letter")
     }
 
     // ---- S-C3 / S-C4: at-least-once ----
@@ -263,7 +267,11 @@ class RealBrokerM9SpikeDeadLetterTest {
         assertTrue(api.publish(al.src, "poke").body.contains("\"routed\":true"))
         withAmqp(container) { M9SpikeDl.rejectOne(it, al.src) }
         awaitUntil("the control dead letter arrives", 40) { api.peek(al.dlq).isNotEmpty() }
-        M9SpikeDl.assertStaysEmpty(api, al.src, "nothing comes back to the ready list")
+        // the held message is NOT in the target before the retry: the target holds exactly the control (a held message is never ready in the
+        // source, so a check of the source proves nothing). The control was dead-lettered AFTER the held one, so if the held one were going to
+        // arrive first or at once it would show here.
+        assertEquals(listOf("poke"), api.peek(al.dlq), "the target holds only the control; the held message did not follow it")
+        assertTrue(heldSignature(al.src), "the held message is still in the source (messages=1, ready 0, unacked 0)")
         val d = M9SpikeDl.detail(api, al.src)
         M9SpikeDl.note("S-C3 at-least-once, binding back and a new dead letter delivered: target=${api.peek(al.dlq)} source messages=${d["messages"]} ready=${d["messages_ready"]} unacked=${d["messages_unacknowledged"]}")
 
@@ -290,6 +298,7 @@ class RealBrokerM9SpikeDeadLetterTest {
         assertEquals(JsonPrimitive("at-least-once"), M9SpikeDl.effective(api, p.src)!!["dead-letter-strategy"])
         val outP = heldAfterRefusal(p)
         M9SpikeDl.note("S-C4 policy without overflow, full target: held=$outP")
+        assertFalse(outP, "policy dead-letter-strategy at-least-once WITHOUT overflow behaves as at-most-once: the refused dead letter is dropped, not held")
 
         // by policy, overflow drop-head
         val d = Rig("c4d", dlqArgs = fullTarget)
@@ -297,13 +306,17 @@ class RealBrokerM9SpikeDeadLetterTest {
         M9SpikeDl.note("S-C4 policy with overflow drop-head: PUT=${rd.status} effective=${M9SpikeDl.effective(api, d.src)}")
         val outD = heldAfterRefusal(d)
         M9SpikeDl.note("S-C4 policy with overflow drop-head, full target: held=$outD")
+        assertEquals(201, rd.status, "$rd")
+        assertFalse(outD, "policy at-least-once with overflow drop-head behaves as at-most-once: the refused dead letter is dropped, not held")
 
         // by argument, no x-overflow
         val a = Rig("c4a", srcArgs = null, dlqArgs = fullTarget)
         val ra = api.declareQueue(a.src, """{"x-queue-type":"quorum","x-dead-letter-exchange":"${a.dlx}","x-dead-letter-strategy":"at-least-once"}""")
         M9SpikeDl.note("S-C4 argument without x-overflow: ${ra.status} ${ra.body.take(300)} arguments=${if (ra.ok) M9SpikeDl.detail(api, a.src)["arguments"] else "-"}")
-        val outA = if (ra.ok) heldAfterRefusal(a) else null
+        assertEquals(201, ra.status, "the argument form without x-overflow must be accepted (it was refused: $ra)")
+        val outA = heldAfterRefusal(a)
         M9SpikeDl.note("S-C4 argument without x-overflow, full target: held=$outA")
+        assertFalse(outA, "arguments x-dead-letter-strategy at-least-once WITHOUT x-overflow behave as at-most-once: the refused dead letter is dropped, not held")
 
         // by argument with x-overflow reject-publish
         val b = Rig("c4b", srcArgs = null, dlqArgs = fullTarget)
@@ -344,6 +357,28 @@ class RealBrokerM9SpikeDeadLetterTest {
     }
 
     @Test
+    fun `S-C5 the same quorum limit set by POLICY holds three and refuses the rest`() {
+        val q = cl.queue(unique("c5p"))
+        assertEquals(201, api.declareQueue(q, """{"x-queue-type":"quorum"}""").status)
+        val reply = api.put("/api/policies/%2F/${cl.policy("p-$q")}", """{"pattern":"^$q$","apply-to":"quorum_queues","priority":0,"definition":{"max-length":2,"overflow":"reject-publish"}}""")
+        assertEquals(201, reply.status, "$reply")
+        M9SpikeDl.awaitEffective(api, q, "max-length")
+        assertEquals(JsonPrimitive("reject-publish"), M9SpikeDl.effective(api, q)!!["overflow"])
+        val confirms = mutableListOf<String>()
+        withAmqp(container) { conn ->
+            val ch = conn.createChannel()
+            ch.confirmSelect()
+            for (i in 1..6) {
+                ch.basicPublish("", q, true, M9SpikeDl.persistent(), "m$i".toByteArray())
+                confirms += "m$i:" + if (ch.waitForConfirms(10_000)) "ack" else "nack"
+            }
+        }
+        M9SpikeDl.note("S-C5 quorum max-length 2 BY POLICY: AMQP confirms=$confirms queue=${api.peek(q)}")
+        assertEquals(listOf("m1:ack", "m2:ack", "m3:ack", "m4:nack", "m5:nack", "m6:nack"), confirms)
+        assertEquals(listOf("m1", "m2", "m3"), api.peek(q), "a quorum queue with max-length 2 set by policy holds three messages")
+    }
+
+    @Test
     fun `S-C5 the same limit on a classic queue is exact, and drop-head (the default) keeps the newest`() {
         val c = cl.queue(unique("c5c"))
         assertEquals(201, api.declareQueue(c, """{"x-queue-type":"classic","x-max-length":2,"x-overflow":"reject-publish"}""").status)
@@ -354,7 +389,9 @@ class RealBrokerM9SpikeDeadLetterTest {
         val d = cl.queue(unique("c5d"))
         assertEquals(201, api.declareQueue(d, """{"x-queue-type":"quorum","x-max-length":2}""").status)
         repeat(4) { assertTrue(api.publish(d, "m${it + 1}").body.contains("\"routed\":true")) }
-        awaitUntil("drop-head keeps the newest", 30) { api.peek(d).let { it == listOf("m3", "m4") || it == listOf("m2", "m3", "m4") } }
+        // one outcome, seen in 3 of 3 runs on 4.4.0 (M9-00b-b); a quorum queue with drop-head holds exactly the limit, not limit + 1
+        awaitUntil("drop-head keeps the newest two", 30) { api.peek(d) == listOf("m3", "m4") }
+        assertEquals(listOf("m3", "m4"), api.peek(d), "still the newest two after the settle")
         M9SpikeDl.note("S-C5 default overflow (drop-head), quorum max-length 2, four publishes accepted: queue=${api.peek(d)}")
     }
 
@@ -424,7 +461,11 @@ class RealBrokerM9SpikeDeadLetterTest {
             }
             seenAt.size == 3
         }
-        M9SpikeDl.note("S-C3 retry of a held dead letter: seconds after the repair until it arrived: full target=${seenAt[full.dlq]}, unbound=${seenAt[unbound.dlq]}, missing exchange=${seenAt[missing.dlq]}")
+        // Observations of the retry, all RabbitMQ 4.4.0, measured from the repair (R5 of the review, recorded honestly, NOT asserted):
+        // this test once at 175 s (all three kinds at that second); throwaway probes: 165 to 170 s once, nothing within 40 s and nothing within 60 s.
+        // Four observations: only "not within one minute, within three" is supported; the interval and what the timer counts from are unknown.
+        // The poll step of this test is one `peek` per kind per loop (a few hundred ms), so seenAt has about one second of resolution.
+        M9SpikeDl.note("S-C3 retry of a held dead letter: seenAt seconds after the repair until it arrived: full target=${seenAt[full.dlq]}, unbound=${seenAt[unbound.dlq]}, missing exchange=${seenAt[missing.dlq]}")
         awaitUntil("the sources are empty once delivered", 40) { listOf(full, unbound, missing).all { M9SpikeDl.messages(api, it.src) == 0 } }
     }
 
