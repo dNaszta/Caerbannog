@@ -13,6 +13,8 @@ Spec "Naming" (broker name rules) and "Measured facts of M9-00c", S-H. Today the
 ## Scope
 In (`core.planner`, `commonMain`, no `java.*`; UTF-8 byte length is counted with a pure function, not `String.toByteArray` from the JVM: write it over code points, 1 to 4 bytes):
 - Block, with a fixed `PlannerTexts` message each: a queue, exchange or stream name that starts with `amq.` (case: only the lower-case prefix was measured; do not block `AMQ.`, `Amq.`); a queue name longer than 255 bytes (UTF-8 bytes, not characters).
+- The stream form's RESPONSE name (field `responseName`, followed or typed) is a stream name: the `amq.` rule applies to it too, with the same message on field `responseName`. Why: the dot style derives `amq.dln` from the stream `amq`, which the broker refuses (S-H, stream manager). No length rule for it (streams have none). The derived name is never repaired silently.
+- Order inside one field, one message only (the scenarios assert exactly one): empty, `.`/`..`, `amq.` prefix, queue byte length, then the parser's reason (`FormChecks.nameProblem`). Put the rule in `FormChecks.nameProblem` (new parameter or a `BrokerNameRules.problem(kind, name)` call before the parser round trip); the stream form's existing `queueConflict` stays after it. Check that the parser round trip does not already refuse a 256-letter name with another text (the scenarios expect the new text).
 - Not blocked, with scenarios: `amq` without a dot; 255 bytes; an exchange, a policy, a stream of 256 bytes; a space or a slash in a name.
 - `PlanValidation`: no new rule. A name from an opened file passes through (A2); the check cannot predict these refusals; the apply stops with the broker's answer.
 - A policy named `amq.x` is accepted by the broker (201): never block it (the policy form is `M9-08`; add a unit test there).
@@ -21,11 +23,17 @@ Out: hints for names (advice stays O11); the 255-byte rule for streams, exchange
 
 ## Acceptance
 - BDD: `19_topology_planner.feature` / "A name that RabbitMQ would refuse is refused by the form" (outline, 5 rows; @m9-01b @negative @fake-broker; the two messages DECIDED by the owner on 2026-11-16, Owner review list item 1 of `M9-00c`; `@needs-decision` removed)
+- BDD: `19_topology_planner.feature` / "A response stream name that RabbitMQ would refuse is refused by the form" (1 scenario; @m9-01b @negative @fake-broker; added by the architect at this step: the derived `amq.dln`)
 - BDD: `19_topology_planner.feature` / "A name that RabbitMQ accepts is not refused by the form" (outline, 5 rows; @m9-01b @fake-broker)
+- Runner: `RunTopologyPlannerAcceptanceTest` filter does NOT list `@m9-01b` yet (it lists `@m9-01` and the others only): add `@m9-01b` when the steps exist; the scenarios carry no `@needs-*` tag, so the existing `not @needs-decision and not @needs-spike` stays. 11 runs in all: 5 refused rows, 1 response stream, 5 accepted rows.
+- Steps (test developer, `PlannerSteps.fillForm`, today a closed `when` over five inputs): add `the name "<x>"` for any kind in general (not one row per name), `a name of <n> letters` (ASCII `a` repeated), `a name of <n> letters "<c>"`, the kind "Stream" (a `streamForm` in `PlannerDriver`), and `the name "<x>" and its response stream`. "Next" enabled/disabled steps exist.
 - Unit: `QueueFormTest`, `ExchangeFormTest`, `StreamFormTest` rows per name (prefix, 255 and 256 ASCII bytes, 127 and 128 two-byte characters, a four-byte character at the border); `Utf8LengthTest` (1 to 4 byte code points, well-formed text only).
 
 ## Design notes
-One pure `BrokerNameRules` object, used by the three forms; messages in `PlannerTexts`. No broker is touched. The rules mirror `DeclareEquivalenceTable`'s neighbour data: the S-H table of the results file is the evidence; cite it in a comment, not the numbers twice.
+One pure `BrokerNameRules` object in `core.planner`, used by the three forms; messages in `PlannerTexts` (`NAME_RESERVED` = `Names that start with "amq." are reserved`, `QUEUE_NAME_TOO_LONG` = `A queue name can be at most 255 bytes long`). Suggested API for the unit tests: `BrokerNameRules.reservedPrefix(name): Boolean`, `BrokerNameRules.queueNameTooLong(name): Boolean`, `Utf8Length.of(text): Int` (internal, code points: below 0x80 one byte, 0x800 two, 0x10000 three, else four; a lone surrogate is out of scope: counted as 3 and not tested). No broker is touched. The rules mirror `DeclareEquivalenceTable`'s neighbour data: the S-H table of the results file is the evidence; cite it in a comment, not the numbers twice.
+
+## Live test
+Only the built-in exchange row (Scope) is unmeasured; all other claims are in the S-H table (measured on 4.4). The new class (suggested `RealBrokerM9BuiltInExchangeDeclareTest`, tag `broker`) declares `amq.topic` and `amq.direct` again with their real type and answers 204 or 401, plus a positive control (an ordinary exchange redeclared: 204). It needs no BDD scenario; the rule is the same either way. `RealBrokerM9SpikeNamesTest` has no `amq.direct`/`amq.topic` row today (checked).
 
 ## UX
 `docs/ux/Planner.dc.html` "4." forms: the existing field-error style, no new element.
