@@ -13,13 +13,38 @@ object PlannerTexts {
     )
 
     /** The kinds that have a form today, in wizard order. The others of [WIZARD_KINDS] are drawn when the task that builds their form lands. */
-    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream")
+    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream", "MQTT route")
+
+    fun mqttRefusal(reason: MqttFilterRefusal): String = when (reason) {
+        MqttFilterRefusal.Empty -> "Enter a topic filter"
+        MqttFilterRefusal.HashNotLast -> "# must be the last level"
+        MqttFilterRefusal.PlusNotWholeLevel -> "+ must stand for a whole level"
+        MqttFilterRefusal.DotInLevel -> "A level cannot contain a dot: RabbitMQ would read it as another level"
+        MqttFilterRefusal.StarInLevel -> "A level cannot contain *: use + for a whole level"
+        MqttFilterRefusal.EmptyLevel -> "A level cannot be empty"
+    }
+
+    /** Always shown with an MQTT route: the app cannot read the broker's MQTT exchange (spike S-B1). */
+    const val MQTT_EXCHANGE_ASSUMPTION: String =
+        "Assumes the MQTT plugin uses its default exchange amq.topic. The app cannot check this: on a broker with another MQTT exchange this route receives nothing from MQTT."
+    const val MQTT_ROUTE_LABEL: String = "MQTT route"
+    const val MQTT_FILTER_LABEL: String = "Topic filter"
+    const val MQTT_DESTINATION_LABEL: String = "Destination"
+    const val MQTT_QUEUE_LABEL: String = "Queue"
+    const val MQTT_STREAM_LABEL: String = "Stream"
+    fun mqttRouteSaves(key: String): String = "Saved as a binding on amq.topic with the key $key"
+    fun mqttMatchingTopic(topic: String): String = "Topic that matches: $topic"
+
+    /** [to] is "stream x", "queue x" or the bare name when the kind is not known. */
+    fun mqttRouteTitle(filter: String, to: String): String = "MQTT route $filter to $to"
+    fun mqttRouteDetail(key: String): String = "Binding on amq.topic with the key $key"
 
     fun kindDescription(kind: String): String = when (kind) {
         "Queue" -> "A quorum or classic queue"
         "Exchange" -> "Fanout, direct, topic or headers"
         "Binding" -> "From an exchange to a queue or an exchange"
         "Stream" -> "Optionally with its response stream (DLN)"
+        "MQTT route" -> "A topic filter to a queue or stream, saved as a binding on amq.topic"
         else -> ""
     }
 
