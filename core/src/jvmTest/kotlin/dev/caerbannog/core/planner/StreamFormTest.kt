@@ -191,4 +191,67 @@ class StreamFormTest {
         val known = KnownTopology(streams = setOf("Legacy_Telemetry", "Legacy_Replies"))
         assertEquals(emptyList(), StreamForm("Legacy_Telemetry", true, responseName = "Legacy_Replies").hints(ctx(known = known)))
     }
+
+    // ---- M9-01b: the broker's name rules (S-H); the response stream name is a stream name ----
+
+    private val reserved = "Names that start with \"amq.\" are reserved"
+
+    @Test
+    fun `an amq prefix is refused on the stream name, in lower case only`() {
+        assertEquals(listOf(FieldProblem("name", reserved)), StreamForm("amq.orders").problems(ctx()))
+        assertEquals(listOf(FieldProblem("name", reserved)), StreamForm("amq.").problems(ctx()))
+        assertEquals(emptyList(), StreamForm("amq").problems(ctx()))
+        assertEquals(emptyList(), StreamForm("AMQ.orders").problems(ctx()))
+        assertEquals(emptyList(), StreamForm("Amq.orders").problems(ctx()))
+        assertEquals(emptyList(), StreamForm("amq.orders").actions(ctx()))
+    }
+
+    @Test
+    fun `a stream has no length rule, 255 and 256 bytes and more pass`() {
+        for (name in listOf("a".repeat(255), "a".repeat(256), "é".repeat(128), "a".repeat(300))) {
+            assertEquals(emptyList(), StreamForm(name).problems(ctx()), "a name of ${name.length} characters")
+            assertEquals(1, StreamForm(name).actions(ctx()).size)
+        }
+    }
+
+    @Test
+    fun `a space and a slash are not refused`() {
+        for (ok in listOf("telemetry eu", "telemetry/eu")) assertEquals(emptyList(), StreamForm(ok).problems(ctx()), "name \"$ok\"")
+    }
+
+    @Test
+    fun `the response name that follows a stream named amq in the dot style is refused on its own field`() {
+        val dot = ctx(style = NamingStyle.DOT)
+        val form = StreamForm(name = "amq", withResponse = true)
+        assertEquals("amq.dln", form.effectiveResponseName(dot))
+        assertEquals(listOf(FieldProblem("responseName", reserved)), form.problems(dot))
+        assertEquals(emptyList(), form.actions(dot), "the derived name is never repaired silently")
+    }
+
+    @Test
+    fun `a typed response name with the prefix is refused, and the stream name keeps its own verdict`() {
+        val form = StreamForm(name = "telemetry", withResponse = true, responseName = "amq.replies")
+        assertEquals(listOf(FieldProblem("responseName", reserved)), form.problems(ctx()))
+        assertEquals(
+            listOf(FieldProblem("name", reserved), FieldProblem("responseName", reserved)),
+            StreamForm(name = "amq.telemetry", withResponse = true, responseName = "amq.replies").problems(ctx()),
+        )
+        assertEquals(listOf(FieldProblem("name", reserved)), StreamForm(name = "amq.telemetry", withResponse = true).problems(ctx()).filter { it.field == "name" })
+    }
+
+    @Test
+    fun `a response name is checked only while the pair is ticked, and has no length rule or case rule`() {
+        assertEquals(emptyList(), StreamForm(name = "telemetry", withResponse = false, responseName = "amq.replies").problems(ctx()))
+        for (ok in listOf("AMQ.replies", "amq", "a".repeat(256), "replies eu")) {
+            assertEquals(emptyList(), StreamForm(name = "telemetry", withResponse = true, responseName = ok).problems(ctx()), "response \"${ok.take(20)}\"")
+        }
+    }
+
+    @Test
+    fun `one message per field, the prefix before the clash with a queue of the plan`() {
+        val plan = planOf(MigrationAction.DeclareQueue(name = "amq.orders", type = "quorum"))
+        assertEquals(listOf(FieldProblem("name", reserved)), StreamForm("amq.orders").problems(ctx(plan = plan)))
+        assertEquals(listOf(FieldProblem("name", "Give the stream a name")), StreamForm("").problems(ctx()))
+        assertEquals(listOf(FieldProblem("responseName", "Give the response stream a name")), StreamForm("telemetry", true, responseName = "").problems(ctx()))
+    }
 }

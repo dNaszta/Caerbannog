@@ -119,6 +119,13 @@ Bodies from `MigrationRequests` (the real builder: always `x-queue-type`). Per t
   - a stream named `.` or `..` that exists: also 200 list: the app cannot tell it from the vhost listing. Only the GET was measured; a DELETE through the management API was not tried (the test removes such streams through the stream protocol).
 - Streams of 255 and 256 bytes, `amq` and names with a space or slash are read back by the management GET as `type: stream`.
 
+## M9-01b: a repeated declare of an existing built-in exchange (measured 2026-11-17, RabbitMQ 4.4.0)
+
+Test: `RealBrokerM9BuiltInExchangeDeclareTest` (4 tests, tag `broker`, one class: the `4-management` tag is a 4.x broker; an ordinary exchange declared again is 204 as positive control; `amq.topic` and `amq.direct` exist with their types `topic` and `direct`; the answer below). Request: the executor's own (`PUT /api/exchanges/%2F/{name}` with `MigrationRequests.requestFor`, the default settings: durable, no auto-delete, not internal).
+
+- **`PUT amq.topic` as `topic` and `PUT amq.direct` as `direct` answer `204`**, not 401: the broker treats the repeat of an existing built-in exchange with its real settings as the no-op it is. The 401 of S-H is for a NEW `amq.` name (it does not exist, so the declare would create it).
+- So the exchange form's refusal "Names that start with "amq." are reserved" is true for a new name and slightly broader than the broker for an existing built-in one: that is the intended behaviour (the planner never declares a built-in exchange; a binding uses it as its source), and the message does not claim that the broker refuses the built-in names themselves. Other settings than the real ones (for example `amq.topic` as `direct`) were not measured.
+
 ## Architect review of the spike (step 3, 2026-11-16, round 0)
 
 Verdict ACCEPTED WITH FOLLOW-UPS. Every item is pinned by a live row with a positive control, except what the lines above now mark as not pinned (the 12-probe tie run, the units `M h m`, names above 256 bytes, DELETE of `.`/`..`, the arguments outside the 20 candidates). Open points for the test developer (none blocks): (T1) both tables could assert that every row of the constant was visited (today a row nobody sends is never compared; the ids are all used, checked by hand); (T2) `M9-05b` adds the live rows it needs for the arguments outside the 20 candidates it wants to classify and for the name `...`; (T3) the three-dots name was not measured (the parser allows it, the path becomes `%2E%2E%2E`).

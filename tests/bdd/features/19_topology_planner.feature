@@ -118,6 +118,14 @@ Feature: Topology planner
       | Queue    | a name of 256 letters     | A queue name can be at most 255 bytes long |
       | Queue    | a name of 128 letters "é" | A queue name can be at most 255 bytes long |
 
+  # The dot style derives "amq.dln" from "amq": the derived response name is a stream name like any other and the broker refuses it.
+  @m9-01b @negative @fake-broker
+  Scenario: A response stream name that RabbitMQ would refuse is refused by the form
+    Given a new plan with the naming style "dot.separated"
+    When I fill the "Stream" form with the name "amq" and its response stream
+    Then the form says "Names that start with "amq." are reserved"
+    And "Next" is disabled
+
   @m9-01b @fake-broker
   Scenario Outline: A name that RabbitMQ accepts is not refused by the form
     Given a new plan

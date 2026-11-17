@@ -158,15 +158,37 @@ class PlannerSteps {
 
     @When("I fill the {string} form with {}")
     fun fillForm(kind: String, input: String) {
-        val f = when (kind to input) {
-            "Queue" to "an empty name" -> d.queueForm("", null)
-            "Queue" to "the name \"..\"" -> d.queueForm("..", null)
-            "Exchange" to "an empty name" -> d.exchangeForm("", "direct")
-            "Binding" to "no exchange" -> d.bindingForm("", "orders", "k")
-            "Binding" to "no destination" -> d.bindingForm("events", "", "k")
+        // M9-01b: a name for any of the three named kinds, in four sentence forms: the name itself, a run of ASCII letters, a run of one given
+        // character, and a stream name that also ticks the response stream. The driver builds the form; the rules are the core's.
+        val named = nameInput(input)
+        val f = when {
+            kind == "Binding" && input == "no exchange" -> d.bindingForm("", "orders", "k")
+            kind == "Binding" && input == "no destination" -> d.bindingForm("events", "", "k")
+            input == "an empty name" && kind == "Queue" -> d.queueForm("", null)
+            input == "an empty name" && kind == "Exchange" -> d.exchangeForm("", "direct")
+            named != null -> when (kind) {
+                "Queue" -> d.queueForm(named.name, null)
+                "Exchange" -> d.exchangeForm(named.name, "direct")
+                "Stream" -> d.streamForm(named.name, withResponse = named.withResponse)
+                else -> error("no name input is known for the \"$kind\" form")
+            }
             else -> error("no input \"$input\" is known for the \"$kind\" form")
         }
         d.fill(f)
+    }
+
+    private class NameInput(val name: String, val withResponse: Boolean = false)
+
+    private val theName = Regex("^the name \"(.*)\"( and its response stream)?$")
+    private val lettersOf = Regex("^a name of (\\d+) letters(?: \"(.)\")?$")
+
+    private fun nameInput(input: String): NameInput? {
+        theName.matchEntire(input)?.let { return NameInput(it.groupValues[1], withResponse = it.groupValues[2].isNotEmpty()) }
+        lettersOf.matchEntire(input)?.let { m ->
+            val letter = m.groupValues[2].ifEmpty { "a" }
+            return NameInput(letter.repeat(m.groupValues[1].toInt()))
+        }
+        return null
     }
 
     @When("I open the binding form")

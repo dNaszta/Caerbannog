@@ -92,6 +92,8 @@ object PlannerTexts {
     const val EXCHANGE_NAME_MISSING: String = "Give the exchange a name"
     const val STREAM_NAME_MISSING: String = "Give the stream a name"
     const val RESPONSE_NAME_MISSING: String = "Give the response stream a name"
+    const val NAME_RESERVED: String = "Names that start with \"amq.\" are reserved"
+    const val QUEUE_NAME_TOO_LONG: String = "A queue name can be at most 255 bytes long"
     const val RESPONSE_NAME_SAME: String = "The response stream needs a name of its own"
     const val RESPONSE_STREAM_TICK: String = "Also create its response stream (DLN)"
     const val RESPONSE_STREAM_NAME_LABEL: String = "Response stream (DLN) name"
