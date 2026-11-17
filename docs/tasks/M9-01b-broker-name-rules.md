@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: M9-01 (done), M9-00c (done)    Size: S
 
-Status: step 2 done (tests first, 2026-11-17). Red for the right reason: 6 of the 11 `@m9-01b` runs fail (the 5 refused rows and the response stream: `form problems expected [message] but was []`), the 5 accepted rows pass already (regression guards); the unit tests do not compile until `BrokerNameRules`, `Utf8Length` and the two `PlannerTexts` constants exist. Live row measured: `amq.topic` and `amq.direct` redeclared with their real type answer **204** (see `M9-00c-spike-results.md`, "M9-01b"). Next: step 3, the senior developer. Policy `amq.x` unit test waits for `M9-08` (no policy form yet).
+Status: step 3 done (build, 2026-11-17): `BrokerNameRules`, `Utf8Length`, two `PlannerTexts` constants, `FormChecks.nameProblem` takes `isQueue`; all `@m9-01b` runs and unit tests green, `RealBrokerM9BuiltInExchangeDeclareTest` 4 of 4 green. Next: test verification and review. Earlier: step 2 done (tests first, 2026-11-17). Red for the right reason: 6 of the 11 `@m9-01b` runs fail (the 5 refused rows and the response stream: `form problems expected [message] but was []`), the 5 accepted rows pass already (regression guards); the unit tests do not compile until `BrokerNameRules`, `Utf8Length` and the two `PlannerTexts` constants exist. Live row measured: `amq.topic` and `amq.direct` redeclared with their real type answer **204** (see `M9-00c-spike-results.md`, "M9-01b"). Next: step 3, the senior developer. Policy `amq.x` unit test waits for `M9-08` (no policy form yet).
 
 NEW 2026-11-16, written at step 3 of `M9-00c`. Starts after `M9-02` or in parallel with it; it touches only `core.planner` name rules and their texts.
 
