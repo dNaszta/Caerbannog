@@ -71,9 +71,12 @@ object PlannerTexts {
     const val RESPONSE_STREAM_TICK: String = "Also create its response stream (DLN)"
     const val RESPONSE_STREAM_NAME_LABEL: String = "Response stream (DLN) name"
 
-    /** Says only what the planner does: no claim about the broker until the spike M9-00b has measured it. */
+    /**
+     * What the planner does, plus the owner's one sentence about the broker (decision O16, basis S-D1 to S-D3 of the
+     * spike M9-00b). No second claim about the broker.
+     */
     const val RESPONSE_STREAM_NOTE: String =
-        "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them."
+        "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it."
     const val RESPONSE_LINK_LABEL: String = "response (DLN)"
 
     /** The second line of a response stream's row; the name goes in only through the echo rule. */

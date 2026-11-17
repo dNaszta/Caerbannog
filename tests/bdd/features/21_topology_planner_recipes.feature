@@ -90,16 +90,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add a stream "telemetry" with the wizard and tick "Also create its response stream (DLN)"
     Then the plan holds no exchange, no binding and no policy
 
-  # The sentence about what the broker does (S-D, spike M9-00b) is deferred: it is not measured, so this text says only what the planner does.
-  @m9-07 @fake-broker
-  Scenario: The wizard says what a response stream is
-    When I tick "Also create its response stream (DLN)" in the stream form
-    Then the form says "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them."
-
   # M9-07c (owner decision O16, 2026-11-17: "add it"): the one sentence about the broker is added, unchanged from the mockup.
-  # Basis: M9-00b S-D1 to S-D3 (RabbitMQ 4.4.0, a plain stream). This scenario REPLACES the one above in step 2 of M9-07c; until then it
-  # carries @needs-M9-07c and no @fake-broker so that no runner selects it (the planner runner needs @fake-broker).
-  @m9-07 @m9-07c @needs-M9-07c
+  # Basis: M9-00b S-D1 to S-D3 (RabbitMQ 4.4.0, a plain stream). This scenario replaced "The wizard says what a response stream is".
+  @m9-07 @m9-07c @fake-broker
   Scenario: The wizard says what a response stream is and what RabbitMQ does not do
     When I tick "Also create its response stream (DLN)" in the stream form
     Then the form says "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it."
