@@ -272,4 +272,36 @@ class StreamMessageMappingTest {
         assertEquals("[a, 2]", PropertyValueText.of(m.applicationProperties["list"]))
         assertEquals("{k: v}", PropertyValueText.of(m.applicationProperties["map"]))
     }
+
+    // --- M9-00b-c step 4: can a hostile nesting reach the renderer? ---
+
+    /** A message whose annotation `x-deep` is a list nested [depth] levels deep, as AMQP 1.0 bytes written by hand (the builders cannot do 1000 levels). */
+    private fun deepMessageBytes(depth: Int): ByteArray {
+        fun int(out: java.io.ByteArrayOutputStream, v: Int) { out.write(v ushr 24); out.write(v ushr 16); out.write(v ushr 8); out.write(v) }
+        var deep = byteArrayOf(0x45) // an empty list
+        repeat(depth) {
+            val out = java.io.ByteArrayOutputStream()
+            out.write(0xd0); int(out, 4 + deep.size); int(out, 1); out.write(deep)
+            deep = out.toByteArray()
+        }
+        val mapPayload = byteArrayOf(0xa3.toByte(), 6) + "x-deep".encodeToByteArray() + deep
+        val out = java.io.ByteArrayOutputStream()
+        out.write(byteArrayOf(0x00, 0x53, 0x72, 0xd1.toByte())); int(out, 4 + mapPayload.size); int(out, 2); out.write(mapPayload)
+        out.write(byteArrayOf(0x00, 0x53, 0x75, 0xa0.toByte(), 1, 0x78)) // body: data "x"
+        return out.toByteArray()
+    }
+
+    private fun decodeDeep(depth: Int): Message = deepMessageBytes(depth).let { codec.decode(io.netty.buffer.Unpooled.wrappedBuffer(it), it.size) }
+
+    @Test
+    fun `a value nested beyond the decoder limit never reaches the renderer`() {
+        // measured on stream client 1.12.0: 30 levels decode, 40 do not (DecodeException, an Exception the reader already catches per page)
+        val m = toStreamMessage(0L, 0L, decodeDeep(30))
+        assertEquals(31, PropertyValueText.of(m.properties["x-deep"]).count { it == '[' })
+        for (depth in listOf(200, 5_000, 50_000)) {
+            val thrown = runCatching { decodeDeep(depth) }.exceptionOrNull()
+            assertTrue(thrown != null && thrown !is StackOverflowError, "depth $depth: expected a decode refusal, got $thrown")
+        }
+    }
 }
+
