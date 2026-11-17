@@ -185,4 +185,4 @@ Items 6 to 11 stay as in "Step 2: contract confirmed".
 | 9 | Step title `MQTT route <filter> to stream <name>` / `to queue <name>` / `to <name>` | planner list, summary, Migrations | OPEN | yes |
 | 10 | Step detail `Binding on amq.topic with the key <key>` | same places | OPEN | yes |
 | 11 | Labels `Topic filter`, `Destination`, `Queue`, `Stream`, `Topic that matches: <topic>` | form | OPEN | yes |
-| 12 | Label over the Queue/Stream radios: `Kind (optional, narrows the list)`; now none | form | OPEN | yes: says the choice is optional and what it does; until decided the radios stay unlabeled |
+| 12 | Label over the Queue/Stream radios: `Kind (optional, narrows the list)`; now none | form | DECIDED yes (owner, 2026-11-17, "accept all"); built by `M9-10d` | yes: says the choice is optional and what it does |

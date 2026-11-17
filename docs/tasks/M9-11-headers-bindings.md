@@ -24,25 +24,46 @@ In:
 Out: `all-with-x` and `any-with-x` as choices (see above); deleting a headers binding (the format's `deleteBinding` has no arguments today; a later format addition).
 
 ## Acceptance
-- BDD: `21_topology_planner_recipes.feature` / "A binding on a headers exchange carries its headers and the match rule" (@fake-broker @smoke)
-- BDD: `21_topology_planner_recipes.feature` / "Header values keep their type in the saved file" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "Only the two measured match rules are offered, and the binding always carries one" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A binding from an opened file that uses a rule the form does not offer is kept as it is" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A number and the same text are different header values" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "Two bindings that differ only in their headers are two steps" (@fake-broker)
-- BDD: `21_topology_planner_recipes.feature` / "A headers binding without a header says what it would match" (outline, two rows; @fake-broker @negative: wording decided 2026-11-16)
-- BDD: `21_topology_planner_recipes.feature` / "A fanout binding has no routing key field" (@fake-broker)
-- Unit tests, written first: `BindingFormHeadersTest` (arguments and types written, `formOf` round trip, read-only for anything else), `PlanValidationBindingIdentityTest`. Compose: `BindingFormHeadersUiTest`.
-- Live: nothing new; `RealBrokerM9SpikeHeadersBindingTest` of the spike stays the proof, and the executor's binding request with arguments is already proven by `RealBrokerM8MigrationRequestsTest`.
+All in `tests/bdd/features/21_topology_planner_recipes.feature`, section "M9-11: bindings on a headers exchange", tag `@m9-11`, all `@fake-broker`:
+- "A binding on a headers exchange carries its headers and the match rule" (@smoke)
+- "Header values keep their type in the saved file"
+- "Two bindings that differ only in their headers are two steps"
+- "Only the two measured match rules are offered, and the binding always carries one"
+- "A binding from an opened file that uses a rule the form does not offer is kept as it is"
+- "A headers binding without a header says what it would match" (outline, rows `all` and `any`; @negative)
+- "A number and the same text are different header values"
+- "A fanout binding has no routing key field"
+- ADDED at step 1: "A header row that cannot be written is refused" (outline, 3 rows; @negative), "A header listed twice is refused" (@negative), "A binding from an opened file keeps its headers and opens in the headers form".
+- The step glue of the outline and the new scenarios is new: the test developer writes the steps in `acceptance-tests/.../planner/` (`PlannerSteps.kt` and `PlannerDriver.kt` already drive `BindingForm`).
+- Unit tests, written first: `BindingFormHeadersTest` (core; arguments and types written, `formOf` round trip, read-only for anything else, hints, problems), `PlanValidationBindingIdentityTest` (core), `BindingFormHeadersUiTest` (ui, Compose).
+- Live: nothing new for the form. `RealBrokerM9SpikeHeadersBindingTest` stays the proof; the executor's binding request with arguments is proven by `RealBrokerM8MigrationRequestsTest`. One small live probe (a boolean argument and a boolean header, with a positive control) is wanted so that the boolean type is measured before it is offered as routing: the test developer may put it in this task or in `M9-13`; if it shows that a boolean does not match, the boolean choice is removed from the form (see Open points).
 
 ## Design notes
-No format change: `declareBinding` has typed `arguments` since M8-04, and the executor matches a binding by key and arguments. No broker in this task.
+Confirmed at step 1 (2026-11-17) against main c34b19f2: `MigrationAction.DeclareBinding` already has typed `arguments: Map<String, ArgumentValue>` (M8-04), its `detail` is the arguments sorted by key as `key=value` (so `format=pdf, type=report, x-match=all`, the text the first scenario expects, needs no change), `FormContext.asksRoutingKey(exchange)` already hides the routing key for a known fanout or headers exchange (plan first, then `KnownTopology`), and `PlannerViewModel.detailsOf` already hands it to the screen. No format change, no broker, no new dependency, `core` stays pure.
+
+Correction to the first draft of this brief: `PlanValidation.duplicates` handles only queues, exchanges and streams. Bindings are not checked for "declared twice" at all today, so there is no binding identity to widen. `PlanValidationBindingIdentityTest` therefore pins: two bindings with the same exchange, destination and key but different arguments give NO `PlanProblem`. It does not ask for a new "declared twice" note on identical bindings (not in scope; if wanted it is a separate idea).
+
+API to pin (core.planner, `StepForms.kt`; names are the architect's, the test developer pins them):
+- `enum class MatchRule(val wire: String) { ALL("all"), ANY("any") }`; start value `ALL`.
+- `enum class HeaderValueType { TEXT, WHOLE, FLAG }`.
+- `data class HeaderMatch(val name: String, val type: HeaderValueType = TEXT, val value: String = "")`. The value is raw text because a whole-number field is typed key by key (`1`, then `12`); for `FLAG` it is `"true"` or `"false"`. `fun argumentValue(): ArgumentValue?` gives `Text`, `Whole` (null when `value` is not a whole number that fits a `Long`, no sign other than a leading `-`, no spaces) or `Flag`. Deviation from the first draft ("`HeaderMatch` holds an `ArgumentValue`"): the draft cannot hold half-typed input.
+- `BindingForm` gains `headers: List<HeaderMatch> = emptyList()`, `matchRule: MatchRule = MatchRule.ALL` and `heldRule: String? = null`. `heldRule` is the verbatim `x-match` of an opened file when it is not `all` or `any` (`all-with-x`, `any-with-x`, or anything else the file holds); the form writes `heldRule` when set and `matchRule.wire` otherwise. Choosing `all` or `any` in the form clears `heldRule`: an explicit choice is an edit, the only way a kept rule changes.
+- Arguments written (`actions`): when `headers` is not empty, or the source exchange is a known headers exchange (plan or `KnownTopology`): `x-match` plus one entry per header, typed `Text`, `Whole` or `Flag`; otherwise no arguments, byte for byte as before. An empty `headers` list on a known headers exchange writes `{x-match: all}` and the form's hint is the fixed warning. The routing key is written as held (the form never adds one: the field is not asked for fanout and headers); a held key of an opened file is kept, not dropped.
+- `formOf` for `DeclareBinding` (after the MQTT route check, unchanged): a binding whose arguments are `Text`, `Whole` or `Flag` values plus an `x-match` of kind `Text` opens as `BindingForm`: `all` or `any` as `matchRule`, any other text as `heldRule` (so `all-with-x` opens in the form and is written back unchanged: scenario "kept as it is"). Read-only step (`null`, A2): any other argument kind (decimal, list, table, null), a non-text `x-match`, and arguments WITHOUT `x-match` (how such a binding routes was not measured, so the form must not write a rule the file did not have). A binding with no arguments is the plain form, as today.
+- Problems (blocking, field `headers`, one per mistake, first wins in the page message): empty name `Give the header a name`; name `x-match` `x-match is the match rule, not a header`; a name used twice `A header can be listed once`; `WHOLE` with a value that is not a whole number `A whole number has digits only`. These four texts are working wording of the architect (technical refusals in the style of the decided name refusals), constants in `PlannerTexts`; the owner may reword them (see Open points). Spaces in a name or a text value are allowed and kept; nothing is trimmed (a header `" format"` is a different header on the broker).
+- Hints (never blocking): the two fixed warnings, only when the source exchange is a known headers exchange and `headers` is empty, `PlannerTexts.HEADERS_NONE_ALL` and `HEADERS_NONE_ANY` (decided texts above), as a `FieldHint("headers", ...)`.
+- When the exchange type is not known, the routing key field is shown, the headers section is not offered; a form that already holds headers (opened file) shows the section so they can be edited or removed, and writes them.
+- Exchange type of the plan: the LAST declaration of that name wins (existing `asksRoutingKey`); add a small `FormContext.exchangeType(name): String?` that `asksRoutingKey` also uses, so there is one place that reads it.
+- `WizardState.Details` gains what the screen needs: `asksHeaders: Boolean` (true for a known headers exchange or a form that holds headers). Keep decisions in core; the view only draws.
+- Plan graph, check and dry run are unchanged: the check's binding row already compares key and arguments (M9-05/M8); the graph edge label stays the routing key. State in the PR if a headers binding looks odd on the graph; do not change the graph here.
 
 ## UX
-`docs/ux/Planner.dc.html`: "4." form "Binding on a headers exchange".
+`docs/ux/Planner.dc.html`, "form-binding-headers" (the mockup title still says "S-E pending": S-E is measured; fix the title when the screen is built). States: the source exchange is a known headers exchange (match rule choice `all headers match` / `any header matches`, header rows of name, value, a type chip `text`, `number`, `true or false`, a remove button, `Add header`; no routing key), unknown type (routing key field, no headers section), a form that already holds headers (section shown), problem under a row, hint (the two fixed warnings) when there is no row. The mockup's chip says `number`; the model name is `WHOLE` (whole numbers only, a decimal is not offered). A boolean value is a two-way choice, not free text. Stable `testTag`s to add: `planForm:matchRule:all`, `planForm:matchRule:any`, `planForm:header:<n>:name`, `:value`, `:type`, `:remove`, `planForm:addHeader`. Look and feel stay Material 3 like the other forms; no new colours.
 
 ## MCP
-None (owner decision 2026-11-15).
+None (owner decision 2026-11-15). Re-evaluated at step 1: the planner has no MCP surface at all (it builds a draft that the user saves as a migration on the Migrations screen), and a headers binding is only a binding argument in the same migration format, which `M5-09` read-only tools already list and dry-run. No new tool, no write tool, nothing to expose safely.
+
+Safety (CLAUDE.md): the form only writes steps into a draft; the broker names it suggests come from the read-only `KnownTopology`; no new request, no queue read, no TLS path, no dependency.
 
 ## Open points
 - Q1 (decided 2026-11-15): topic and headers exchanges are offered, so this task stays.
@@ -50,5 +71,12 @@ None (owner decision 2026-11-15).
 - The two warnings and the offered rules are DECIDED (owner, 2026-11-16, review list items 6, 7, 10 of `M9-00a`: the texts above; offer only `all` and `any`); build the form with these texts behind constants.
 - Small live addition (the gate task `M9-13` or a test of this task, the test developer's choice): one headers binding with a boolean argument and a publish with the boolean header, with a positive control, so that the boolean type is measured before it is offered as routing.
 
+- DECIDED at step 1 (architect, technical, no new owner product decision): a file binding with arguments but no `x-match` is read-only; the four header refusals are working wording (listed below); a boolean is offered only if the live probe shows it routes (otherwise remove `FLAG` from the form and keep reading it from files).
+- OWNER GLANCE (not blocking, ships as written unless reworded; recommendation yes): the four refusal texts `Give the header a name`, `x-match is the match rule, not a header`, `A header can be listed once`, `A whole number has digits only`, and the type chip labels `text`, `number`, `true or false`.
+- Not measured, so not claimed: that a header whose name starts with `x-` is ignored by `all` and `any` matching (RabbitMQ documents this; the form does not rely on it and does not forbid such names except `x-match`).
+
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
+
+## Step 1 record
+Architect, 2026-11-17, branch `m9-11-headers-bindings` (worktree `../Caerbannog-m9-11`), main c34b19f2: brief confirmed against `StepForms.kt`, `FormContext.kt`, `PlanValidation.kt`, `PlannerViewModel.detailsOf`, `PlanForms.kt`, `MigrationModels.kt` and the spec (S-E, O15, O8/Q1). Changed: the PlanValidation bullet (bindings are not checked for duplicates today), the model of a header value (raw text plus type, not `ArgumentValue`), the handling of a kept `all-with-x` rule, the no-`x-match` case; added three scenarios (refused rows, duplicate header, opened file keeps headers). Next: step 2, test developer writes the tests first (unit, UI, glue).

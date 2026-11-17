@@ -167,7 +167,7 @@ Why pinned is right: the three banners are "what the dialog tells you now"; they
 - **Follow-up `M9-10e`** (S, brief written: `docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md`): the write-permission gate on the older MQTT entry points and the fold check of the AMQP `PublishDialog`. The coordinator adds the index row.
 - **Code review:** production code follows the brief and the rules (core pure, no `java.*` in `core`, UUID in `desktopApp`, no new dependency, no new read path, MCP none, publishing only through `PublishMqttViewModel` and the existing publisher; opening sends nothing). Minor: imports in `PublishMqttDialog.kt` are out of order (goes away with round 3); `MigrationsScreen` looks the status up per row inside the loop (acceptable, small lists); `route?.let(onTestMessage)` in the row could take the route as a parameter (idea).
 
-## Owner review list (new wording; all OPEN, recommendation given, the owner may answer "yes to all")
+## Owner review list (new wording; DECIDED 2026-11-17, owner "accept all": items 1 to 7 yes; the entries below say OPEN as written before the answer)
 1. OPEN. Refusal of a value with a control character (new text): `No control characters in a value`. Recommendation: yes.
 2. OPEN. The O15 dot text reused for a `+` value: `A level cannot contain a dot: RabbitMQ would read it as another level`. Recommendation: yes (no new sentence).
 3. OPEN. The sample dialog title `Send a test message` and the confirm and cancel buttons `Open the dialog` and `Cancel` (the first two are in the mockup). Recommendation: yes.
@@ -175,7 +175,7 @@ Why pinned is right: the three banners are "what the dialog tells you now"; they
 5. OPEN. The field texts: the labels `Value for the + in level N` and `Value for the rest of the topic`, the hint `for example a device id`, and the other refusals `Enter a value`, `One level only: no /`, `No + or # in a value`. Recommendation: yes.
 6. OPEN (words already decided by the owner as O16 and O17; listed so the whole set is seen once). The two banner texts as in `MqttTestMessageTexts` and the tests (stream, queue). Recommendation: yes.
 7. OPEN (visual change, not wording). In the Publish MQTT dialog the Cancel and Publish buttons are pinned at the bottom and the form scrolls above them with a visible scrollbar (round 2). After round 3 the header notice, the confirmation and the error are pinned there too, so they are always seen, and the dialog always opens at its top (title, broker warning, topic). Trade-off the owner should see: the notice about the `correlation-id` header sits above the buttons while the headers list it talks about is in the scrolling form, below the fold on opening (at 1000x600 and 1280x800); the notice text names the property, so it reads alone, and the user scrolls to see or edit the row. Applies to every opening of that dialog (stream, topology, test message). Recommendation: yes.
-No product decision is open. The owner may separately want `M9-10e` (write-permission gate on the older MQTT entry points); recommendation: yes, small.
+No product decision is open. `M9-10e` is QUEUED (owner, 2026-11-17: yes). The owner may separately have wanted `M9-10e` (write-permission gate on the older MQTT entry points); recommendation: yes, small.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.

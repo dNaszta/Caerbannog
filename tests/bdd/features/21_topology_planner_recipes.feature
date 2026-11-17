@@ -872,6 +872,36 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the plan has both bindings and no problem
     And the first is saved with "pages" as the number 10 and the second with "pages" as the text "10"
 
+  # Added at step 1 of M9-11 (architect, 2026-11-17): a header row the form cannot write as one argument is refused under the headers, and
+  # the step is not added. The four texts are working wording (technical refusals in the style of the decided name refusals); the owner
+  # may reword them.
+  @m9-11 @negative @fake-broker
+  Scenario Outline: A header row that cannot be written is refused
+    Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
+    When I open the binding form for "documents" and give it the header "<name>" with the <type> "<value>"
+    Then the form says "<message>"
+    And no step is added
+
+    Examples:
+      | name    | type   | value | message                               |
+      |         | text   | pdf   | Give the header a name                |
+      | x-match | text   | any   | x-match is the match rule, not a header |
+      | pages   | number | ten   | A whole number has digits only        |
+
+  @m9-11 @negative @fake-broker
+  Scenario: A header listed twice is refused
+    Given a plan that declares the headers exchange "documents" and the quorum queue "reports"
+    When I open the binding form for "documents" and give it the header "format" "pdf" and the header "format" "csv"
+    Then the form says "A header can be listed once"
+    And no step is added
+
+  @m9-11 @fake-broker
+  Scenario: A binding from an opened file keeps its headers and opens in the headers form
+    Given a pending migration "0006" with a binding from the headers exchange "documents" to the queue "reports" with the arguments "x-match" "any" and "pages" 10
+    When I choose "Edit steps" for "0006"
+    Then the step is shown as a binding with the detail "pages=10, x-match=any"
+    And its form holds the header "pages" as the number 10 and the match rule "any"
+
   @m9-11 @fake-broker
   Scenario: A fanout binding has no routing key field
     Given a plan that declares the fanout exchange "broadcast" and the quorum queue "audit"
