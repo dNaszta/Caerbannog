@@ -34,9 +34,12 @@ class PlanValidationPolicyTest {
 
     private fun plan(vararg actions: MigrationAction) = TopologyPlan.of("", actions.toList(), "/")
 
-    /** The policy notes only (a plan can carry other problems), as (step position 1-based, message). */
+    /**
+     * The overlap and no-effect notes only (a plan can carry other problems), as (step position 1-based, message). The missing dead-letter exchange note
+     * (the sample value "x" of a dead-letter key names an exchange that is nowhere) is a note of its own, pinned in the `21` scenarios.
+     */
     private fun notes(plan: TopologyPlan, known: KnownTopology = KnownTopology.None): List<Pair<Int, String>> =
-        PlanValidation.problems(plan, known).filter { !it.blocking && it.stepId != null && "olic" in it.message }
+        PlanValidation.problems(plan, known).filter { !it.blocking && it.stepId != null && "olic" in it.message && "does not exist yet" !in it.message }
             .map { p -> plan.steps.indexOfFirst { it.id == p.stepId } + 1 to p.message }
 
     private fun overlap(a: String, b: String, on: String) =

@@ -282,6 +282,34 @@ class PlannerPolicySteps {
         MigrationAction.DeclarePolicy(name, pattern, linkedMapOf(k1 to ArgumentValue.Text(v1), k2 to ArgumentValue.Text(v2), k3 to ArgumentValue.Text(v3)), vhost = d.vhost),
     )
 
+    @Given("a plan that declares the policy {string} on {string} with {string} {string}")
+    fun planWithOneText(name: String, pattern: String, k1: String, v1: String) = planFromActions(
+        MigrationAction.DeclarePolicy(name, pattern, linkedMapOf(k1 to ArgumentValue.Text(v1)), vhost = d.vhost),
+    )
+
+    @Given("a plan that declares the policy {string} on {string} with {string} {string} and {string} {string}")
+    fun planWithTwoTexts(name: String, pattern: String, k1: String, v1: String, k2: String, v2: String) = planFromActions(
+        MigrationAction.DeclarePolicy(name, pattern, linkedMapOf(k1 to ArgumentValue.Text(v1), k2 to ArgumentValue.Text(v2)), vhost = d.vhost),
+    )
+
+    /** The scenario says the exchange is nowhere: the plan has none of that name and the planner knows no broker names. */
+    @Given("neither the broker nor the plan has the exchange {string}")
+    fun noSuchExchange(exchange: String) {
+        assertEquals(
+            emptyList<String>(),
+            d.plan.steps.map { it.action }.filterIsInstance<MigrationAction.DeclareExchange>().map { it.name }.filter { it == exchange },
+            "the plan declares the exchange: ${d.titles()}",
+        )
+        assertEquals(KnownTopology.None, d.known, "the planner knows names of the broker")
+    }
+
+    /** A note of the plan itself (no check run), shown on the step. */
+    @Then("the step {string} shows the note {string}")
+    fun stepShowsNote(title: String, note: String) {
+        val notes = notesOf(policyStepTitled(title))
+        assertTrue(note in notes, "the notes of \"$title\" are $notes, expected \"$note\"")
+    }
+
     @Given("a plan that declares the exchange {string} and then the policy {string} on {string} with {string} {string}")
     fun planExchangeThenPolicy(exchange: String, name: String, pattern: String, key: String, value: String) = planFromActions(
         MigrationAction.DeclareExchange(exchange, vhost = d.vhost),

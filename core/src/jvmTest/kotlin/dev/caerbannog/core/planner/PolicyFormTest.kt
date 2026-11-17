@@ -367,6 +367,43 @@ class PolicyFormTest {
         assertFalse("more" in exactlyTen, "ten names are all shown: $exactlyTen")
     }
 
+    // Format decided by the architect on 2026-11-17 (brief M9-08, "Step 2: contract confirmed", gap 4): each source lists its names quoted, in the order found:
+    // `"a"`, `"a" and "b"`, `"a", "b" and "c"`; ten names at most, then `, ... and N more`; the sentence is `matches <plan list> in this plan and <broker list> on "<connection>"`.
+
+    @Test
+    fun `three names are joined with commas and a last and, in the order found, in both sources`() {
+        val plan = planOf(MigrationAction.DeclareQueue("orders-a"), MigrationAction.DeclareQueue("orders-b"), MigrationAction.DeclareQueue("orders-c"))
+        assertEquals(listOf("""matches "orders-a", "orders-b" and "orders-c" in this plan"""), matchLine(valid, context(plan)))
+        val c = context(plan, KnownTopology(queues = linkedSetOf("orders-x", "orders-y", "orders-z")))
+        assertEquals(
+            listOf("""matches "orders-a", "orders-b" and "orders-c" in this plan and "orders-x", "orders-y" and "orders-z" on "uat-eu""""),
+            matchLine(valid, c),
+        )
+    }
+
+    @Test
+    fun `a name found in both sources is shown in both, not merged`() {
+        val c = context(planOf(MigrationAction.DeclareQueue("orders")), KnownTopology(queues = setOf("orders")))
+        assertEquals(listOf("""matches "orders" in this plan and "orders" on "uat-eu""""), matchLine(valid, c))
+    }
+
+    @Test
+    fun `two names and the cap of ten, in full`() {
+        val ten = ('a'..'j').map { "orders-$it" }
+        val plan12 = planOf(*(ten + listOf("orders-k", "orders-l")).map { MigrationAction.DeclareQueue(it) as MigrationAction }.toTypedArray())
+        val quotedTen = ten.joinToString(", ") { "\"$it\"" }.let { it.substringBeforeLast(", ") + " and " + it.substringAfterLast(", ") }
+        // over the cap: all ten names comma-joined, then `and N more` (N = names left out)
+        val firstTen = ten.joinToString(", ") { "\"$it\"" }
+        assertEquals(listOf("""matches $firstTen and 2 more in this plan"""), matchLine(valid, context(plan12)))
+        val twoNames = context(planOf(MigrationAction.DeclareQueue("orders-a"), MigrationAction.DeclareQueue("orders-b")), KnownTopology(queues = (ten + "orders-k" + "orders-l").toCollection(linkedSetOf())))
+        assertEquals(
+            listOf("""matches "orders-a" and "orders-b" in this plan and $firstTen and 2 more on "uat-eu""""),
+            matchLine(valid, twoNames),
+        )
+        val exactlyTen = planOf(*ten.map { MigrationAction.DeclareQueue(it) as MigrationAction }.toTypedArray())
+        assertEquals(listOf("""matches $quotedTen in this plan"""), matchLine(valid, context(exactlyTen)), "exactly ten names shows no count")
+    }
+
     @Test
     fun `a hostile pattern cannot hang the hint`() {
         val f = valid.copy(pattern = "(.*a){40}")

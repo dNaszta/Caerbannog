@@ -83,6 +83,13 @@ class StepFormsPolicyTest {
     }
 
     @Test
+    fun `a choice whose value is not an offered wire makes the policy read-only (the dropdown cannot hold it without changing the file)`() {
+        assertNull(StepForms.formOf(policy(definition = mapOf("overflow" to ArgumentValue.Text("bogus")))), "overflow: bogus")
+        assertNull(StepForms.formOf(policy(definition = mapOf("overflow" to ArgumentValue.Text("Reject-Publish")))), "a wire in another case")
+        assertIs<PolicyForm>(StepForms.formOf(policy(definition = mapOf("overflow" to ArgumentValue.Text("reject-publish")))), "an offered wire opens")
+    }
+
+    @Test
     fun `operator policies and deletes stay read-only`() {
         assertNull(StepForms.formOf(MigrationAction.DeclareOperatorPolicy("op", "^orders", mapOf("max-length" to ArgumentValue.Whole(5)))))
         assertNull(StepForms.formOf(MigrationAction.DeletePolicy("orders-limits")))

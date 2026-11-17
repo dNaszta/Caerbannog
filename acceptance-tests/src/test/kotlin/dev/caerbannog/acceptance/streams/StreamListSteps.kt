@@ -465,10 +465,10 @@ class StreamListSteps {
 
     /**
      * Only the age has a cell (StreamRow.retention is displayMaxAge()), and the MCP tools print the age only: a size limit is carried by the summary
-     * and shown nowhere yet. The step therefore reads the summary the list is built from; see the report of M9-08 step 2 (the wording over-promises).
+     * and shown nowhere yet (decided in M9-08, step 2). The step therefore reads the summary the list is built from.
      */
-    @Then("^the stream \"([^\"]*)\" shows the retention (\\d+) bytes$")
-    fun theStreamShowsTheRetentionBytes(name: String, bytes: Long) {
+    @Then("^the stream \"([^\"]*)\" has the maximum size (\\d+) bytes$")
+    fun theStreamHasTheMaximumSize(name: String, bytes: Long) {
         assertEquals(bytes, summaryOf(name).retention.maxLengthBytes, "maxLengthBytes of the summary the list is built from")
     }
 

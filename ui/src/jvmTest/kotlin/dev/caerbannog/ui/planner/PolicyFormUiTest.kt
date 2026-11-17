@@ -280,6 +280,33 @@ class PolicyFormUiTest {
         r.close()
     }
 
+    /**
+     * The page message, word for word (decided by the owner on 2026-11-17): the quoted word is the NEW target's label, the list holds the labels of the removed
+     * rows in row order joined by `, `, and the next edit clears it. The gate's example named "Segment size (bytes)", which Streams DOES offer: the rows here are
+     * ones the catalog really drops when going from quorum queues to streams.
+     */
+    @Test
+    fun `the page message names the new target and the labels of the removed rows, and the next edit clears it`() = runDesktopComposeUiTest(1280, 800) {
+        val r = UiRig()
+        toPolicyForm(r)
+        chooseTarget("quorum_queues")
+        node("planForm:addSetting").performClick()
+        chooseKey(0, "delivery-limit")
+        node("planForm:setting:0:value").performTextInput("5")
+        node("planForm:addSetting").performClick()
+        chooseKey(1, "max-length-bytes")
+        node("planForm:setting:1:value").performTextInput("9")
+        node("planForm:addSetting").performClick()
+        chooseKey(2, "max-length")
+        node("planForm:setting:2:value").performTextInput("7")
+        chooseTarget("streams")
+        assertEquals(listOf(PolicySetting("max-length-bytes", "9")), r.form().settings)
+        assertEquals("""Removed because "Streams" does not offer them: Delivery limit, Maximum number of messages.""", textOf("planWizard:pageMessage"))
+        node("planForm:setting:0:value").performTextInput("0")
+        assertEquals(0, onAllNodesCount("planWizard:pageMessage"), "the next edit clears it")
+        r.close()
+    }
+
     // ---- Next, summary, the plan ----
 
     @Test

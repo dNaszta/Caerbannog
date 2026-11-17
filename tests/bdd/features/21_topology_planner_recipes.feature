@@ -20,7 +20,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   The dead-lettering facts (S-C, S-D, M9-00b, measured 2026-11-16 on RabbitMQ 4.4.0) are in docs/spec.md "Measured facts of
   M9-00b": the m9-09 scenarios lost needs-spike, no scenario carries it any more. The scenarios that carry NEW wording from
   that spike (the at-least-once explanation and its slow delivery, the note for a queue with its own dead-letter argument,
-  the two policy notes) carry @needs-decision until the owner answers the Owner review list of
+  the two policy notes of @m9-09) carry @needs-decision until the owner answers the Owner review list of
   docs/tasks/M9-00b-spike-dead-lettering-and-streams.md; the planner runner (@m9-01 to @m9-07, not @needs-decision) does not
   select them, and no other runner selects the m9-09 or m9-08 tags.
 
@@ -376,8 +376,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I check the plan against "uat-eu"
     Then the step "Declare policy orders-dlx" shows no note about another policy
 
-  # Two notes that come from M9-00b (S-C4, S-C6): wording proposed, owner review list items 4 and 5 of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md.
-  @m9-08 @fake-broker @needs-decision
+  # Two notes that come from M9-00b (S-C4, S-C6): wording decided by the owner on 2026-11-17 ("all recommended are ok").
+  @m9-08 @fake-broker
   Scenario Outline: A policy that asks for at least once without the setting that makes it hold is pointed out
     Given a plan that declares the policy "orders-dlx" on "^orders$" with <settings>
     Then the step "Declare policy orders-dlx" shows the note "RabbitMQ accepts this but would not keep a message it cannot pass on: at least once only holds together with the setting that refuses publishers when the queue is full."
@@ -392,7 +392,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx" and "dead-letter-strategy" "at-least-once" and "overflow" "reject-publish"
     Then the step "Declare policy orders-dlx" shows no note about at least once
 
-  @m9-08 @fake-broker @needs-decision
+  @m9-08 @fake-broker
   Scenario: A policy that names a dead-letter exchange that is nowhere is pointed out
     Given a plan that declares the policy "orders-dlx" on "^orders$" with "dead-letter-exchange" "orders-dlx"
     And neither the broker nor the plan has the exchange "orders-dlx"
@@ -442,8 +442,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the plan lists these steps in this order
       | Declare stream telemetry |
 
-  # The wording of the refusal is proposed (owner decision list of docs/tasks/M9-08-policy-step.md, item 2).
-  @m9-08 @negative @fake-broker @needs-decision
+  # The wording of the refusal was decided by the owner on 2026-11-17.
+  @m9-08 @negative @fake-broker
   Scenario Outline: A retention value the broker would refuse is refused by the form
     When I add a stream "telemetry" with the wizard and set "Keep messages for" to "<value>"
     Then the form says "Enter a number and a unit, for example 7D"
