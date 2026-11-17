@@ -14,7 +14,7 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-10` MQTT route step | M | in progress (branch `m9-10-mqtt-route-step`, no commit yet) |
+| M9 | `M9-10` MQTT route step | M | in progress (branch `m9-10-mqtt-route-step`, step 2 tests first) |
 | M9 | `M9-07b` stream pair with MQTT routes | S | `M9-10` (one scenario also `M9-12`) |
 | M9 | `M9-11` headers bindings | S | nothing |
 | M9 | `M9-01b` broker name rules | S | nothing |
@@ -48,7 +48,7 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 - Deep-list `[` handling in `ManagementDeclareCheck` (a body that starts with `[` nested deeply).
 - Tidy-ups: three private copies of the hex helper; an `add` inside a filter in `TopologyExport.note()`; an unused `GRAPH_BOX_MIN`; import order in `ManagementDeclareCheck`.
 - Test hygiene, needs a small brief: `closedLocalPort()` in `ReachabilityCheckerPlainTest` picks a free port, closes it, and another test's server can take it before use, so it is flaky under load (from `M2-14a`).
-- `M9-05`: its `@broker` scenario `RealBrokerPlanCheckTest` was recorded as NOT RUN in the briefs; later M9 tasks report live runs, but whether this class itself ran is unclear from git.
+- `M9-05`: its `@broker` scenario `RealBrokerPlanCheckTest` was first NOT RUN (no container runtime). It has since run and passed on RabbitMQ 4.4.0: 1 test on 2026-11-16 (coordinator, merged main), then 5 of 5 with the M9-05b rows (2026-11-16/17) and again in the M9-14c verification. The old 'NOT RUN' lines in the M9-05 and M9-06 briefs are history.
 - `M8-14c-migrations-app-bar-narrow` (app bar wraps at 1024x768, named in the `M8-14` review) has no row and no brief.
 
 | ID | Title | Milestone | Status |
