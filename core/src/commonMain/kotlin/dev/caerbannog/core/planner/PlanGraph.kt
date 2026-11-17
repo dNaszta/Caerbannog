@@ -164,8 +164,19 @@ fun planPreview(
         notice = notice,
         edgeLabels = routeLabels,
         mqttRouteEdgeIds = routeLabels.keys,
+        notes = planGraphNotes(plan),
     )
 }
+
+/**
+ * The notes of the review graph: one for every request stream whose response stream is the destination of an MQTT route, standing between the
+ * request stream and `amq.topic` (owner decision O13). The pair is recognised in [plan] only (A11), the same rule the summary sentence uses,
+ * so the two cannot disagree. A note is not a step, an edge or stored.
+ */
+fun planGraphNotes(plan: TopologyPlan): List<PlanGraphNote> =
+    PlanPairs.requestsAnsweredOverMqtt(plan.steps.map { it.action }).map {
+        PlanGraphNote(sourceId = "q:$it", targetId = "e:${MqttRoutes.EXCHANGE}", text = PlannerTexts.SERVICE_NOT_PLANNED)
+    }
 
 /**
  * Edge id to topic filter for every drawn edge that is a recognised MQTT route. An edge is the route's binding: same exchange, destination
