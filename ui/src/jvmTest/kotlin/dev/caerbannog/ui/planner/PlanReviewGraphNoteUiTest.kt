@@ -197,4 +197,57 @@ class PlanReviewGraphNoteUiTest {
             r.close()
         }
     }
+
+    // ---- step 2 addendum (architect's gate, decision 3a) ----
+
+    private fun DesktopComposeUiTest.assertNoteBetweenAndFree(request: String, topic: String, others: List<String>) {
+        val note = rect("planGraphNote:0")
+        val a = rect("planGraphNode:q:$request")
+        val b = rect("planGraphNode:e:$topic")
+        (listOf(a, b) + others.map { rect(it) } + PlannerNodeTags.withPrefix(this, "edgePill:").map { rect(it) }).forEach { o ->
+            assertTrue(note[2] <= o[0] || o[2] <= note[0] || note[3] <= o[1] || o[3] <= note[1], "the note ${note.toList()} overlaps ${o.toList()}")
+        }
+        val cx = (note[0] + note[2]) / 2
+        val cy = (note[1] + note[3]) / 2
+        val xs = listOf((a[0] + a[2]) / 2, (b[0] + b[2]) / 2)
+        val ys = listOf((a[1] + a[3]) / 2, (b[1] + b[3]) / 2)
+        assertTrue(cx >= xs.min() - 24f && cx <= xs.max() + 24f, "centre x $cx is not between the nodes $xs")
+        assertTrue(cy >= ys.min() - 24f && cy <= ys.max() + 24f, "centre y $cy is not between the nodes $ys")
+    }
+
+    @Test
+    fun `the same column case, an exchange bound to amq topic, puts the note between the two nodes and on no node or pill`() = runDesktopComposeUiTest(1600, 1000) {
+        val r = rig {
+            exchange("events")
+            add(dev.caerbannog.core.planner.BindingForm("events", "amq.topic", dev.caerbannog.core.topology.BindingDestinationType.EXCHANGE, "k"))
+            deviceFlow()
+        }
+        showPlanner(r)
+        assertDrawn("planGraphNode:e:amq.topic")
+        assertEquals(listOf("planGraphNote:0"), notes())
+        // the precondition of the case: amq.topic and the request stream share a column (same left edge)
+        assertEquals(rect("planGraphNode:e:amq.topic")[0], rect("planGraphNode:q:device-commands")[0], "this is not the same column case")
+        assertNoteBetweenAndFree("device-commands", "amq.topic", listOf("planGraphNode:q:device-commands-dln", "planGraphNode:e:events"))
+        r.close()
+    }
+
+    @Test
+    fun `a graph with no note keeps the 140 dp spacing between its layers and a note widens it to 244 dp`() = runDesktopComposeUiTest(1600, 1000) {
+        val r = rig { queue("orders"); exchange("events"); binding("events", "orders", "order.created") }
+        showPlanner(r)
+        val events = rect("planGraphNode:e:events")
+        val orders = rect("planGraphNode:q:orders")
+        val scale = (events[2] - events[0]) / 200f
+        assertEquals(140f * scale, orders[0] - events[2], 1f, "the gap between the two layers of a plan with no note")
+        r.close()
+        runDesktopComposeUiTest(1600, 1000) {
+            val r2 = rig { deviceFlow() }
+            showPlanner(r2)
+            val topic = rect("planGraphNode:e:amq.topic")
+            val request = rect("planGraphNode:q:device-commands")
+            val sc = (topic[2] - topic[0]) / 200f
+            assertEquals(244f * sc, request[0] - topic[2], 1f, "the gap between the two columns that hold the note's nodes")
+            r2.close()
+        }
+    }
 }

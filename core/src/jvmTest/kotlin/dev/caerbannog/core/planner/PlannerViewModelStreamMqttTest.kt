@@ -148,4 +148,31 @@ class PlannerViewModelStreamMqttTest {
         vm.editStep(rig.state.plan.steps.single().id)
         assertEquals(StreamForm(name = "telemetry"), details().form)
     }
+
+    // ---- step 2 addendum (architect's gate) ----
+
+    @Test
+    fun `the route line of the summary reads to stream and the sentence is the note`() {
+        open(StreamForm("device-commands", withResponse = true, answersTopic = "devices/+/answer"))
+        vm.next()
+        val s = summary()
+        val titles = s.actions.map { rig.state.wordsOf(it, s.actions).title }
+        assertEquals(
+            listOf("Declare stream device-commands", "Declare stream device-commands-dln", "MQTT route devices/+/answer to stream device-commands-dln"),
+            titles,
+        )
+    }
+
+    @Test
+    fun `a single route form into a planned response stream has no summary note, and the graph has the note after Add`() {
+        rig.add(StreamForm("device-commands", withResponse = true))
+        assertEquals(emptyList(), rig.state.graph.notes)
+        vm.openWizard()
+        vm.chooseKind("MQTT route")
+        vm.updateForm(MqttRouteForm("devices/+/answer", "device-commands-dln", MqttDestinationKind.Stream))
+        vm.next()
+        assertNull(summary().note, "the sentence belongs to the pair's tick, not to a route form")
+        vm.addToPlan()
+        assertEquals(listOf(PlanGraphNote("q:device-commands", "e:amq.topic", PlannerTexts.SERVICE_NOT_PLANNED)), rig.state.graph.notes)
+    }
 }

@@ -265,10 +265,11 @@ class StreamFormMqttTicksUiTest {
         node("planWizard:next").performClick()
         val summary = textOf("planWizard:summary")
         assertTrue(summary.contains("This adds 3 steps"), summary)
-        // The words of the route in the summary (the kind word "stream" is not pinned here: the list below says it, see the report)
-        assertTrue(summary.contains("MQTT route devices/+/answer to") && summary.contains("device-commands-dln"), summary)
+        assertTrue(summary.contains("MQTT route devices/+/answer to stream device-commands-dln"), summary)
         assertEquals("Your own service turns a request into an MQTT message; the planner does not plan that.", textOf("planWizard:summaryNote"))
         node("planWizard:summaryNote").assertIsDisplayed()
+        assertEquals(1, countTagged("planWizard:summaryNote"), "the sentence is drawn once")
+        assertEquals(1, Regex("Your own service turns").findAll(textOf("planWizard")).count(), "the sentence appears once in the whole dialog")
         r.close()
     }
 

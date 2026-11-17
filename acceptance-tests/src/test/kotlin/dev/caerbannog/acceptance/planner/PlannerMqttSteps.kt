@@ -143,7 +143,7 @@ class PlannerMqttSteps {
 
     @Then("the planner lists {string}")
     fun plannerListsOne(title: String) {
-        // Among the steps (M9-07b: a pair and its route are three steps); with one step in the plan this is the same as "exactly this step".
+        // Means "among the steps" (M9-07b: a pair and its route are three steps). For the M9-10 scenarios it is the same assertion as before, because their plan has one step.
         val row = d.titles().indexOf(title)
         assertTrue(row >= 0, "the planner's steps are ${d.titles()}, expected \"$title\" among them")
         assertShownOnScreen(title, row)
