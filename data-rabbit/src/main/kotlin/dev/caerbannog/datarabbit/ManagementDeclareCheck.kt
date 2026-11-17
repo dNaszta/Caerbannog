@@ -50,6 +50,8 @@ class ManagementDeclareCheck internal constructor(private val reader: ResourceRe
                 HonouredArgumentRule.extraOnBroker(action, body) == null &&
                 HonouredArgumentRule.otherNumberKind(action, body) == null
             ) BrokerFinding.Same else BrokerFinding.Different
+        // A stream is judged by the matcher alone (type and the declared settings), exactly as the executor's pre-read judges it: apply and check
+        // agree. Rules 3 and 4 are not applied: the executor never relies on a repeated create for a stream.
         is MigrationAction.DeclareStream,
         is MigrationAction.DeclarePolicy, is MigrationAction.DeclareOperatorPolicy ->
             if (DeclaredResourceMatcher.matches(action, body)) BrokerFinding.Same else BrokerFinding.Different

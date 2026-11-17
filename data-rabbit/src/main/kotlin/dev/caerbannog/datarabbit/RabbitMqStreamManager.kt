@@ -5,6 +5,7 @@ import com.rabbitmq.stream.StreamDoesNotExistException
 import com.rabbitmq.stream.StreamException
 import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
+import dev.caerbannog.core.streams.StreamSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -15,10 +16,13 @@ class RabbitMqStreamManager internal constructor(
     private val environments: StreamEnvironments,
 ) : StreamManager {
 
-    override suspend fun createStream(vhost: String, name: String): StreamManagementResult = withContext(Dispatchers.IO) {
+    override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult = withContext(Dispatchers.IO) {
         try {
             val env = environments.environmentFor(vhost)
-            env.streamCreator().stream(name).create()
+            val creator = env.streamCreator().stream(name)
+            // The raw route keeps a text such as "7D" as written; the typed `maxAge(Duration)` would make it seconds (S-14c-1).
+            settings.protocolArguments().forEach { (argument, value) -> creator.argument(argument, value) }
+            creator.create()
             StreamManagementResult.Success
         } catch (e: Exception) {
             val msg = e.message ?: e.javaClass.simpleName
