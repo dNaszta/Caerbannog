@@ -112,14 +112,14 @@ Feature: Model Context Protocol (MCP) server
 
   # M9-08d, owner decision 2026-11-17 (option b): the retention text carries the byte limit as in the list, and an additive
   # number field maxLengthBytes (null when none) carries the exact value. Read-only GETs as before.
-  @m9-08d
+  @m9-08d @needs-M9-08d
   Scenario: MCP server shows the maximum size of a stream as text and as a number
     Given the stream "telemetry" on vhost "/" has no retention of its own and a policy that sets "max-length-bytes" to 1000000
     When the client calls MCP tool "caerbannog_list_streams" with profile "dev-local" and vhost "/"
     Then the tool result includes stream "telemetry" with retention "1 MB"
     And the tool result includes stream "telemetry" with maxLengthBytes 1000000
 
-  @m9-08d
+  @m9-08d @needs-M9-08d
   Scenario: MCP server gives a null maxLengthBytes for a stream without a size limit
     Given the stream "telemetry" on vhost "/" has no retention of its own and a policy that sets "max-age" to "7D"
     When the client calls MCP tool "caerbannog_get_stream_details" with profile "dev-local" and stream "telemetry"

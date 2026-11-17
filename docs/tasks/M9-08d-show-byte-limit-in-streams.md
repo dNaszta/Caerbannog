@@ -19,7 +19,7 @@ In:
 - Stream detail (UI): the retention line shows the same text; the exact byte count goes where the existing detail layout already shows exact values (tooltip or detail row).
 - `mcp-server` `McpServer.kt`: the list tool (about line 577) and `caerbannog_get_stream_details` (about line 622) set `retention` to the same text (`"none"` when neither limit is set, as today) and add `maxLengthBytes` (JSON number, `null` when none). Additive: no existing field changes name or type. Note that `retention` there is today the raw `maxAge` text; with an age only it becomes the compact display form (`604800s` becomes `7D`), the same text as the list. Say so in the commit message.
 - `docs/ux/Streams.dc.html`: the Retention note (line 178) says the cell may read `7D`, `1 MB` or `7D, 1 MB`; add one example row with both; header unchanged.
-- Scenarios (already written, tag `@m9-08d`): `03_stream_list.feature` (three) and `14_mcp_server.feature` (two). The two `@m9-08b` scenarios that assert the summary stay.
+- Scenarios (already written, tags `@m9-08d @needs-M9-08d`; the `needs` tag keeps them out of the default run until the steps exist, 2026-11-18; the step 2 test developer REMOVES `@needs-M9-08d` from the five scenarios and `and not @needs-M9-08d` from `RunStreamListAcceptanceTest` and `RunMcpAcceptanceTest` in the same commit as the step definitions, and deletes its row in `tests/bdd/README.md`): `03_stream_list.feature` (three) and `14_mcp_server.feature` (two). The two `@m9-08b` scenarios that assert the summary stay.
 
 Out: segment size, the policy's name, a "set by policy" marker (decided against, 2026-11-16), any write path, any change to how the byte limit is read.
 
