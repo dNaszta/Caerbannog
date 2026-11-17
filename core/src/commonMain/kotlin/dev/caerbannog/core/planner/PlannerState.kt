@@ -46,6 +46,10 @@ sealed interface WizardState {
         val asksHeaders: Boolean = false,
         /** The response name a stream form suggests in the plan's naming style; empty for the other forms. The screen has no naming style of its own. */
         val suggestedResponseName: String = "",
+        /** The queues a dead-lettering form can pick, this plan first, no stream (empty for the other forms). */
+        val queueSuggestions: List<Suggestion> = emptyList(),
+        /** Notes the form gets from a read of the broker (the policy that already applies to the queue); empty for the other forms and while nothing is known. */
+        val formNotes: List<String> = emptyList(),
     ) : WizardState {
         /** A hint never disables Next (O11); a problem does. */
         val nextEnabled: Boolean get() = problems.isEmpty()
@@ -56,7 +60,7 @@ sealed interface WizardState {
         val form: StepForm,
         val actions: List<dev.caerbannog.core.migrations.MigrationAction>,
         val editingStepId: Int?,
-        /** One sentence under the list, or null; neutral on purpose so a later step (M9-09) can use the same place. */
+        /** One sentence under the list, or null; neutral on purpose so every kind can use the same place. */
         val note: String? = null,
     ) : WizardState
 }

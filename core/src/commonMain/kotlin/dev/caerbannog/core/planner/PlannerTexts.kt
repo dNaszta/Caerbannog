@@ -12,8 +12,8 @@ object PlannerTexts {
         "Queue", "Exchange", "Binding", "Stream", "Policy", "Dead-lettering for a queue", "MQTT route",
     )
 
-    /** The kinds that have a form today, in wizard order. The others of [WIZARD_KINDS] are drawn when the task that builds their form lands. */
-    val BUILT_KINDS: List<String> = listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "MQTT route")
+    /** The kinds that have a form today, in wizard order; every kind of [WIZARD_KINDS] has one since M9-09. */
+    val BUILT_KINDS: List<String> = WIZARD_KINDS
 
     fun mqttRefusal(reason: MqttFilterRefusal): String = when (reason) {
         MqttFilterRefusal.Empty -> "Enter a topic filter"
@@ -45,6 +45,7 @@ object PlannerTexts {
         "Binding" -> "From an exchange to a queue or an exchange"
         "Stream" -> "Optionally with its response stream (DLN)"
         "Policy" -> "Limits and other settings by name pattern"
+        "Dead-lettering for a queue" -> DEAD_LETTER_KIND_DESCRIPTION
         "MQTT route" -> "A topic filter to a queue or stream, saved as a binding on amq.topic"
         else -> ""
     }
@@ -326,6 +327,45 @@ object PlannerTexts {
         "The broker applies ${policyWords(policy)} to ${named(queue, "a queue")} at the same priority. Only one of the two will apply, and RabbitMQ does not say which."
 
     private fun policyWords(policy: String): String = if (echoableName(policy)) "the policy $policy" else "a policy"
+
+    /** The dead-lettering recipe (M9-09). Decided wording: spec O19; labels and safety nets: the brief "Texts". No number of minutes, ever. */
+    const val DEAD_LETTER_KIND_DESCRIPTION: String = "Exchange, dead-letter queue, binding and policy"
+    const val DEAD_LETTER_TARGET_QUEUE: String = "A dead-letter queue"
+    const val DEAD_LETTER_TARGET_STREAM: String = "A stream"
+    const val DEAD_LETTER_AT_MOST_ONCE: String = "At most once"
+    const val DEAD_LETTER_AT_LEAST_ONCE: String = "At least once"
+    const val DEAD_LETTER_DEFAULT_PILL: String = "default"
+    const val DEAD_LETTER_DEFAULT_NOTE: String = "If the dead-letter target cannot take a message, RabbitMQ drops it."
+    const val DEAD_LETTER_AT_LEAST_ONCE_NOTE: String =
+        "RabbitMQ keeps a message it cannot pass on and retries. Retries can take minutes, so do not rely on a quick delivery."
+    const val DEAD_LETTER_FULL_QUEUE_NOTE: String =
+        "While the queue is full, publishers are refused. A quorum queue holds one message more than its limit."
+    const val DEAD_LETTER_REFUSED_TICK_LABEL: String = "Publishers are refused when the queue is full"
+    const val DEAD_LETTER_TICK_REQUIRED: String = "Tick \"$DEAD_LETTER_REFUSED_TICK_LABEL\" to use $DEAD_LETTER_AT_LEAST_ONCE"
+    const val DEAD_LETTER_AT_LEAST_ONCE_UNAVAILABLE: String = "At least once is only for a queue known to be a quorum queue."
+    const val DEAD_LETTER_SOURCE_IS_STREAM: String = "Dead-lettering does not work for a stream. Choose a queue."
+    const val DEAD_LETTER_QUEUE_MISSING: String = "Choose or type the queue"
+    const val DEAD_LETTER_EDGE_LABEL: String = "dead letters"
+    const val DEAD_LETTER_SUMMARY_CAUSES: String =
+        "Messages that are rejected, expire, are dropped by the queue's length limit or are returned too often are dead-lettered."
+    const val DEAD_LETTER_QUEUE_LABEL: String = "Queue"
+    const val DEAD_LETTER_TARGET_HEADING: String = "Dead letters go to"
+    const val DEAD_LETTER_EXCHANGE_LABEL: String = "Dead-letter exchange"
+    const val DEAD_LETTER_TARGET_QUEUE_LABEL: String = "Dead-letter queue"
+    const val DEAD_LETTER_TARGET_STREAM_LABEL: String = "Dead-letter stream"
+    const val DEAD_LETTER_STRATEGY_HEADING: String = "How sure"
+
+    fun deadLetterTargetQueueLine(name: String): String = "Quorum queue" + if (echoableName(name)) " $name" else ""
+
+    fun deadLetterTargetStreamLine(name: String): String =
+        "Stream" + (if (echoableName(name)) " $name" else "") + ": dead letters are kept and can be browsed."
+
+    /** Each name is judged alone by the echo rule; a refused one is left out of its own place and the sentence stays whole. */
+    fun deadLetterOwnArgument(queue: String, exchange: String): String =
+        "The queue ${if (echoableName(queue)) "$queue " else ""}names its own dead-letter exchange${if (echoableName(exchange)) " $exchange" else ""}. " +
+            "RabbitMQ uses that one and ignores this policy's exchange."
+
+    fun deadLetterQueueUntouched(queue: String): String = "The queue ${if (echoableName(queue)) "$queue " else ""}itself is not changed."
 
     /** The retention block of the stream form. */
     const val KEEP_FOR_LABEL: String = "Keep messages for"
