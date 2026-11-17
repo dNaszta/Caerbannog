@@ -376,6 +376,8 @@ internal fun FormField(
     placeholder: String? = null,
     hintTag: String = "planForm:hint:$field",
     modifier: Modifier = Modifier,
+    /** The test tag of the text field; the error and hint tags stay `planForm:error:<field>` and [hintTag]. */
+    tag: String = "planForm:$field",
     onChange: (String) -> Unit,
 ) {
     val error = details.problem(field)
@@ -392,7 +394,7 @@ internal fun FormField(
                 placeholder = placeholder?.let { { Text(it) } },
                 singleLine = true,
                 isError = error != null,
-                modifier = Modifier.weight(1f).focusRequester(focus).onEnter(onNext).testTag("planForm:$field"),
+                modifier = Modifier.weight(1f).focusRequester(focus).onEnter(onNext).testTag(tag),
             )
             if (suggestions != null) SuggestionsMenu(field, suggestions, onPick = onChange)
         }
@@ -447,7 +449,7 @@ private fun SuggestionsMenu(field: String, suggestions: List<Suggestion>, onPick
 
 /** A choice of one value as radios, each tagged `<tagPrefix><value>`. [note] is the second line of an option, when it has one. */
 @Composable
-private fun ChoiceGroup(
+internal fun ChoiceGroup(
     tagPrefix: String,
     options: List<Pair<String, String>>,
     selected: String,

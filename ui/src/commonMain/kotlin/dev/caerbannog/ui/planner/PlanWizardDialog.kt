@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.caerbannog.core.planner.BindingForm
+import dev.caerbannog.core.planner.DeadLetterForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.planner.MqttRouteForm
@@ -250,6 +251,7 @@ private fun kindIcon(kind: String): AppIcon = when (kind) {
     "Exchange" -> AppIcon.SwapHoriz
     "Stream" -> AppIcon.Stream
     "Policy" -> AppIcon.Rule
+    PlannerTexts.DEAD_LETTER_KIND -> AppIcon.Inbox
     else -> AppIcon.Link
 }
 
@@ -263,6 +265,7 @@ private fun DetailsPage(details: WizardState.Details, events: PlannerEvents, onN
         is BindingForm -> BindingFormView(form, details, events, onNext)
         is StreamForm -> StreamFormView(form, details, events, onNext)
         is PolicyForm -> PolicyFormView(form, details, events, onNext)
+        is DeadLetterForm -> DeadLetterFormView(form, details, events, onNext)
         is MqttRouteForm -> MqttRouteFormView(form, details, events, onNext)
     }
 }

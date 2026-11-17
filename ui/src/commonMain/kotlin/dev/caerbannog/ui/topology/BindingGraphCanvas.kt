@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import dev.caerbannog.core.planner.PlanGraph
+import dev.caerbannog.core.planner.PlanLinkKind
 import dev.caerbannog.core.planner.PlanMark
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.topology.BindingGraph
@@ -151,7 +152,7 @@ internal fun BindingGraphCanvas(
             // Notes sit over the edge lines but under the links, labels and nodes.
             notes.forEachIndexed { index, note -> noteRects[index]?.let { PlanGraphNoteBox(index, note.text, it) } }
 
-            // Response stream links: dotted, no arrow, never a routing line
+            // Links: dotted for a response stream, dashed for dead letters; no arrow, never a routing line
             val linkColor = MaterialTheme.colorScheme.outline
             Canvas(Modifier.fillMaxSize()) {
                 val width = 1.5.dp.toPx()
@@ -162,7 +163,13 @@ internal fun BindingGraphCanvas(
                     drawPath(
                         path,
                         color = linkColor,
-                        style = Stroke(width = width, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, width * 2.5f))),
+                        style = Stroke(
+                            width = width,
+                            cap = StrokeCap.Round,
+                            pathEffect = PathEffect.dashPathEffect(
+                                if (link.kind == PlanLinkKind.DeadLetter) floatArrayOf(width * 4f, width * 3f) else floatArrayOf(0.1f, width * 2.5f),
+                            ),
+                        ),
                     )
                 }
             }
@@ -180,7 +187,7 @@ internal fun BindingGraphCanvas(
                         .testTag("planGraphLink:${link.sourceId}:${link.targetId}"),
                 ) {
                     Text(
-                        PlannerTexts.RESPONSE_LINK_LABEL,
+                        if (link.kind == PlanLinkKind.DeadLetter) PlannerTexts.DEAD_LETTER_EDGE_LABEL else PlannerTexts.RESPONSE_LINK_LABEL,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -260,8 +267,8 @@ internal fun BindingGraphCanvas(
     }
 }
 
-/** A response stream link ready to draw: the polyline, and where its label starts (left edge) and sits (vertical middle). */
-private class LinkShape(val sourceId: String, val targetId: String, val points: List<Pair<Float, Float>>, val labelX: Float, val labelY: Float)
+/** A link ready to draw: the polyline, and where its label starts (left edge) and sits (vertical middle). */
+private class LinkShape(val sourceId: String, val targetId: String, val kind: PlanLinkKind, val points: List<Pair<Float, Float>>, val labelX: Float, val labelY: Float)
 
 /** Below the key pill (18 dp tall) and the "new" pill under it. */
 private const val MQTT_LABEL_OFFSET = 34f
@@ -280,7 +287,7 @@ private fun responseLinkShapes(plan: PlanGraph, nodes: List<PositionedNode>): Li
     if (from.x == to.x) {
         val right = from.x + NODE_WIDTH
         LinkShape(
-            link.sourceId, link.targetId,
+            link.sourceId, link.targetId, link.kind,
             listOf(right to fromY, right + LINK_BRACKET to fromY, right + LINK_BRACKET to toY, right to toY),
             labelX = right + LINK_BRACKET + 4f,
             labelY = (fromY + toY) / 2f,
@@ -291,7 +298,7 @@ private fun responseLinkShapes(plan: PlanGraph, nodes: List<PositionedNode>): Li
         val startY = left.y + NODE_HEIGHT / 2f
         val endY = right.y + NODE_HEIGHT / 2f
         LinkShape(
-            link.sourceId, link.targetId,
+            link.sourceId, link.targetId, link.kind,
             listOf(startX to startY, right.x to endY),
             labelX = (startX + right.x) / 2f - LINK_LABEL_WIDTH / 2f,
             labelY = (startY + endY) / 2f,
