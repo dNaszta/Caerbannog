@@ -14,6 +14,7 @@ CLAUDE.md safety rule: topology changes and publishing respect the profile's dec
 In:
 - The three MQTT entry points show their "Publish MQTT message" control disabled with `noWritePermission(vhost)` as the reason when the finished permission check says publishing is not enabled; an unfinished check counts as no permission (same expression as `canWrite` in `Main.kt` and `MigrationsInputs.publishingEnabled`). One pure rule in `core` shared with `MqttTestMessage.offer` (the MQTT-port, then permission order), so the surfaces cannot disagree.
 - Check the AMQP `PublishDialog` at 1280x800 and 1000x600 with the largest realistic content (headers, banner). If Publish or Cancel is outside the window, give it the same fix as `PublishMqttDialog` (pinned footer, visible scrollbar on overflow). If not, record "checked, fine" in the Status and add a layout test that pins it.
+- The Publish MQTT dialog footer (notice, confirmation, error, buttons) is not height-bounded: give the error banner a maximum height with its own scrollbar so the body always keeps a minimum (found at M9-10b final review; today a 400-character error keeps the body at 120 dp or more, pinned by `PublishMqttDialogLayoutUiTest`). One layout test with a 2000-character error.
 Out: any change of wording (the write text is reused); changing the topology control level logic; any new request kind.
 
 ## Acceptance
