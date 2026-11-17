@@ -57,7 +57,7 @@ class MqttTopicSampleTest {
 
     @Test
     fun `the start values give the same topic as the route form`() {
-        val filters = listOf("devices/+/answer", "sensors/#", "a/+/b/+", "+", "#", "x y/+", "+/+/#", "devices/d1/status")
+        val filters = listOf("devices/+/answer", "sensors/#", "a/+/b/+", "+", "#", "x y/+", " a/+", "+/+/#", "devices/d1/status")
         for (filter in filters) {
             val expected = assertNotNull(MqttRouteForm(filter, "d").matchingTopic(), "the route form refuses \"$filter\"")
             val starts = MqttTopicSample.slots(filter).map { MqttTopicSample.startValue(it) }
@@ -141,5 +141,43 @@ class MqttTopicSampleTest {
         val long = "x".repeat(10_000)
         assertEquals("devices/$long/answer", topic("devices/+/answer", long))
         assertEquals("sensors/$long", topic("sensors/#", long))
+    }
+
+    // ---- round 1: control characters by Char.isISOControl, the order of the checks, the wrong count ----
+
+    @Test
+    fun `DEL and the C1 range are control characters, a no-break space and a non-ASCII letter are not`() {
+        for (c in listOf('\u007f', '\u0080', '\u009f')) {
+            assertEquals("No control characters in a value", onlyText("devices/+/answer", "d${c}42"), "plus, code ${c.code}")
+            assertEquals("No control characters in a value", onlyText("sensors/#", "a${c}b"), "hash, code ${c.code}")
+        }
+        assertEquals("devices/d\u00a042/answer", topic("devices/+/answer", "d\u00a042"))
+        assertEquals("sensors/caf\u00e9", topic("sensors/#", "caf\u00e9"))
+    }
+
+    @Test
+    fun `a slot with several problems reports only the first, in the order blank, control, slash, plus or hash, dot`() {
+        assertEquals("One level only: no /", onlyText("devices/+/answer", "d/4.2"))
+        assertEquals("One level only: no /", onlyText("devices/+/answer", "d+/"))
+        assertEquals("Enter a value", onlyText("devices/+/answer", "  "))
+        assertEquals("No control characters in a value", onlyText("devices/+/answer", "a\u0000.b"))
+        assertEquals("No control characters in a value", onlyText("devices/+/answer", "a\u0000/b"))
+        assertEquals("No + or # in a value", onlyText("devices/+/answer", "a+.b"))
+        assertEquals(1, problems("devices/+/answer", "d/4.2+\u0000").size)
+        // a hash value: blank, control, then + or #; slash and dot are fine
+        assertEquals("No control characters in a value", onlyText("sensors/#", "a/+\u0000"))
+        assertEquals("No + or # in a value", onlyText("sensors/#", "a.b/+"))
+    }
+
+    @Test
+    fun `the wrong number of values is one problem with the smaller count as field and never throws`() {
+        val few = problems("a/+/b/+", "x")
+        assertEquals(listOf(SampleProblem(1, "Expected 2 values, got 1")), few)
+        val none = problems("devices/+/answer")
+        assertEquals(listOf(SampleProblem(0, "Expected 1 values, got 0")), none)
+        val many = problems("devices/+/answer", "x", "y", "z")
+        assertEquals(listOf(SampleProblem(1, "Expected 1 values, got 3")), many)
+        val plain = problems("devices/d1/status", "x")
+        assertEquals(listOf(SampleProblem(0, "Expected 0 values, got 1")), plain)
     }
 }

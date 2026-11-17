@@ -39,4 +39,20 @@ class CorrelationIdHeaderTest {
         val plain = MqttRoute("devices/d1/status", "devices.d1.status", "telemetry")
         assertEquals("devices/d1/status", MqttTestMessage.opening(plain, MqttDestinationKind.Stream, emptyList(), ids).topic)
     }
+
+    @Test
+    fun `a refused value or a wrong count does not throw, the topic is the filter unchanged and header and notice stay`() {
+        for (values in listOf(listOf("d/42"), listOf(""), emptyList(), listOf("a", "b"))) {
+            val opening = MqttTestMessage.opening(route, MqttDestinationKind.Stream, values, ids)
+            assertEquals("devices/+/answer", opening.topic, "values $values")
+            assertEquals("correlation-id", opening.headers.single().key, "values $values")
+            assertEquals(MqttDestinationKind.Stream, kindOfNotice(opening), "values $values")
+        }
+    }
+
+    private fun kindOfNotice(opening: TestMessageOpening): MqttDestinationKind? = when {
+        opening.notice?.text?.startsWith("In the stream message") == true -> MqttDestinationKind.Stream
+        opening.notice?.text?.startsWith("In the queue message") == true -> MqttDestinationKind.Queue
+        else -> null
+    }
 }
