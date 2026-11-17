@@ -97,4 +97,18 @@ class PlanPreviewMqttTest {
         assertEquals(PlanMark.Existing, g.markOf("e:amq.topic"))
         assertEquals(PlanMark.Existing, g.markOf("e:events"), "pending with no read: no verdict means the default mark")
     }
+
+    // ---- step 4 round 2, finding F5: the type the node states for a built-in exchange ----
+
+    @Test
+    fun `a built-in exchange the plan does not declare states its own type, also when the broker was not read`() {
+        val expected = mapOf("amq.topic" to "topic", "amq.direct" to "direct", "amq.fanout" to "fanout", "amq.headers" to "headers")
+        for ((name, type) in expected) {
+            val plan = planOf(MigrationAction.DeclareQueue("q"), MigrationAction.DeclareBinding(name, "q", "k"))
+            for (known in listOf(null, KnownTopology.None)) {
+                val node = planPreview(plan, known).graph.nodes.first { it.node.id == "e:$name" }.node
+                assertEquals("exchange, $type", node.detail, "$name with known = $known")
+            }
+        }
+    }
 }

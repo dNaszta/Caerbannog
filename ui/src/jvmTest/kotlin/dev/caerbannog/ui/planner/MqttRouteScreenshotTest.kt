@@ -40,6 +40,9 @@ class MqttRouteScreenshotTest {
     @Test fun `02 two routes`() = graph("02-two", 2, false)
     @Test fun `03 five routes`() = graph("03-five", 5, false)
     @Test fun `04 five routes into a pair`() = graph("04-pair", 5, true)
+    @Test fun `10 ten routes`() = graph("10-ten", 10, false)
+    @Test fun `11 twenty routes`() = graph("11-twenty", 20, false)
+    @Test fun `12 twenty routes at 1024 x 768`() = graph("12-twenty-1024", 20, false, 1024)
     @Test fun `05 two routes at 1024`() = graph("05-two-1024", 2, false, 1024)
 
     @Test fun `00 baseline two plain bindings`() = runDesktopComposeUiTest(1280, 900) {
