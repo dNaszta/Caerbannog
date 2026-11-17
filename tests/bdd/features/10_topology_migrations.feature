@@ -382,7 +382,8 @@ Feature: Topology migrations
 
   # The four keys are the retention keys and the leader locator measured by M9-00b/M9-00c/M9-14 (x-max-age is TEXT, the other two retention keys
   # are numbers). The reasons are the architect's proposal in the style of the existing parser reasons, the developer may word them better;
-  # the accepted leader locator values ("balanced", "client-local") are fixed by the live rows of step 0 of M9-14c, not guessed.
+  # the accepted leader locator values (balanced, client-local, random, least-leaders) and the value rules are fixed by the live rows of M9-14c
+  # (step 2a, 2026-11-17) and the table "StreamSettingRules" in the brief; the byte-key and locator reasons were changed by step 2a.
   @m9-14c @needs-M9-14c @negative
   Scenario Outline: A stream setting that the app cannot carry is refused when the file is read
     Given a migration file declares the stream "audit" with the setting "<key>" as <value>
@@ -394,8 +395,11 @@ Feature: Topology migrations
       | x-dead-letter-exchange    | the text "x"  | stream setting "x-dead-letter-exchange" is not supported |
       | x-queue-type              | the text "stream" | stream setting "x-queue-type" is not supported       |
       | x-max-age                 | the number 7  | stream setting "x-max-age" must be text such as 7D      |
-      | x-max-length-bytes        | the text "1gb" | stream setting "x-max-length-bytes" must be a whole number |
-      | x-queue-leader-locator    | the text "nearest" | stream setting "x-queue-leader-locator" must be balanced or client-local |
+      | x-max-age                 | the text "7d" | stream setting "x-max-age" must be text such as 7D      |
+      | x-max-length-bytes        | the text "1gb" | stream setting "x-max-length-bytes" must be a whole number above 0 |
+      | x-max-length-bytes        | the number 0  | stream setting "x-max-length-bytes" must be a whole number above 0 |
+      | x-stream-max-segment-size-bytes | the number -1 | stream setting "x-stream-max-segment-size-bytes" must be a whole number above 0 |
+      | x-queue-leader-locator    | the text "nearest" | stream setting "x-queue-leader-locator" must be balanced, client-local, random or least-leaders |
 
   @m9-14c @needs-M9-14c @negative
   Scenario: A stream that exists with other retention is a conflict, never changed
