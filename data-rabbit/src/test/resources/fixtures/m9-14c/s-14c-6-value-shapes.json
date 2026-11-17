@@ -1,0 +1,254 @@
+{
+    "R max-age '7D'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '7d'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "7d",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '1Y'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "1Y",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '10m'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "10m",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '0s'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "0s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '7W'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "7W",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age 'P7D'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "P7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '604800s'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "604800s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '1h'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "1h",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age '7'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "7",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age ''": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-age PT168H": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "604800s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-age PT1S": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "1s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-age PT0S": {
+        "outcome": "refused IllegalArgumentException"
+    },
+    "T x-max-age PT1.5S": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "1s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes '0'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 0,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes '1'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 1,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes '9223372036854775807'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 9223372036854775807,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes '-1'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": -1,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes '1.5'": {
+        "outcome": "refused StreamException code=-1"
+    },
+    "R max-length-bytes '1GB'": {
+        "outcome": "refused StreamException code=-1"
+    },
+    "R max-length-bytes 'abc'": {
+        "outcome": "refused StreamException code=-1"
+    },
+    "T x-max-length-bytes 0": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 0,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-length-bytes 1": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 1,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-length-bytes 9223372036854775807": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 9223372036854775807,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-length-bytes -1": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": -1,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R stream-max-segment-size-bytes '0'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 0
+        }
+    },
+    "R stream-max-segment-size-bytes '1'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 1
+        }
+    },
+    "R stream-max-segment-size-bytes '3000000000'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 3000000000
+        }
+    },
+    "R stream-max-segment-size-bytes '4000000000'": {
+        "outcome": "refused StreamException code=17"
+    },
+    "R stream-max-segment-size-bytes '-1'": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": -1
+        }
+    },
+    "R stream-max-segment-size-bytes '1.5'": {
+        "outcome": "refused StreamException code=-1"
+    },
+    "T x-stream-max-segment-size-bytes 0": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-stream-max-segment-size-bytes 1": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 1
+        }
+    },
+    "T x-stream-max-segment-size-bytes 3000000000": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 3000000000
+        }
+    },
+    "T x-stream-max-segment-size-bytes 4000000000": {
+        "outcome": "refused IllegalArgumentException"
+    }
+}

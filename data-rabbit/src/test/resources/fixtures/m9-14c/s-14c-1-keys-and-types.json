@@ -1,0 +1,142 @@
+{
+    "T x-max-age 7 days": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "604800s",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-max-length-bytes 1GB": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 1000000000,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-stream-max-segment-size-bytes 100MB": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 100000000
+        }
+    },
+    "T x-queue-leader-locator client-local": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "client-local",
+            "x-queue-type": "stream"
+        }
+    },
+    "T x-queue-leader-locator balanced": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-age 7D": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R max-length-bytes 1000000000": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-max-length-bytes": 1000000000,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R stream-max-segment-size-bytes 100000000": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream",
+            "x-stream-max-segment-size-bytes": 100000000
+        }
+    },
+    "R queue-leader-locator client-local": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "client-local",
+            "x-queue-type": "stream"
+        }
+    },
+    "R dead-letter-exchange dlx": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R initial-cluster-size 1": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-initial-cluster-size": 1,
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-type stream": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R queue-type quorum": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R foo bar": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R x-max-age 7D (x- name)": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R x-max-length-bytes 1000000000 (x- name)": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R x-stream-max-segment-size-bytes 100000000 (x- name)": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R x-queue-leader-locator client-local (x- name)": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "R x-foo bar (x- name)": {
+        "outcome": "accepted",
+        "arguments": {
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    }
+}

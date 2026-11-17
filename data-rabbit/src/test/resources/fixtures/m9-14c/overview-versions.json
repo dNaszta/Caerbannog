@@ -1,0 +1,5 @@
+{
+    "rabbitmq_version": "4.4.0",
+    "erlang_version": "29.1.2",
+    "management_version": "4.4.0"
+}

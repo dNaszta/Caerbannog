@@ -1,0 +1,96 @@
+{
+    "repeat a same settings": {
+        "outcome": "accepted",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat b max-age 1D": {
+        "outcome": "refused StreamException code=17",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat c no settings": {
+        "outcome": "refused StreamException code=17",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat d only max-age 7D": {
+        "outcome": "accepted",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat e locator client-local": {
+        "outcome": "refused StreamException code=17",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat f superset with max-length-bytes": {
+        "outcome": "refused StreamException code=17",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "repeat g typed route T same retention": {
+        "outcome": "accepted",
+        "before": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        },
+        "after": {
+            "x-max-age": "7D",
+            "x-queue-leader-locator": "balanced",
+            "x-queue-type": "stream"
+        }
+    },
+    "create over an existing quorum queue": {
+        "outcome": "refused StreamException code=17"
+    }
+}
