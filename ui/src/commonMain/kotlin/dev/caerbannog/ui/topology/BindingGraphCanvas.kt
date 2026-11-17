@@ -162,6 +162,35 @@ internal fun BindingGraphCanvas(
                 }
             }
 
+            // An MQTT route says so under its key pill: the topic filter as the user typed it, and the words that name the kind.
+            if (plan != null) {
+                edges.filter { it.edge.id in plan.mqttRouteEdgeIds }.forEach { edge ->
+                    Column(
+                        Modifier
+                            .offset(x = edge.labelX.dp, y = (edge.labelY + MQTT_LABEL_OFFSET).dp)
+                            .layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints)
+                                layout(placeable.width, placeable.height) { placeable.place(-placeable.width / 2, 0) }
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            plan.edgeLabels[edge.edge.id].orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            modifier = Modifier.testTag("planGraphEdgeLabel:${edge.edge.id}"),
+                        )
+                        Text(
+                            PlannerTexts.MQTT_ROUTE_LABEL,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("planGraphEdgeTag:${edge.edge.id}"),
+                        )
+                    }
+                }
+            }
+
             // Routing key pills
             edges.forEach { edge ->
                 if (edge.edge.routingKey.isNotEmpty()) {
@@ -245,6 +274,8 @@ internal fun BindingGraphCanvas(
 /** A response stream link ready to draw: the polyline, and where its label starts (left edge) and sits (vertical middle). */
 private class LinkShape(val sourceId: String, val targetId: String, val points: List<Pair<Float, Float>>, val labelX: Float, val labelY: Float)
 
+/** Below the key pill (18 dp tall) and the "new" pill under it. */
+private const val MQTT_LABEL_OFFSET = 34f
 private const val LINK_LABEL_WIDTH = 96f
 private const val LINK_BRACKET = 14f
 

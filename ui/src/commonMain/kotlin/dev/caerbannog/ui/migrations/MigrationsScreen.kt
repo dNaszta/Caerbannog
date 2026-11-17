@@ -60,6 +60,7 @@ import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
+import dev.caerbannog.core.planner.MqttRoutes
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.ui.appframe.AppDestination
@@ -524,7 +525,7 @@ private fun MigrationDetailPanel(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val failedIndex = MigrationsWording.failedActionIndex(state.applyOutcome, file.version)
                     dryRun.actions.forEachIndexed { index, actionDryRun ->
-                        DryRunActionRow(actionDryRun, index, failed = index == failedIndex)
+                        DryRunActionRow(actionDryRun, index, failed = index == failedIndex, siblings = dryRun.actions.map { it.action })
                     }
                 }
             }
@@ -614,7 +615,10 @@ private fun DryRunActionRow(
     actionDryRun: ActionDryRun,
     index: Int,
     failed: Boolean = false,
+    siblings: List<MigrationAction> = emptyList(),
 ) {
+    // The kind of a route's destination comes from the migration's own actions only: the file may be applied to another broker later.
+    val words = MqttRoutes.words(actionDryRun.action, siblings)
     val isAllowed = actionDryRun.allowed
     val (icon, iconTint, pillText, pillBg, pillColor) = if (isAllowed) {
         Quintup(AppIcon.CheckCircle, Color(0xFF2E7D32), "Allowed", Color(0xFFE8F5E9), Color(0xFF2E7D32))
@@ -635,10 +639,10 @@ private fun DryRunActionRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = actionDryRun.action.description,
+                text = words?.title ?: actionDryRun.action.description,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            actionDryRun.action.detail?.let { detail ->
+            (words?.detail ?: actionDryRun.action.detail)?.let { detail ->
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
