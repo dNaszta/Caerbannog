@@ -153,7 +153,7 @@ class PlannerViewModel(
             "Binding" -> BindingForm(exchange = "", destination = "")
             "Stream" -> StreamForm(name = "")
             "Policy" -> PolicyForm(name = "", pattern = "")
-            "Dead-lettering for a queue" -> DeadLetterForm(queue = "")
+            PlannerTexts.DEAD_LETTER_KIND -> DeadLetterForm(queue = "")
             "MQTT route" -> MqttRouteForm(filter = "", destination = "")
             else -> return@act
         }
@@ -732,6 +732,9 @@ class PlannerViewModel(
             asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
             asksHeaders = binding?.let { it.headers.isNotEmpty() || ctx.exchangeType(it.exchange) == "headers" } ?: false,
             suggestedResponseName = (form as? StreamForm)?.suggestedResponseName(ctx).orEmpty(),
+            suggestedExchangeName = (form as? DeadLetterForm)?.suggestedExchangeName(ctx).orEmpty(),
+            suggestedTargetName = (form as? DeadLetterForm)?.suggestedTargetName(ctx).orEmpty(),
+            offersAtLeastOnce = (form as? DeadLetterForm)?.offersAtLeastOnce(ctx) ?: false,
             queueSuggestions = if (form is DeadLetterForm) ctx.queueSuggestions() else emptyList(),
             formNotes = if (form is DeadLetterForm) formNotes else emptyList(),
         )

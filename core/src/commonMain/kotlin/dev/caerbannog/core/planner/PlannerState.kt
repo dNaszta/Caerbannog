@@ -46,6 +46,10 @@ sealed interface WizardState {
         val asksHeaders: Boolean = false,
         /** The response name a stream form suggests in the plan's naming style; empty for the other forms. The screen has no naming style of its own. */
         val suggestedResponseName: String = "",
+        /** The names a dead-lettering form suggests in the plan's naming style (empty while no queue is chosen), and whether its queue offers At least once; the screen has no context of its own. */
+        val suggestedExchangeName: String = "",
+        val suggestedTargetName: String = "",
+        val offersAtLeastOnce: Boolean = false,
         /** The queues a dead-lettering form can pick, this plan first, no stream (empty for the other forms). */
         val queueSuggestions: List<Suggestion> = emptyList(),
         /** Notes the form gets from a read of the broker (the policy that already applies to the queue); empty for the other forms and while nothing is known. */

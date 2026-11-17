@@ -7,9 +7,12 @@ import dev.caerbannog.core.migrations.echoableName
  * rule ([echoableName]); a name the rule refuses is left out and the sentence stays whole without it.
  */
 object PlannerTexts {
+    /** The name of the dead-lettering kind: the card, the title of its form and the key of `chooseKind`. */
+    const val DEAD_LETTER_KIND: String = "Dead-lettering for a queue"
+
     /** The kinds the wizard offers, in the order of the mockup and the spec. None deletes anything. */
     val WIZARD_KINDS: List<String> = listOf(
-        "Queue", "Exchange", "Binding", "Stream", "Policy", "Dead-lettering for a queue", "MQTT route",
+        "Queue", "Exchange", "Binding", "Stream", "Policy", DEAD_LETTER_KIND, "MQTT route",
     )
 
     /** The kinds that have a form today, in wizard order; every kind of [WIZARD_KINDS] has one since M9-09. */
@@ -45,7 +48,7 @@ object PlannerTexts {
         "Binding" -> "From an exchange to a queue or an exchange"
         "Stream" -> "Optionally with its response stream (DLN)"
         "Policy" -> "Limits and other settings by name pattern"
-        "Dead-lettering for a queue" -> DEAD_LETTER_KIND_DESCRIPTION
+        DEAD_LETTER_KIND -> DEAD_LETTER_KIND_DESCRIPTION
         "MQTT route" -> "A topic filter to a queue or stream, saved as a binding on amq.topic"
         else -> ""
     }
