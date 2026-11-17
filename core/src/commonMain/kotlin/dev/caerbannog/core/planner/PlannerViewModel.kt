@@ -136,6 +136,7 @@ class PlannerViewModel(
             "Exchange" -> ExchangeForm(name = "")
             "Binding" -> BindingForm(exchange = "", destination = "")
             "Stream" -> StreamForm(name = "")
+            "MQTT route" -> MqttRouteForm(filter = "", destination = "")
             else -> return@act
         }
         page = Page.Form(blank, editing = null)
@@ -601,7 +602,11 @@ class PlannerViewModel(
             editingStepId = editing,
             pageMessage = if (binding != null) problems.firstOrNull()?.message else null,
             exchangeSuggestions = if (binding != null) ctx.exchangeSuggestions() else emptyList(),
-            destinationSuggestions = binding?.let { ctx.destinationSuggestions(it.destinationKind) }.orEmpty(),
+            destinationSuggestions = when (form) {
+                is BindingForm -> ctx.destinationSuggestions(form.destinationKind)
+                is MqttRouteForm -> ctx.routeDestinationSuggestions(form.destinationKind)
+                else -> emptyList()
+            },
             asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
             suggestedResponseName = (form as? StreamForm)?.suggestedResponseName(ctx).orEmpty(),
         )

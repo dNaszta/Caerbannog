@@ -42,6 +42,14 @@ data class FormContext(
         BindingDestinationType.EXCHANGE -> exchangeSuggestions()
     }
 
+    /** Destinations for an MQTT route: only streams or only queues when the kind is said, else both (this plan first, then the broker). */
+    fun routeDestinationSuggestions(kind: MqttDestinationKind?): List<Suggestion> {
+        val all = destinationSuggestions(BindingDestinationType.QUEUE)
+        if (kind == null) return all
+        val streams = plan.steps.mapNotNull { (it.action as? MigrationAction.DeclareStream)?.name }.toSet() + known.streams
+        return all.filter { (it.name in streams) == (kind == MqttDestinationKind.Stream) }
+    }
+
     fun exchangeSuggestions(): List<Suggestion> = suggestions(planExchanges().map { it.name }, known.exchanges.keys)
 
     /** The routing key is asked unless the exchange is a fanout or headers exchange whose type is known (the plan's own count as known). */

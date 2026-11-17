@@ -60,6 +60,8 @@ data class PlanGraph(
     val links: List<PlanLink> = emptyList(),
     val edgeLabels: Map<String, String> = emptyMap(),
     val notice: PlanGraphNotice? = null,
+    /** The edges that are MQTT routes (A10); the screen draws [PlannerTexts.MQTT_ROUTE_LABEL] on them and their filter from [edgeLabels]. */
+    val mqttRouteEdgeIds: Set<String> = emptySet(),
     val notes: List<PlanGraphNote> = emptyList(),
 ) {
     fun markOf(nodeId: String): PlanMark = when (nodeId) {
@@ -144,6 +146,7 @@ fun planPreview(
         }
     }
 
+    val routeLabels = mqttRouteLabels(bindings, graph)
     val notice = when {
         graph.isTooLarge -> PlanGraphNotice.TooLarge
         pending && known == null -> null
@@ -157,7 +160,21 @@ fun planPreview(
         notInPlanNodeIds = notInPlan,
         links = responseLinks(plan),
         notice = notice,
+        edgeLabels = routeLabels,
+        mqttRouteEdgeIds = routeLabels.keys,
     )
+}
+
+/**
+ * Edge id to topic filter for every drawn edge that is a recognised MQTT route. An edge is the route's binding: same exchange, destination
+ * and key (a binding the graph draws once even when the plan holds it twice).
+ */
+private fun mqttRouteLabels(bindings: List<MigrationAction.DeclareBinding>, graph: BindingGraph): Map<String, String> {
+    val routes = bindings.mapNotNull { MqttRoutes.routeOf(it) }
+    return graph.edges.map { it.edge }.mapNotNull { edge ->
+        val route = routes.firstOrNull { edge.sourceId == "e:${MqttRoutes.EXCHANGE}" && edge.targetId == "q:${it.destination}" && edge.routingKey == it.key }
+        route?.let { edge.id to it.filter }
+    }.toMap()
 }
 
 /** One link per recognised pair, from the request stream to its response stream; a link is not an edge, so it adds no routing. */
