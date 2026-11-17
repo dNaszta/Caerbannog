@@ -2,6 +2,7 @@ package dev.caerbannog.core.connections.fakes
 
 import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
+import dev.caerbannog.core.streams.StreamSettings
 import dev.caerbannog.core.streams.StreamSummary
 import java.util.Collections
 
@@ -14,6 +15,8 @@ class FakeStreamManager(
 ) : StreamManager {
 
     val createdStreams = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+    /** M9-14c: every create with the semantic settings it was asked for (NONE for a plain create), in order. */
+    val createdWithSettings = Collections.synchronizedList(mutableListOf<Triple<String, String, StreamSettings>>())
     val deletedStreams = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
 
     @Volatile
@@ -32,11 +35,12 @@ class FakeStreamManager(
     @Volatile
     var failDeleteWith: String? = null
 
-    override suspend fun createStream(vhost: String, name: String): StreamManagementResult {
+    override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult {
         failCreateWith?.let { return StreamManagementResult.Failed(it) }
         refuseCreateWith?.let { return StreamManagementResult.Refused(it) }
 
         createdStreams += vhost to name
+        createdWithSettings += Triple(vhost, name, settings)
         catalog?.addStream(
             StreamSummary(
                 name = name,
@@ -66,6 +70,7 @@ class FakeStreamManager(
 
     fun clear() {
         createdStreams.clear()
+        createdWithSettings.clear()
         deletedStreams.clear()
         refuseCreateWith = null
         refuseDeleteWith = null

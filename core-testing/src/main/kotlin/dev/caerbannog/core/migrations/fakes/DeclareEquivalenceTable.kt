@@ -88,6 +88,15 @@ object DeclareEquivalenceTable {
         StreamAnswer("stream.create.new", "Success"),
         StreamAnswer("stream.arguments.after-create", "Arguments", """{"x-queue-leader-locator":"balanced","x-queue-type":"stream"}"""),
         StreamAnswer("stream.create.again", "Success"),
+        // M9-14c (S-14c-1, -3, -5; RabbitMQ 4.4.0; settings sent by the raw route under the protocol names): the settings are shown as arguments with the
+        // text as written, the default locator is added, and a repeat is Success only when equal (a declared subset counts) and never alters the stream.
+        StreamAnswer("stream.arguments.after-create-with-settings", "Arguments", """{"x-max-age":"7D","x-queue-leader-locator":"balanced","x-queue-type":"stream"}"""),
+        StreamAnswer("stream.create.again-same", "Success"),
+        StreamAnswer("stream.create.again-subset-locator", "Success"),
+        StreamAnswer("stream.create.again-other-retention", "Refused", "PRECONDITION_FAILED"),
+        StreamAnswer("stream.create.again-other-locator", "Refused", "PRECONDITION_FAILED"),
+        StreamAnswer("stream.create.again-no-settings", "Refused", "PRECONDITION_FAILED"),
+        StreamAnswer("stream.create.again-superset", "Refused", "PRECONDITION_FAILED"),
         StreamAnswer("stream.create.on-quorum-queue", "Refused", "PRECONDITION_FAILED"),
         StreamAnswer("stream.create.on-classic-queue", "Refused", "PRECONDITION_FAILED"),
         StreamAnswer("stream.create.on-exchange-name", "Success"),
