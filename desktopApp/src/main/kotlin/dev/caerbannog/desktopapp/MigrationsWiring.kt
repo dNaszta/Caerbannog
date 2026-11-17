@@ -39,7 +39,7 @@ data class MigrationsInputs(
     val streams: StreamCatalog? = null,
     /** The read-only check port of the same connection (M9-05), already behind the closed-connection guard; null when there is none or the connection cannot run migrations. */
     val declareCheck: DeclareCheck? = null,
-    /** M9-10b: the held source has an MQTT port (the same function as [offersMqttPublishing]). */
+    /** M9-10b: the held source has an MQTT port (the port part of [mqttPublishAccess]). */
     val hasMqtt: Boolean = false,
     /** M9-10b: the finished permission check says test publishing is enabled; an unfinished check or no connection is false (as `canWrite` in Main.kt). */
     val publishingEnabled: Boolean = false,
@@ -72,7 +72,7 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
         topology = source?.topology,
         streams = source?.catalog,
         declareCheck = source?.declareCheck,
-        hasMqtt = offersMqttPublishing(source),
+        hasMqtt = source?.hasMqtt == true,
         publishingEnabled = (current?.status as? PermissionCheckStatus.Done)?.result?.publishingEnabled ?: false,
     )
 }
