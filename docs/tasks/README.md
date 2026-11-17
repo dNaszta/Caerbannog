@@ -16,9 +16,8 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-08b` stream retention from policy | S | nothing |
-| M9 | `M9-08` policy step | M | `M9-08b` (retention block) |
-| M9 | `M9-09` dead-lettering recipe | M | `M9-08` |
+| M9 | `M9-08` policy step, ONE task in two slices: slice 1 retention from a policy (the old `M9-08b`, folded in 2026-11-17), slice 2 the policy form, notes and the stream retention block | M | nothing (briefed, ready) |
+| M9 | `M9-09` dead-lettering recipe | M | `M9-08` (slice 2: `ExactPattern`, the catalog, the notes) |
 | M9 | `M9-12` open a pending file as steps | M | nothing |
 | M9 | `M9-13` gate on a real broker | M | last: after `M9-08` to `M9-12` |
 | M9 | `M9-10f` AMQP publish dialog: bounded banners, gutter only on overflow | S | nothing (briefed) |
@@ -238,8 +237,8 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M9-07-stream-step-and-response-stream | Stream kind with the optional tick "Also create its response stream (DLN)" (shown as "Response stream (DLN)"), suggested name with the suffix `dln`, the pair recognised by its name, link in the graph; no routing without an MQTT tick | M9 | S | done (merged, 652c42a, 2026-11-16) |
 |  M9-07b-stream-pair-mqtt-routes | The two optional ticks of a stream pair, "Answers arrive over MQTT" (a route into the response stream) and "Requests are also recorded from an MQTT topic" (one into the request stream), and the graph note "Your own service turns a request into an MQTT message; the planner does not plan that." | M9 | S | done (merged, 9765f506, 2026-11-17; accepted with follow-ups after round 2; owner review list "yes to all" 2026-11-17; follow-up M9-07d optional) |
 | M9-07d-graph-notes-out-of-view | With 2+ routes into the response stream or several pairs the graph note can slide below the stacked labels and be out of view on a short card; a pure rule in `placeNotes` tries the free band or stacks notes before searching downward | M9 (follow-up) | XS-S | briefed (optional, unscheduled; no owner-visible effect) |
-| M9-08-policy-step | Policy kind with a catalog of measured settings per target, match preview, the one-policy warning in the plan and in the check, stream retention as one policy covering the pair | M9 | M | briefed (blocked: M9-08b, the retention block comes after it) |
-| M9-08b-stream-retention-from-policy | The stream list and the MCP stream tools show a retention that a policy sets (measured gap, S-F1d) | M9 | S | briefed (ready) |
+| M9-08-policy-step | Umbrella of two slices (unified 2026-11-17): slice 1 the stream list and MCP show a retention a policy sets (old M9-08b); slice 2 Policy kind with a catalog of measured settings per target, match preview, the one-policy notes in the plan and in the check, stream retention as one policy covering the pair; one `@broker` class `RealBrokerM9PolicyStepTest` | M9 | M | briefed (ready); three owner wording decisions open, none blocks
+| M9-08b-stream-retention-from-policy | Folded into `M9-08` slice 1 (2026-11-17); the file keeps the measured facts; the `@m9-08b` tag stays | M9 | S | folded into M9-08
 | M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | briefed (blocked: M9-08) |
 |  M9-10-mqtt-route-step | MQTT route kind: topic filter to a queue or stream as one binding on `amq.topic`, exact two-way translation, shown as a route again when a file is opened, "Send a test message" on an applied route that asks a sample value for every wildcard (a device id for the `+`) and opens the Publish MQTT dialog with a pre-filled correlation-id header, live test | M9 | M | done (merged, c014ea8b, 2026-11-17; accepted with follow-ups, round 3; owner review items 6 to 12 decided "yes to all" 2026-11-17; open: radio label item 12 to build as a small follow-up M9-10d) |
 | M9-10b-mqtt-test-message | The "Send a test message" with sample values dialog for an applied route (cut out of M9-10 on 2026-11-17) | M9 | M | done, merged 2026-11-17 (accepted with follow-ups after round 3; full suite, live MqttRoute 6/6, IoT 1/1, M5 14/14, mutation checks and screenshots re-verified; real-window checks still manual before the release tag) |

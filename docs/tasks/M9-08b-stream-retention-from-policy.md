@@ -2,6 +2,8 @@
 
 Milestone: M9    Depends on: M9-00c (done)    Size: S
 
+FOLDED INTO `M9-08` SLICE 1 (architect, 2026-11-17, loop step 1). This is no longer a task of its own: the exact scope, the acceptance and the live test (the single class `RealBrokerM9PolicyStepTest`) are in `docs/tasks/M9-08-policy-step.md`, "Slice 1". What changed against the text below: the pure rule is named `RetentionSources.merge`; `max-length-bytes` is read from the policy first (measured, S-14c-4), the other two keys keep the argument (unmeasured, stated); a scenario for the precedence is added in `03`; the `@m9-08b` tag stays. The text below is kept as the record of the facts.
+
 NEW 2026-11-16, written at step 3 of `M9-00c`. No dependency on a planner task; it must be done BEFORE the retention block of `M9-08` is released (the planner saves retention as a policy, and without this task the stream list would show an empty Retention column for exactly the streams the planner configured).
 
 ## Goal

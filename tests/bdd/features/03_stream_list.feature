@@ -260,6 +260,13 @@ Feature: Stream list
       | max-age          | "7D"    | "7D"                   |
       | max-length-bytes | 1000000 | 1000000 bytes          |
 
+  # Measured by M9-14c (S-14c-4, max-length-bytes only): the policy decides, the argument keeps showing its declared value.
+  @m9-08b @needs-M9-08b @fake-broker
+  Scenario: A policy decides the maximum size when the stream also declared one
+    Given a stream "telemetry" declared with "x-max-length-bytes" 500 and a policy that sets "max-length-bytes" to 1000000
+    When I open the stream list
+    Then the stream "telemetry" shows the retention 1000000 bytes
+
   @m9-08b @broker
   Scenario: Retention set by a policy on a real stream is shown
     Given a real broker with a stream "telemetry" created without retention
