@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * M9-07 step 2: the new fixed texts and the guard of the neutral note. The brief cuts the one sentence that is a claim about the broker (spike
- * M9-00b has not run), so the note says only what the planner does. Constants fixed by these tests (names for the architect to confirm):
+ * M9-07 step 2: the new fixed texts and the guard of the note. M9-07c (owner decision O16, 2026-11-17) added ONE sentence about the broker,
+ * measured by spike M9-00b (S-D1 to S-D3): the guard now allows exactly that sentence, once, and no second broker claim. Constants fixed by these tests (names for the architect to confirm):
  * `RESPONSE_STREAM_TICK`, `RESPONSE_STREAM_NAME_LABEL`, `RESPONSE_STREAM_NOTE`, `RESPONSE_LINK_LABEL`, `responseStreamOf(requestName)`.
  */
 class PlannerTextsStreamTest {
@@ -37,19 +37,22 @@ class PlannerTextsStreamTest {
     }
 
     @Test
-    fun `the note says what a response stream is and what ticking does - and nothing else`() {
+    fun `the note says what a response stream is, what ticking does and what RabbitMQ does not do - and nothing else`() {
         assertEquals(
-            "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them.",
+            "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it.",
             PlannerTexts.RESPONSE_STREAM_NOTE,
         )
     }
 
     @Test
-    fun `the note makes no claim about what RabbitMQ does`() {
-        val note = PlannerTexts.RESPONSE_STREAM_NOTE.lowercase()
-        // S-D (spike M9-00b) is not measured: no sentence about messages moving, being written, delivered or kept, and no word for the broker.
-        for (word in listOf("rabbitmq", "broker", "message", "move", "moves", "write", "writes", "delivers", "deliver", "consume", "publish", "application", "by itself", "automatic", "retain", "retention")) {
-            assertTrue(word !in note, "the note mentions \"$word\", which is a claim the planner cannot make yet: $note")
+    fun `the note makes exactly one claim about RabbitMQ, the owner's sentence, and no second one`() {
+        val note = PlannerTexts.RESPONSE_STREAM_NOTE
+        val sentence = "RabbitMQ does not move messages into it by itself: your applications write to it."
+        assertTrue(note.endsWith(sentence), "the note does not end with the owner's sentence: $note")
+        assertEquals(1, note.split(sentence).size - 1, "the owner's sentence must appear exactly once: $note")
+        // M9-00b measured only S-D1 to S-D3: no sentence about retention, dead letters, deleting, queues or super streams.
+        for (word in listOf("retention", "dead-letter", "delete", "queue", "super")) {
+            assertTrue(word !in note.lowercase(), "the note mentions \"$word\", a second broker claim nobody reviewed: $note")
         }
     }
 

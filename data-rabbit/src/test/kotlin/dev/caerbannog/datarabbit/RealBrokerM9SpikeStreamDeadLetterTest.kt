@@ -159,28 +159,28 @@ class RealBrokerM9SpikeStreamDeadLetterTest {
     @Test
     fun `S-D2 a dead-letter-exchange policy for streams is accepted and stays out of effect`() {
         val (dlx, _) = dlxWithQueue("d2")
-        val target = cl.queue(unique("d2-stream"))
+        // one target stream per policy, so `apply-to: all` is independent of `apply-to: streams` (review finding R4)
+        val targets = listOf("streams", "all").associateWith { cl.queue(unique("d2-stream-$it")) }
         val control = cl.queue(unique("d2-control"))
-        assertEquals(201, api.declareQueue(target, streamArgs()).status)
-        assertEquals(201, api.declareQueue(control, streamArgs()).status)
-        val results = listOf("streams", "all").map { applyTo ->
+        (targets.values + control).forEach { assertEquals(201, api.declareQueue(it, streamArgs()).status) }
+        targets.forEach { (applyTo, target) ->
             val name = cl.policy("p-d2-$applyTo-$run")
             val reply = api.put("/api/policies/%2F/$name", """{"pattern":"^$target$","apply-to":"$applyTo","priority":0,"definition":{"dead-letter-exchange":"$dlx"}}""")
             M9SpikeDl.note("S-D2 PUT policy apply-to=$applyTo dead-letter-exchange: ${reply.status} ${reply.body.take(200)}")
             assertEquals(201, reply.status)
-            applyTo
         }
-        assertEquals(2, results.size)
-        // positive control: a retention policy on a second stream of the same batch takes effect
+        // positive control: a retention policy on another stream of the same batch takes effect
         val retention = cl.policy("p-d2-control-$run")
         assertEquals(201, api.put("/api/policies/%2F/$retention", """{"pattern":"^$control$","apply-to":"streams","priority":0,"definition":{"max-length-bytes":5000000}}""").status)
         M9SpikeDl.assertStaysAbsent(
-            "a dead-letter-exchange policy must not show on a stream",
+            "a dead-letter-exchange policy must not show on a stream (apply-to streams and apply-to all, each on its own stream)",
             positive = { M9SpikeDl.effective(api, control)?.containsKey("max-length-bytes") == true },
-            stillAbsent = { M9SpikeDl.effective(api, target).isNullOrEmpty() && M9SpikeDl.policyOf(api, target) == null },
+            stillAbsent = { targets.values.all { M9SpikeDl.effective(api, it).isNullOrEmpty() && M9SpikeDl.policyOf(api, it) == null } },
         )
-        val d = M9SpikeDl.detail(api, target)
-        M9SpikeDl.note("S-D2 stream after the policies took ~effect time: policy=${d["policy"]} effective_policy_definition=${d["effective_policy_definition"]} arguments=${d["arguments"]}")
+        targets.forEach { (applyTo, target) ->
+            val d = M9SpikeDl.detail(api, target)
+            M9SpikeDl.note("S-D2 stream (apply-to $applyTo) after the policies took ~effect time: policy=${d["policy"]} effective_policy_definition=${d["effective_policy_definition"]} arguments=${d["arguments"]}")
+        }
     }
 
     // ---- S-D3: a stream filled beyond a tiny retention, with the policy and the argument ----
