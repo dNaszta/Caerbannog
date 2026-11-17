@@ -6,6 +6,7 @@ import dev.caerbannog.core.json.UntrustedJson
 import dev.caerbannog.core.json.parseUntrustedJson
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
+import dev.caerbannog.core.planner.BrokerPolicyReader
 import dev.caerbannog.core.streams.StreamManager
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
@@ -23,6 +24,8 @@ internal data class MigrationAccess(
     val version: String? = null,
     /** M9-05: the read-only check; null exactly when [executor] is null, decided by the same overview read. */
     val declareCheck: DeclareCheck? = null,
+    /** M9-08: the one-policy read of the planner's check notes; null exactly when [executor] is null (a 3.x broker is sent GET requests only, and none for this). */
+    val policyReader: BrokerPolicyReader? = null,
 ) {
 
     companion object {
@@ -44,6 +47,7 @@ internal data class MigrationAccess(
                     null,
                     version,
                     ManagementDeclareCheck(ResourceReader(http, requests)),
+                    ManagementBrokerPolicyReader(ResourceReader(http, requests)),
                 )
             }
         }

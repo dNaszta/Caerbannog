@@ -347,19 +347,22 @@ internal object ManagementJson {
      * required and `definition` must be an object. M9-14b: a definition VALUE the model refuses is left out and the row says `definitionComplete = false`.
      */
     fun parsePolicies(body: String): CatalogResult<List<PolicyRow>> = guarded(body) { root ->
-        CatalogResult.Success(
-            root.asArray().map { it.asObject() }.map { p ->
-                val (definition, definitionComplete) = tolerantValues(p["definition"].asObject())
-                PolicyRow(
-                    name = p.requiredString("name"),
-                    vhost = p.requiredString("vhost"),
-                    pattern = p.requiredString("pattern"),
-                    applyTo = p.requiredString("apply-to"),
-                    priority = p.requiredInt("priority"),
-                    definition = definition,
-                    definitionComplete = definitionComplete,
-                )
-            },
+        CatalogResult.Success(root.asArray().map { policyRow(it.asObject()) })
+    }
+
+    /** M9-08: the answer of `GET /api/policies/{vhost}/{name}`, one object of the same shape as a row of [parsePolicies]; a list is not the item. */
+    fun parsePolicy(body: String): CatalogResult<PolicyRow> = guarded(body) { root -> CatalogResult.Success(policyRow(root.asObject())) }
+
+    private fun policyRow(p: JsonObject): PolicyRow {
+        val (definition, definitionComplete) = tolerantValues(p["definition"].asObject())
+        return PolicyRow(
+            name = p.requiredString("name"),
+            vhost = p.requiredString("vhost"),
+            pattern = p.requiredString("pattern"),
+            applyTo = p.requiredString("apply-to"),
+            priority = p.requiredInt("priority"),
+            definition = definition,
+            definitionComplete = definitionComplete,
         )
     }
 
