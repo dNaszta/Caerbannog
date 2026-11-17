@@ -15,6 +15,7 @@ import dev.caerbannog.core.mqtt.MqttClientRow
 import dev.caerbannog.core.mqtt.MqttHeader
 import dev.caerbannog.core.mqtt.MqttSubscription
 import dev.caerbannog.core.streams.Retention
+import dev.caerbannog.core.streams.RetentionSources
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.topology.BindingDestinationType
 import dev.caerbannog.core.topology.BindingRow
@@ -113,6 +114,19 @@ class McpSteps {
             )
         )
         fakeStreamOffsets.setFirst(vhost, streamName, first)
+    }
+
+    // M9-08 slice 1: the retention comes from a policy; the summary is built through the one pure rule of core, as the data-rabbit parser builds it.
+    @Given("the stream {string} on vhost {string} has no retention of its own and a policy that sets {string} to {string}")
+    fun theStreamHasRetentionFromAPolicy(streamName: String, vhost: String, key: String, value: String) {
+        fakeStreamCatalog.addStream(
+            StreamSummary(
+                name = streamName, vhost = vhost, messages = 10, consumers = 0, segments = 1, firstTimestamp = null,
+                leader = "rabbit@node1", node = "rabbit@node1", members = listOf("rabbit@node1"), online = listOf("rabbit@node1"),
+                retention = RetentionSources.merge(Retention(), mapOf(key to dev.caerbannog.core.json.ArgumentValue.Text(value))),
+            )
+        )
+        fakeStreamOffsets.setFirst(vhost, streamName, 0)
     }
 
     @Given("the queue {string} on vhost {string} is a {string} queue with {long} messages")
@@ -287,6 +301,21 @@ class McpSteps {
         assertTrue(lastToolResultText.contains(stream))
         assertTrue(lastToolResultText.contains(count.toString()))
         assertTrue(lastToolResultText.contains(retention))
+    }
+
+    @Then("the tool result includes stream {string} with retention {string}")
+    fun assertStreamRetention(stream: String, retention: String) {
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(lastToolResultText)
+        val streams = findStreams(parsed)
+        val entry = streams.firstOrNull { it["name"]?.toString()?.trim('"') == stream }
+        assertTrue(entry != null, "no stream $stream in $lastToolResultText")
+        assertEquals(retention, entry!!["retention"]?.toString()?.trim('"'), "retention of $stream in $lastToolResultText")
+    }
+
+    private fun findStreams(e: kotlinx.serialization.json.JsonElement): List<kotlinx.serialization.json.JsonObject> = when (e) {
+        is kotlinx.serialization.json.JsonObject -> (if (e.containsKey("retention")) listOf(e) else emptyList()) + e.values.flatMap { findStreams(it) }
+        is kotlinx.serialization.json.JsonArray -> e.flatMap { findStreams(it) }
+        else -> emptyList()
     }
 
     @Then("the tool result includes queue {string} of type {string} with {long} messages")

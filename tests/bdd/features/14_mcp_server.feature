@@ -104,7 +104,7 @@ Feature: Model Context Protocol (MCP) server
     And no property value of the tool result contains "[Ljava"
 
   # M9-08b: the same read feeds the MCP stream tools (see 03_stream_list.feature).
-  @m9-08b @needs-M9-08b
+  @m9-08b
   Scenario: MCP server shows retention that a policy sets on a stream
     Given the stream "telemetry" on vhost "/" has no retention of its own and a policy that sets "max-age" to "7D"
     When the client calls MCP tool "caerbannog_list_streams" with profile "dev-local" and vhost "/"

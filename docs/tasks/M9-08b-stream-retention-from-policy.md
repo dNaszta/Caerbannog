@@ -41,3 +41,9 @@ Evaluated: no new tool, no schema change. The result of the two existing read-on
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, spec updated (A5 sentence about the gap removed), the `@broker` scenario RUN or reported as not run.
+
+## Measured answers (test developer, M9-08 step 2, 2026-11-17, RabbitMQ 4.4.0 through `rabbitmq:4-management`, `RealBrokerM9PolicyStepTest` 5 of 5 green)
+1. `GET /api/queues/{vhost}?...&columns=<the list's columns today>` returns NO `effective_policy_definition` for a stream with a policy (the broker honours the column list exactly). With `effective_policy_definition` ADDED to the column list the same row carries it (`{"max-age":"7D","max-length-bytes":1000000}`). The detail GET carries it with or without a column list. So the stream list needs no detail call: add the column (`ManagementRequests.LIST_COLUMNS`), one request as before. Fixtures: `fixtures/m9-00/s-f1d-stream-detail-with-policy.json` and `s-f1d-stream-list-row-with-policy.json` (captured by the live class with `M9_08_CAPTURE_DIR`).
+2. `alternate-exchange` set by a POLICY (`apply-to: exchanges`) acts on an exchange: a message published through the management API to an exchange with no matching binding is `routed: false` before the policy and `routed: true` after it (the alternate exchange is a fanout bound to a queue); an exchange with no policy still answers `routed: false`. The Exchanges target stays.
+3. The `max-age` units `M`, `h` and `m`: `1M`, `1h` and `1m` each answered 201. `MaxAgeUnits.measured` is `Y`, `M`, `D`, `h`, `m`, `s` (with `7d`, `7`, `abc` still 400, S-F1c).
+4. The list row of `GET /api/queues/{vhost}` with the columns the planner's reader uses carries `type` (`quorum`) and `policy` (the name of the policy that applies); the item `GET /api/policies/{vhost}/{name}` answers one policy that `ManagementJson.parsePolicies` reads (priority, apply-to, definition).
