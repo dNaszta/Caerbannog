@@ -116,7 +116,7 @@ fun planPreview(
     }
 
     val streamNames = (declaredStreams + queueNames.filter { it in brokerStreams }).toSet()
-    fun exchangeType(name: String): String = brokerExchanges[name] ?: declaredExchanges[name] ?: "direct"
+    fun exchangeType(name: String): String = brokerExchanges[name] ?: declaredExchanges[name] ?: builtInExchangeType(name) ?: "direct"
     val drawn = buildBindingGraph(
         exchanges = exchangeNames.map { name ->
             ExchangeRow(name, plan.vhost, exchangeType(name), durable = true, autoDelete = false, internal = false)
@@ -187,6 +187,15 @@ private fun responseLinks(plan: TopologyPlan): List<PlanLink> = PlanPairs.respon
 }.distinct()
 
 private const val BUILT_IN_EXCHANGE_PREFIX = "amq."
+
+/** The type of a default exchange, from its name, for when the broker was not read. Other amq.* names are not guessed. */
+private fun builtInExchangeType(name: String): String? = when (name) {
+    "amq.topic" -> "topic"
+    "amq.direct" -> "direct"
+    "amq.fanout" -> "fanout"
+    "amq.headers" -> "headers"
+    else -> null
+}
 
 private fun GraphNode.rawName(): String = id.substring(2)
 
