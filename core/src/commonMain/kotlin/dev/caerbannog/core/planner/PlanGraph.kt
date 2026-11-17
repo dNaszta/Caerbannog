@@ -140,6 +140,8 @@ fun planPreview(
         when {
             onBroker -> Unit
             declared -> isNew += node.id
+            // The broker reserves the names amq.* and has the default exchanges in every virtual host, read or not (O15).
+            isExchange && name.startsWith(BUILT_IN_EXCHANGE_PREFIX) -> Unit
             // While the broker has not answered, an end that is not declared may well exist: no verdict yet.
             pending && known == null -> Unit
             else -> notInPlan += node.id
@@ -183,6 +185,8 @@ private fun responseLinks(plan: TopologyPlan): List<PlanLink> = PlanPairs.respon
     val to = (plan.steps.firstOrNull { it.id == response }?.action as? MigrationAction.DeclareStream)?.name
     if (from == null || to == null) null else PlanLink("q:$from", "q:$to", PlanLinkKind.ResponseStream)
 }.distinct()
+
+private const val BUILT_IN_EXCHANGE_PREFIX = "amq."
 
 private fun GraphNode.rawName(): String = id.substring(2)
 
