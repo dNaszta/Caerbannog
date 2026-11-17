@@ -57,6 +57,7 @@ None (owner decision 2026-11-15).
 
 ## Open points
 - Settled by the spike (2026-11-16): the catalog (S-F1b), the notes exist (S-F2a: no merge). Not settled: whether a policy with `apply-to: queues` includes streams (conservative reading above), the winner of an equal-priority tie (the note says it is not predictable), `M`, `h`, `m` as `max-age` units.
+- Note from M9-14c (merged-pending, 2026-11-17): a stream step that declares retention as an argument and a stream whose retention a policy sets are `Different` in "Already there" (the check does not read `effective_policy_definition`); the planner form keeps writing retention as a policy, so its own steps are not affected. Precedence argument against policy is measured in `docs/tasks/M9-14c-spike-results.md` S-14c-4.
 - Q4 (decided 2026-11-15: retention in the stream form as one policy covering the stream and, with a tick, its response stream): the keys are confirmed (S-F1b: `max-age`, `max-length-bytes`, `stream-max-segment-size-bytes` take effect on a stream). The stream list does NOT show a policy-set retention (S-F1d): the follow-up is `M9-08b`, to be merged before the retention block is released. Not fixed here.
 - A plain label per key is wording: the list of labels is shown to the owner with the spike results before step 2 (Owner review list item 2 of `M9-00c`, together with the target labels and the three notes, items 3 to 5; all DECIDED by the owner on 2026-11-16, "do arch suggest" = the recommendation).
 
