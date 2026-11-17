@@ -3,6 +3,7 @@ package dev.caerbannog.mcp
 import dev.caerbannog.core.browser.BrowseResult
 import dev.caerbannog.core.browser.BrowseStart
 import dev.caerbannog.core.browser.MessageFilterCriteria
+import dev.caerbannog.core.browser.PropertyValueText
 import dev.caerbannog.core.browser.StreamMessage
 import dev.caerbannog.core.browser.StreamMessageReader
 import dev.caerbannog.core.browser.StreamScanner
@@ -794,12 +795,12 @@ class McpServer(
                             put("timestamp", msg.timestamp)
                             putJsonObject("properties") {
                                 for ((k, v) in msg.properties) {
-                                    put(k, v?.toString() ?: "")
+                                    put(k, PropertyValueText.of(v))
                                 }
                             }
                             putJsonObject("applicationProperties") {
                                 for ((k, v) in msg.applicationProperties) {
-                                    put(k, v?.toString() ?: "")
+                                    put(k, PropertyValueText.of(v))
                                 }
                             }
                             val (preview, truncated) = formatPayload(msg.payload)
@@ -828,12 +829,12 @@ class McpServer(
                                 put("timestamp", msg.timestamp)
                                 putJsonObject("properties") {
                                     for ((k, v) in msg.properties) {
-                                        put(k, v?.toString() ?: "")
+                                        put(k, PropertyValueText.of(v))
                                     }
                                 }
                                 putJsonObject("applicationProperties") {
                                     for ((k, v) in msg.applicationProperties) {
-                                        put(k, v?.toString() ?: "")
+                                        put(k, PropertyValueText.of(v))
                                     }
                                 }
                                 val (preview, truncated) = formatPayload(msg.payload)

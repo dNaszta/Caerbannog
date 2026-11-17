@@ -159,10 +159,11 @@ class StreamScanner(
                 }
             }
             is MessageFilterCriteria.Property -> {
-                message.properties[criteria.name]?.toString() == criteria.value
+                criteria.name in message.properties && PropertyValueText.of(message.properties[criteria.name]) == criteria.value
             }
             is MessageFilterCriteria.ApplicationProperty -> {
-                message.applicationProperties[criteria.name]?.toString() == criteria.value
+                criteria.name in message.applicationProperties &&
+                    PropertyValueText.of(message.applicationProperties[criteria.name]) == criteria.value
             }
         }
     }
