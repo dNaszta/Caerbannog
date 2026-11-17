@@ -2,6 +2,8 @@
 
 Milestone: M9    Depends on: M9-01 (done), M9-00c (done)    Size: S
 
+Status: step 2 done (tests first, 2026-11-17). Red for the right reason: 6 of the 11 `@m9-01b` runs fail (the 5 refused rows and the response stream: `form problems expected [message] but was []`), the 5 accepted rows pass already (regression guards); the unit tests do not compile until `BrokerNameRules`, `Utf8Length` and the two `PlannerTexts` constants exist. Live row measured: `amq.topic` and `amq.direct` redeclared with their real type answer **204** (see `M9-00c-spike-results.md`, "M9-01b"). Next: step 3, the senior developer. Policy `amq.x` unit test waits for `M9-08` (no policy form yet).
+
 NEW 2026-11-16, written at step 3 of `M9-00c`. Starts after `M9-02` or in parallel with it; it touches only `core.planner` name rules and their texts.
 
 ## Goal
@@ -28,6 +30,9 @@ Out: hints for names (advice stays O11); the 255-byte rule for streams, exchange
 - Runner: `RunTopologyPlannerAcceptanceTest` filter does NOT list `@m9-01b` yet (it lists `@m9-01` and the others only): add `@m9-01b` when the steps exist; the scenarios carry no `@needs-*` tag, so the existing `not @needs-decision and not @needs-spike` stays. 11 runs in all: 5 refused rows, 1 response stream, 5 accepted rows.
 - Steps (test developer, `PlannerSteps.fillForm`, today a closed `when` over five inputs): add `the name "<x>"` for any kind in general (not one row per name), `a name of <n> letters` (ASCII `a` repeated), `a name of <n> letters "<c>"`, the kind "Stream" (a `streamForm` in `PlannerDriver`), and `the name "<x>" and its response stream`. "Next" enabled/disabled steps exist.
 - Unit: `QueueFormTest`, `ExchangeFormTest`, `StreamFormTest` rows per name (prefix, 255 and 256 ASCII bytes, 127 and 128 two-byte characters, a four-byte character at the border); `Utf8LengthTest` (1 to 4 byte code points, well-formed text only).
+
+## Test API fixed at step 2
+`internal object Utf8Length { fun of(text: String): Int }`, `object BrokerNameRules { fun reservedPrefix(name): Boolean; fun queueNameTooLong(name): Boolean }` (public or internal, same package `core.planner`), `PlannerTexts.NAME_RESERVED`, `PlannerTexts.QUEUE_NAME_TOO_LONG`. The forms are tested through their public `problems(ctx)`/`actions(ctx)`; the parser round trip has no length rule (checked: a 256-letter name only gets the new text). Steps: `PlannerSteps.fillForm` handles `the name "<x>"` (with ` and its response stream`), `a name of <n> letters`, `a name of <n> letters "<c>"` for Queue, Exchange and Stream.
 
 ## Design notes
 One pure `BrokerNameRules` object in `core.planner`, used by the three forms; messages in `PlannerTexts` (`NAME_RESERVED` = `Names that start with "amq." are reserved`, `QUEUE_NAME_TOO_LONG` = `A queue name can be at most 255 bytes long`). Suggested API for the unit tests: `BrokerNameRules.reservedPrefix(name): Boolean`, `BrokerNameRules.queueNameTooLong(name): Boolean`, `Utf8Length.of(text): Int` (internal, code points: below 0x80 one byte, 0x800 two, 0x10000 three, else four; a lone surrogate is out of scope: counted as 3 and not tested). No broker is touched. The rules mirror `DeclareEquivalenceTable`'s neighbour data: the S-H table of the results file is the evidence; cite it in a comment, not the numbers twice.

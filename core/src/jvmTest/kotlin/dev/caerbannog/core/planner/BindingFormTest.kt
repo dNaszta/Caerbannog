@@ -127,4 +127,13 @@ class BindingFormTest {
         )
         for (f in forms) assertEquals(f, StepForms.formOf(f.actions(ctx()).single()), f.toString())
     }
+
+    // ---- M9-01b: the binding form has no name rule; a built-in exchange is a legal source ----
+
+    @Test
+    fun `a binding from a built-in exchange is not refused for its amq prefix`() {
+        for (source in listOf("amq.topic", "amq.direct", "amq.fanout", "amq.match")) {
+            assertEquals(emptyList(), BindingForm(exchange = source, destination = "orders", routingKey = "k").problems(ctx()), source)
+        }
+    }
 }

@@ -52,4 +52,35 @@ class ExchangeFormTest {
         assertNull(StepForms.formOf(MigrationAction.DeclareExchange(name = "e", arguments = mapOf("alternate-exchange" to ArgumentValue.Text("x")))))
         assertNull(StepForms.formOf(MigrationAction.DeleteExchange(name = "e")))
     }
+
+    // ---- M9-01b: the broker's name rules (S-H) ----
+
+    private val reserved = "Names that start with \"amq.\" are reserved"
+
+    @Test
+    fun `an amq prefix is refused for every exchange type, in lower case only`() {
+        for (type in listOf("fanout", "direct", "topic", "headers")) {
+            assertEquals(listOf(FieldProblem("name", reserved)), ExchangeForm(name = "amq.orders", type = type).problems(ctx()), type)
+        }
+        assertEquals(listOf(FieldProblem("name", reserved)), ExchangeForm(name = "amq.").problems(ctx()))
+        for (ok in listOf("amq", "AMQ.orders", "Amq.orders", "amqx", "amq-orders")) {
+            assertEquals(emptyList(), ExchangeForm(name = ok).problems(ctx()), "name \"$ok\"")
+        }
+        assertEquals(emptyList(), ExchangeForm(name = "amq.topic", type = "topic").actions(ctx()), "the planner never declares a built-in exchange")
+    }
+
+    @Test
+    fun `an exchange has no length rule, 255 and 256 bytes and more pass`() {
+        for (name in listOf("a".repeat(255), "a".repeat(256), "é".repeat(128), "é".repeat(127) + "a", "a".repeat(300))) {
+            assertEquals(emptyList(), ExchangeForm(name = name).problems(ctx()), "a name of ${name.length} characters")
+            assertEquals(1, ExchangeForm(name = name).actions(ctx()).size)
+        }
+    }
+
+    @Test
+    fun `a space and a slash are not refused, and the first rule that applies speaks`() {
+        for (ok in listOf("events eu", "events/eu")) assertEquals(emptyList(), ExchangeForm(name = ok).problems(ctx()), "name \"$ok\"")
+        assertEquals(listOf(FieldProblem("name", "Give the exchange a name")), ExchangeForm(name = "").problems(ctx()))
+        assertEquals(listOf(FieldProblem("name", reserved)), ExchangeForm(name = "amq." + "a".repeat(300)).problems(ctx()))
+    }
 }
