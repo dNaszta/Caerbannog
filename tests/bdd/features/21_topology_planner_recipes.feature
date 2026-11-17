@@ -25,8 +25,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   select them, and no other runner selects the m9-09 or m9-08 tags.
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
-  stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes and their test
-  message, @m9-11 bindings on a headers exchange, @m9-13 the gate.
+  stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes (the route step), @m9-10b
+  their test message, @m9-11 bindings on a headers exchange, @m9-13 the gate.
 
   Background:
     Given I am connected to "uat-eu" with the virtual host "/"
@@ -680,9 +680,11 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I add an MQTT route from "sensors/+/temp" to the stream "telemetry" with the wizard
     Then the review graph shows an edge from "amq.topic" to "telemetry" labelled "sensors/+/temp" and "MQTT route"
 
+  # Since the split of M9-10 (2026-11-17) the test message scenarios below carry @m9-10b (docs/tasks/M9-10b-mqtt-test-message.md);
+  # @m9-10 is the route step only. The planner runner lists @m9-10 only: it does not select @m9-10b until M9-10b widens it.
   # A15 (proposed by the architect, wanted by the owner, O14): the test message asks for a sample value
   # for every wildcard of the filter, then opens the existing Publish MQTT dialog, which accepts no wildcards.
-  @m9-10 @smoke @fake-broker
+  @m9-10b @smoke @fake-broker
   Scenario: After applying, a test message asks for a sample value and opens the dialog with a concrete topic
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
@@ -692,7 +694,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the Publish MQTT dialog opens with the topic "devices/d42/answer"
     And nothing is published until I press Publish
 
-  @m9-10 @fake-broker
+  @m9-10b @fake-broker
   Scenario: A route without wildcards opens the dialog at once
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/d1/status" to the stream "telemetry" is applied to "uat-eu"
@@ -700,7 +702,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then no value is asked for
     And the Publish MQTT dialog opens with the topic "devices/d1/status"
 
-  @m9-10 @fake-broker
+  @m9-10b @fake-broker
   Scenario: A hash asks for the rest of the topic
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "sensors/#" to the stream "telemetry" is applied to "uat-eu"
@@ -709,7 +711,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I enter "room1/temp"
     Then the Publish MQTT dialog opens with the topic "sensors/room1/temp"
 
-  @m9-10 @negative @fake-broker
+  @m9-10b @negative @fake-broker
   Scenario Outline: A sample value that would not make a valid topic is refused
     Given the test message of the route "devices/+/answer" asks for the value of the "+"
     When I enter "<value>"
@@ -723,7 +725,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | d+42  | No + or # in a value     |
       | d#42  | No + or # in a value     |
 
-  @m9-10 @fake-broker
+  @m9-10b @fake-broker
   Scenario: The dialog opens with a correlation-id header that is generated and can be changed
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
@@ -740,7 +742,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   # WARNING, not a quiet hint, and it adds that the owner's service must read and write that application property; the
   # dialog gets no correlation data field (Q17 stays). The second sentence is the architect's proposal for the owner to approve
   # (the scenario below carries it; the owner may reword it): the warning is shown as a warning banner, not as plain text.
-  @m9-10 @fake-broker
+  @m9-10b @fake-broker
   Scenario: The dialog warns that the service must read and write the application property correlation-id
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
@@ -750,15 +752,15 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And the dialog has no field for MQTT 5 correlation data
 
   # Measured (M9-00a, S-A6): on a quorum queue the header arrives as an entry of the headers table, not as an application
-  # property. The queue text is the architect's proposal; the owner has not seen it (list in docs/tasks/M9-10-mqtt-route-step.md).
-  @m9-10 @fake-broker @needs-decision
+  # property. The text is DECIDED (owner, 2026-11-17, O17: "show text", option a).
+  @m9-10b @fake-broker
   Scenario: The warning for a route into a queue names the headers table
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
     And the migration "0005" with the MQTT route "sensors/+/temp" to the queue "temperatures" is applied to "uat-eu"
     When I choose "Send a test message" for that route and enter "s1"
     Then under the header "correlation-id" a warning says "In the queue message this arrives as an entry of the headers table named correlation-id, not as the AMQP correlation_id property. Your service must read and write that header."
 
-  @m9-10 @negative @fake-broker
+  @m9-10b @negative @fake-broker
   Scenario Outline: The test message is not offered where publishing is not possible
     Given <situation>
     And the migration "0005" with the MQTT route "sensors/+/temp" to the stream "telemetry" is applied to "uat-eu"
@@ -770,7 +772,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | the connection has no MQTT port  | This connection has no MQTT port                                 |
       | the user has no write permission | Test publishing is disabled: no write permission on virtual host /. |
 
-  @m9-10 @negative @fake-broker
+  @m9-10b @negative @fake-broker
   Scenario: A route of a migration that is not applied here offers no test message
     Given the pending migration "0005" with the MQTT route "sensors/+/temp" to the stream "telemetry"
     When I select "0005" on the Migrations screen
