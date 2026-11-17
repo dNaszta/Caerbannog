@@ -122,7 +122,7 @@ class PlannerCheckSteps {
 
     private val declareQueueRow = Regex("^Declare (\\w+) queue (.+)$")
     private val declareExchangeRow = Regex("^Declare (\\w+) exchange (.+)$")
-    private val declareStreamRow = Regex("^Declare stream (.+)$")
+    private val declareStreamRow = Regex("^Declare stream (\\S+)(?: with (.+))?$")
     private val declarePolicyRow = Regex("^Declare policy (.+)$")
     private val bindRow = Regex("^Bind (.+) to (.+) with (.+)$")
     private val deleteQueueRow = Regex("^Delete queue (.+)$")
@@ -131,12 +131,25 @@ class PlannerCheckSteps {
     private fun actionOf(row: String, vhost: String = d.vhost): MigrationAction {
         declareQueueRow.matchEntire(row)?.let { return MigrationAction.DeclareQueue(it.groupValues[2], it.groupValues[1], vhost = vhost) }
         declareExchangeRow.matchEntire(row)?.let { return MigrationAction.DeclareExchange(it.groupValues[2], it.groupValues[1], vhost = vhost) }
-        declareStreamRow.matchEntire(row)?.let { return MigrationAction.DeclareStream(it.groupValues[1], vhost = vhost) }
+        declareStreamRow.matchEntire(row)?.let { return MigrationAction.DeclareStream(it.groupValues[1], vhost = vhost, arguments = streamSettingsOf(it.groupValues[2])) }
         declarePolicyRow.matchEntire(row)?.let { return policy(it.groupValues[1], "^orders", "max-length", 1000, vhost) }
         bindRow.matchEntire(row)?.let { return MigrationAction.DeclareBinding(it.groupValues[1], it.groupValues[2], it.groupValues[3], vhost = vhost) }
         deleteQueueRow.matchEntire(row)?.let { return MigrationAction.DeleteQueue(it.groupValues[1], vhost = vhost) }
         error("the step \"$row\" is not one the check steps know")
     }
+
+    /** `x-max-age 7D and x-max-length-bytes 5` as the arguments of a stream step: the age and the locator are text, the rest are numbers (M9-14c). */
+    private fun streamSettingsOf(clause: String): Map<String, ArgumentValue> =
+        if (clause.isEmpty()) emptyMap() else clause.split(" and ").associate { part ->
+            val (key, value) = part.trim().split(" ", limit = 2)
+            key to (if (key == "x-max-age" || key == "x-queue-leader-locator") ArgumentValue.Text(value) else ArgumentValue.Whole(value.toLong()))
+        }
+
+    /** The row of a step as the scenario writes it: its description, and for a stream with settings ` with k v and k v`. */
+    private fun rowOf(action: MigrationAction): String =
+        if (action is MigrationAction.DeclareStream && action.arguments.isNotEmpty()) {
+            action.description + " with " + action.arguments.entries.joinToString(" and ") { (k, v) -> k + " " + if (v is ArgumentValue.Text) v.value else (v as ArgumentValue.Whole).value }
+        } else action.description
 
     private fun policy(name: String, pattern: String, key: String, value: Int, vhost: String = d.vhost) =
         MigrationAction.DeclarePolicy(name, pattern, mapOf(key to ArgumentValue.Whole(value.toLong())), vhost = vhost)
@@ -163,6 +176,12 @@ class PlannerCheckSteps {
 
     @Given("the broker has the stream {string}")
     fun stream(name: String) = CheckWorld.seedQueue(name, "stream")
+
+    /** M9-14c: a stream as the product makes it, with the settings the scenario names (text or number as the broker shows them). */
+    @Given("the broker has the stream {string} with {string} as the text {string} and {string} as the text {string}")
+    fun streamWithTwoTexts(name: String, k1: String, v1: String, k2: String, v2: String) {
+        CheckWorld.broker.addQueue("/", name, type = "stream", arguments = mapOf(k1 to JsonPrimitive(v1), k2 to JsonPrimitive(v2)))
+    }
 
     /** A binding cannot exist without its ends on a real broker: the fake gets both, unless the scenario gave them already. */
     @Given("the broker has the binding from {string} to {string} with routing key {string}")
@@ -200,6 +219,10 @@ class PlannerCheckSteps {
 
     @Given("a plan with the step {string}")
     fun planWithOneStep(row: String) = planOf(actionOf(row))
+
+    /** The outline of M9-14c writes the step unquoted (`a plan with the step Declare stream audit with x-max-age 1D`); a quoted one is the step above. */
+    @Given("^a plan with the step ([^\"].*)$")
+    fun planWithOneUnquotedStep(row: String) = planOf(actionOf(row))
 
     @Given("a plan that declares the policy {string} on {string} with {string} {int}")
     fun planWithPolicy(name: String, pattern: String, key: String, value: Int) = planOf(policy(name, pattern, key, value))
@@ -266,8 +289,8 @@ class PlannerCheckSteps {
 
     private fun stepOf(title: String): StepCheck {
         val plan = currentPlan()
-        val index = plan.steps.indexOfFirst { it.action.description == title }
-        assertTrue(index >= 0, "the plan has no step \"$title\": ${plan.steps.map { it.action.description }}")
+        val index = plan.steps.indexOfFirst { it.action.description == title || rowOf(it.action) == title }
+        assertTrue(index >= 0, "the plan has no step \"$title\": ${plan.steps.map { rowOf(it.action) }}")
         return CheckWorld.steps()[index]
     }
 
@@ -282,6 +305,9 @@ class PlannerCheckSteps {
 
     @Then("the step {string} shows {string}")
     fun stepShows(title: String, label: String) = assertShows(stepOf(title), label, "\"$title\"")
+
+    @Then("^the step ([^\"].*) shows \"([^\"]*)\"$")
+    fun unquotedStepShows(title: String, label: String) = assertShows(stepOf(title), label, "\"$title\"")
 
     @Then("the step shows {string}")
     fun onlyStepShows(label: String) = assertShows(onlyStep(), label, "the step")

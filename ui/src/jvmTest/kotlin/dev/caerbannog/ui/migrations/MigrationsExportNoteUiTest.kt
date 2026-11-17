@@ -17,7 +17,8 @@ import kotlin.test.assertTrue
 
 /**
  * M9-14 step 4 (round 1): the one line under the export result (`MigrationsScreenState.exportNote`, tag `migrations-export-note`) had no UI test.
- * Shown when set, absent when null, still on screen with long and hostile names and at 1024 px. Writes `ui/build/screenshots/migrations-export-note-*.png`
+ * M9-14c step 2b: the sample strings say "other settings of stream ..." (a possible note: the words retention and leader locator no longer occur); the display
+ * rules (escaping, ten entries, width) are unchanged. Shown when set, absent when null, still on screen with long and hostile names and at 1024 px. Writes `ui/build/screenshots/migrations-export-note-*.png`
  * as a side effect (cheap, so no opt-in tag) for the owner's look.
  */
 @OptIn(ExperimentalTestApi::class)
@@ -44,14 +45,14 @@ class MigrationsExportNoteUiTest {
     fun `a note is drawn with its text, no note draws nothing`() = runDesktopComposeUiTest(1280, 800) {
         show(null)
         onAllNodesWithTagCount("migrations-export-note").let { assertEquals(0, it) }
-        show("Left out: retention of stream audit; exclusive queue session-1")
+        show("Left out: other settings of stream audit; exclusive queue session-1")
         onNodeWithTag("migrations-export-note").assertIsDisplayed()
         shot("short")
     }
 
     @Test
     fun `a long and hostile note stays inside the window at 1280 and at 1024 px`() {
-        val hostile = "Left out: " + (1..12).joinToString("; ") { "retention of stream <b>orders</b>‮-$it-" + "n".repeat(200) }
+        val hostile = "Left out: " + (1..12).joinToString("; ") { "other settings of stream <b>orders</b>‮-$it-" + "n".repeat(200) }
         for ((w, h) in listOf(1280 to 800, 1024 to 768)) {
             runDesktopComposeUiTest(w, h) {
                 show(hostile)
