@@ -49,12 +49,23 @@ data class ExchangeForm(val name: String, val type: String = "direct") : StepFor
 /**
  * A stream, with its response stream (DLN) when [withResponse] (O9, O10). [responseName] null means "follows the stream name"; any string, even
  * an empty one, means the user typed it, so a later change of [name] leaves it alone.
+ *
+ * [answersTopic] and [requestsTopic] are the two optional MQTT ticks of a pair (O13): null is off, a string is on, and `""` is on with no filter
+ * typed yet (the form then asks for one; nothing is guessed). Both are ignored while [withResponse] is false, so a stale value never makes a step.
  */
 data class StreamForm(
     val name: String,
     val withResponse: Boolean = false,
     val responseName: String? = null,
+    val answersTopic: String? = null,
+    val requestsTopic: String? = null,
 ) : StepForm {
+    /** Switches the pair. Off clears both ticks (they exist only with the pair) and keeps a typed [responseName] for the next time. */
+    fun withPair(on: Boolean): StreamForm = when {
+        !on -> copy(withResponse = false, answersTopic = null, requestsTopic = null)
+        else -> copy(withResponse = true)
+    }
+
     /** The response name the stream name gives in the plan's naming style; empty while there is no stream name. */
     fun suggestedResponseName(ctx: FormContext): String =
         if (name.isEmpty()) "" else PlanNaming.derived(name, DerivedWord.DLN, ctx.namingStyle)
@@ -67,7 +78,7 @@ data class StreamForm(
         if (!withResponse) return own
         val response = effectiveResponseName(ctx)
         // A response name that follows an empty stream name is not a second problem: the first one says what to do.
-        if (responseName == null && name.isEmpty()) return own
+        if (responseName == null && name.isEmpty()) return own + topicProblems()
         val theirs = FormChecks.nameProblem(response, PlannerTexts.RESPONSE_NAME_MISSING, "responseName") { build(response, ctx) }
             .ifEmpty {
                 if (response == name) {
@@ -76,14 +87,32 @@ data class StreamForm(
                     queueConflict(response, "responseName", ctx)
                 }
             }
-        return own + theirs
+        return own + theirs + topicProblems()
     }
+
+    /** Only the filter check of the route form: its destination is a stream name this form already checks, so one mistake gets one message. */
+    private fun topicProblems(): List<FieldProblem> = buildList {
+        answersTopic?.let { addAll(topicProblem(it, "answersTopic")) }
+        requestsTopic?.let { addAll(topicProblem(it, "requestsTopic")) }
+    }
+
+    private fun topicProblem(filter: String, field: String): List<FieldProblem> =
+        (MqttTopicTranslation.toBindingKey(filter) as? Translation.Refused)
+            ?.let { listOf(FieldProblem(field, PlannerTexts.mqttRefusal(it.reason))) }.orEmpty()
 
     override fun actions(ctx: FormContext): List<MigrationAction> = when {
         problems(ctx).isNotEmpty() -> emptyList()
-        withResponse -> listOf(build(name, ctx), build(effectiveResponseName(ctx), ctx))
+        withResponse -> {
+            val response = effectiveResponseName(ctx)
+            // Each route is what the MQTT route form gives for it, so the pair and the route step cannot drift apart.
+            listOf(build(name, ctx), build(response, ctx)) +
+                routeInto(answersTopic, response, ctx) + routeInto(requestsTopic, name, ctx)
+        }
         else -> listOf(build(name, ctx))
     }
+
+    private fun routeInto(filter: String?, destination: String, ctx: FormContext): List<MigrationAction> =
+        if (filter == null) emptyList() else MqttRouteForm(filter, destination, MqttDestinationKind.Stream).actions(ctx)
 
     override fun hints(ctx: FormContext): List<FieldHint> =
         FormChecks.nameHint(name, ctx, "name") { isNewStreamName(name, ctx) } +

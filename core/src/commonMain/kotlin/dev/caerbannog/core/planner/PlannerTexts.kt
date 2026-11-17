@@ -104,6 +104,21 @@ object PlannerTexts {
         "A response stream is an ordinary stream, named after its request stream. Ticking this declares both streams and adds no routing between them. RabbitMQ does not move messages into it by itself: your applications write to it."
     const val RESPONSE_LINK_LABEL: String = "response (DLN)"
 
+    /**
+     * The one sentence of the wizard summary and of the review graph note when an MQTT route leads into a response stream (owner decision O13).
+     * It says what is not planned and claims no bridge from a stream to MQTT; it says nothing about a correlation id (O16).
+     */
+    const val SERVICE_NOT_PLANNED: String = "Your own service turns a request into an MQTT message; the planner does not plan that."
+
+    /** The two MQTT ticks of the stream form, each with its sub-line and the label of its topic filter field (owner decision O13). */
+    const val ANSWERS_OVER_MQTT_TICK: String = "Answers arrive over MQTT"
+    const val ANSWERS_OVER_MQTT_SUBLINE: String = "Adds an MQTT route into the response stream."
+    const val ANSWERS_TOPIC_LABEL: String = "Topic filter of the answers"
+    const val ANSWERS_TOPIC_PLACEHOLDER: String = "devices/+/answer"
+    const val REQUESTS_OVER_MQTT_TICK: String = "Requests are also recorded from an MQTT topic"
+    const val REQUESTS_OVER_MQTT_SUBLINE: String = "Adds an MQTT route into the request stream."
+    const val REQUESTS_TOPIC_LABEL: String = "Topic filter of the requests"
+
     /** The second line of a response stream's row; the name goes in only through the echo rule. */
     fun responseStreamOf(request: String): String =
         if (echoableName(request)) "Response stream (DLN) of $request" else "Response stream (DLN)"
