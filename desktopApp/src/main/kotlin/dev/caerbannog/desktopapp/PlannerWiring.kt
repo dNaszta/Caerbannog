@@ -1,5 +1,6 @@
 package dev.caerbannog.desktopapp
 
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.FolderOpener
 import dev.caerbannog.core.planner.BrokerPolicyReader
@@ -69,14 +70,28 @@ class CatalogKnownTopologyReader(
         val exchanges = (topology.exchanges(vhost) as? CatalogResult.Success)?.value ?: return null
         val queues = allQueues(vhost) ?: return null
         val streamNames = allStreams(vhost) ?: return null
+        val ownExchanges = ownDeadLetterExchanges(vhost)
         return KnownTopology(
             // The default exchange is not a name a plan can bind to.
             exchanges = exchanges.filterNot { it.isDefault }.associate { it.name to it.type },
             queues = queues.keys,
             streams = streamNames,
             // A broker stream has no policy name here (a StreamSummary carries none): no check note for a stream that already exists.
-            queueDetails = queues + streamNames.associateWith { KnownQueue("stream", null) },
+            queueDetails = queues.mapValues { (name, queue) -> queue.copy(ownDeadLetterExchange = ownExchanges[name]) } +
+                streamNames.associateWith { KnownQueue("stream", null) },
         )
+    }
+
+    /**
+     * The `x-dead-letter-exchange` argument of each queue, as text (M9-09), from the declarations the export already reads (one GET). Only that
+     * argument is read, never `effective_policy_definition`. A queue whose typed arguments are incomplete makes no claim (the lost argument may be
+     * this one), and a failed read answers nothing for every queue: the names and policies of [read] must not depend on one extra call.
+     */
+    private suspend fun ownDeadLetterExchanges(vhost: String): Map<String, String> {
+        val declarations = (topology.queueDeclarations(vhost) as? CatalogResult.Success)?.value ?: return emptyMap()
+        return declarations.filter { it.typedArgumentsComplete }.mapNotNull { declaration ->
+            (declaration.arguments["x-dead-letter-exchange"] as? ArgumentValue.Text)?.let { declaration.name to it.value }
+        }.toMap()
     }
 
     private suspend fun allQueues(vhost: String): Map<String, KnownQueue>? {
