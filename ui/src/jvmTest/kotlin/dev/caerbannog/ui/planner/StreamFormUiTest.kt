@@ -96,8 +96,9 @@ class StreamFormUiTest {
         assertTrue(textOf("planForm:responseTick").contains(PlannerTexts.RESPONSE_STREAM_TICK), textOf("planForm:responseTick"))
         assertNotDrawn("planForm:responseName")
         assertNotDrawn("planForm:responseNote")
-        // nothing of M9-07b or M9-08 is drawn in this task
-        assertNotDrawn("planForm:mqttAnswers")
+        // the MQTT ticks (M9-07b, StreamFormMqttTicksUiTest) come only with the pair tick; the retention block is M9-08
+        assertNotDrawn("planForm:answersOverMqtt")
+        assertNotDrawn("planForm:requestsOverMqtt")
         assertNotDrawn("planForm:retention")
         node("planWizard:next").assertIsNotEnabled()
         assertEquals(PlannerTexts.RESPONSE_STREAM_TICK, "Also create its response stream (DLN)")
