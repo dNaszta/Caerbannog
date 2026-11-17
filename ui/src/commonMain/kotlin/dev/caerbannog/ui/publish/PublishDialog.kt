@@ -1,5 +1,6 @@
 package dev.caerbannog.ui.publish
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -75,12 +77,21 @@ fun PublishTestMessageDialog(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
         ) {
+            val bodyScroll = rememberScrollState()
+            // Feedback and the buttons stay outside the scroll, so Publish and Cancel are always on screen; the fields are what scrolls.
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                Box(modifier = Modifier.weight(1f, fill = false)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 12.dp)
+                            .verticalScroll(bodyScroll)
+                            .testTag("publishDialogBody"),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                 // Header
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
@@ -125,6 +136,14 @@ fun PublishTestMessageDialog(
 
                 // Warning banner
                 WarningBanner(text = state.warningBanner)
+                    }
+                    if (bodyScroll.maxValue > 0) {
+                        VerticalScrollbar(
+                            rememberScrollbarAdapter(bodyScroll),
+                            Modifier.align(Alignment.CenterEnd).matchParentSize().testTag("publishDialogBodyScrollbar"),
+                        )
+                    }
+                }
 
                 // Status feedback banners
                 val gate = state.gate
