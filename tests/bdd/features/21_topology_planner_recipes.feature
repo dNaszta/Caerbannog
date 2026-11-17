@@ -23,8 +23,8 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   docs/tasks/M9-00b-spike-dead-lettering-and-streams.md): the at-least-once explanation and its slow delivery, the note for
   a queue with its own dead-letter argument and the default's "can be lost" line are decided and word for word in the
   scenarios below; the optional line about the reason travelling with a stream message (item 10) is skipped until
-  M9-00b-c is built. No scenario of 19, 20 or 21 carries needs-decision any more, and no other runner selects the m9-09 or
-  m9-08 tags.
+  M9-00b-c is built. No scenario of 19, 20 or 21 carries needs-decision any more. The planner runner
+  (RunTopologyPlannerAcceptanceTest) selects @m9-08 and @m9-09 (with @fake-broker); no other runner does.
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes (the route step), @m9-10b
@@ -582,7 +582,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   @m9-09 @fake-broker
   Scenario: A queue that already has a policy is pointed out before the recipe is added
-    Given the broker has the quorum queue "orders" with the policy "limits" applied
+    Given the broker has the quorum queue "orders" with the policy "limits" applied at a priority lower than 0
     When I choose the queue "orders" in the dead-lettering form
     Then the form says "The broker applies the policy limits to orders. Only one policy applies to a queue: this one would take its place."
 
