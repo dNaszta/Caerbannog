@@ -224,11 +224,11 @@ private fun StepRow(
             if (pairLine != null) Spacer(Modifier.width(RESPONSE_INDENT))
             ConnectionIcon(step.action.icon(), SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(step.title, style = MaterialTheme.typography.bodyMedium)
+                Text(state.stepTitle(step.id), style = MaterialTheme.typography.bodyMedium)
                 pairLine?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planStepPair:$index"))
                 }
-                step.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                state.stepDetail(step.id)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (blocking.isNotEmpty()) {
                     Row(Modifier.testTag("planStepProblem:$index"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

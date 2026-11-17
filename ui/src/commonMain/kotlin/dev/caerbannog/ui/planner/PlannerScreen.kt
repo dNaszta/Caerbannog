@@ -158,6 +158,7 @@ fun PlannerScreen(
     PlanWizardDialog(
         wizard = state.wizard,
         events = events,
+        wordsOf = state::wordsOf,
         onAddToPlan = { summary ->
             addMarker = state.plan.steps.map { it.id }.toSet() to summary.editingStepId
             events.addToPlan()

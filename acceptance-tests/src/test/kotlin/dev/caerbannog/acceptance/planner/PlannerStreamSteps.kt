@@ -206,20 +206,37 @@ class PlannerStreamSteps {
 
     // ---- a saved file (stand-ins until M9-12) ----
 
-    private var pendingVersion: String? = null
-
     @Given("a pending migration {string} that declares the streams {string} and {string}")
     fun pendingStreams(version: String, first: String, second: String) {
-        pendingVersion = version
-        d.store.putDraft("", listOf(MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost)))
+        PendingStandIn.put(d, version, listOf(MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost)))
     }
 
     @When("I choose {string} for {string}")
     fun chooseFor(button: String, version: String) {
         assertEquals("Edit steps", button, "this stand-in knows one button; M9-12 binds the real ones")
-        assertEquals(pendingVersion, version)
+        PendingStandIn.open(d, version)
+    }
+}
+
+/**
+ * The one stand-in for M9-12 ("Edit steps" opens a pending file as steps), shared by every step class of the planner glue: [put] writes the actions of
+ * the pending file into the draft file, [open] restarts the planner on it. M9-12 binds the sentence `I choose {string} for {string}` to the real
+ * Migrations screen and must replace [open] (and the Givens that call [put]), not add a second step.
+ */
+internal object PendingStandIn {
+    private var version: String? = null
+    private var count = 0
+
+    fun put(d: PlannerDriver, version: String, actions: List<MigrationAction>) {
+        this.version = version
+        count = actions.size
+        d.store.putDraft("", actions)
+    }
+
+    fun open(d: PlannerDriver, version: String) {
+        assertEquals(this.version, version, "no pending migration \"$version\" was put by a Given")
         d.restart()
         assertNotNull(d.vm)
-        assertTrue(d.plan.steps.size == 2, "the file's steps were not opened: ${d.titles()}")
+        assertTrue(d.plan.steps.size == count, "the file's steps were not opened: ${d.titles()}")
     }
 }

@@ -196,6 +196,23 @@ data class PlannerState(
     /** "Check against uat-eu", or "Check" while there is no connection. */
     val checkLabel: String get() = PlannerTexts.checkLabel(connectionName)
 
+    /**
+     * The two lines a plan action is shown with: the words of an MQTT route (its kind from this plan, then from the broker's names), else the
+     * action's own description and detail. The step list, the summary page of the wizard and every other place that words a step call this.
+     */
+    fun wordsOf(action: MigrationAction): MqttRouteWords =
+        MqttRoutes.words(action, plan.steps.map { it.action }, known ?: KnownTopology.None) ?: MqttRouteWords(action.description, action.detail.orEmpty())
+
+    /** The title of step [stepId] as the planner shows it; empty for an id that is not in the plan. */
+    fun stepTitle(stepId: Int): String =
+        plan.steps.firstOrNull { it.id == stepId }?.let { wordsOf(it.action).title }.orEmpty()
+
+    /** The second line of step [stepId], or null when it has none. */
+    fun stepDetail(stepId: Int): String? {
+        val action = plan.steps.firstOrNull { it.id == stepId }?.action ?: return null
+        return if (MqttRoutes.routeOf(action) != null) wordsOf(action).detail else action.detail
+    }
+
     /** "Response stream (DLN) of telemetry" for a step that [PlanPairs] recognises as a response stream; null for every other step. */
     fun responseStreamLine(stepId: Int): String? {
         val request = PlanPairs.responseOf(plan)[stepId] ?: return null

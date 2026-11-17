@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
+import dev.caerbannog.core.migrations.MigrationAction
+import dev.caerbannog.core.planner.MqttRouteForm
+import dev.caerbannog.core.planner.MqttRouteWords
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.StreamForm
@@ -77,7 +80,12 @@ private val MIN_PAGES_HEIGHT: Dp = 160.dp
  * stay in reach. Nothing here is sent anywhere until the view model's "Add to plan", and even that changes a plan only.
  */
 @Composable
-internal fun PlanWizardDialog(wizard: WizardState, events: PlannerEvents, onAddToPlan: (WizardState.Summary) -> Unit) {
+internal fun PlanWizardDialog(
+    wizard: WizardState,
+    events: PlannerEvents,
+    wordsOf: (MigrationAction) -> MqttRouteWords,
+    onAddToPlan: (WizardState.Summary) -> Unit,
+) {
     if (wizard == WizardState.Closed) return
     // The height of the window the dialog stands over, read here: inside the dialog the constraints are the dialog's own. The pages scroll
     // within what is left after the stepper, the buttons and the padding, so the buttons stay in reach on a short window.
@@ -117,7 +125,7 @@ internal fun PlanWizardDialog(wizard: WizardState, events: PlannerEvents, onAddT
                         when (wizard) {
                             WizardState.Kind -> KindPage(selectedKind, onSelect = { selectedKind = it }, onChoose = events::chooseKind)
                             is WizardState.Details -> DetailsPage(wizard, events, onNext = primary)
-                            is WizardState.Summary -> SummaryPage(wizard)
+                            is WizardState.Summary -> SummaryPage(wizard, wordsOf)
                             WizardState.Closed -> Unit
                         }
                     }
@@ -252,21 +260,23 @@ private fun DetailsPage(details: WizardState.Details, events: PlannerEvents, onN
         is ExchangeForm -> ExchangeFormView(form, details, events, onNext)
         is BindingForm -> BindingFormView(form, details, events, onNext)
         is StreamForm -> StreamFormView(form, details, events, onNext)
+        is MqttRouteForm -> MqttRouteFormView(form, details, events, onNext)
     }
 }
 
 // ---- page 3 ----
 
 @Composable
-private fun SummaryPage(summary: WizardState.Summary) {
+private fun SummaryPage(summary: WizardState.Summary, wordsOf: (MigrationAction) -> MqttRouteWords) {
     Column(Modifier.fillMaxWidth().testTag("planWizard:summary"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(PlannerTexts.summaryTitle(summary.actions.size), style = MaterialTheme.typography.titleLarge)
         summary.actions.forEachIndexed { i, action ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                 Text("${i + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(20.dp))
                 Column {
-                    Text(action.description, style = MaterialTheme.typography.bodyMedium)
-                    action.detail?.let {
+                    val words = wordsOf(action)
+                    Text(words.title, style = MaterialTheme.typography.bodyMedium)
+                    words.detail.takeIf { it.isNotEmpty() }?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

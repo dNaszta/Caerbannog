@@ -158,7 +158,9 @@ object StepForms {
                 null
             }
         is MigrationAction.DeclareBinding ->
-            if (action.arguments.isEmpty()) {
+            if (MqttRoutes.routeOf(action) != null) {
+                MqttRouteForm(filter = MqttRoutes.routeOf(action)?.filter.orEmpty(), destination = action.queue)
+            } else if (action.arguments.isEmpty()) {
                 BindingForm(action.exchange, action.queue, action.destinationType, action.routingKey)
             } else {
                 null

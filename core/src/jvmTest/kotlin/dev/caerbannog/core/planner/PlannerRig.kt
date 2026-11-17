@@ -88,6 +88,7 @@ internal class PlannerRig(
             is ExchangeForm -> "Exchange"
             is BindingForm -> "Binding"
             is StreamForm -> "Stream"
+            is MqttRouteForm -> "MQTT route"
         }
     }
 }

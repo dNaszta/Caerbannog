@@ -60,6 +60,8 @@ data class PlanGraph(
     val links: List<PlanLink> = emptyList(),
     val edgeLabels: Map<String, String> = emptyMap(),
     val notice: PlanGraphNotice? = null,
+    /** The edges that are MQTT routes (A10); the screen draws [PlannerTexts.MQTT_ROUTE_LABEL] on them and their filter from [edgeLabels]. */
+    val mqttRouteEdgeIds: Set<String> = emptySet(),
     val notes: List<PlanGraphNote> = emptyList(),
 ) {
     fun markOf(nodeId: String): PlanMark = when (nodeId) {
@@ -114,7 +116,7 @@ fun planPreview(
     }
 
     val streamNames = (declaredStreams + queueNames.filter { it in brokerStreams }).toSet()
-    fun exchangeType(name: String): String = brokerExchanges[name] ?: declaredExchanges[name] ?: "direct"
+    fun exchangeType(name: String): String = brokerExchanges[name] ?: declaredExchanges[name] ?: builtInExchangeType(name) ?: "direct"
     val drawn = buildBindingGraph(
         exchanges = exchangeNames.map { name ->
             ExchangeRow(name, plan.vhost, exchangeType(name), durable = true, autoDelete = false, internal = false)
@@ -138,12 +140,15 @@ fun planPreview(
         when {
             onBroker -> Unit
             declared -> isNew += node.id
+            // The broker reserves the names amq.* and has the default exchanges in every virtual host, read or not (O15).
+            isExchange && name.startsWith(BUILT_IN_EXCHANGE_PREFIX) -> Unit
             // While the broker has not answered, an end that is not declared may well exist: no verdict yet.
             pending && known == null -> Unit
             else -> notInPlan += node.id
         }
     }
 
+    val routeLabels = mqttRouteLabels(bindings, graph)
     val notice = when {
         graph.isTooLarge -> PlanGraphNotice.TooLarge
         pending && known == null -> null
@@ -157,7 +162,21 @@ fun planPreview(
         notInPlanNodeIds = notInPlan,
         links = responseLinks(plan),
         notice = notice,
+        edgeLabels = routeLabels,
+        mqttRouteEdgeIds = routeLabels.keys,
     )
+}
+
+/**
+ * Edge id to topic filter for every drawn edge that is a recognised MQTT route. An edge is the route's binding: same exchange, destination
+ * and key (a binding the graph draws once even when the plan holds it twice).
+ */
+private fun mqttRouteLabels(bindings: List<MigrationAction.DeclareBinding>, graph: BindingGraph): Map<String, String> {
+    val routes = bindings.mapNotNull { MqttRoutes.routeOf(it) }
+    return graph.edges.map { it.edge }.mapNotNull { edge ->
+        val route = routes.firstOrNull { edge.sourceId == "e:${MqttRoutes.EXCHANGE}" && edge.targetId == "q:${it.destination}" && edge.routingKey == it.key }
+        route?.let { edge.id to it.filter }
+    }.toMap()
 }
 
 /** One link per recognised pair, from the request stream to its response stream; a link is not an edge, so it adds no routing. */
@@ -166,6 +185,17 @@ private fun responseLinks(plan: TopologyPlan): List<PlanLink> = PlanPairs.respon
     val to = (plan.steps.firstOrNull { it.id == response }?.action as? MigrationAction.DeclareStream)?.name
     if (from == null || to == null) null else PlanLink("q:$from", "q:$to", PlanLinkKind.ResponseStream)
 }.distinct()
+
+private const val BUILT_IN_EXCHANGE_PREFIX = "amq."
+
+/** The type of a default exchange, from its name, for when the broker was not read. Other amq.* names are not guessed. */
+private fun builtInExchangeType(name: String): String? = when (name) {
+    "amq.topic" -> "topic"
+    "amq.direct" -> "direct"
+    "amq.fanout" -> "fanout"
+    "amq.headers" -> "headers"
+    else -> null
+}
 
 private fun GraphNode.rawName(): String = id.substring(2)
 

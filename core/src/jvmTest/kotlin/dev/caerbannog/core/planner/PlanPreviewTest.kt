@@ -224,4 +224,10 @@ class PlanPreviewTest {
         assertEquals(GraphNodeKind.Stream, g.node("q:audit-log").kind)
         assertEquals("Declare stream audit-log", withSettings.description)
     }
+
+    @Test
+    fun `an undeclared plain exchange that is not built in stays not in this plan when nothing was read (round 2 control)`() {
+        val g = planPreview(planOf(queue("orders"), bind("events", "orders", "k")), none)
+        assertEquals(PlanMark.NotInPlan, g.markOf("e:events"))
+    }
 }

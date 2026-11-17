@@ -20,6 +20,8 @@ import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.planner.KnownTopologyReader
+import dev.caerbannog.core.planner.MqttDestinationKind
+import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.PlannerContext
@@ -70,6 +72,11 @@ import kotlinx.coroutines.cancel
  *    ticked), the field tags `planForm:hint:responseName` and `planForm:error:responseName`; the step list: `planStepPair:<i>` (the second line
  *    of a response stream's row, "Response stream (DLN) of <name>"); the review graph: `planGraphLink:<source id>:<target id>` (the dotted link,
  *    its text `PlannerTexts.RESPONSE_LINK_LABEL`).
+ *  - (M9-10) the MQTT route form (kind card `planWizard:kind:MQTT route`): `planForm:filter` and `planForm:destination` (text fields),
+ *    `planForm:destinationKind:queue|stream` (radio, `selected` semantics), `planForm:error:filter` / `planForm:error:destination`, `planForm:mqttKey`
+ *    (`PlannerTexts.mqttRouteSaves(key)`, drawn only while the filter is accepted), `planForm:mqttTopic` (the matching topic, drawn only while the
+ *    filter is accepted), `planForm:mqttAssumption` (`PlannerTexts.MQTT_EXCHANGE_ASSUMPTION`, always drawn on this form); the review graph:
+ *    `planGraphEdgeLabel:<edge id>` (text = the filter) and `planGraphEdgeTag:<edge id>` (text `PlannerTexts.MQTT_ROUTE_LABEL`), both only for a route.
  */
 internal const val FOLDER = "/work/migrations"
 
@@ -124,6 +131,8 @@ internal class UiRig(
     fun stream(name: String, withResponse: Boolean = false, responseName: String? = null) =
         add(StreamForm(name = name, withResponse = withResponse, responseName = responseName))
     fun binding(exchange: String, queue: String, key: String = "") = add(BindingForm(exchange = exchange, destination = queue, routingKey = key))
+    fun mqttRoute(filter: String, destination: String, kind: MqttDestinationKind? = null) =
+        add(MqttRouteForm(filter = filter, destination = destination, destinationKind = kind))
 
     /** The mockup's plan, three steps: a queue, an exchange and a binding of the two. */
     fun threeSteps() {
@@ -135,6 +144,7 @@ internal class UiRig(
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
+        is MqttRouteForm -> "MQTT route"
     }
 }
 

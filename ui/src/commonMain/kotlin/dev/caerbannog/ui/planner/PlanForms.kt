@@ -31,6 +31,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.planner.BindingForm
 import dev.caerbannog.core.planner.ExchangeForm
+import dev.caerbannog.core.planner.MqttDestinationKind
+import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.QueueForm
 import dev.caerbannog.core.planner.StreamForm
@@ -140,6 +142,41 @@ internal fun StreamFormView(initial: StreamForm, details: WizardState.Details, e
             )
         }
     }
+}
+
+@Composable
+internal fun MqttRouteFormView(initial: MqttRouteForm, details: WizardState.Details, events: PlannerEvents, onNext: () -> Unit) {
+    var form by remember(details.editingStepId) { mutableStateOf(initial) }
+    val change = { new: MqttRouteForm -> form = new; events.updateForm(new) }
+    Text(PlannerTexts.MQTT_ROUTE_LABEL, style = MaterialTheme.typography.titleLarge)
+    FormField("filter", PlannerTexts.MQTT_FILTER_LABEL, form.filter, details, onNext, autoFocus = true) { change(form.copy(filter = it)) }
+    // The key and the topic are drawn only while the filter is accepted; the assumption is drawn always, because the app cannot check it.
+    form.bindingKey()?.let {
+        Text(PlannerTexts.mqttRouteSaves(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planForm:mqttKey"))
+    }
+    form.matchingTopic()?.let {
+        Text(PlannerTexts.mqttMatchingTopic(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planForm:mqttTopic"))
+    }
+    ChoiceGroup(
+        tagPrefix = "planForm:destinationKind:",
+        options = listOf("queue" to PlannerTexts.MQTT_QUEUE_LABEL, "stream" to PlannerTexts.MQTT_STREAM_LABEL),
+        selected = when (form.destinationKind) {
+            MqttDestinationKind.Queue -> "queue"
+            MqttDestinationKind.Stream -> "stream"
+            null -> ""
+        },
+        note = null,
+        horizontal = true,
+    ) { change(form.copy(destinationKind = if (it == "stream") MqttDestinationKind.Stream else MqttDestinationKind.Queue)) }
+    FormField("destination", PlannerTexts.MQTT_DESTINATION_LABEL, form.destination, details, onNext, suggestions = details.destinationSuggestions) {
+        change(form.copy(destination = it))
+    }
+    Text(
+        PlannerTexts.MQTT_EXCHANGE_ASSUMPTION,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag("planForm:mqttAssumption"),
+    )
 }
 
 /**
