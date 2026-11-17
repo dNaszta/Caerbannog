@@ -60,7 +60,15 @@ import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
+import dev.caerbannog.core.mqtt.CorrelationIdSource
+import dev.caerbannog.core.planner.KnownTopology
+import dev.caerbannog.core.planner.MqttRoute
 import dev.caerbannog.core.planner.MqttRoutes
+import dev.caerbannog.core.planner.MqttTestMessage
+import dev.caerbannog.core.planner.MqttTestMessageTexts
+import dev.caerbannog.core.planner.MqttTopicSample
+import dev.caerbannog.core.planner.TestMessageOffer
+import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.ui.appframe.AppDestination
@@ -105,7 +113,12 @@ fun MigrationsScreen(
     /** "Plan saved as ...", set by the window after a save; transient, not part of the migrations state. */
     plannerNotice: String? = null,
     onDismissPlannerNotice: () -> Unit = {},
+    /** M9-10b: called with what the Publish MQTT dialog is to open with, after "Send a test message" (and its sample values) of an MQTT route. */
+    onSendTestMessage: (TestMessageOpening) -> Unit = {},
+    /** Where the generated `correlation-id` of a test message comes from; the window passes a UUID source. */
+    correlationIds: CorrelationIdSource = CorrelationIdSource { "" },
 ) {
+    var sampleFor by remember { mutableStateOf<MqttRoute?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var askDismissDraft by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -314,6 +327,14 @@ fun MigrationsScreen(
                         onEdit = { showEditDialog = true },
                         onValidateAgain = onValidateAgain,
                         onApply = { onApplySingle(selectedFile.version) },
+                        onTestMessage = { route ->
+                            // A route without wildcards needs no sample value: the Publish MQTT dialog opens at once.
+                            if (MqttTopicSample.slots(route.filter).isEmpty()) {
+                                onSendTestMessage(testMessageOpening(route, selectedFile, emptyList(), correlationIds))
+                            } else {
+                                sampleFor = route
+                            }
+                        },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 } else {
@@ -340,6 +361,21 @@ fun MigrationsScreen(
                 onDismissDraft()
             },
         )
+    }
+
+    val sampleRoute = sampleFor
+    val sampleFile = state.selectedFile
+    if (sampleRoute != null && sampleFile != null) {
+        Dialog(onDismissRequest = { sampleFor = null }) {
+            MqttTestMessageDialog(
+                filter = sampleRoute.filter,
+                onOpen = { values ->
+                    sampleFor = null
+                    onSendTestMessage(testMessageOpening(sampleRoute, sampleFile, values, correlationIds))
+                },
+                onCancel = { sampleFor = null },
+            )
+        }
     }
 
     state.confirmation?.let { EmptyHistoryDialog(it, onCancelEmptyHistory, onConfirmEmptyHistory) }
@@ -459,6 +495,7 @@ private fun MigrationDetailPanel(
     onEdit: () -> Unit,
     onValidateAgain: () -> Unit,
     onApply: () -> Unit,
+    onTestMessage: (MqttRoute) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val copyToClipboard = rememberCopyToClipboard()
@@ -524,8 +561,20 @@ private fun MigrationDetailPanel(
             if (dryRun != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val failedIndex = MigrationsWording.failedActionIndex(state.applyOutcome, file.version)
+                    // Applied means applied on THIS connection profile: the entry's status is read from this profile's history.
+                    val status = state.entries.firstOrNull { it.file.version == file.version }?.status
                     dryRun.actions.forEachIndexed { index, actionDryRun ->
-                        DryRunActionRow(actionDryRun, index, failed = index == failedIndex, siblings = dryRun.actions.map { it.action })
+                        val route = MqttRoutes.routeOf(actionDryRun.action)
+                        val offer = if (route == null || status == null) {
+                            TestMessageOffer.NotOffered
+                        } else {
+                            MqttTestMessage.offer(status, route, state.hasMqtt, state.publishingEnabled, state.vhost)
+                        }
+                        DryRunActionRow(
+                            actionDryRun, index, failed = index == failedIndex, siblings = dryRun.actions.map { it.action },
+                            testMessage = offer,
+                            onTestMessage = { route?.let(onTestMessage) },
+                        )
                     }
                 }
             }
@@ -616,6 +665,8 @@ private fun DryRunActionRow(
     index: Int,
     failed: Boolean = false,
     siblings: List<MigrationAction> = emptyList(),
+    testMessage: TestMessageOffer = TestMessageOffer.NotOffered,
+    onTestMessage: () -> Unit = {},
 ) {
     // The kind of a route's destination comes from the migration's own actions only: the file may be applied to another broker later.
     val words = MqttRoutes.words(actionDryRun.action, siblings)
@@ -658,6 +709,7 @@ private fun DryRunActionRow(
                     color = Color(0xFFC62828),
                 )
             }
+            TestMessageControl(testMessage, index, onTestMessage)
         }
         if (failed) {
             Pill("Failed", Color(0xFFFFEBEE), Color(0xFFC62828), AppIcon.Error, Modifier.testTag("dryRunFailed:$index"))
@@ -673,6 +725,31 @@ private fun DryRunActionRow(
         }
     }
 }
+
+/** The button of an MQTT route row and, when it is disabled, the reason under it; nothing for a row that is not offered one. */
+@Composable
+private fun TestMessageControl(offer: TestMessageOffer, index: Int, onClick: () -> Unit) {
+    if (offer is TestMessageOffer.NotOffered) return
+    TextButton(
+        onClick = onClick,
+        enabled = offer is TestMessageOffer.Available,
+        modifier = Modifier.testTag("migrations:testMessageBtn:$index"),
+    ) {
+        Text(MqttTestMessageTexts.BUTTON)
+    }
+    if (offer is TestMessageOffer.Disabled) {
+        Text(
+            text = offer.reason,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 12.dp).testTag("migrations:testMessageReason:$index"),
+        )
+    }
+}
+
+/** The kind of the destination comes from the migration's own declare steps, as for the row's words: unknown gives no notice and no guess. */
+private fun testMessageOpening(route: MqttRoute, file: MigrationFile, values: List<String>, ids: CorrelationIdSource): TestMessageOpening =
+    MqttTestMessage.opening(route, MqttRoutes.kindOf(route.destination, file.up, KnownTopology.None), values, ids)
 
 private data class Quintup<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
 

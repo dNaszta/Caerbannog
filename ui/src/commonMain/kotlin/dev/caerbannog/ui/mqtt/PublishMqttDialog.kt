@@ -1,6 +1,8 @@
 package dev.caerbannog.ui.mqtt
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -73,184 +77,203 @@ fun PublishMqttDialog(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
         ) {
+            val bodyScroll = rememberScrollState()
+            // The actions stay outside the scroll, so Publish and Cancel are always on screen; the body is what scrolls.
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Header
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Publish MQTT message",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.testTag("publishMqttDialogTitle"),
-                    )
-                    Text(
-                        text = "Publish a test message to any topic on this broker.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                // Destination Warning Banner
-                WarningBanner(state.warningBanner)
-
-                // Topic Input
-                OutlinedTextField(
-                    value = state.topic,
-                    onValueChange = events::setTopic,
-                    label = { Text("Topic") },
-                    placeholder = { Text("e.g. sensors/room-1/temperature") },
-                    isError = state.topicError != null,
-                    supportingText = {
-                        state.topicError?.let { err ->
-                            Text(
-                                text = err,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.testTag("publishMqttTopicError"),
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().testTag("publishMqttTopicInput"),
-                    singleLine = true,
-                )
-
-                // QoS Selector
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Quality of Service (QoS)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().testTag("publishMqttQosSelector"),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        MqttQos.entries.forEach { qos ->
-                            val isSelected = state.qos == qos
-                            val label = when (qos) {
-                                MqttQos.AT_MOST_ONCE -> "QoS 0 (At most once)"
-                                MqttQos.AT_LEAST_ONCE -> "QoS 1 (At least once)"
-                                MqttQos.EXACTLY_ONCE -> "QoS 2 (Exactly once)"
-                            }
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { events.setQos(qos) },
-                                label = { Text(label) },
-                                modifier = Modifier.testTag("qosChip:${qos.value}"),
-                            )
-                        }
-                    }
-                }
-
-                // Retain Switch
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = state.retain,
-                            role = Role.Switch,
-                            onValueChange = events::setRetain,
-                        )
-                        .testTag("publishMqttRetainSwitch"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                        Text(
-                            text = "Retain message",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = "The broker stores this message as the latest retained value for new subscribers.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = state.retain,
-                        onCheckedChange = null,
-                    )
-                }
-
-                // Payload Input
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Payload",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = state.payload,
-                        onValueChange = events::setPayload,
-                        placeholder = { Text("Message body") },
+                Box(modifier = Modifier.weight(1f, fill = false)) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 140.dp, max = 300.dp)
-                            .testTag("publishMqttPayloadInput"),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                        maxLines = 15,
-                        minLines = 5,
-                    )
-                }
-
-                // Headers (MQTT 5 user properties)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(end = 12.dp)
+                            .verticalScroll(bodyScroll)
+                            .testTag("publishMqttBody"),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        // Header
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                text = "Headers",
+                                text = "Publish MQTT message",
+                                style = MaterialTheme.typography.headlineSmall,
+                                modifier = Modifier.testTag("publishMqttDialogTitle"),
+                            )
+                            Text(
+                                text = "Publish a test message to any topic on this broker.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        // Destination Warning Banner
+                        WarningBanner(state.warningBanner)
+
+                        // Topic Input
+                        OutlinedTextField(
+                            value = state.topic,
+                            onValueChange = events::setTopic,
+                            label = { Text("Topic") },
+                            placeholder = { Text("e.g. sensors/room-1/temperature") },
+                            isError = state.topicError != null,
+                            supportingText = {
+                                state.topicError?.let { err ->
+                                    Text(
+                                        text = err,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.testTag("publishMqttTopicError"),
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("publishMqttTopicInput"),
+                            singleLine = true,
+                        )
+
+                        // QoS Selector
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Quality of Service (QoS)",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(
-                                text = "Sent as MQTT 5 user properties. Rows without a key are ignored.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        TextButton(onClick = events::addHeader, modifier = Modifier.testTag("publishMqttAddHeaderButton")) {
-                            ConnectionIcon(AppIcon.Add, SmallIconSize)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Add header")
-                        }
-                    }
-                    state.headers.forEachIndexed { index, header ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            OutlinedTextField(
-                                value = header.key,
-                                onValueChange = { events.setHeader(index, it, header.value) },
-                                label = { Text("Key") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f).testTag("publishMqttHeaderKey:$index"),
-                            )
-                            OutlinedTextField(
-                                value = header.value,
-                                onValueChange = { events.setHeader(index, header.key, it) },
-                                label = { Text("Value") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f).testTag("publishMqttHeaderValue:$index"),
-                            )
-                            IconButton(
-                                onClick = { events.removeHeader(index) },
-                                modifier = Modifier.testTag("publishMqttRemoveHeader:$index"),
+                            Row(
+                                modifier = Modifier.fillMaxWidth().testTag("publishMqttQosSelector"),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                ConnectionIcon(AppIcon.Close, IconSize, contentDescription = "Remove header")
+                                MqttQos.entries.forEach { qos ->
+                                    val isSelected = state.qos == qos
+                                    val label = when (qos) {
+                                        MqttQos.AT_MOST_ONCE -> "QoS 0 (At most once)"
+                                        MqttQos.AT_LEAST_ONCE -> "QoS 1 (At least once)"
+                                        MqttQos.EXACTLY_ONCE -> "QoS 2 (Exactly once)"
+                                    }
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { events.setQos(qos) },
+                                        label = { Text(label) },
+                                        modifier = Modifier.testTag("qosChip:${qos.value}"),
+                                    )
+                                }
                             }
                         }
+
+                        // Retain Switch
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = state.retain,
+                                    role = Role.Switch,
+                                    onValueChange = events::setRetain,
+                                )
+                                .testTag("publishMqttRetainSwitch"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = "Retain message",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = "The broker stores this message as the latest retained value for new subscribers.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = state.retain,
+                                onCheckedChange = null,
+                            )
+                        }
+
+                        // Payload Input
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Payload",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedTextField(
+                                value = state.payload,
+                                onValueChange = events::setPayload,
+                                placeholder = { Text("Message body") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 140.dp, max = 300.dp)
+                                    .testTag("publishMqttPayloadInput"),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                maxLines = 15,
+                                minLines = 5,
+                            )
+                        }
+
+                        // Headers (MQTT 5 user properties)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Headers",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "Sent as MQTT 5 user properties. Rows without a key are ignored.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TextButton(onClick = events::addHeader, modifier = Modifier.testTag("publishMqttAddHeaderButton")) {
+                                    ConnectionIcon(AppIcon.Add, SmallIconSize)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Add header")
+                                }
+                            }
+                            state.headers.forEachIndexed { index, header ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    OutlinedTextField(
+                                        value = header.key,
+                                        onValueChange = { events.setHeader(index, it, header.value) },
+                                        label = { Text("Key") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f).testTag("publishMqttHeaderKey:$index"),
+                                    )
+                                    OutlinedTextField(
+                                        value = header.value,
+                                        onValueChange = { events.setHeader(index, header.key, it) },
+                                        label = { Text("Value") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f).testTag("publishMqttHeaderValue:$index"),
+                                    )
+                                    IconButton(
+                                        onClick = { events.removeHeader(index) },
+                                        modifier = Modifier.testTag("publishMqttRemoveHeader:$index"),
+                                    ) {
+                                        ConnectionIcon(AppIcon.Close, IconSize, contentDescription = "Remove header")
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                    if (bodyScroll.maxValue > 0) {
+                        VerticalScrollbar(
+                            rememberScrollbarAdapter(bodyScroll),
+                            Modifier.align(Alignment.CenterEnd).matchParentSize().testTag("publishMqttBodyScrollbar"),
+                        )
                     }
                 }
 
-                // Feedback Banners
+                // What the dialog tells the user now stays pinned with the buttons, so it is never below the fold: the notice, then the feedback.
+                state.headerNoticeText?.let { text -> HeaderNoticeBanner(text) }
                 state.confirmation?.let { msg ->
                     BannerBox(text = msg, isError = false, testTag = "publishMqttConfirmation")
                 }
@@ -260,7 +283,7 @@ fun PublishMqttDialog(
 
                 // Action Buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -294,6 +317,32 @@ private fun WarningBanner(text: String) {
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth().testTag("publishMqttWarningBanner"),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ConnectionIcon(AppIcon.Warning, IconSize)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
+/** The warning above the buttons. It appears and disappears with the header, so a polite live region lets a screen reader announce it. */
+@Composable
+private fun HeaderNoticeBanner(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("publishMqttHeaderNotice")
+            .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

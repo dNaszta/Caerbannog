@@ -21,7 +21,12 @@ data class PublishMqttState(
     val confirmation: String? = null,
     val error: String? = null,
     val topicError: String? = null,
+    val headerNotice: HeaderNotice? = null,
 ) {
+    /** The notice text while a header with the notice's key (trimmed, case-sensitive) is in the list; never part of [canPublish]. */
+    val headerNoticeText: String?
+        get() = headerNotice?.takeIf { notice -> headers.any { it.key.trim() == notice.key } }?.text
+
     val canPublish: Boolean
         get() = topic.isNotBlank() &&
             topicError == null &&
@@ -45,12 +50,16 @@ class PublishMqttViewModel(
     private val connectionName: String,
     private val scope: CoroutineScope,
     initialTopic: String = "",
+    initialHeaders: List<MqttHeader> = emptyList(),
+    headerNotice: HeaderNotice? = null,
 ) {
     private val _state = MutableStateFlow(
         PublishMqttState(
             connectionName = connectionName,
             topic = initialTopic,
             topicError = validateTopic(initialTopic),
+            headers = initialHeaders,
+            headerNotice = headerNotice,
         )
     )
     val state: StateFlow<PublishMqttState> = _state.asStateFlow()

@@ -158,6 +158,8 @@ class PlannerGraphSteps {
     fun says(title: String) {
         // M9-05: after a check, "it says" is a sentence of the check result (the step that needs something that is missing), not the graph's notice.
         if (CheckWorld.result != null) return CheckWorld.saysSentence(title)
+        // M9-10b: after "I enter" in the sample value dialog of a test message, "it says" is the message under the value field.
+        if (PlannerTestMessageSteps.valueDialogOpen) return PlannerTestMessageSteps.saysUnderField(title)
         // M9-10: the sentence of the MQTT route form (the form is on show, not the graph).
         if (title == dev.caerbannog.core.planner.PlannerTexts.MQTT_EXCHANGE_ASSUMPTION) return PlannerMqttSteps.assumptionSaid(title)
         val text = screen.textOf("planner:graphNotice").orEmpty()

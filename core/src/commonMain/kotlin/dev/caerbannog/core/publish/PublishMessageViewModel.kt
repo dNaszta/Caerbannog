@@ -57,7 +57,7 @@ class PublishMessageViewModel(
     private val gate: PublishGate = if (writePermission) {
         PublishGate.Enabled
     } else {
-        PublishGate.Disabled("Test publishing is disabled: no write permission on virtual host $vhost.")
+        PublishGate.Disabled(noWritePermission(vhost))
     }
 
     private val _state = MutableStateFlow(

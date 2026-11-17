@@ -41,6 +41,10 @@ data class MigrationsScreenState(
     val unavailableReason: String? = null,
     /** M9-14: the one line under the export result naming what the last export left out; null when nothing was, cleared by the next export. */
     val exportNote: String? = null,
+    /** M9-10b: this connection has an MQTT port; with [publishingEnabled] it decides the button "Send a test message" of an MQTT route. */
+    val hasMqtt: Boolean = false,
+    /** M9-10b: the declared permission allows test publishing; false while the permission check is not finished. */
+    val publishingEnabled: Boolean = false,
 ) {
     /** True when a folder is chosen and exists, so "Show folder" has something to open; decided by the typed problem, never by text. */
     val canShowFolder: Boolean
