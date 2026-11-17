@@ -143,8 +143,10 @@ class PlannerMqttSteps {
 
     @Then("the planner lists {string}")
     fun plannerListsOne(title: String) {
-        assertEquals(listOf(title), d.titles(), "the planner's steps")
-        assertShownOnScreen(title, 0)
+        // Among the steps (M9-07b: a pair and its route are three steps); with one step in the plan this is the same as "exactly this step".
+        val row = d.titles().indexOf(title)
+        assertTrue(row >= 0, "the planner's steps are ${d.titles()}, expected \"$title\" among them")
+        assertShownOnScreen(title, row)
     }
 
     private fun assertShownOnScreen(title: String, row: Int) =

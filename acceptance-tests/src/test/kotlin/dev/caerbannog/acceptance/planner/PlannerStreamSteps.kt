@@ -5,7 +5,9 @@ import dev.caerbannog.core.planner.PlanLink
 import dev.caerbannog.core.planner.PlanLinkKind
 import dev.caerbannog.core.planner.PlanMark
 import dev.caerbannog.core.planner.PlannerTexts
+import dev.caerbannog.core.planner.PlanGraphNote
 import dev.caerbannog.core.planner.StreamForm
+import dev.caerbannog.core.planner.WizardState
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -48,9 +50,19 @@ class PlannerStreamSteps {
     private fun addPair(form: StreamForm) {
         d.fill(form)
         d.next()
-        summaryTitleSeen = d.summaryTitle()
+        readSummary()
         d.addToPlan()
     }
+
+    /** What the summary page said (title and note, in the state and on the screen) before Add to plan closes the wizard. */
+    private fun readSummary() {
+        summaryTitleSeen = d.summaryTitle()
+        summaryNoteSeen = (d.state.wizard as? WizardState.Summary)?.note
+        summaryNoteOnScreen = screen.textOf("planWizard:summaryNote")
+    }
+
+    private var summaryNoteSeen: String? = null
+    private var summaryNoteOnScreen: String? = null
 
     // ---- adding ----
 
@@ -137,12 +149,30 @@ class PlannerStreamSteps {
             val screen = PlannerScreens.forViewModel(world.vm)
             assertEquals(note, screen.textOf("planForm:responseNote"), "the note on the screen")
         }
+
+        /** M9-07b: the problem of a tick is also under its field on the screen. */
+        fun tickErrorOnScreen(message: String) {
+            val world = PlannerWorld.driver
+            val form = world.form as? StreamForm ?: return
+            val screen = PlannerScreens.forViewModel(world.vm)
+            val tagged = listOf("answersTopic" to form.answersTopic, "requestsTopic" to form.requestsTopic).filter { it.second != null }
+            val problem = world.formProblems().firstOrNull { p -> tagged.any { it.first == p.field } } ?: return
+            assertEquals(message, screen.textOf("planForm:error:${problem.field}"), "the error under ${problem.field}")
+        }
     }
 
     // ---- the summary and the plan ----
 
     @Then("the summary says {string}")
-    fun summarySays(title: String) = assertEquals(title, summaryTitleSeen, "the wizard's summary page said")
+    fun summarySays(title: String) {
+        // M9-07b: the sentence of the summary's note (what the planner does not plan) is "said" by the summary too, in the state and on the page.
+        if (title == PlannerTexts.SERVICE_NOT_PLANNED) {
+            assertEquals(title, summaryNoteSeen, "state: the note of the summary page")
+            assertEquals(title, summaryNoteOnScreen, "screen: the text of planWizard:summaryNote")
+            return
+        }
+        assertEquals(title, summaryTitleSeen, "the wizard's summary page said")
+    }
 
     @Then("the plan lists {string} and nothing else")
     fun listsAndNothingElse(title: String) = assertEquals(listOf(title), d.titles(), "the plan's steps")
@@ -204,7 +234,181 @@ class PlannerStreamSteps {
         assertEquals(label, screen.textOf("planGraphLink:q:$request:q:$response"), "screen: the label of the link")
     }
 
+    // ---- M9-07b: the MQTT ticks (the form is driven on the REAL planner screen: the ticks are clicked and the filters typed there) ----
+
+    private val answersLabel = "Answers arrive over MQTT"
+    private val requestsLabel = "Requests are also recorded from an MQTT topic"
+
+    private fun which(tick: String): String = when (tick) {
+        answersLabel -> "answers"
+        requestsLabel -> "requests"
+        else -> error("\"$tick\" is not one of the two MQTT ticks")
+    }
+
+    private fun tickMqtt(tick: String, filter: String) {
+        val side = which(tick)
+        assertTrue(screen.isDrawn("planForm:${side}OverMqtt"), "the tick \"$tick\" is not drawn")
+        assertTrue(screen.textOf("planForm:${side}OverMqtt").orEmpty().contains(tick), "the tick says: ${screen.textOf("planForm:${side}OverMqtt")}")
+        screen.click("planForm:${side}OverMqtt")
+        assertTrue(screen.isOn("planForm:${side}OverMqtt"), "the tick \"$tick\" is not on after it was ticked")
+        if (filter.isNotEmpty()) screen.replaceText("planForm:${side}Topic", filter)
+        val form = currentStream()
+        assertEquals(filter, if (side == "answers") form.answersTopic else form.requestsTopic, "the filter in the state of the form")
+    }
+
+    private fun pairWithTicks(name: String, vararg ticks: Pair<String, String>) {
+        d.fill(d.streamForm(name))
+        screen.click("planForm:responseTick")
+        assertTrue(currentStream().withResponse, "the pair tick is not on")
+        ticks.forEach { (tick, filter) -> tickMqtt(tick, filter) }
+    }
+
+    private fun finishPair() {
+        d.next()
+        readSummary()
+        d.addToPlan()
+    }
+
+    @When("I add a stream {string} with its response stream")
+    fun addPairPlain(name: String) { pairWithTicks(name); finishPair() }
+
+    @When("I add a stream {string} with its response stream and tick {string} with the topic filter {string}")
+    fun addPairOneTick(name: String, tick: String, filter: String) { pairWithTicks(name, tick to filter); finishPair() }
+
+    @When("I add a stream {string} with its response stream, tick {string} with the topic filter {string} and tick {string} with the topic filter {string}")
+    fun addPairTwoTicks(name: String, first: String, firstFilter: String, second: String, secondFilter: String) {
+        pairWithTicks(name, first to firstFilter, second to secondFilter)
+        finishPair()
+    }
+
+    @Then("{string} and {string} are not offered")
+    fun ticksNotOffered(first: String, second: String) {
+        which(first); which(second)
+        assertTrue(!screen.isDrawn("planForm:answersOverMqtt"), "the answers tick is drawn while the pair tick is off")
+        assertTrue(!screen.isDrawn("planForm:requestsOverMqtt"), "the requests tick is drawn while the pair tick is off")
+        assertTrue(screen.isDrawn("planForm:responseTick"), "the form is not on show: the pair tick is not drawn")
+    }
+
+    @When("I tick {string}")
+    fun tickPair(tick: String) {
+        assertEquals(PlannerTexts.RESPONSE_STREAM_TICK, tick)
+        tickOn()
+    }
+
+    @When("I untick {string}")
+    fun untickPair(tick: String) {
+        assertEquals(PlannerTexts.RESPONSE_STREAM_TICK, tick)
+        screen.click("planForm:responseTick")
+        assertEquals(false, screen.isOn("planForm:responseTick"), "the pair tick is still on")
+        assertEquals(false, currentStream().withResponse, "the state still holds the pair")
+    }
+
+    @Then("both are offered and neither is ticked")
+    fun bothOffered() {
+        listOf("answers" to answersLabel, "requests" to requestsLabel).forEach { (side, label) ->
+            assertTrue(screen.isDrawn("planForm:${side}OverMqtt"), "the $side tick is not drawn")
+            assertTrue(screen.textOf("planForm:${side}OverMqtt").orEmpty().contains(label), "the $side tick says: ${screen.textOf("planForm:${side}OverMqtt")}")
+            assertEquals(false, screen.isOn("planForm:${side}OverMqtt"), "the $side tick is on on the screen")
+            assertTrue(!screen.isDrawn("planForm:${side}Topic"), "the $side filter field is drawn while its tick is off")
+        }
+        assertEquals(null, currentStream().answersTopic, "state: answers tick")
+        assertEquals(null, currentStream().requestsTopic, "state: requests tick")
+    }
+
+    @Then("the route is the action {string} from {string} to {string} with routing key {string}")
+    fun routeIsAction(name: String, exchange: String, destination: String, key: String) {
+        val route = d.plan.steps.map { it.action }.filterIsInstance<MigrationAction.DeclareBinding>().single()
+        assertEquals(name, route.actionName)
+        assertEquals(exchange, route.exchange)
+        assertEquals(destination, route.queue)
+        assertEquals(key, route.routingKey)
+        assertEquals(emptyMap(), route.arguments)
+    }
+
+    @When("I tick {string} in the stream form and enter the topic filter {string}")
+    fun tickAndEnter(tick: String, filter: String) {
+        // The stream has a valid name, so the only problem of the form is the one of the filter.
+        pairWithTicks("device-commands", tick to filter)
+    }
+
+    @Given("the stream form with the response stream and {string} ticked")
+    fun formWithTick(tick: String) = pairWithTicks("device-commands", tick to "devices/+/answer")
+
+    @Then("the MQTT ticks are not offered any more")
+    fun ticksGone() {
+        listOf("answersOverMqtt", "requestsOverMqtt", "answersTopic", "requestsTopic", "mqttAssumption").forEach {
+            assertTrue(!screen.isDrawn("planForm:$it"), "planForm:$it is still drawn")
+        }
+        assertEquals(StreamForm(name = "device-commands"), currentStream(), "the state of the form: both ticks are cleared with the pair")
+    }
+
+    @Then("the summary holds the stream only")
+    fun summaryStreamOnly() {
+        d.next()
+        readSummary()
+        assertEquals(listOf(MigrationAction.DeclareStream("device-commands", vhost = d.vhost)), d.summaryActions())
+        assertEquals("This adds 1 step", summaryTitleSeen)
+        assertEquals(null, summaryNoteSeen, "no sentence about a service without a route")
+        assertEquals(null, summaryNoteOnScreen, "no planWizard:summaryNote without a route")
+    }
+
+    @Given("a plan with the stream pair {string} and the answers route {string} added by the wizard")
+    fun planWithPairAndRoute(name: String, filter: String) {
+        d.newPlan()
+        pairWithTicks(name, answersLabel to filter)
+        finishPair()
+        assertEquals(3, d.plan.steps.size, "the pair and its route: ${d.titles()}")
+    }
+
+    @Then("the review graph shows no note about a service")
+    fun noNote() {
+        assertTrue(screen.isDrawn("planner:reviewGraph"), "the review graph is not drawn, so \"no note\" proves nothing")
+        assertEquals(emptyList(), d.state.graph.notes, "state: notes")
+        assertEquals(emptyList(), screen.tagsWithPrefix("planGraphNote:"), "screen: notes")
+    }
+
+    @Then("the review graph still shows no note about a service")
+    fun stillNoNote() = noNote()
+
+    @Then("it shows the note {string} between {string} and {string}")
+    fun showsNote(text: String, request: String, exchange: String) {
+        assertEquals(listOf(PlanGraphNote("q:$request", "e:$exchange", text)), d.state.graph.notes, "state: the notes of the graph")
+        assertEquals(listOf("planGraphNote:0"), screen.tagsWithPrefix("planGraphNote:"), "screen: the notes drawn")
+        assertEquals(text, screen.textOf("planGraphNote:0"), "screen: the text of the note")
+        listOf("q:$request", "e:$exchange").forEach { assertTrue(screen.isDrawn("planGraphNode:$it"), "the node $it is not drawn") }
+    }
+
+    @Then("the note is not a step and cannot be changed")
+    fun noteIsNotAStep() {
+        assertEquals(3, d.plan.steps.size, "the plan holds the two streams and the route: ${d.titles()}")
+        assertTrue(d.titles().none { it.contains(PlannerTexts.SERVICE_NOT_PLANNED) }, "the note is a step: ${d.titles()}")
+        assertTrue(d.store.savedTexts.none { it.contains(PlannerTexts.SERVICE_NOT_PLANNED) }, "the note is in the draft file")
+        assertEquals(emptyList(), screen.actionsUnder("planGraphNote:0"), "the note offers an action")
+        val before = d.plan
+        screen.click("planGraphNote:0")
+        assertEquals(before, d.plan, "a click on the note changed the plan")
+        assertEquals(emptyList(), d.executor.executedActions, "a click on the note reached the broker")
+    }
+
     // ---- a saved file (stand-ins until M9-12) ----
+
+    // Stand-in until M9-12 (open a pending file as steps), like the two Givens of M9-07 and the three of M9-10: puts the file's actions in the draft file.
+    @Given("a pending migration {string} that declares the streams {string} and {string} and binds {string} to {string} with routing key {string}")
+    fun pendingPairWithRoute(version: String, first: String, second: String, exchange: String, destination: String, key: String) {
+        PendingStandIn.put(
+            d, version,
+            listOf(
+                MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost),
+                MigrationAction.DeclareBinding(exchange, destination, key, vhost = d.vhost),
+            ),
+        )
+    }
+
+    @Then("the review graph shows the note about the owner's service")
+    fun graphShowsNote() {
+        assertEquals(listOf(PlanGraphNote("q:device-commands", "e:amq.topic", PlannerTexts.SERVICE_NOT_PLANNED)), d.state.graph.notes, "state: the notes of the graph")
+        assertEquals(PlannerTexts.SERVICE_NOT_PLANNED, screen.textOf("planGraphNote:0"), "screen: the note")
+    }
 
     @Given("a pending migration {string} that declares the streams {string} and {string}")
     fun pendingStreams(version: String, first: String, second: String) {

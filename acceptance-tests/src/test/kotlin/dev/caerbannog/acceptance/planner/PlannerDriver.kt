@@ -227,7 +227,7 @@ class PlannerDriver {
     fun moveUp(position: Int) = vm.moveStepUp(stepAt(position).id)
     fun moveDown(position: Int) = vm.moveStepDown(stepAt(position).id)
     fun removeByTitle(title: String) {
-        val step = plan.steps.firstOrNull { it.action.description == title } ?: error("no step titled \"$title\" in ${titles()}")
+        val step = plan.steps.firstOrNull { it.action.description == title || state.stepTitle(it.id) == title } ?: error("no step titled \"$title\" in ${titles()}")
         vm.removeStep(step.id)
     }
 
