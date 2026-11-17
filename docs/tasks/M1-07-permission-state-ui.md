@@ -3,6 +3,7 @@
 Milestone: M1    Depends on: M1-03, M1-05, M1-06, M1-09, M1-10, M1-11 (all done)    Size: M
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (815b067, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Briefed and confirmed by the architect (rewritten after the M1-06/M1-10 changes). Not started.
 - Product owner decisions recorded here (2026-11-04):
   1. Pill wording follows the mockup: "Can change topology" (class `pill ok`) and "Topology locked" (class `pill bad`).

@@ -79,6 +79,7 @@ Tests written first (red recorded) and passing, no unrelated changes, scenarios 
 added, spec Risks entry for last-write-wins closed (architect moves it) once merged.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (1e2a1db, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - State: briefed 2026-11-04 by the architect, awaiting product owner confirmation and the team loop (step 1 onward).
 - Step 2 (tests first, test developer, 2026-11-04): red. Written: `ConnectionSessionTest` (latest-started-wins in both release
   orders, names independent, forget/rename during a check, `current` follows select/forget/check; replaces the M1-09 test

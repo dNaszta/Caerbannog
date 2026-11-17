@@ -62,6 +62,7 @@ None.
 - Status and README row updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (c04f092, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 Step 1: brief written by solution-architect (2026-11-06).
 Step 2: tests first done (test-developer, 2026-11-06). Added unit tests in `TopologyViewModelVhostTest` asserting `homeVhost` and Compose UI test in `TopologyVhostSwitchUiTest` asserting caption text and semantics. Confirmed red on assertions (commit `e7a6693`).

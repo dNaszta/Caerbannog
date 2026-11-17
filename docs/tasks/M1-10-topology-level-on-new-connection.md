@@ -3,6 +3,7 @@
 Milestone: M1    Depends on: M1-05-wire-desktopapp-connections (screen is wired; branch base), M1-02-connection-profiles    Size: S
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (1f2942a, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - State: done (accepted with follow-ups, round 0; step 5 architect review; not merged). Briefed earlier. Product decisions taken by the product owner: (1) the level is selectable on the form
   while creating a connection; (2) in edit mode it applies on Save, one rule everywhere; (3) choosing Full control asks
   for a confirmation.

@@ -33,6 +33,7 @@ None new (see umbrella).
 Tests first and passing, no hash outside the file, spec updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (af2b9e7, 2026-11-11); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Step 1 (architect, 2026-11-11): briefed. Owner decisions FINAL (2026-11-11): D4 A (raw view hides hashes), D5 B (an existing vhost with a differing carried setting is a Conflict; `/` exempt, to be confirmed). Ready for step 2. 13 `@m8-12a` scenarios (3 new for D5).
 - Step 2 (test developer, 2026-11-11, round 0, base `8895db8`): tests first, red on compile stubs marked `M8-12a STUB`.
   - Stubs: the four `MigrationAction`s (real data, `DeclareUser.detail` null), `AccessCodecs.kt` (codecs refuse on read and write nothing; `redactedRaw` returns the text), `MigrationRunner.dryRun/applyPending(userTags)` and `MigrationsViewModel(userTags, setConnectionContext(newUserTags))` accept the tags and ignore them, `ApplyOutcome.resourceName` returns null for the new actions, `FakeTopologyMigrationExecutor` has the broker model and seeders (`existingVhost`, `existingUser`, `existingPermissions`, `/` present) but the four actions neither change it nor conflict. Real: `PermissionCheckResult.userTags` (interface default empty, `Checked.userTags`). data-rabbit main got three stub branches (`ExecutorReasons`, `MigrationReadRequests`, `MigrationRequests`) only so that the sealed `when`s compile; the executor itself is `M8-12c`.

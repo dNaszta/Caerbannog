@@ -44,6 +44,7 @@ None. (The `file` input was decided on 2026-11-09 and is safe because the output
 Tests first and passing, no secret in any output, spec MCP table matches the code (13 tools).
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (e2433f6, 2026-11-11); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Step 1 (architect, 2026-11-11): made exact against main `1418028` plus M8-12b; two scenarios tagged and one added (paging) in `16`. Not started; independent of the gate.
 - Step 2 (test developer, 2026-11-11, round 0, branch `m8-10-mcp-report-and-shovels`, base main `37a50fe`): tests first, red on compile stubs marked `M8-10 STUB`.
   - Stubs: `CompatibilityReportJson.encodePage` (returns the whole report, no page), core `ShovelStatusReader` and `ShovelListOutcome` (real types), `ManagementShovelStatusReader` in data-rabbit (answers `Failed`), `McpServer(definitionsSourceProvider, definitionsFileLoader, shovelStatusProvider)` (accepted, unused: the two tools are not registered, so the server lists 11 tools and answers "Unknown tool"). core-testing: `FakeShovelStatusReader`.

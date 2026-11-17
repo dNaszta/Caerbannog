@@ -151,6 +151,7 @@ Tests first and passing, only one dependency added, no unrelated changes, README
 installer notes, manual check recorded.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (5c9c910, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - 2026-11-04 (architect): product owner decided "use material defaults" (standard Material icons); artifact verified
   on Maven Central; briefed.
 - 2026-11-04 (architect): brief sharpened against main 28e0bdc (icon table with sizes and artifacts, reveal toggle

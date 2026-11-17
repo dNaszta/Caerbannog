@@ -104,6 +104,7 @@ No product decision and no new dependency or build-tool choice is needed. Nothin
 - `docs/tasks/README.md` updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (1f2942a, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 - Step: 2 done (test developer). `desktopApp/src/test/kotlin/dev/caerbannog/desktopapp/CompositionRootTest.kt`
   written, red (unresolved reference `createConnectionsViewModel`). Test calls it positionally as

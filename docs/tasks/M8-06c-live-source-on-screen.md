@@ -96,6 +96,7 @@ None (UI-only). Reason: the live read is reachable by an agent only through the 
 Tests written first and passing (core, ui, desktopApp, acceptance), `verifyTestDiscovery` green, no transport change, `RealBrokerM8LiveSourceTest` untouched, mockup and README rows updated, `Main.kt` F6 done, F4 tags replaced, F8 card rule and its test, spec untouched unless wording changes (it does not: the spec only needs the INFO_LINE wording if the owner picks (a) or (b); then update "Migrating from RabbitMQ 3.x" there).
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (f8d0594, 2026-11-11); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 ### Step 2, round 0 (test developer, 2026-11-10): tests first, red
 

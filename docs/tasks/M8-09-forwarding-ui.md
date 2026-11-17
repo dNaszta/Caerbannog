@@ -64,6 +64,7 @@ Already decided, no question: P1/P14 credentials and the disclosure, P4 Full con
 Tests first and passing, screenshots looked at, spec screens table updated, `ForwardingTexts` holds every fixed text of the service and the screen, no unrelated change.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (ce58253, 2026-11-11); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Step 1 (architect, 2026-11-11, round 0, base main `ab5ae6a`, branch `m8-09-forwarding-ui`): brief made exact; mockup section 14 drawn (the mockup had no forwarding flow); owner decisions D1 to D5 listed (D6 recommended to accept). Waits for the owner's answers on D1 to D5 and an eye on section 14 before step 2.
 - Owner decisions (2026-11-11, FINAL): D1 = A (app-bar button `migrate3x-forward` in the live report, list of the analysis's queues); D2 and D3 = the proposed wording as written in this brief and `ForwardingTexts`, pinned in tests; D4 = A (no Remove after Finished; Remove shown while a shovel exists or runs, and after a Failed that was not cleaned up, enabled at Full control only); D5 = A (destination fixed: same queue name in the vhost of the connected 4.x profile, must exist); D6 accepted (leaving the screen stops polling, not the shovel).
 - Step 2 (test developer, 2026-11-11, round 0, base `001e96e`): tests first, red, compile stubs marked `M8-09 STUB`.

@@ -89,6 +89,7 @@ Out: the tooltip sentence (`STORED_OFFSETS_HINT`), the lag rule, the status type
 Owner's decision recorded here and in the spec, tests red then green, mockup and spec text in line, no unrelated change. Addendum: the new footnote test red then green, every other test unedited, the screenshot class run once and the two pictures looked at.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (8c4719b, 2026-11-15); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Branch: `m2-17b-lag-hint-wording` (worktree `.claude/worktrees/m2-17b`, from main 286c44f). Round: 0.
 - Step 1 (architect, 2026-11-15): DONE, commit 6042a8e. Brief confirmed ready (owner chose option A on 2026-11-15); spec tab paragraph and mockup (two pill titles and the note) carry the confirmed sentence. Two test literals (`StreamClientsTextsTest:21`, `StreamClientsTestKit.HINT_TEXT:102`) plus the constant; `ClientsSteps` needs no change.
 - Step 2 (test developer, 2026-11-15): DONE, commit 537035a. Two literals changed; red for the right reason (assertion mismatch old vs new text): core `StreamClientsTextsTest` 1 failed, ui `StreamClientsStatusUiTest` 2 failed, `StreamScreenUiTest` 1 failed, `StreamClientsLazyUiTest` 2 failed. `StreamClientsHintPopupUiTest` stays green (geometry only). Not run: acceptance, brokerTest, screenshots.

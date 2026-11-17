@@ -36,6 +36,7 @@ None.
 Tests first (title assertion) and passing, no unrelated changes.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (351e6b7, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - State: done. Architect step 5: Accepted (2026-11-04), no findings above idea. Not pushed; merge by the coordinator. Earlier: step 3 done (senior developer): title string changed, guard comment added, full `./gradlew test --rerun-tasks --continue` green. Branch `m1-11-declared-permissions-polish`.
 - Step 4 (test engineer, 2026-11-04): verified, pass, no findings. Full rerun: core 66, data-rabbit 19, ui 39, acceptance 38 (5 skipped by design tags), desktopApp 3. Mutation (title reverted to "Declared permissions") fails the new test, exit 1; restored, tree clean. Diff scope: one string, one test, comment-only gradle change, docs.
 - Architect review: diff is 5 files, one string equal to the mockup title (Main.dc.html line 81), one exact-match test, comment-only gradle change. Not checked: visual rendering and narrow-window wrapping of the longer title.

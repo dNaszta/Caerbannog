@@ -100,6 +100,7 @@ Tests written first and failing for the right reason; all scenarios above pass; 
 brief and `docs/spec.md` (open question moved); no unrelated changes; `docs/tasks/README.md` updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (b5e3bc3, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - Round: 1, step 5 done (architect): ACCEPTED WITH FOLLOW-UPS. Done. Not pushed or merged. Follow-up: `M1-09-permission-check-hardening` (before M1-07).
 - Branch: `m1-03-permission-check`
 - Base branch: `main` (needs only M1-02, already in main; does not need M1-04 or M1-05)

@@ -65,6 +65,7 @@ None here. Data feeds `docs/ux/Streams.dc.html` (columns decided by N1 and D5).
 Tests written first and failing for the right reason, then passing; `./gradlew test` and `task test:broker` green; no unrelated changes; spec "Management API facts" updated if a fixture disagrees; task index row updated.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (718e2c2, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 ### Part 1 (`m2-03-connection-lifecycle`), step 2: tests first (test developer, 2026-11-04)
 Red: written, not passing, because `ActiveConnection`, `LinkState`, `ConnectionGateway`, `HeldConnection`, `OpenResult`, `ConnectionFailureReason`, `ConnectionNotes` and the new `ConnectionsViewModel` parameter do not exist (compile failure in `:core:compileTestKotlinJvm` and `:acceptance-tests:compileTestKotlin`; every unresolved name is one of these). Also red at runtime: `:ui:jvmTest` `ConnectionsScreenUiTest` "the edit panel says the host name is not verified". As a check on the tests themselves (not committed, no production code in this repo) they were run against a throwaway implementation in the scratchpad: core 34 of 34 and the feature 13 run 11 of 11 selected scenarios passed there.

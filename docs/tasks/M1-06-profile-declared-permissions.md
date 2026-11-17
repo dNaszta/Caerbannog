@@ -3,6 +3,7 @@
 Milestone: M1    Depends on: M1-03-permission-check (core `DeclaredPermissions`, session rule)    Size: S
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (01b0122, 2026-11-04); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 - State: done. Architect step 5: Accepted with follow-ups (2026-11-04), no blocker or major. Not pushed; merge by the coordinator.
   - Decisions for the user to see: the UX deviation from the earlier three-state-per-right idea (one switch plus two yes/no
     choices) was the architect's recommendation, adopted by the coordinator without asking the user. Reason: `DeclaredPermissions`

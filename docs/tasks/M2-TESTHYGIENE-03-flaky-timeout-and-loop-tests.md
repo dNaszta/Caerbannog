@@ -36,6 +36,7 @@ None.
 Tests green under load, mutation for (b) fails fast, no production file changed, README row added.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (cc96485, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 - Step 1: Brief confirmed by solution-architect (2026-11-06). Branch `m2-testhygiene-03-flaky-timeout-and-loop-tests`.
 - Step 2 & 3: Implementation by senior developer & test developer:

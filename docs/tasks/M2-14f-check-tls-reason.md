@@ -29,6 +29,7 @@ Whether the stream-leg `SSLSocket` gives the same shapes as the HTTP client (pla
 Tests first and red for the right reason, passing; spec D9a text unchanged except the Check sentence; README row.
 
 ## Status
+- Reconciled 2026-11-17: this task is merged into `main` (b749296, 2026-11-06); statements below about waiting for a merge, an unpushed branch or an owner's merge word are history.
 
 ### Step 2: Tests first (test developer, 2026-11-06)
 - Declared `ConnectionCheckResult.CertificateRejected` in `core/src/commonMain/kotlin/dev/caerbannog/core/connections/ConnectionCheckResult.kt`.
