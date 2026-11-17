@@ -96,6 +96,13 @@ class MqttRouteFormTest {
     }
 
     @Test
+    fun `the matching topic is built from the filter's own levels and keeps a space at either end`() {
+        // Decided at the step 2 gate: + gives item, # gives test, every other level is unchanged. The shared helper trims the whole key; this one must not.
+        assertEquals(" a/item", form(" a/+").matchingTopic())
+        assertEquals("a/b ", form("a/b ").matchingTopic())
+    }
+
+    @Test
     fun `a matching topic of the form is a topic the filter matches`() {
         // The suggestion must be a concrete topic (no wildcard) with as many levels as the filter, except that a trailing # may stand for one level.
         for (f in listOf("sensors/+/temp", "sensors/#", "+", "#", "a/b/c", "+/+/#", "x/+")) {

@@ -154,6 +154,21 @@ class MqttRouteFormUiTest {
         r.close()
     }
 
+    @Test
+    fun `the summary page shows the route words and not the raw binding`() = runDesktopComposeUiTest(1280, 800) {
+        val r = UiRig { stream("telemetry") }
+        toForm(r)
+        node("planForm:destinationKind:stream").performClick()
+        node("planForm:filter").performTextInput("sensors/+/temp")
+        node("planForm:destination").performTextInput("telemetry")
+        node("planWizard:next").performClick()
+        val summary = textOf("planWizard:summary")
+        assertTrue(summary.contains("MQTT route sensors/+/temp to stream telemetry"), summary)
+        assertTrue(summary.contains("Binding on amq.topic with the key sensors.*.temp"), summary)
+        assertTrue(!summary.contains("Bind amq.topic"), "the raw binding words are on the confirmation page: $summary")
+        r.close()
+    }
+
     // ---- the step row ----
 
     @Test

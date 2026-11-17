@@ -109,6 +109,29 @@ class PlannerViewModelMqttTest {
     }
 
     @Test
+    fun `wordsOf gives the route words for a route and the action's own words for anything else`() {
+        // API fixed at the step 2 gate: PlannerState.wordsOf(action: MigrationAction): MqttRouteWords; stepTitle, stepDetail and the wizard summary use it.
+        rig.add(QueueForm("telemetry"))
+        val route = MigrationAction.DeclareBinding("amq.topic", "telemetry", "sensors.*.temp")
+        val words = rig.state.wordsOf(route)
+        assertEquals("MQTT route sensors/+/temp to queue telemetry", words.title)
+        assertEquals("Binding on amq.topic with the key sensors.*.temp", words.detail)
+        val plain = MigrationAction.DeclareBinding("events", "telemetry", "a.b", arguments = mapOf("x-note" to dev.caerbannog.core.json.ArgumentValue.Text("n")))
+        assertEquals(plain.description, rig.state.wordsOf(plain).title)
+        assertEquals(plain.detail, rig.state.wordsOf(plain).detail)
+    }
+
+    @Test
+    fun `the wizard summary of a route is worded as a route`() {
+        rig.add(StreamForm("telemetry"))
+        vm.openWizard(); vm.chooseKind("MQTT route")
+        vm.updateForm(MqttRouteForm("sensors/+/temp", "telemetry", MqttDestinationKind.Stream))
+        vm.next()
+        val action = assertIs<WizardState.Summary>(rig.state.wizard).actions.single()
+        assertEquals("MQTT route sensors/+/temp to stream telemetry", rig.state.wordsOf(action).title)
+    }
+
+    @Test
     fun `a binding written in the binding form on amq topic is worded as a route`() {
         rig.add(StreamForm("telemetry"))
         rig.add(BindingForm("amq.topic", "telemetry", BindingDestinationType.QUEUE, "sensors.#"))
