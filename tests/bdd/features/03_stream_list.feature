@@ -279,19 +279,19 @@ Feature: Stream list
 
   # M9-08d, owner decision 2026-11-17 (option b): one Retention cell shows the age, the byte limit, or both
   # ("7D, 1 MB": age first), the byte limit in the compact decimal format (1000000 is "1 MB", 1500000 is "1.5 MB").
-  @m9-08d @fake-broker
+  @m9-08d @needs-M9-08d @fake-broker
   Scenario: A stream with a maximum size and no age shows the size as its retention
     Given a stream "telemetry" with no retention of its own and a policy that sets "max-length-bytes" to 1000000
     When I open the stream list
     Then the stream "telemetry" shows the retention "1 MB"
 
-  @m9-08d @fake-broker
+  @m9-08d @needs-M9-08d @fake-broker
   Scenario: A stream with an age and a maximum size shows both in one cell
     Given a stream "telemetry" declared with "x-max-age" "7D" and "x-max-length-bytes" 1000000
     When I open the stream list
     Then the stream "telemetry" shows the retention "7D, 1 MB"
 
-  @m9-08d @fake-broker
+  @m9-08d @needs-M9-08d @fake-broker
   Scenario: A stream with an age only still shows the age alone
     Given a stream "telemetry" declared with "x-max-age" "7D" and no maximum size
     When I open the stream list

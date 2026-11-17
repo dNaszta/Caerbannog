@@ -12,12 +12,16 @@ Reconciled against git (`main` eb0d16d): every task branch is merged; the only b
 
 ### Open work
 
-Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9-01b` and `M9-10e` (`main` after the M9-10e merge).
+Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9-01b`, `M9-10e` and `M9-08` (`86ad0540`).
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-08` policy step, ONE task in two slices: slice 1 retention from a policy (the old `M9-08b`, folded in 2026-11-17), slice 2 the policy form, notes and the stream retention block | M | nothing (briefed, ready) |
-| M9 | `M9-09` dead-lettering recipe | M | `M9-08` (slice 2: `ExactPattern`, the catalog, the notes) |
+| M9 | `M9-08` policy step: DONE and merged (`86ad0540`, accepted with follow-ups) | M | done |
+| M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 | S | nothing (briefed) |
+| M9 | `M9-08d` retention column, detail and MCP show the byte limit too | S | nothing (briefed; owner chose b on 2026-11-17) |
+| M9 | `M9-08e` live rows for the claims `M9-08` left open | S | nothing (briefed) |
+| M9 | `M9-08f` policy step polish | XS | nothing (briefed) |
+| M9 | `M9-09` dead-lettering recipe | M | built, reviewed 2026-11-18: accepted with follow-ups (`M9-09b`); waits for a look at the dashed edge, then merge (m9-09-dead-lettering-recipe worktree) |
 | M9 | `M9-12` open a pending file as steps | M | nothing |
 | M9 | `M9-13` gate on a real broker | M | last: after `M9-08` to `M9-12` |
 | M9 | `M9-10f` AMQP publish dialog: bounded banners, gutter only on overflow | S | nothing (briefed) |
@@ -237,13 +241,14 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M9-07-stream-step-and-response-stream | Stream kind with the optional tick "Also create its response stream (DLN)" (shown as "Response stream (DLN)"), suggested name with the suffix `dln`, the pair recognised by its name, link in the graph; no routing without an MQTT tick | M9 | S | done (merged, 652c42a, 2026-11-16) |
 |  M9-07b-stream-pair-mqtt-routes | The two optional ticks of a stream pair, "Answers arrive over MQTT" (a route into the response stream) and "Requests are also recorded from an MQTT topic" (one into the request stream), and the graph note "Your own service turns a request into an MQTT message; the planner does not plan that." | M9 | S | done (merged, 9765f506, 2026-11-17; accepted with follow-ups after round 2; owner review list "yes to all" 2026-11-17; follow-up M9-07d optional) |
 | M9-07d-graph-notes-out-of-view | With 2+ routes into the response stream or several pairs the graph note can slide below the stacked labels and be out of view on a short card; a pure rule in `placeNotes` tries the free band or stacks notes before searching downward | M9 (follow-up) | XS-S | briefed (optional, unscheduled; no owner-visible effect) |
-| M9-08-policy-step | Umbrella of two slices (unified 2026-11-17): slice 1 the stream list and MCP show a retention a policy sets (old M9-08b); slice 2 Policy kind with a catalog of measured settings per target, match preview, the one-policy notes in the plan and in the check, stream retention as one policy covering the pair; one `@broker` class `RealBrokerM9PolicyStepTest` | M9 | M | built and reviewed 2026-11-17: accepted with follow-ups (M9-08c to M9-08f); merge pending the owner's word
+| M9-08-policy-step | Umbrella of two slices (unified 2026-11-17): slice 1 the stream list and MCP show a retention a policy sets (old M9-08b); slice 2 Policy kind with a catalog of measured settings per target, match preview, the one-policy notes in the plan and in the check, stream retention as one policy covering the pair; one `@broker` class `RealBrokerM9PolicyStepTest` | M9 | M | built, reviewed 2026-11-17 (accepted with follow-ups M9-08c to M9-08f) and merged at 86ad0540
 | M9-08b-stream-retention-from-policy | Folded into `M9-08` slice 1 (2026-11-17); the file keeps the measured facts; the `@m9-08b` tag stays | M9 | S | folded into M9-08 (reviewed with it, accepted with follow-ups)
 | M9-08c-wizard-short-window-buttons | Cancel and Next of the wizard reachable at 1280 x 420 and font scale 1.5 (measure base commit first) | M9 (follow-up) | S | briefed |
 | M9-08d-show-byte-limit-in-streams | Retention column, detail and MCP stream tools show the byte limit as well as the age | M9 (follow-up) | S | briefed (ready; owner chose b on 2026-11-17: age and byte limit in one cell, additive `maxLengthBytes`) |
 | M9-08e-policy-unmeasured-claims | Live rows for the claims M9-08 left open: precedence of policy over argument for max-age and segment size, at-least-once with reject-publish-dlx, apply-to queues and streams, the 0 boundaries | M9 (follow-up) | S | briefed |
 | M9-08f-policy-step-polish | Keep known names on a failed re-read, canAddSetting in core, policy form words into PlannerTexts, a row pinning the 3-binder overlap note | M9 (follow-up) | XS | briefed |
-| M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | briefed (blocked: M9-08) |
+| M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | built, reviewed 2026-11-18, accepted with follow-ups (`M9-09b`); merge after a look at the dashed edge |
+| M9-09b-dead-letter-follow-ups | Live proof of the own-argument read, graph link helper names, the dashed edge check | M9 | S | planned (after M9-09 merge) |
 |  M9-10-mqtt-route-step | MQTT route kind: topic filter to a queue or stream as one binding on `amq.topic`, exact two-way translation, shown as a route again when a file is opened, "Send a test message" on an applied route that asks a sample value for every wildcard (a device id for the `+`) and opens the Publish MQTT dialog with a pre-filled correlation-id header, live test | M9 | M | done (merged, c014ea8b, 2026-11-17; accepted with follow-ups, round 3; owner review items 6 to 12 decided "yes to all" 2026-11-17; open: radio label item 12 to build as a small follow-up M9-10d) |
 | M9-10b-mqtt-test-message | The "Send a test message" with sample values dialog for an applied route (cut out of M9-10 on 2026-11-17) | M9 | M | done, merged 2026-11-17 (accepted with follow-ups after round 3; full suite, live MqttRoute 6/6, IoT 1/1, M5 14/14, mutation checks and screenshots re-verified; real-window checks still manual before the release tag) |
 | M9-10e-mqtt-publish-gates-and-dialog-fold | Write-permission gate on the older MQTT entry points, AMQP `PublishDialog` fold check, max height with own scrollbar for the Publish MQTT error banner | M9 | S | done, merged 2026-11-17 (accepted with follow-ups: `M9-10f`) | docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md |

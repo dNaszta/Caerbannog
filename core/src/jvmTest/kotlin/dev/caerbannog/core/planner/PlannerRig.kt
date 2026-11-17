@@ -91,6 +91,7 @@ internal class PlannerRig(
             is BindingForm -> "Binding"
             is StreamForm -> "Stream"
             is PolicyForm -> "Policy"
+            is DeadLetterForm -> "Dead-lettering for a queue"
             is MqttRouteForm -> "MQTT route"
         }
     }

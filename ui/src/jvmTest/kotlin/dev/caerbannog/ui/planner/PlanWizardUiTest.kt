@@ -65,7 +65,7 @@ class PlanWizardUiTest {
     fun `page 1 offers the kinds that have a form and no other`() = runDesktopComposeUiTest(1280, 800) {
         val r = rig()
         open(r)
-        val built = listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "MQTT route") // M9-10: the MQTT route kind has its form now; M9-08: Policy
+        val built = listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "Dead-lettering for a queue", "MQTT route") // M9-10: the MQTT route kind has its form now; M9-08: Policy; M9-09: Dead-lettering
         built.forEach { node("planWizard:kind:$it").assertIsDisplayed() }
         PlannerTexts.WIZARD_KINDS.filterNot { it in built }.forEach {
             assertNotDrawn("planWizard:kind:$it")

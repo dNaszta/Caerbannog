@@ -129,6 +129,17 @@ class FakeTopologyCatalog : TopologyCatalog {
         synchronized(operatorPolicyRows) { operatorPolicyRows.removeAll { it.vhost == row.vhost && it.name == row.name }; operatorPolicyRows += row }
     }
 
+    /**
+     * M9-09: a queue as the broker lists it AND declares it, in one call: the statistics row (type, policy) from [row] and the flags and typed arguments from
+     * [declaration] (a real broker returns both views of one queue; [addQueue] and [declare] alone each replace the other's half). Both must name the same queue.
+     */
+    fun addQueue(row: QueueRow, declaration: QueueDeclaration): FakeTopologyCatalog = apply {
+        require(row.name == declaration.name && row.vhost == declaration.vhost && row.type == declaration.type) { "the row and the declaration are of two queues" }
+        vhosts += row.vhost
+        put(QueueEntry(row.name, row.vhost, row.type, row))
+        putDeclaration(declaration)
+    }
+
     private fun putDeclaration(declaration: QueueDeclaration) {
         synchronized(declarations) {
             declarations.removeAll { it.vhost == declaration.vhost && it.name == declaration.name }

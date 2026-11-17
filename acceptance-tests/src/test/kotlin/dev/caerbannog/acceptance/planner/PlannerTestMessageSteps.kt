@@ -375,6 +375,8 @@ class PlannerTestMessageSteps {
 
     @Then("{string} is not offered")
     fun notOffered(button: String) {
+        // M9-09: "At least once" is not offered by the dead-lettering form (one sentence, two screens)
+        if (button == "At least once") return PlannerDeadLetterSteps().atLeastOnceNotOffered()
         assertEquals("Send a test message", button)
         for (i in 0..5) {
             assertFalse(driver.isDrawn("migrations:testMessageBtn:$i"), "a button is drawn on row $i")

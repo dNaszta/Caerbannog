@@ -83,6 +83,15 @@ class PlannerViewModel(
     private var loaded = false
     private var reviewView: ReviewView = ReviewView.Graph
 
+    /**
+     * The policy note of a dead-lettering form (M9-09): [formNotes] belong to [notesKey] (the queue and the names read when it was asked), and
+     * [notesJob] is the one read behind them. [notesGeneration] tells a late answer from the current one.
+     */
+    private var notesKey: Pair<String, KnownTopology?>? = null
+    private var formNotes: List<String> = emptyList()
+    private var notesJob: Job? = null
+    private var notesGeneration = 0
+
     /** What the broker has for [knownVhost]; null before an answer and after a failed read. */
     private var known: KnownTopology? = null
 
@@ -144,6 +153,7 @@ class PlannerViewModel(
             "Binding" -> BindingForm(exchange = "", destination = "")
             "Stream" -> StreamForm(name = "")
             "Policy" -> PolicyForm(name = "", pattern = "")
+            PlannerTexts.DEAD_LETTER_KIND -> DeadLetterForm(queue = "")
             "MQTT route" -> MqttRouteForm(filter = "", destination = "")
             else -> return@act
         }
@@ -152,7 +162,21 @@ class PlannerViewModel(
 
     fun updateForm(form: StepForm) = act {
         val current = page as? Page.Form ?: return@act
-        page = current.copy(form = form, message = removedRowsMessage(current.form, form))
+        val updated = withStrategyThatFits(current.form, form)
+        page = current.copy(form = updated, message = removedRowsMessage(current.form, updated))
+    }
+
+    /**
+     * A dead-lettering form whose queue changed may hold At least once only if the new queue offers it (a known quorum queue); otherwise it goes
+     * back to At most once, which also takes the tick away, so the user does not meet the form's own problem for a choice made for another queue.
+     */
+    private fun withStrategyThatFits(before: StepForm, after: StepForm): StepForm {
+        if (before !is DeadLetterForm || after !is DeadLetterForm || before.queue == after.queue) return after
+        return if (after.strategy == DeadLetterStrategy.AtLeastOnce && !after.offersAtLeastOnce(formContext())) {
+            after.withStrategy(DeadLetterStrategy.AtMostOnce)
+        } else {
+            after
+        }
     }
 
     /** The page says which rows a change of target removed; any other change says nothing. */
@@ -443,7 +467,44 @@ class PlannerViewModel(
             lock.withLock {
                 if (allowedWhenLocked || !locked()) block()
                 syncKnown()
+                syncFormNotes()
                 publish()
+            }
+        }
+    }
+
+    /**
+     * Keeps the one policy read of the dead-lettering form: a read when the form first has a queue, a new one (the old one cancelled) when the
+     * queue or the broker's names change, none when the form is left. It asks `BrokerPolicyNotes` about the policy step the form would add, so
+     * there is one matcher. No reader, no names or a failed read leave the list empty: no claim. Only GET requests, never while locked (3.x).
+     */
+    private fun syncFormNotes() {
+        val form = ((page as? Page.Form)?.form ?: (page as? Page.Summary)?.form) as? DeadLetterForm
+        val key = if (form == null || form.queue.isEmpty() || locked()) null else form.queue to known
+        if (key == notesKey) return
+        notesKey = key
+        notesJob?.cancel()
+        notesJob = null
+        formNotes = emptyList()
+        val generation = ++notesGeneration
+        val source = policies
+        val names = known
+        if (form == null || key == null || source == null || names == null) return
+        val probe = form.policyProbe(formContext())
+        notesJob = scope.launch {
+            val notes = try {
+                BrokerPolicyNotes(source, names).notesFor(probe)
+            } catch (e: CancellationException) {
+                currentCoroutineContext().ensureActive()
+                emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            lock.withLock {
+                if (generation == notesGeneration) {
+                    formNotes = notes
+                    publish()
+                }
             }
         }
     }
@@ -488,6 +549,7 @@ class PlannerViewModel(
                 if (generation == readGeneration) {
                     known = answer
                     knownPending = false
+                    syncFormNotes()
                     publish()
                 }
             }
@@ -647,7 +709,8 @@ class PlannerViewModel(
      */
     private fun summaryOf(p: Page.Summary): WizardState.Summary {
         val actions = p.form.actions(formContext())
-        val note = PlannerTexts.SERVICE_NOT_PLANNED.takeIf { PlanPairs.requestsAnsweredOverMqtt(actions).isNotEmpty() }
+        val note = (p.form as? DeadLetterForm)?.let { "${PlannerTexts.DEAD_LETTER_SUMMARY_CAUSES} ${PlannerTexts.deadLetterQueueUntouched(it.queue)}" }
+            ?: PlannerTexts.SERVICE_NOT_PLANNED.takeIf { PlanPairs.requestsAnsweredOverMqtt(actions).isNotEmpty() }
         return WizardState.Summary(p.form, actions, p.editing, note)
     }
 
@@ -669,6 +732,11 @@ class PlannerViewModel(
             asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
             asksHeaders = binding?.let { it.headers.isNotEmpty() || ctx.exchangeType(it.exchange) == "headers" } ?: false,
             suggestedResponseName = (form as? StreamForm)?.suggestedResponseName(ctx).orEmpty(),
+            suggestedExchangeName = (form as? DeadLetterForm)?.suggestedExchangeName(ctx).orEmpty(),
+            suggestedTargetName = (form as? DeadLetterForm)?.suggestedTargetName(ctx).orEmpty(),
+            offersAtLeastOnce = (form as? DeadLetterForm)?.offersAtLeastOnce(ctx) ?: false,
+            queueSuggestions = if (form is DeadLetterForm) ctx.queueSuggestions() else emptyList(),
+            formNotes = if (form is DeadLetterForm) formNotes else emptyList(),
         )
     }
 

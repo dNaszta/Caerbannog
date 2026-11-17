@@ -19,8 +19,11 @@ data class KnownTopology(
     }
 }
 
-/** One queue or stream of the broker: its [type] (`quorum`, `classic`, `stream`) and the name of the policy that applies to it, null for none or unknown. */
-data class KnownQueue(val type: String, val policy: String?)
+/**
+ * One queue or stream of the broker: its [type] (`quorum`, `classic`, `stream`) and the name of the policy that applies to it, null for none or unknown.
+ * [ownDeadLetterExchange] is the value of the queue's own `x-dead-letter-exchange` argument (M9-09); null when it has none or the read did not say.
+ */
+data class KnownQueue(val type: String, val policy: String?, val ownDeadLetterExchange: String? = null)
 
 enum class SuggestionSource { PLAN, BROKER }
 
@@ -49,6 +52,12 @@ data class FormContext(
         BindingDestinationType.EXCHANGE -> exchangeSuggestions()
     }
 
+    /** The queues a dead-lettering form can pick: this plan's queues first, then the broker's, no name twice. Streams are never offered (S-D1). */
+    fun queueSuggestions(): List<Suggestion> = suggestions(
+        fromPlan = plan.steps.mapNotNull { (it.action as? MigrationAction.DeclareQueue)?.name },
+        fromBroker = known.queues,
+    )
+
     /** Destinations for an MQTT route: only streams or only queues when the kind is said, else both (this plan first, then the broker). */
     fun routeDestinationSuggestions(kind: MqttDestinationKind?): List<Suggestion> {
         val all = destinationSuggestions(BindingDestinationType.QUEUE)
@@ -65,6 +74,21 @@ data class FormContext(
     /** The type of [exchange]: the last declaration in this plan wins, then the broker's; null when neither knows it. The one place that reads it. */
     fun exchangeType(exchange: String): String? =
         planExchanges().lastOrNull { it.name == exchange }?.type ?: known.exchanges[exchange]
+
+    /**
+     * The type of the queue or stream [name]: the last declaration in this plan wins (a stream gives `stream`), then the broker's; null when neither
+     * knows it. The one place that reads it, so `apply-to` and "At least once" cannot disagree.
+     */
+    fun queueType(name: String): String? {
+        val declared = plan.steps.map { it.action }.lastOrNull {
+            (it is MigrationAction.DeclareQueue && it.name == name) || (it is MigrationAction.DeclareStream && it.name == name)
+        }
+        return when (declared) {
+            is MigrationAction.DeclareQueue -> declared.type
+            is MigrationAction.DeclareStream -> "stream"
+            else -> known.queueDetails[name]?.type
+        }
+    }
 
     private fun planExchanges(): List<MigrationAction.DeclareExchange> =
         plan.steps.mapNotNull { it.action as? MigrationAction.DeclareExchange }

@@ -1,5 +1,6 @@
 package dev.caerbannog.core.planner
 
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.topology.BindingDestinationType
@@ -101,6 +102,8 @@ fun planPreview(
     val declaredQueues = declaredQueueTypes.keys.toList()
     val declaredStreams = actions.filterIsInstance<MigrationAction.DeclareStream>().map { it.name }
     val bindings = actions.filterIsInstance<MigrationAction.DeclareBinding>()
+    // A dead-letter link names a queue and an exchange the plan may not declare; both are drawn, so a link never points at an undrawn node.
+    val deadLetters = deadLetterPairs(plan)
 
     val brokerExchanges = known?.exchanges.orEmpty()
     val brokerQueues = known?.queues.orEmpty()
@@ -110,6 +113,10 @@ fun planPreview(
     val queueNames = linkedSetOf<String>()
     exchangeNames += declaredExchanges.keys
     queueNames += declaredQueues + declaredStreams
+    deadLetters.forEach { (queue, exchange) ->
+        queueNames += queue
+        exchangeNames += exchange
+    }
     bindings.forEach { b ->
         exchangeNames += b.exchange
         if (b.destinationType == BindingDestinationType.EXCHANGE) exchangeNames += b.queue else queueNames += b.queue
@@ -124,8 +131,8 @@ fun planPreview(
         queues = emptyList(),
         bindings = bindings.map { BindingRow(it.exchange, plan.vhost, it.queue, it.destinationType, it.routingKey) },
         streams = streamNames.map { StreamSummary(it, plan.vhost, null, 0, null, null, null, null, emptyList(), emptyList()) },
-        extraExchanges = declaredExchanges.keys.toList(),
-        extraQueues = declaredQueues + declaredStreams,
+        extraExchanges = declaredExchanges.keys.toList() + deadLetters.map { it.second },
+        extraQueues = declaredQueues + declaredStreams + deadLetters.map { it.first },
     )
     // The review graph words a node as the mockup does ("exchange, direct", "queue, quorum", "stream"); the Topology screen keeps its own words.
     val graph = drawn.copy(nodes = drawn.nodes.map { it.copy(node = it.node.copy(detail = subtitleOf(it.node, ::exchangeType, declaredQueueTypes))) })
@@ -160,7 +167,7 @@ fun planPreview(
         newNodeIds = isNew,
         newEdgeIds = graph.edges.map { it.edge.id }.toSet(),
         notInPlanNodeIds = notInPlan,
-        links = responseLinks(plan),
+        links = responseLinks(plan) + deadLetterLinks(plan),
         notice = notice,
         edgeLabels = routeLabels,
         mqttRouteEdgeIds = routeLabels.keys,
@@ -195,6 +202,30 @@ private fun responseLinks(plan: TopologyPlan): List<PlanLink> = PlanPairs.respon
     val from = (plan.steps.firstOrNull { it.id == request }?.action as? MigrationAction.DeclareStream)?.name
     val to = (plan.steps.firstOrNull { it.id == response }?.action as? MigrationAction.DeclareStream)?.name
     if (from == null || to == null) null else PlanLink("q:$from", "q:$to", PlanLinkKind.ResponseStream)
+}.distinct()
+
+/**
+ * One link per queue that dead-letters into an exchange, from the queue to the exchange; a link is not an edge. Derived from names in [plan], never
+ * from the broker: a policy step that holds `dead-letter-exchange` and whose pattern is exactly one name ([ExactPattern.nameOf]), and a queue
+ * step whose arguments carry `x-dead-letter-exchange` as text.
+ */
+internal fun deadLetterLinks(plan: TopologyPlan): List<PlanLink> =
+    deadLetterPairs(plan).map { (queue, exchange) -> PlanLink("q:$queue", "e:$exchange", PlanLinkKind.DeadLetter) }
+
+/** The (queue, exchange) names of [deadLetterLinks], in plan order, no pair twice. The empty name is no name: it gives no link. */
+private fun deadLetterPairs(plan: TopologyPlan): List<Pair<String, String>> = plan.steps.mapNotNull { step ->
+    when (val action = step.action) {
+        is MigrationAction.DeclarePolicy -> {
+            val exchange = (action.definition["dead-letter-exchange"] as? ArgumentValue.Text)?.value
+            val queue = ExactPattern.nameOf(action.pattern)
+            if (exchange.isNullOrEmpty() || queue.isNullOrEmpty()) null else queue to exchange
+        }
+        is MigrationAction.DeclareQueue -> {
+            val exchange = (action.arguments["x-dead-letter-exchange"] as? ArgumentValue.Text)?.value
+            if (exchange.isNullOrEmpty()) null else action.name to exchange
+        }
+        else -> null
+    }
 }.distinct()
 
 private const val BUILT_IN_EXCHANGE_PREFIX = "amq."

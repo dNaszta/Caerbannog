@@ -20,5 +20,5 @@ import org.junit.platform.suite.api.Suite
 @SelectClasspathResource("20_topology_planner_check.feature")
 @SelectClasspathResource("21_topology_planner_recipes.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.planner")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "(@m9-01 or @m9-01b or @m9-02 or @m9-03 or @m9-04 or @m9-05 or @m9-06 or @m9-07 or @m9-07b or @m9-08 or @m9-10 or @m9-10b or @m9-11) and @fake-broker and not @needs-decision and not @needs-spike")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "(@m9-01 or @m9-01b or @m9-02 or @m9-03 or @m9-04 or @m9-05 or @m9-06 or @m9-07 or @m9-07b or @m9-08 or @m9-09 or @m9-10 or @m9-10b or @m9-11) and @fake-broker and not @needs-decision and not @needs-spike")
 class RunTopologyPlannerAcceptanceTest

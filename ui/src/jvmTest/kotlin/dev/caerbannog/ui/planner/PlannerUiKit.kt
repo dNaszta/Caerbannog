@@ -155,6 +155,7 @@ internal class UiRig(
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
         is dev.caerbannog.core.planner.PolicyForm -> "Policy"
+        is dev.caerbannog.core.planner.DeadLetterForm -> "Dead-lettering for a queue"
         is MqttRouteForm -> "MQTT route"
     }
 }

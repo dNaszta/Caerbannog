@@ -10,6 +10,7 @@ import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolder
 import dev.caerbannog.core.migrations.fakes.FakeMigrationFolders
 import dev.caerbannog.core.planner.BindingForm
+import dev.caerbannog.core.planner.DeadLetterForm
 import dev.caerbannog.core.planner.ExchangeForm
 import dev.caerbannog.core.planner.FieldHint
 import dev.caerbannog.core.planner.FieldProblem
@@ -265,6 +266,7 @@ class PlannerDriver {
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
         is PolicyForm -> "Policy"
+        is DeadLetterForm -> "Dead-lettering for a queue"
         is MqttRouteForm -> "MQTT route"
     }
 }

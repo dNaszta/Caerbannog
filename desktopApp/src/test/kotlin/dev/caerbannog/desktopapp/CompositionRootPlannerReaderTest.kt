@@ -179,9 +179,10 @@ class CompositionRootPlannerReaderTest {
         assertEquals(600, known.queues.size, "every page of the queues")
         assertTrue("queue-600" in known.queues && "queue-001" in known.queues)
         assertEquals(130, known.streams.size, "every page of the streams")
-        val allowed = setOf("topology.exchanges", "topology.queues", "streams.listStreams")
-        assertEquals(emptySet(), everything.toSet() - allowed, "the planner asked for more than the three list calls")
-        assertEquals(allowed, everything.toSet(), "the planner must read exchanges, queues and streams")
+        // M9-09: one more GET, the queue declarations (the queue's own x-dead-letter-exchange); still no call under one queue's name and no bindings
+        val allowed = setOf("topology.exchanges", "topology.queues", "topology.queueDeclarations", "streams.listStreams")
+        assertEquals(emptySet(), everything.toSet() - allowed, "the planner asked for more than the four list calls")
+        assertEquals(allowed, everything.toSet(), "the planner must read exchanges, queues, their declarations and streams")
     }
 
     @Test

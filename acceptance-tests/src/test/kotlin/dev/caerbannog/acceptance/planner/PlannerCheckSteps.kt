@@ -173,13 +173,27 @@ class PlannerCheckSteps {
     fun exchangeAndQueue(exchange: String, queue: String) { CheckWorld.seedExchange(exchange); CheckWorld.seedQueue(queue) }
 
     @Given("the broker has the classic queue {string}")
-    fun classicQueue(name: String) = CheckWorld.seedQueue(name, "classic")
+    fun classicQueue(name: String) {
+        CheckWorld.seedQueue(name, "classic")
+        // M9-09: the dead-lettering form needs the planner to have read the type; the older check scenarios keep their planner as it was
+        if (DeadLetterWorld.active) {
+            val d = PlannerWorld.driver
+            d.known = d.known.copy(queues = d.known.queues + name, queueDetails = d.known.queueDetails + (name to dev.caerbannog.core.planner.KnownQueue("classic", null)))
+        }
+    }
 
     @Given("the broker has the fanout exchange {string}")
     fun fanout(name: String) = CheckWorld.seedExchange(name, "fanout")
 
     @Given("the broker has the stream {string}")
-    fun stream(name: String) = CheckWorld.seedQueue(name, "stream")
+    fun stream(name: String) {
+        CheckWorld.seedQueue(name, "stream")
+        // M9-09: the dead-lettering form must find that the planner read a stream; the older scenarios keep their planner as it was
+        if (DeadLetterWorld.active) {
+            val d = PlannerWorld.driver
+            d.known = d.known.copy(streams = d.known.streams + name, queueDetails = d.known.queueDetails + (name to dev.caerbannog.core.planner.KnownQueue("stream", null)))
+        }
+    }
 
     /** M9-14c: a stream as the product makes it, with the settings the scenario names (text or number as the broker shows them). */
     @Given("the broker has the stream {string} with {string} as the text {string} and {string} as the text {string}")
