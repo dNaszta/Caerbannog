@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: M9-00a (S-E), M9-03    Size: S
 
-PLANNED 2026-11-15. Status: step 3 built (senior developer, 2026-11-17), waiting for step 4 (verify) and review. Decided 2026-11-15 (Q1): headers and topic exchanges are in the first version.
+PLANNED 2026-11-15. Status: step 4 verified (test developer, 2026-11-17): pass with findings (0 blocker, 0 major, 2 minor, 1 idea), waiting for review. Decided 2026-11-15 (Q1): headers and topic exchanges are in the first version.
 
 ## Goal
 When the source of a binding is a headers exchange, the binding form asks for headers (name, value, value type) and the match rule (all or any) instead of a routing key, and writes them as binding arguments. Two bindings that differ only in their headers are two steps.
@@ -110,3 +110,12 @@ Go for step 3 (senior developer): the contract is closed; implement against the 
 
 ## Step 3 record
 Senior developer, 2026-11-17, branch `m9-11-headers-bindings`. Built against the step 2 tests: `StepForms.kt` (`MatchRule`, `HeaderValueType`, `HeaderMatch` with `argumentValue()` and `withType()`, `BindingForm.headers/matchRule/heldRule/withRule`, `formOf` opens headers bindings, `x-match` alone is read-only), `FormContext.exchangeType`, `WizardState.Details.asksHeaders`, `PlannerTexts` (two warnings, four refusals), `PlanForms.kt` (`HeadersSection`, `HeaderRow`). Graph, check and dry run untouched. Not done by me (not mine to edit): the mockup title in `docs/ux/Planner.dc.html` still says "S-E pending".
+
+## Step 4 record
+Test developer, 2026-11-17, branch `m9-11-headers-bindings` (head 59407f16). Verdict: pass with findings; no blocker, no major.
+- `./gradlew test --continue --rerun-tasks`: BUILD SUCCESSFUL, 0 failed. core jvmTest 3479, ui jvmTest 1223, acceptance 3998 (2468 skipped, all tag-excluded), data-rabbit 1022, desktopApp 189, mcp-server 45, dev-seed 90. `verifyTestDiscovery` green. All 10 `@m9-11` scenarios ran and passed, with the outline rows (two warnings, three refusals), read from the Cucumber pretty output of `RunTopologyPlannerAcceptanceTest` (321 run, 0 failed, 130 skipped: the `@broker` scenarios).
+- Live `RealBrokerM9HeadersBindingTest` (one class, RabbitMQ 4.4.0): 5 of 5.
+- Mutations, each reverted (tree clean): `any` written as `all` (8 tests red), `x-match` not written (11 red), `formOf` opens x-match only (1 red, the named test), no duplicate-name check (1 red).
+- Screenshots (opt-in `HeadersBindingScreenshotTest`, tag `screenshot`, added by the test developer): no overflow, type radios not clipped at 700 x 700 or 1280 x 800, one error text only (first wins). Existing planner screenshots (PlannerScreenshotTest, PlannerCheck, PlannerStream, MqttRoute: 46 images) are byte identical to main c34b19f2.
+- Findings: (1, minor) at 700 x 700 the header refusal sits under "Add header", below the fold of the dialog's scroll, while Next is already disabled: the user sees a dead Next and has to scroll to read why (the 1280 x 800 size shows it after a scroll as well once three rows exist). (2, minor) the mockup title in `docs/ux/Planner.dc.html` still says "S-E pending" (known, not the developer's to edit). (3, idea) the review graph draws a headers binding as one edge labelled only `new` (empty key), the headers and the rule appear only in the step list (`format=pdf, x-match=all`); two bindings that differ only in headers were not drawn side by side in this check.
+- Safety: no new request, no queue read, no logging, no secret in the diff (production change is 6 files in core and ui).
