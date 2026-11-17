@@ -16,7 +16,7 @@ sealed interface StreamManagementResult {
  * Capability to create and delete streams on a broker.
  */
 interface StreamManager {
-    suspend fun createStream(vhost: String, name: String): StreamManagementResult
+    suspend fun createStream(vhost: String, name: String, settings: StreamSettings = StreamSettings.NONE): StreamManagementResult
     suspend fun deleteStream(vhost: String, name: String): StreamManagementResult
 }
 
@@ -24,7 +24,7 @@ interface StreamManager {
  * Default fallback when stream management is unavailable or disconnected.
  */
 object UnavailableStreamManager : StreamManager {
-    override suspend fun createStream(vhost: String, name: String): StreamManagementResult =
+    override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult =
         StreamManagementResult.Failed("Stream management unavailable")
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =

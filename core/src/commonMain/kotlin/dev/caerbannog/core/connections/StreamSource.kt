@@ -29,6 +29,7 @@ import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
+import dev.caerbannog.core.streams.StreamSettings
 import dev.caerbannog.core.streams.StreamSummary
 import dev.caerbannog.core.streams.SuperStreamLayout
 import dev.caerbannog.core.streams.UnavailableStreamManager
@@ -149,8 +150,9 @@ internal class GuardedStreamManager(
     private val inner: StreamManager,
     private val isCurrent: () -> Boolean,
 ) : StreamManager {
-    override suspend fun createStream(vhost: String, name: String): StreamManagementResult =
-        if (isCurrent()) inner.createStream(vhost, name) else StreamManagementResult.Failed("Connection closed")
+    // Forwarding `settings` matters: the interface default would silently drop them on every stream made through a real connection.
+    override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult =
+        if (isCurrent()) inner.createStream(vhost, name, settings) else StreamManagementResult.Failed("Connection closed")
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
         if (isCurrent()) inner.deleteStream(vhost, name) else StreamManagementResult.Failed("Connection closed")

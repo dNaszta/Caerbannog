@@ -101,9 +101,11 @@ sealed interface MigrationAction {
     data class DeclareStream(
         val name: String,
         override val vhost: String = "/",
+        val arguments: Map<String, ArgumentValue> = emptyMap(),
     ) : MigrationAction {
         override val actionName: String get() = "declareStream"
         override val description: String get() = "Declare stream $name"
+        override val detail: String? get() = argumentsDetail(arguments)
     }
 
     data class DeleteStream(
