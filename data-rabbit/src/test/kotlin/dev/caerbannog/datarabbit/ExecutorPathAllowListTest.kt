@@ -4,6 +4,7 @@ import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.streams.StreamManagementResult
 import dev.caerbannog.core.streams.StreamManager
+import dev.caerbannog.core.streams.StreamSettings
 import dev.caerbannog.core.topology.BindingDestinationType
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -131,7 +132,7 @@ class ExecutorPathAllowListTest {
     )
 
     private val noStreams = object : StreamManager {
-        override suspend fun createStream(vhost: String, name: String) = StreamManagementResult.Success
+        override suspend fun createStream(vhost: String, name: String, settings: StreamSettings) = StreamManagementResult.Success
         override suspend fun deleteStream(vhost: String, name: String) = StreamManagementResult.Success
     }
 

@@ -319,6 +319,83 @@ class RealBrokerM9StreamArgumentsTest {
         finish("6", "value-shapes", o, raw)
     }
 
+    // ---- S7: the scenario "A stream made from a migration has the retention and the leader locator it declared" (feature 10, @broker) ----
+    // M9-14c step 2b. Unlike S1 to S6 this goes through the REAL `RabbitMqStreamManager`, the real executor and the real runner of a held connection:
+    // a seam test cannot see a wrong protocol name (an x- name is accepted and NOT SHOWN), so the SHOWN text is asserted. RED until the build.
+
+    private val secrets = object : dev.caerbannog.core.connections.SecretStore {
+        override fun store(profileName: String, password: String) = Unit
+        override fun retrieve(profileName: String): String = "guest"
+        override fun delete(profileName: String) = Unit
+    }
+
+    private fun openHeld(vhost: String): dev.caerbannog.core.connections.HeldConnection {
+        val profile = dev.caerbannog.core.connections.ConnectionProfile(
+            name = "m9-14c", host = rabbit.host, virtualHost = vhost, username = "guest",
+            streamPort = rabbit.getMappedPort(5552), managementPort = rabbit.getMappedPort(15672), tls = false,
+            topologyControlLevel = dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL,
+        )
+        val opened = kotlinx.coroutines.runBlocking { dev.caerbannog.datarabbit.RabbitMqConnectionGateway(secrets).open(profile) }
+        check(opened is dev.caerbannog.core.connections.OpenResult.Opened) { "could not open the held connection: $opened" }
+        toClose += opened.connection
+        return opened.connection
+    }
+
+    private fun apply(held: dev.caerbannog.core.connections.HeldConnection, vhost: String, action: dev.caerbannog.core.migrations.MigrationAction): dev.caerbannog.core.migrations.MigrationApplyResult {
+        val file = (dev.caerbannog.core.migrations.MigrationParser.parse(dev.caerbannog.core.migrations.MigrationParser.exportToJson("0001", "m9-14c", listOf(action)))
+            as dev.caerbannog.core.migrations.MigrationValidationResult.Valid).migration
+        return kotlinx.coroutines.runBlocking {
+            dev.caerbannog.core.migrations.MigrationRunner(dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository(), held.migrationExecutor!!)
+                .applyPending("m9-14c", listOf(file), true, dev.caerbannog.core.connections.TopologyControlLevel.FULL_CONTROL, vhost = vhost)
+        }
+    }
+
+    @Test
+    fun `S7 a stream made from a migration has the retention and the leader locator it declared, a repeat changes nothing, other retention is a conflict`() {
+        val vhost = newVhost("s7"); val held = openHeld(vhost); control(env(vhost), vhost)
+        val args = linkedMapOf<String, dev.caerbannog.core.json.ArgumentValue>(
+            "x-max-age" to dev.caerbannog.core.json.ArgumentValue.Text("7D"),
+            "x-max-length-bytes" to dev.caerbannog.core.json.ArgumentValue.Whole(1_000_000_000),
+            "x-queue-leader-locator" to dev.caerbannog.core.json.ArgumentValue.Text("client-local"),
+        )
+        val declare = dev.caerbannog.core.migrations.MigrationAction.DeclareStream("audit", vhost, args)
+        assertEquals(dev.caerbannog.core.migrations.MigrationApplyResult.Success(listOf("0001")), apply(held, vhost, declare))
+        val created = argumentsOf(vhost, "audit")
+        assertEquals("x-max-age=text:7D, x-max-length-bytes=number:1000000000, x-queue-leader-locator=text:client-local, x-queue-type=text:stream", shown(created),
+            "as the management API shows it: the age as the TEXT 7D (not 604800s), the length as a number, the locator as asked")
+        // the name trap: a stream made with the settings is not a plain one
+        val plain = name("plain")
+        assertEquals("accepted", attempt(env(vhost), plain) { it })
+        assertTrue(argumentsOf(vhost, plain) != created, "a stream with settings equals a plain one: the settings were not sent under the right names")
+        // a repeat changes nothing
+        assertEquals(dev.caerbannog.core.migrations.MigrationApplyResult.Success(listOf("0001")), apply(held, vhost, declare))
+        assertEquals(created, argumentsOf(vhost, "audit"))
+        // other retention: a conflict, the stream is unchanged
+        val other = declare.copy(arguments = args + ("x-max-age" to dev.caerbannog.core.json.ArgumentValue.Text("1D")))
+        val result = apply(held, vhost, other)
+        assertTrue(result is dev.caerbannog.core.migrations.MigrationApplyResult.ActionFailed && result.reason.contains("exists with different settings"), "got $result")
+        assertEquals(created, argumentsOf(vhost, "audit"), "the conflict must leave the stream unchanged")
+    }
+
+    @Test
+    fun `S7b the real stream manager shows 7D as text and the byte keys as numbers`() {
+        val vhost = newVhost("s7b")
+        val profile = dev.caerbannog.core.connections.ConnectionProfile(
+            name = "m9-14c", host = rabbit.host, virtualHost = vhost, username = "guest",
+            streamPort = rabbit.getMappedPort(5552), managementPort = rabbit.getMappedPort(15672), tls = false,
+        )
+        StreamEnvironments(profile, "guest", BrokerTransport.Plain).use { environments ->
+            val manager = RabbitMqStreamManager(environments)
+            val n = name("real")
+            val settings = dev.caerbannog.core.streams.StreamSettings(maxAge = "7D", maxLengthBytes = 1_000_000_000, segmentSizeBytes = 100_000_000, leaderLocator = "random")
+            assertEquals(dev.caerbannog.core.streams.StreamManagementResult.Success, kotlinx.coroutines.runBlocking { manager.createStream(vhost, n, settings) })
+            assertEquals(
+                "x-max-age=text:7D, x-max-length-bytes=number:1000000000, x-queue-leader-locator=text:random, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:100000000",
+                shown(argumentsOf(vhost, n)),
+            )
+        }
+    }
+
     private val PINNED: Map<String, String> = PINNED_FACTS
 }
 

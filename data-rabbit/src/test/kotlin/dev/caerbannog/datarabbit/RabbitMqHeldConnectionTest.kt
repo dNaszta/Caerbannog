@@ -18,6 +18,7 @@ import dev.caerbannog.core.streams.StreamManager
 import dev.caerbannog.core.streams.StreamOffsets
 import dev.caerbannog.core.streams.StreamPage
 import dev.caerbannog.core.streams.StreamSummary
+import dev.caerbannog.core.streams.StreamSettings
 import dev.caerbannog.core.topology.BindingRow
 import dev.caerbannog.core.topology.ExchangeRow
 import dev.caerbannog.core.topology.QueuePage
@@ -178,7 +179,7 @@ private object StubPublisher : MessagePublisher {
 }
 
 private object StubStreamManager : StreamManager {
-    override suspend fun createStream(vhost: String, name: String): StreamManagementResult =
+    override suspend fun createStream(vhost: String, name: String, settings: StreamSettings): StreamManagementResult =
         StreamManagementResult.Failed("Stub")
 
     override suspend fun deleteStream(vhost: String, name: String): StreamManagementResult =
