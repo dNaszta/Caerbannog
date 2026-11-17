@@ -53,9 +53,9 @@ import dev.caerbannog.ui.connections.SmallIconSize
 // The forms of wizard page 2 (mockup section 4). Each form keeps its own fields while the page is on show: the view model answers on another
 // thread, and a field that is rewritten from a late state loses letters. The problems, hints and suggestions are read from the state.
 
-private fun WizardState.Details.problem(field: String): String? = problems.firstOrNull { it.field == field }?.message
+internal fun WizardState.Details.problem(field: String): String? = problems.firstOrNull { it.field == field }?.message
 
-private fun WizardState.Details.hint(field: String): String? = hints.firstOrNull { it.field == field }?.message
+internal fun WizardState.Details.hint(field: String): String? = hints.firstOrNull { it.field == field }?.message
 
 @Composable
 internal fun QueueFormView(initial: QueueForm, details: WizardState.Details, events: PlannerEvents, onNext: () -> Unit) {
@@ -264,6 +264,30 @@ internal fun StreamFormView(initial: StreamForm, details: WizardState.Details, e
                 )
             }
         }
+        RetentionBlock(form, details, onNext, change)
+    }
+}
+
+/**
+ * The retention of a new stream, saved as one policy step (Q4): last block of the form, drawn only while adding. Its tick (the policy also covers
+ * the response stream) is drawn only while the response stream is ticked.
+ */
+@Composable
+private fun RetentionBlock(form: StreamForm, details: WizardState.Details, onNext: () -> Unit, change: (StreamForm) -> Unit) {
+    FormField("keepFor", PlannerTexts.KEEP_FOR_LABEL, form.keepFor, details, onNext, placeholder = "7D") { change(form.copy(keepFor = it)) }
+    FormField("keepAtMost", PlannerTexts.KEEP_AT_MOST_LABEL, form.keepAtMost, details, onNext) { change(form.copy(keepAtMost = it)) }
+    if (form.withResponse) {
+        Row(
+            modifier = Modifier
+                .toggleable(value = form.sameRetentionForResponse, role = Role.Checkbox, onValueChange = { change(form.copy(sameRetentionForResponse = it)) })
+                .padding(vertical = 4.dp)
+                .testTag("planForm:retentionResponseTick"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(checked = form.sameRetentionForResponse, onCheckedChange = null)
+            Text(PlannerTexts.RETENTION_RESPONSE_TICK, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
@@ -341,7 +365,7 @@ internal fun MqttRouteFormView(initial: MqttRouteForm, details: WizardState.Deta
  * button opens a list, the items of this plan first; a typed name that is in no list is allowed and is told so.
  */
 @Composable
-private fun FormField(
+internal fun FormField(
     field: String,
     label: String,
     value: String,
@@ -350,13 +374,15 @@ private fun FormField(
     autoFocus: Boolean = false,
     suggestions: List<Suggestion>? = null,
     placeholder: String? = null,
+    hintTag: String = "planForm:hint:$field",
+    modifier: Modifier = Modifier,
     onChange: (String) -> Unit,
 ) {
     val error = details.problem(field)
     val hint = details.hint(field)
     val focus = remember { FocusRequester() }
     if (autoFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedTextField(
                 value = value,
@@ -373,7 +399,7 @@ private fun FormField(
         if (error != null) {
             Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp).testTag("planForm:error:$field"))
         } else if (hint != null) {
-            Row(Modifier.padding(start = 16.dp).testTag("planForm:hint:$field"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.padding(start = 16.dp).testTag(hintTag), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ConnectionIcon(AppIcon.Lightbulb, SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

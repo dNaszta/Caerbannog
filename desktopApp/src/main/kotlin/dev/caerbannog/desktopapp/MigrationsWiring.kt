@@ -12,6 +12,7 @@ import dev.caerbannog.core.migrations.MigrationsViewModel
 import dev.caerbannog.core.mqtt.CorrelationIdSource
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
+import dev.caerbannog.core.planner.BrokerPolicyReader
 import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.ui.mqtt.PublishMqttEvents
 import dev.caerbannog.core.migrations.TopologyMigrationExecutor
@@ -39,6 +40,8 @@ data class MigrationsInputs(
     val streams: StreamCatalog? = null,
     /** The read-only check port of the same connection (M9-05), already behind the closed-connection guard; null when there is none or the connection cannot run migrations. */
     val declareCheck: DeclareCheck? = null,
+    /** M9-08: the one-policy read for the notes of the check, same rules as [declareCheck]. */
+    val policyReader: BrokerPolicyReader? = null,
     /** M9-10b: the held source has an MQTT port (the port part of [mqttPublishAccess]). */
     val hasMqtt: Boolean = false,
     /** M9-10b: the finished permission check says test publishing is enabled; an unfinished check or no connection is false (as `canWrite` in Main.kt). */
@@ -72,6 +75,7 @@ fun AppComposition.migrationsInputs(connections: ConnectionsState): MigrationsIn
         topology = source?.topology,
         streams = source?.catalog,
         declareCheck = source?.declareCheck,
+        policyReader = source?.policyReader,
         hasMqtt = source?.hasMqtt == true,
         publishingEnabled = (current?.status as? PermissionCheckStatus.Done)?.result?.publishingEnabled ?: false,
     )

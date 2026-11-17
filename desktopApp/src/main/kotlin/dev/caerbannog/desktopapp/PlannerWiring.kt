@@ -2,6 +2,8 @@ package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.FolderOpener
+import dev.caerbannog.core.planner.BrokerPolicyReader
+import dev.caerbannog.core.planner.KnownQueue
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.KnownTopologyReader
 import dev.caerbannog.core.planner.NamingStyle
@@ -70,20 +72,22 @@ class CatalogKnownTopologyReader(
         return KnownTopology(
             // The default exchange is not a name a plan can bind to.
             exchanges = exchanges.filterNot { it.isDefault }.associate { it.name to it.type },
-            queues = queues,
+            queues = queues.keys,
             streams = streamNames,
+            // A broker stream has no policy name here (a StreamSummary carries none): no check note for a stream that already exists.
+            queueDetails = queues + streamNames.associateWith { KnownQueue("stream", null) },
         )
     }
 
-    private suspend fun allQueues(vhost: String): Set<String>? {
-        val names = mutableSetOf<String>()
+    private suspend fun allQueues(vhost: String): Map<String, KnownQueue>? {
+        val queues = linkedMapOf<String, KnownQueue>()
         var page = 1
         do {
             val result = (topology.queues(vhost, page) as? CatalogResult.Success)?.value ?: return null
-            names += result.rows.map { it.name }
+            result.rows.forEach { queues[it.name] = KnownQueue(it.type, it.policy) }
             page++
         } while (page <= result.pageCount)
-        return names
+        return queues
     }
 
     private suspend fun allStreams(vhost: String): Set<String>? {
@@ -120,6 +124,7 @@ fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: Corou
         scope = scope,
         reader = knownTopologyReaderOf(inputs),
         declareCheck = inputs.declareCheck,
+        policies = inputs.policyReader,
         // The summary says when the check ran; the view model's own default clock is for tests and always says 0.
         clock = RefreshClock { System.currentTimeMillis() },
     )
@@ -128,9 +133,9 @@ fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: Corou
  * What the planner window keys its view model on: the context AND the check port. A reconnect to the same profile has the same context
  * but a new port, and a view model keyed on the context alone would keep the port of the closed connection.
  */
-data class PlannerKey(val context: PlannerContext, val declareCheck: DeclareCheck?)
+data class PlannerKey(val context: PlannerContext, val declareCheck: DeclareCheck?, val policyReader: BrokerPolicyReader? = null)
 
-fun plannerKeyOf(inputs: MigrationsInputs): PlannerKey = PlannerKey(plannerContextOf(inputs), inputs.declareCheck)
+fun plannerKeyOf(inputs: MigrationsInputs): PlannerKey = PlannerKey(plannerContextOf(inputs), inputs.declareCheck, inputs.policyReader)
 
 /**
  * Follows [viewModel] for the navigation: a saved plan closes the planner and opens Migrations with that version waiting; a confirmed
