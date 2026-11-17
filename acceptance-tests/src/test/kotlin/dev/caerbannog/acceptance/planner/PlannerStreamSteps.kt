@@ -165,6 +165,8 @@ class PlannerStreamSteps {
 
     @Then("the summary says {string}")
     fun summarySays(title: String) {
+        // M9-09: the dead-lettering scenarios read the summary page in PlannerDeadLetterSteps
+        if (DeadLetterWorld.active) return PlannerDeadLetterSteps().summarySays(title)
         // M9-07b: the sentence of the summary's note (what the planner does not plan) is "said" by the summary too, in the state and on the page.
         if (title == PlannerTexts.SERVICE_NOT_PLANNED) {
             assertEquals(title, summaryNoteSeen, "state: the note of the summary page")
@@ -291,6 +293,7 @@ class PlannerStreamSteps {
 
     @When("I tick {string}")
     fun tickPair(tick: String) {
+        if (tick == "Publishers are refused when the queue is full") return PlannerDeadLetterSteps().tick(tick) // M9-09: the tick of the dead-lettering form
         assertEquals(PlannerTexts.RESPONSE_STREAM_TICK, tick)
         tickOn()
     }

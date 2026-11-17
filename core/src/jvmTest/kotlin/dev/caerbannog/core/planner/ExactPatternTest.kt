@@ -4,6 +4,7 @@ import dev.caerbannog.core.migrate3x.PatternCompilation
 import dev.caerbannog.core.migrate3x.PolicyPatternMatcher
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -83,5 +84,45 @@ class ExactPatternTest {
         // the broker has no such limit. The text of the pattern must not change because of that.
         val name = "s".repeat(255)
         assertEquals("^$name$", ExactPattern.of(listOf(name)))
+    }
+
+    // ---- M9-09: nameOf, the exact inverse of `of` for ONE name ----
+
+    @Test
+    fun `nameOf reads back the one name of of`() {
+        listOf("orders", "orders.eu", "jobs+retry", "é-ü", "a b", "x".repeat(255)).forEach { name ->
+            assertEquals(name, ExactPattern.nameOf(ExactPattern.of(listOf(name))), "round trip of <$name>")
+        }
+    }
+
+    @Test
+    fun `nameOf round-trips every special character, alone and inside a name`() {
+        "\\.^$*+?()[]{}|".forEach { ch ->
+            assertEquals("$ch", ExactPattern.nameOf(ExactPattern.of(listOf("$ch"))), "the character <$ch> alone")
+            assertEquals("a${ch}b", ExactPattern.nameOf(ExactPattern.of(listOf("a${ch}b"))), "the character <$ch> inside")
+        }
+        val all = "\\.^$*+?()[]{}|"
+        assertEquals(all, ExactPattern.nameOf(ExactPattern.of(listOf(all))))
+    }
+
+    @Test
+    fun `nameOf is null for several names, an unescaped special character, no anchors and a trailing backslash`() {
+        listOf(
+            "^(a|b)$", "^(a)$", "^a|b$", "^a.b$", "^a*$", "^a+$", "^a?$", "^[ab]$", "^a{2}$", "^a(b$", "^a)b$", "^a^b$", "^a\\$", "^a\$b$",
+            "orders", "^orders", "orders$", "^orders$ ", " ^orders$", "^orders\\$", "^orders$\n", "^a\\", "^\\$", "^orders$$",
+            "", "$", "^", ".*", "^.*$",
+        ).forEach { assertNull(ExactPattern.nameOf(it), "<$it> is not the pattern of one name") }
+    }
+
+    @Test
+    fun `nameOf of the pattern of the empty name is the empty name`() {
+        assertEquals("", ExactPattern.nameOf(ExactPattern.of(listOf(""))))
+        assertEquals("", ExactPattern.nameOf("^$"))
+    }
+
+    @Test
+    fun `nameOf of the pattern of several names is null`() {
+        assertNull(ExactPattern.nameOf(ExactPattern.of(listOf("a", "b"))))
+        assertNull(ExactPattern.nameOf(ExactPattern.of(listOf("orders", "orders-dlq"))))
     }
 }

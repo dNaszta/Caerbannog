@@ -599,6 +599,34 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I choose the queue "unlisted" in the dead-lettering form without a connection
     Then "At least once" is not offered
 
+  # Added at M9-09 step 2 (test developer): acceptance points of the brief that had no scenario.
+  @m9-09 @negative @fake-broker
+  Scenario: A stream is not offered as the source and typing its name is refused
+    Given the broker has the stream "telemetry"
+    When I choose the queue "telemetry" in the dead-lettering form
+    Then the form says "Dead-lettering does not work for a stream. Choose a queue."
+    And "Next" is disabled
+
+  @m9-09 @negative @fake-broker
+  Scenario: Without a queue the form says what to choose and Next stays disabled
+    When I open the dead-lettering form
+    Then the form says "Choose or type the queue"
+    And "Next" is disabled
+
+  @m9-09 @fake-broker
+  Scenario: The queue is chosen from this plan and the broker, streams left out
+    Given a plan that declares the quorum queue "orders"
+    And the broker has the quorum queue "audit"
+    And the broker has the stream "telemetry"
+    When I open the dead-lettering form
+    Then the queues offered are "orders" from this plan and "audit" from the broker
+
+  @m9-09 @fake-broker
+  Scenario: A queue whose policy has the same priority says that only one applies
+    Given the broker has the quorum queue "orders" with the policy "limits" applied with priority 0
+    When I choose the queue "orders" in the dead-lettering form
+    Then the form says "The broker applies the policy limits to orders at the same priority. Only one of the two will apply, and RabbitMQ does not say which."
+
   # The wording of the next three scenarios is decided (owner, 2026-11-17: items 1, 2, 3 and 8 of the Owner review list of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md, accepted as recommended); basis S-C2, S-C3, S-C5.
   @m9-09 @fake-broker
   Scenario: The default says that a dead letter can be lost

@@ -99,7 +99,11 @@ class PlannerSteps {
     }
 
     @Given("the broker has the quorum queue {string}")
-    fun brokerQueue(name: String) { CheckWorld.seedQueue(name); d.known = d.known.copy(queues = d.known.queues + name) }
+    fun brokerQueue(name: String) {
+        CheckWorld.seedQueue(name)
+        // M9-09: the planner reads the type of every queue with its name (KnownTopology.queueDetails), so a form can tell a quorum queue from a classic one
+        d.known = d.known.copy(queues = d.known.queues + name, queueDetails = d.known.queueDetails + (name to dev.caerbannog.core.planner.KnownQueue("quorum", null)))
+    }
 
     @Given("the broker has the direct exchange {string}")
     fun brokerExchange(name: String) { CheckWorld.seedExchange(name); d.known = d.known.copy(exchanges = d.known.exchanges + (name to "direct")) }
@@ -237,6 +241,8 @@ class PlannerSteps {
     fun formSays(message: String) {
         // M9-07: the fixed note of the stream form is also "said" by the form; it is a text of the page, not a problem.
         if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
+        // M9-09: the notes of the dead-lettering form are hints of the form or notes the view model read; never problems.
+        if (d.form is dev.caerbannog.core.planner.DeadLetterForm) return PlannerDeadLetterSteps().saidByForm(message)
         // M9-08: the match line and the sentence of the policy form are hints, not problems.
         if (PlannerPolicySteps.isPolicyHint(message)) return PlannerPolicySteps.hintSaid(message)
         // M9-11: the two warnings of a headers binding are hints, not problems.
