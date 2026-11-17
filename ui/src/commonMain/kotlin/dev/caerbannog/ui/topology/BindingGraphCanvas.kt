@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import dev.caerbannog.core.planner.PlanGraph
 import dev.caerbannog.core.planner.PlanMark
 import dev.caerbannog.core.planner.PlannerTexts
@@ -58,6 +59,7 @@ import dev.caerbannog.core.topology.BindingGraph
 import dev.caerbannog.core.topology.GraphNodeKind
 import dev.caerbannog.core.topology.NODE_HEIGHT
 import dev.caerbannog.core.topology.NODE_WIDTH
+import dev.caerbannog.core.topology.PositionedEdge
 import dev.caerbannog.core.topology.PositionedNode
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
@@ -88,7 +90,18 @@ internal fun BindingGraphCanvas(
     // A link of a pair in one column is drawn on the right of it, with its label: leave room for both.
     val linkRoom = if (links.isEmpty()) 0f else (links.maxOf { it.labelX } + LINK_LABEL_WIDTH + 12f)
     val maxX = maxOf((nodes.maxOfOrNull { it.x } ?: 0f) + NODE_WIDTH + 48f, linkRoom)
-    val maxY = (nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f
+    // The review graph draws the labels of one edge as one block and stacks blocks that would collide; the box grows to hold the lowest one.
+    val blocks = if (plan == null) emptyList() else edges.map { edge ->
+        EdgeLabelBlock(
+            edge = edge,
+            hasKey = edge.edge.routingKey.isNotEmpty(),
+            isNew = edge.edge.id in plan.newEdgeIds,
+            isRoute = edge.edge.id in plan.mqttRouteEdgeIds,
+        )
+    }
+    val placed = stackLabelBlocks(blocks.map { LabelBlockSpec(it.edge.labelX, it.edge.labelY, it.height, it.pivot) })
+    val lowestLabel = blocks.indices.maxOfOrNull { placed[it].top + blocks[it].height } ?: 0f
+    val maxY = maxOf((nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f, if (blocks.isEmpty()) 0f else lowestLabel + 48f)
     // The Bindings graph keeps its minimum size; the review graph is as big as its content, so a small plan fits its card and has no bar.
     val graphWidth = maxOf(if (plan == null) 640f else 0f, maxX).dp
     val graphHeight = maxOf(if (plan == null) 400f else 0f, maxY).dp
@@ -96,7 +109,7 @@ internal fun BindingGraphCanvas(
     val horizontal = rememberScrollState()
     val vertical = rememberScrollState()
     val drawing: @Composable () -> Unit = {
-        Box(Modifier.size(graphWidth, graphHeight)) {
+        Box(Modifier.size(graphWidth, graphHeight).then(if (plan == null) Modifier else Modifier.testTag("planner:reviewGraphContent"))) {
             // Edges canvas
             val edgeColor = MaterialTheme.colorScheme.outline
             val newEdgeColor = MaterialTheme.colorScheme.primary
@@ -162,37 +175,8 @@ internal fun BindingGraphCanvas(
                 }
             }
 
-            // An MQTT route says so under its key pill: the topic filter as the user typed it, and the words that name the kind.
-            if (plan != null) {
-                edges.filter { it.edge.id in plan.mqttRouteEdgeIds }.forEach { edge ->
-                    Column(
-                        Modifier
-                            .offset(x = edge.labelX.dp, y = (edge.labelY + MQTT_LABEL_OFFSET).dp)
-                            .layout { measurable, constraints ->
-                                val placeable = measurable.measure(constraints)
-                                layout(placeable.width, placeable.height) { placeable.place(-placeable.width / 2, 0) }
-                            },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            plan.edgeLabels[edge.edge.id].orEmpty(),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            modifier = Modifier.testTag("planGraphEdgeLabel:${edge.edge.id}"),
-                        )
-                        Text(
-                            PlannerTexts.MQTT_ROUTE_LABEL,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag("planGraphEdgeTag:${edge.edge.id}"),
-                        )
-                    }
-                }
-            }
-
             // Routing key pills
-            edges.forEach { edge ->
+            if (plan == null) edges.forEach { edge ->
                 if (edge.edge.routingKey.isNotEmpty()) {
                     Box(
                         Modifier
@@ -219,21 +203,13 @@ internal fun BindingGraphCanvas(
                 }
             }
 
-            // "new" pills of the plan's own bindings, below the routing key pill (or on the line when it has no key)
-            if (plan != null) {
-                edges.filter { it.edge.id in plan.newEdgeIds }.forEach { edge ->
-                    NewPill(
-                        Modifier
-                            .offset(x = edge.labelX.dp, y = (edge.labelY + if (edge.edge.routingKey.isEmpty()) 0f else 18f).dp)
-                            .layout { measurable, constraints ->
-                                val placeable = measurable.measure(constraints)
-                                layout(placeable.width, placeable.height) {
-                                    placeable.place(-placeable.width / 2, -placeable.height / 2)
-                                }
-                            }
-                            .testTag("planGraphNew:${edge.edge.id}"),
-                    )
-                }
+            // The review graph: all the labels of an edge are one block, centred on the edge's label x, stacked with the blocks near it.
+            val cards = nodes.map { CardRect(it.x, it.y, it.x + NODE_WIDTH, it.y + NODE_HEIGHT) }
+            blocks.forEachIndexed { index, block ->
+                EdgeLabelBlockView(
+                    block, plan?.edgeLabels?.get(block.edge.edge.id).orEmpty(),
+                    top = placed[index].top, cards = if (placed[index].stacked) cards else emptyList(),
+                )
             }
 
             // Nodes
@@ -451,3 +427,77 @@ private fun Modifier.dottedOutline(color: Color): Modifier = drawWithContent {
         style = Stroke(width = width, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, width * 2.5f))),
     )
 }
+
+/** What the review graph draws for one edge, top to bottom: key pill, "new", and for an MQTT route its filter and tag. */
+private class EdgeLabelBlock(val edge: PositionedEdge, val hasKey: Boolean, val isNew: Boolean, val isRoute: Boolean) {
+    private val rows: List<Float> = buildList {
+        if (hasKey) add(KEY_ROW)
+        if (isNew) add(NEW_ROW)
+        if (isRoute) { add(TEXT_ROW); add(TEXT_ROW) }
+    }
+    val height: Float = rows.sum()
+
+    /** Distance from the block's top to the middle of its first row, which sits on the edge as the key pill always did. */
+    val pivot: Float = (rows.firstOrNull() ?: 0f) / 2f
+}
+
+@Composable
+private fun EdgeLabelBlockView(block: EdgeLabelBlock, filter: String, top: Float, cards: List<CardRect>) {
+    if (block.height == 0f) return
+    val id = block.edge.edge.id
+    Column(
+        Modifier.offset(y = top.dp).layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            val centre = clampLabelCentre(block.edge.labelX, placeable.width / density, top, block.height, cards)
+            val left = (centre * density).roundToInt() - placeable.width / 2
+            // The box reaches from the graph's left edge to the block's right edge, so the block's own bounds are where it is drawn.
+            layout(left + placeable.width, placeable.height) { placeable.place(left, 0) }
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (block.hasKey) {
+            Box(Modifier.height(KEY_ROW.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .testTag("edgePill:${block.edge.edge.routingKey}"),
+                ) {
+                    Text(
+                        block.edge.edge.routingKey,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        if (block.isNew) Box(Modifier.height(NEW_ROW.dp), contentAlignment = Alignment.Center) { NewPill(Modifier.testTag("planGraphNew:$id")) }
+        if (block.isRoute) {
+            Box(Modifier.height(TEXT_ROW.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    filter,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    modifier = Modifier.testTag("planGraphEdgeLabel:$id"),
+                )
+            }
+            Box(Modifier.height(TEXT_ROW.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    PlannerTexts.MQTT_ROUTE_LABEL,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("planGraphEdgeTag:$id"),
+                )
+            }
+        }
+    }
+}
+
+// Row heights of a label block, in dp: a labelSmall line is 16 dp; the pills add their own padding.
+private const val KEY_ROW = 20f
+private const val NEW_ROW = 18f
+private const val TEXT_ROW = 16f
