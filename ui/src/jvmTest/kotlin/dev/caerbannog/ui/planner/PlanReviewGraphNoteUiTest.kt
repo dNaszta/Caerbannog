@@ -32,6 +32,8 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class PlanReviewGraphNoteUiTest {
+    private val NOTE_NEAR = 40f
+
     private val sentence = "Your own service turns a request into an MQTT message; the planner does not plan that."
 
     private fun rig(prepare: UiRig.() -> Unit) = UiRig(reader = FakeKnownTopologyReader(KnownTopology.None), prepare = prepare)
@@ -200,23 +202,24 @@ class PlanReviewGraphNoteUiTest {
 
     // ---- step 2 addendum (architect's gate, decision 3a) ----
 
-    private fun DesktopComposeUiTest.assertNoteBetweenAndFree(request: String, topic: String, others: List<String>) {
+    /**
+     * The same-column case (decision of step 5): the note stands next to the request stream and covers nothing. It overlaps the column of the request
+     * stream horizontally, is at most [NOTE_NEAR] dp (measured) from that node vertically, and overlaps no node, pill, label or other note.
+     */
+    private fun DesktopComposeUiTest.assertNoteNextToRequestAndFree(request: String, topic: String, others: List<String>) {
         val note = rect("planGraphNote:0")
         val a = rect("planGraphNode:q:$request")
         val b = rect("planGraphNode:e:$topic")
         (listOf(a, b) + others.map { rect(it) } + PlannerNodeTags.withPrefix(this, "edgePill:").map { rect(it) }).forEach { o ->
             assertTrue(note[2] <= o[0] || o[2] <= note[0] || note[3] <= o[1] || o[3] <= note[1], "the note ${note.toList()} overlaps ${o.toList()}")
         }
-        val cx = (note[0] + note[2]) / 2
-        val cy = (note[1] + note[3]) / 2
-        val xs = listOf((a[0] + a[2]) / 2, (b[0] + b[2]) / 2)
-        val ys = listOf((a[1] + a[3]) / 2, (b[1] + b[3]) / 2)
-        assertTrue(cx >= xs.min() - 24f && cx <= xs.max() + 24f, "centre x $cx is not between the nodes $xs")
-        assertTrue(cy >= ys.min() - 24f && cy <= ys.max() + 24f, "centre y $cy is not between the nodes $ys")
+        assertTrue(note[0] < a[2] && a[0] < note[2], "the note ${note.toList()} is not over the column of the request stream ${a.toList()}")
+        val distance = maxOf(0f, note[1] - a[3], a[1] - note[3])
+        assertTrue(distance <= NOTE_NEAR, "the note is $distance px from the request stream, more than $NOTE_NEAR")
     }
 
     @Test
-    fun `the same column case, an exchange bound to amq topic, puts the note between the two nodes and on no node or pill`() = runDesktopComposeUiTest(1600, 1000) {
+    fun `the same column case, an exchange bound to amq topic, puts the note next to the request stream and covers nothing`() = runDesktopComposeUiTest(1600, 1000) {
         val r = rig {
             exchange("events")
             add(dev.caerbannog.core.planner.BindingForm("events", "amq.topic", dev.caerbannog.core.topology.BindingDestinationType.EXCHANGE, "k"))
@@ -227,7 +230,7 @@ class PlanReviewGraphNoteUiTest {
         assertEquals(listOf("planGraphNote:0"), notes())
         // the precondition of the case: amq.topic and the request stream share a column (same left edge)
         assertEquals(rect("planGraphNode:e:amq.topic")[0], rect("planGraphNode:q:device-commands")[0], "this is not the same column case")
-        assertNoteBetweenAndFree("device-commands", "amq.topic", listOf("planGraphNode:q:device-commands-dln", "planGraphNode:e:events"))
+        assertNoteNextToRequestAndFree("device-commands", "amq.topic", listOf("planGraphNode:q:device-commands-dln", "planGraphNode:e:events"))
         r.close()
     }
 

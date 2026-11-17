@@ -111,7 +111,7 @@ class PlanReviewGraphNoteSweepUiTest {
     }
 
     @Test
-    fun `in the same column case the note stays between its nodes whatever the length of the filter`() {
+    fun `in the same column case the note stays next to the request stream and covers nothing whatever the length of the filter`() {
         val problems = mutableListOf<String>()
         for (length in listOf(8, 16, 17, 24, 40)) runDesktopComposeUiTest(1600, 1000) {
             val filter = "d".repeat(length - 6) + "/+/ans"
@@ -122,11 +122,17 @@ class PlanReviewGraphNoteSweepUiTest {
             }
             showPlanner(r)
             val note = rect("planGraphNote:0")
-            val a = rect("planGraphNode:q:p1")
-            val b = rect("planGraphNode:e:amq.topic")
-            val cy = (note[1] + note[3]) / 2
-            val ys = listOf((a[1] + a[3]) / 2, (b[1] + b[3]) / 2)
-            if (cy < ys.min() - 24f || cy > ys.max() + 24f) problems += "a filter of $length characters: the note's centre y $cy is not between the nodes $ys"
+            val request = rect("planGraphNode:q:p1")
+            val topic = rect("planGraphNode:e:amq.topic")
+            val where = "a filter of $length characters"
+            if (!(note[0] < request[2] && request[0] < note[2])) problems += "$where: the note ${note.toList()} is not over the column of the request stream ${request.toList()}"
+            val distance = maxOf(0f, note[1] - request[3], request[1] - note[3])
+            if (distance > 40f) problems += "$where: the note is $distance px from the request stream (at most 40)"
+            for ((name, other) in listOf("the request stream" to request, "amq.topic" to topic) +
+                (PlannerNodeTags.withPrefix(this, "planGraphNode:") + PlannerNodeTags.withPrefix(this, "planGraphEdgeLabel:") + PlannerNodeTags.withPrefix(this, "planGraphEdgeTag:") +
+                    PlannerNodeTags.withPrefix(this, "edgePill:")).map { it to rect(it) }) {
+                if (overlap(note, other)) problems += "$where: the note covers $name"
+            }
             r.close()
         }
         assertEquals(emptyList(), problems)
