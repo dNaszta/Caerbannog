@@ -282,5 +282,8 @@ private fun SummaryPage(summary: WizardState.Summary, wordsOf: (MigrationAction)
                 }
             }
         }
+        summary.note?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("planWizard:summaryNote"))
+        }
     }
 }

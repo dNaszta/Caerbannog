@@ -589,7 +589,17 @@ class PlannerViewModel(
             val ctx = formContext()
             detailsOf(p.form, p.editing, ctx)
         }
-        is Page.Summary -> WizardState.Summary(p.form, p.form.actions(formContext()), p.editing)
+        is Page.Summary -> summaryOf(p)
+    }
+
+    /**
+     * The note is the shared pair rule over the summary's own actions only: a route form into a response stream that is already in the plan says
+     * nothing here, and the graph has its note after "Add to plan" (decision 3c).
+     */
+    private fun summaryOf(p: Page.Summary): WizardState.Summary {
+        val actions = p.form.actions(formContext())
+        val note = PlannerTexts.SERVICE_NOT_PLANNED.takeIf { PlanPairs.requestsAnsweredOverMqtt(actions).isNotEmpty() }
+        return WizardState.Summary(p.form, actions, p.editing, note)
     }
 
     private fun detailsOf(form: StepForm, editing: Int?, ctx: FormContext): WizardState.Details {

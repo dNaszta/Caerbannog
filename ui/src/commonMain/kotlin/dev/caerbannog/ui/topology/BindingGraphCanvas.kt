@@ -84,8 +84,13 @@ internal fun BindingGraphCanvas(
 ) {
     // The review graph closes an empty first column (a plan of queues only has no exchange to its left), so a small plan fits its card.
     val shift = if (plan == null) 0f else (graph.nodes.minOfOrNull { it.x } ?: 24f) - 24f
-    val nodes = if (shift == 0f) graph.nodes else graph.nodes.map { it.copy(x = it.x - shift) }
-    val edges = if (shift == 0f) graph.edges else graph.edges.map { it.copy(fromX = it.fromX - shift, toX = it.toX - shift, labelX = it.labelX - shift) }
+    val shifted = if (shift == 0f) graph.nodes else graph.nodes.map { it.copy(x = it.x - shift) }
+    val shiftedEdges = if (shift == 0f) graph.edges else graph.edges.map { it.copy(fromX = it.fromX - shift, toX = it.toX - shift, labelX = it.labelX - shift) }
+    // Only a review graph that has notes is laid out again: the gap that holds a note is widened. No note, no change (the Topology graph never has one).
+    val notes = plan?.notes.orEmpty()
+    val roomed = if (notes.isEmpty()) RoomedGraph(shifted, shiftedEdges) else makeRoomForNotes(shifted, shiftedEdges, notes)
+    val nodes = roomed.nodes
+    val edges = roomed.edges
     val links = plan?.let { p -> responseLinkShapes(p, nodes) }.orEmpty()
     // A link of a pair in one column is drawn on the right of it, with its label: leave room for both.
     val linkRoom = if (links.isEmpty()) 0f else (links.maxOf { it.labelX } + LINK_LABEL_WIDTH + 12f)
@@ -101,7 +106,12 @@ internal fun BindingGraphCanvas(
     }
     val placed = stackLabelBlocks(blocks.map { LabelBlockSpec(it.edge.labelX, it.edge.labelY, it.height, it.pivot) })
     val lowestLabel = blocks.indices.maxOfOrNull { placed[it].top + blocks[it].height } ?: 0f
-    val maxY = maxOf((nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f, if (blocks.isEmpty()) 0f else lowestLabel + 48f)
+    val noteRects = placeNotes(nodes, blocks.indices.map { i ->
+        val longest = maxOf(blocks[i].edge.edge.routingKey.length, plan?.edgeLabels?.get(blocks[i].edge.edge.id).orEmpty().length, PlannerTexts.MQTT_ROUTE_LABEL.length)
+        labelRectOf(blocks[i].edge.labelX, placed[i].top, blocks[i].height, longest)
+    }, notes)
+    val lowestNote = noteRects.filterNotNull().maxOfOrNull { it.bottom } ?: 0f
+    val maxY = maxOf((nodes.maxOfOrNull { it.y } ?: 0f) + NODE_HEIGHT + 48f, if (blocks.isEmpty()) 0f else lowestLabel + 48f, if (lowestNote == 0f) 0f else lowestNote + 24f)
     // The Bindings graph keeps its minimum size; the review graph is as big as its content, so a small plan fits its card and has no bar.
     val graphWidth = maxOf(if (plan == null) 640f else 0f, maxX).dp
     val graphHeight = maxOf(if (plan == null) 400f else 0f, maxY).dp
@@ -137,6 +147,9 @@ internal fun BindingGraphCanvas(
                     )
                 }
             }
+
+            // Notes sit over the edge lines but under the links, labels and nodes.
+            notes.forEachIndexed { index, note -> noteRects[index]?.let { PlanGraphNoteBox(index, note.text, it) } }
 
             // Response stream links: dotted, no arrow, never a routing line
             val linkColor = MaterialTheme.colorScheme.outline

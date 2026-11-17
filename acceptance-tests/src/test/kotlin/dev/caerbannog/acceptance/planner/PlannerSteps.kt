@@ -217,6 +217,7 @@ class PlannerSteps {
         if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
         assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
         PlannerMqttSteps.filterErrorOnScreen(message) // M9-10: only when the MQTT route form is open
+        PlannerStreamSteps.tickErrorOnScreen(message) // M9-07b: only when the stream form has an MQTT tick that is on
     }
 
     @Then("{string} is disabled")

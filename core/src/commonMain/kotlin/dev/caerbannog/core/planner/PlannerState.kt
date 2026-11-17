@@ -50,7 +50,13 @@ sealed interface WizardState {
     }
 
     /** Page 3: what "Add to plan" would add. */
-    data class Summary(val form: StepForm, val actions: List<dev.caerbannog.core.migrations.MigrationAction>, val editingStepId: Int?) : WizardState
+    data class Summary(
+        val form: StepForm,
+        val actions: List<dev.caerbannog.core.migrations.MigrationAction>,
+        val editingStepId: Int?,
+        /** One sentence under the list, or null; neutral on purpose so a later step (M9-09) can use the same place. */
+        val note: String? = null,
+    ) : WizardState
 }
 
 /** One verdict for "Save as migration": enabled, or disabled with the first reason that applies. */
@@ -199,9 +205,12 @@ data class PlannerState(
     /**
      * The two lines a plan action is shown with: the words of an MQTT route (its kind from this plan, then from the broker's names), else the
      * action's own description and detail. The step list, the summary page of the wizard and every other place that words a step call this.
+     * [alongside] are actions that are not in the plan yet but come with [action] (the summary's own steps), so a route into a stream declared
+     * next to it is worded "to stream ..." there as well.
      */
-    fun wordsOf(action: MigrationAction): MqttRouteWords =
-        MqttRoutes.words(action, plan.steps.map { it.action }, known ?: KnownTopology.None) ?: MqttRouteWords(action.description, action.detail.orEmpty())
+    fun wordsOf(action: MigrationAction, alongside: List<MigrationAction> = emptyList()): MqttRouteWords =
+        MqttRoutes.words(action, plan.steps.map { it.action } + alongside, known ?: KnownTopology.None)
+            ?: MqttRouteWords(action.description, action.detail.orEmpty())
 
     /** The title of step [stepId] as the planner shows it; empty for an id that is not in the plan. */
     fun stepTitle(stepId: Int): String =
