@@ -681,7 +681,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     Then the review graph shows an edge from "amq.topic" to "telemetry" labelled "sensors/+/temp" and "MQTT route"
 
   # Since the split of M9-10 (2026-11-17) the test message scenarios below carry @m9-10b (docs/tasks/M9-10b-mqtt-test-message.md);
-  # @m9-10 is the route step only. The planner runner lists @m9-10 only: it does not select @m9-10b until M9-10b widens it.
+  # @m9-10 is the route step only. The planner runner lists both tags (M9-10b step 2); the glue is PlannerTestMessageSteps.
   # A15 (proposed by the architect, wanted by the owner, O14): the test message asks for a sample value
   # for every wildcard of the filter, then opens the existing Publish MQTT dialog, which accepts no wildcards.
   @m9-10b @smoke @fake-broker
