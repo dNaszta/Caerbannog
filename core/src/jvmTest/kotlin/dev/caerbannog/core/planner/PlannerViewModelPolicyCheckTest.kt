@@ -119,7 +119,7 @@ class PlannerViewModelPolicyCheckTest {
     fun `the wizard offers the Policy kind and opens its form`() {
         val (r, _) = rig()
         assertTrue("Policy" in PlannerTexts.BUILT_KINDS, "built kinds: ${PlannerTexts.BUILT_KINDS}")
-        assertEquals(listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "MQTT route"), PlannerTexts.BUILT_KINDS)
+        assertEquals(listOf("Queue", "Exchange", "Binding", "Stream", "Policy", "Dead-lettering for a queue", "MQTT route"), PlannerTexts.BUILT_KINDS)
         r.vm.openWizard()
         r.vm.chooseKind("Policy")
         val details = assertIs<WizardState.Details>(r.state.wizard)
