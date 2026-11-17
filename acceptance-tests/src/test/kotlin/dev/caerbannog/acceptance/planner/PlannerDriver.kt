@@ -15,6 +15,8 @@ import dev.caerbannog.core.planner.FieldHint
 import dev.caerbannog.core.planner.FieldProblem
 import dev.caerbannog.core.planner.FormContext
 import dev.caerbannog.core.planner.KnownTopology
+import dev.caerbannog.core.planner.MqttDestinationKind
+import dev.caerbannog.core.planner.MqttRouteForm
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlanProblem
 import dev.caerbannog.core.planner.PlanStep
@@ -212,7 +214,8 @@ class PlannerDriver {
     fun saveHint(): String? = (saveGate() as? SaveGate.Disabled)?.reason
 
     fun stepAt(position: Int): PlanStep = plan.steps[position - 1]
-    fun titles(): List<String> = plan.steps.map { it.action.description }
+    /** What the planner list shows as the first line of each step (M9-10: a route is worded as a route; every other step as its action). */
+    fun titles(): List<String> = plan.steps.map { state.stepTitle(it.id) }
 
     fun editStep(position: Int, change: (StepForm) -> StepForm) {
         vm.editStep(stepAt(position).id)
@@ -237,6 +240,9 @@ class PlannerDriver {
     fun streamForm(name: String, withResponse: Boolean = false, responseName: String? = null) =
         StreamForm(name = name, withResponse = withResponse, responseName = responseName)
 
+    fun mqttRouteForm(filter: String, destination: String, kind: MqttDestinationKind? = null) =
+        MqttRouteForm(filter = filter, destination = destination, destinationKind = kind)
+
     fun bindingForm(exchange: String, destination: String, routingKey: String) = BindingForm(
         exchange = exchange,
         destination = destination,
@@ -249,5 +255,6 @@ class PlannerDriver {
         is ExchangeForm -> "Exchange"
         is BindingForm -> "Binding"
         is StreamForm -> "Stream"
+        is MqttRouteForm -> "MQTT route"
     }
 }

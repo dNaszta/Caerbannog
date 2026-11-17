@@ -216,6 +216,7 @@ class PlannerSteps {
         // M9-07: the fixed note of the stream form is also "said" by the form; it is a text of the page, not a problem.
         if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
         assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
+        PlannerMqttSteps.filterErrorOnScreen(message) // M9-10: only when the MQTT route form is open
     }
 
     @Then("{string} is disabled")
