@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: none (the owner answered the open questions on 2026-11-15)    Size: M
 
-STATUS 2026-11-16: measured (20 live tests on RabbitMQ 4.4.0) and reviewed at step 3: Accepted with follow-ups. Owner review list at the end.
+STATUS 2026-11-16: measured (20 live tests on RabbitMQ 4.4.0) and reviewed at step 3: Accepted with follow-ups. Owner review list at the end: ALL ITEMS DECIDED (2026-11-17).
 
 PLANNED 2026-11-15, confirmed for the live run 2026-11-16 (a container runtime exists now). Runs in parallel with `M9-00a` and `M9-00c`; see "How the spike is run".
 
@@ -93,7 +93,10 @@ None. (The sentence wording is the owner's, but it is a follow-up after the run,
 | R8 | accepted | `M9SpikeDlSupport.kt` | The tests get, reject and drain queue messages on a throwaway container and read content through `MgmtApi` (the same management `get` with `ack_requeue_true`) instead of `ManagementQueueMessageInspector`. The CLAUDE.md rule is about the app's own process; this is test code in `src/test`, behind no product interface, with the container's `guest` user. Deviation from the brief (it said the inspector) noted in the results; it proves the broker's answer, not the class. | None. Condition: no production code imports these helpers. |
 | R9 | defect (product) | `StreamMessageMapping.kt:30-33`, `PayloadFormatter.kt:213,262`, `StreamScanner.kt:162`, `McpServer.kt:796,830` | A dead letter in a stream shows `x-opt-deaths` as `[Ljava.lang.Object;@...`; the MCP stream tools have the same raw rendering (they call `toString()`). | New brief `M9-00b-c-readable-death-annotations`. |
 
-## Owner review list (step 3, 2026-11-16; wording is the owner's, nothing here is decided)
+## Owner review list (step 3, 2026-11-16; wording is the owner's)
+
+**Decided by the owner, 2026-11-17 (spec O19): items 1, 2, 3, 8, 9, 10 and 12 are ACCEPTED AS RECOMMENDED** (so item 10, the line that the reason travels with the message, is skipped until `M9-00b-c` is built; item 12: nothing more about timing). Items 6 and 11 were decided the same day (O16); items 4, 5 and 7 with the `M9-08` wording (O15). Every item is now decided; the scenarios lost `@needs-decision`.
+
 | # | Task | What the owner sees | Candidate text | Basis | Recommendation | What waits |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `M9-09` | The note under "At most once" (the default) | `If the dead-letter target cannot take a message, RabbitMQ drops it.` | S-C3 (at-most-once lost the message in all three kinds) | Accept as worded. | scenario "The default says that a dead letter can be lost" |

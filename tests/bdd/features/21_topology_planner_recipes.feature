@@ -18,11 +18,13 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   scenarios carry the decided text word for word and no scenario of 19, 20 or 21 carries needs-decision any more. The
   MQTT facts (S-A, S-B) and the headers facts (S-E) are measured: the tags m9-07b, m9-10 and m9-11 lost needs-spike.
   The dead-lettering facts (S-C, S-D, M9-00b, measured 2026-11-16 on RabbitMQ 4.4.0) are in docs/spec.md "Measured facts of
-  M9-00b": the m9-09 scenarios lost needs-spike, no scenario carries it any more. The scenarios that carry NEW wording from
-  that spike (the at-least-once explanation and its slow delivery, the note for a queue with its own dead-letter argument,
-  the two policy notes of @m9-09) carry @needs-decision until the owner answers the Owner review list of
-  docs/tasks/M9-00b-spike-dead-lettering-and-streams.md; the planner runner (@m9-01 to @m9-07, not @needs-decision) does not
-  select them, and no other runner selects the m9-09 or m9-08 tags.
+  M9-00b": the m9-09 scenarios lost needs-spike, no scenario carries it any more. The owner accepted the new wording of
+  that spike as the architect recommended on 2026-11-17 (items 1, 2, 3, 8, 9, 10 and 12 of the Owner review list of
+  docs/tasks/M9-00b-spike-dead-lettering-and-streams.md): the at-least-once explanation and its slow delivery, the note for
+  a queue with its own dead-letter argument and the default's "can be lost" line are decided and word for word in the
+  scenarios below; the optional line about the reason travelling with a stream message (item 10) is skipped until
+  M9-00b-c is built. No scenario of 19, 20 or 21 carries needs-decision any more, and no other runner selects the m9-09 or
+  m9-08 tags.
 
   Sub-tags: @m9-07 streams and the optional response stream (DLN), @m9-07b the optional MQTT routes of a
   stream pair, @m9-08 policies, @m9-09 dead-lettering for a queue, @m9-10 MQTT routes (the route step), @m9-10b
@@ -530,7 +532,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
 
   @m9-09 @fake-broker
   Scenario Outline: The dead-letter names are suggested with suffixes in the naming style
-    Given the naming style is "<style>"
+    Given I chose the naming style "<style>" in the planner
     When I choose the queue "orders" in the dead-lettering form
     Then the dead-letter exchange is suggested as "<exchange>" and the dead-letter queue as "<queue>"
 
@@ -597,21 +599,21 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     When I choose the queue "unlisted" in the dead-lettering form without a connection
     Then "At least once" is not offered
 
-  # The wording of the next three scenarios is proposed from M9-00b (S-C2, S-C3, S-C5): owner review list items 1 to 3 of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md.
-  @m9-09 @fake-broker @needs-decision
+  # The wording of the next three scenarios is decided (owner, 2026-11-17: items 1, 2, 3 and 8 of the Owner review list of docs/tasks/M9-00b-spike-dead-lettering-and-streams.md, accepted as recommended); basis S-C2, S-C3, S-C5.
+  @m9-09 @fake-broker
   Scenario: The default says that a dead letter can be lost
     Given the broker has the quorum queue "orders"
     When I choose "At most once" in the dead-lettering form for "orders"
     Then the form says "If the dead-letter target cannot take a message, RabbitMQ drops it."
 
-  @m9-09 @fake-broker @needs-decision
+  @m9-09 @fake-broker
   Scenario: At least once says what it needs, what it changes and that it can be slow
     Given the broker has the quorum queue "orders"
     When I choose "At least once" in the dead-lettering form for "orders"
     Then the form says "RabbitMQ keeps a message it cannot pass on and retries. Retries can take minutes, so do not rely on a quick delivery."
     And the form says "While the queue is full, publishers are refused. A quorum queue holds one message more than its limit."
 
-  @m9-09 @fake-broker @needs-decision
+  @m9-09 @fake-broker
   Scenario: A queue that declares its own dead-letter exchange is pointed out
     Given the broker has the quorum queue "orders" declared with the argument "x-dead-letter-exchange" "legacy-dlx"
     When I choose the queue "orders" in the dead-lettering form
