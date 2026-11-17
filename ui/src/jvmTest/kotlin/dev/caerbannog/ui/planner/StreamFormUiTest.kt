@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
@@ -131,6 +132,31 @@ class StreamFormUiTest {
     }
 
     @Test
+    fun `M9-07c on a short window the longer note and the hint keep Back, Next and Cancel on screen`() = runDesktopComposeUiTest(1280, 420) {
+        val r = UiRig()
+        showPlanner(r)
+        node("planner:addStepBtn").performClick()
+        node("planWizard:kind:Stream").performScrollTo().performClick() // on a short window the kinds scroll
+        node("planWizard:next").performClick()
+        node("planForm:name").performScrollTo().performTextInput("orders")
+        node("planForm:responseTick").performScrollTo().performClick()
+        node("planForm:responseName").performScrollTo().performTextReplacement("Orders_Replies") // the naming hint is drawn as well
+        listOf("planWizard:cancel", "planWizard:back", "planWizard:next").forEach { node(it).assertIsDisplayed() }
+        r.close()
+    }
+
+    @Test
+    fun `M9-07c at 1024 the longer note is displayed and the buttons stay inside the window`() = runDesktopComposeUiTest(1024, 768) {
+        val r = UiRig()
+        toStreamForm(r)
+        node("planForm:name").performTextInput("orders")
+        node("planForm:responseTick").performClick()
+        node("planForm:responseNote").assertIsDisplayed()
+        listOf("planWizard:cancel", "planWizard:back", "planWizard:next").forEach { node(it).assertIsDisplayed() }
+        r.close()
+    }
+
+    @Test
     fun `unticking hides the name field and the note again, and a typed name is kept for the next tick`() = runDesktopComposeUiTest(1280, 800) {
         val r = UiRig()
         toStreamForm(r)
@@ -176,9 +202,9 @@ class StreamFormUiTest {
     fun `a response name of its own gets a hint under its field and Next stays enabled`() = runDesktopComposeUiTest(1280, 800) {
         val r = UiRig()
         toStreamForm(r)
-        node("planForm:name").performTextInput("orders")
-        node("planForm:responseTick").performClick()
-        node("planForm:responseName").performTextReplacement("Orders_Replies")
+        node("planForm:name").performScrollTo().performTextInput("orders")
+        node("planForm:responseTick").performScrollTo().performClick()
+        node("planForm:responseName").performScrollTo().performTextReplacement("Orders_Replies")
         assertEquals("This name does not follow kebab-case, for example orders-replies", textOf("planForm:hint:responseName"))
         assertNotDrawn("planForm:hint:name")
         node("planWizard:next").assertIsEnabled()
