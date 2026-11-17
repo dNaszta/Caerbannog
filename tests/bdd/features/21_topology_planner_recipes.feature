@@ -724,6 +724,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
       | d/42  | One level only: no /     |
       | d+42  | No + or # in a value     |
       | d#42  | No + or # in a value     |
+      | d.42  | A level cannot contain a dot: RabbitMQ would read it as another level |
 
   @m9-10b @fake-broker
   Scenario: The dialog opens with a correlation-id header that is generated and can be changed
@@ -737,11 +738,9 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And nothing was published
 
   # Measured (M9-00a, S-A6, S-A7): this header arrives on the stream message as the application property "correlation-id";
-  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. The first
-  # sentence was decided 2026-11-16 (Owner review list of M9-00a, item 5). Owner decision O16 (2026-11-17): it is a visible
-  # WARNING, not a quiet hint, and it adds that the owner's service must read and write that application property; the
-  # dialog gets no correlation data field (Q17 stays). The second sentence is the architect's proposal for the owner to approve
-  # (the scenario below carries it; the owner may reword it): the warning is shown as a warning banner, not as plain text.
+  # the standard AMQP correlation-id is filled only from MQTT 5 correlation data, which the dialog cannot send. Owner decision
+  # O16 (2026-11-17): it is a visible WARNING, not a quiet hint, with the two sentences below (decided, not a proposal); the
+  # dialog gets no correlation data field (Q17 stays). The warning never blocks Publish.
   @m9-10b @fake-broker
   Scenario: The dialog warns that the service must read and write the application property correlation-id
     Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
@@ -759,6 +758,28 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
     And the migration "0005" with the MQTT route "sensors/+/temp" to the queue "temperatures" is applied to "uat-eu"
     When I choose "Send a test message" for that route and enter "s1"
     Then under the header "correlation-id" a warning says "In the queue message this arrives as an entry of the headers table named correlation-id, not as the AMQP correlation_id property. Your service must read and write that header."
+
+  # Architect decision (M9-10b step 1): the kind is read from the migration's own declare steps only. A destination that the file
+  # does not declare has no known kind: no banner, nothing guessed (the Migrations screen knows no broker topology).
+  @m9-10b @fake-broker
+  Scenario: No warning is shown when the kind of the destination is not known
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with only the MQTT route "devices/+/answer" to "device-commands-dln" is applied to "uat-eu"
+    When I choose "Send a test message" for that route and enter "d42"
+    Then the dialog holds one header "correlation-id" with a generated value
+    And no warning is shown under the headers
+
+  @m9-10b @fake-broker
+  Scenario: The warning goes away with the header and never blocks Publish
+    Given I am connected to "uat-eu" with MQTT port 1883 and the user may publish
+    And the migration "0005" with the MQTT route "devices/+/answer" to the stream "device-commands-dln" is applied to "uat-eu"
+    When I choose "Send a test message" for that route and enter "d42"
+    Then Publish is enabled
+    When I rename the header "correlation-id" to "trace-id"
+    Then no warning is shown under the headers
+    When I rename the header "trace-id" to "correlation-id"
+    Then a warning is shown under the headers
+    And Publish is enabled
 
   @m9-10b @negative @fake-broker
   Scenario Outline: The test message is not offered where publishing is not possible
