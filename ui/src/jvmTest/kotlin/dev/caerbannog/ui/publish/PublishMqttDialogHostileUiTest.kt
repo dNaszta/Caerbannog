@@ -25,7 +25,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -147,7 +146,6 @@ class PublishMqttDialogHostileUiTest {
     }
 
     @Test
-    @Disabled("Finding F1 of M9-10b step 4 round 2: the notice's auto-scroll hides the title, the broker-name warning and (at 1000x600) the topic at first sight. Enable when the architect decides.")
     fun `at opening the title, the broker warning and the topic field are on screen`() {
         for ((w, h) in listOf(1280 to 800, 1000 to 600)) runDesktopComposeUiTest(w, h) {
             val host = host().also { show(it) }

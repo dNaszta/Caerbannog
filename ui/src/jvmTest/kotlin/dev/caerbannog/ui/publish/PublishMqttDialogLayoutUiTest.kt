@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.DpRect
 import dev.caerbannog.core.connections.fakes.FakeMqttMessagePublisher
@@ -161,4 +162,64 @@ class PublishMqttDialogLayoutUiTest {
             assertInside("publishMqttCancelButton", bounds("publishMqttCancelButton"), 1000, 600)
         } finally { h.scope.cancel() }
     }
+
+    // ---- round 3: the notice and the feedback banners are pinned in the footer, nothing scrolls on its own ----
+
+    private fun noticePinned(width: Int, height: Int) = runDesktopComposeUiTest(width, height) {
+        val h = host().also { show(it) }
+        try {
+            waitForIdle()
+            // Scroll the body to its top first: a notice that lives in the body would leave the window here, a pinned one does not.
+            onNodeWithTag("publishMqttBody").performTouchInput { swipeDown() }
+            waitForIdle()
+            onNodeWithTag("publishMqttHeaderNotice").assertIsDisplayed()
+            val before = bounds("publishMqttHeaderNotice")
+            assertInside("publishMqttHeaderNotice", before, width, height)
+            val buttonsTop = minOf(bounds("publishMqttPublishButton").top.value, bounds("publishMqttCancelButton").top.value)
+            assertTrue(before.bottom.value <= buttonsTop, "the notice bottom ${before.bottom} is below the buttons top ${buttonsTop}dp")
+            onNodeWithTag("publishMqttBody").performTouchInput { swipeUp() }
+            waitForIdle()
+            assertEquals(before, bounds("publishMqttHeaderNotice"), "the notice moved with the body: it is not pinned")
+        } finally { h.scope.cancel() }
+    }
+
+    @Test
+    fun `at 1280x800 the notice is pinned above the buttons and does not move when the body scrolls`() = noticePinned(1280, 800)
+
+    @Test
+    fun `at 1000x600 the notice is pinned above the buttons and does not move when the body scrolls`() = noticePinned(1000, 600)
+
+    @Test
+    fun `with the notice and a 400-character error at 1000x600 the body keeps 120dp and title, warning and topic are on screen`() = runDesktopComposeUiTest(1000, 600) {
+        val h = host().also { show(it) }
+        try {
+            h.publisher.refuseNextWith = "The broker refused this topic: ".padEnd(400, 'x')
+            h.vm.publish()
+            waitForIdle()
+            assertTrue(drawn("publishMqttError") && drawn("publishMqttHeaderNotice"))
+            val body = bounds("publishMqttBody")
+            assertTrue(body.bottom.value - body.top.value >= 120f, "the body is only ${body.bottom - body.top} high")
+            for (tag in listOf("publishMqttDialogTitle", "publishMqttWarningBanner", "publishMqttTopicInput", "publishMqttHeaderNotice", "publishMqttError")) {
+                assertInside(tag, bounds(tag), 1000, 600)
+            }
+            assertInside("publishMqttPublishButton", bounds("publishMqttPublishButton"), 1000, 600)
+        } finally { h.scope.cancel() }
+    }
+
+    private fun confirmationInside(width: Int, height: Int) = runDesktopComposeUiTest(width, height) {
+        val h = host().also { show(it) }
+        try {
+            h.vm.publish()
+            waitForIdle()
+            assertTrue(drawn("publishMqttConfirmation"), "the confirmation is shown")
+            onNodeWithTag("publishMqttConfirmation").assertIsDisplayed()
+            assertInside("publishMqttConfirmation", bounds("publishMqttConfirmation"), width, height)
+        } finally { h.scope.cancel() }
+    }
+
+    @Test
+    fun `a confirmation after Publish is inside the window with no scroll at 1280x800`() = confirmationInside(1280, 800)
+
+    @Test
+    fun `a confirmation after Publish is inside the window with no scroll at 1000x600`() = confirmationInside(1000, 600)
 }

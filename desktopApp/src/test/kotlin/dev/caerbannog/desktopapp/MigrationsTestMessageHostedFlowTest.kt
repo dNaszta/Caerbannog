@@ -97,7 +97,7 @@ class MigrationsTestMessageHostedFlowTest {
             profileName = "uat-eu", dryRun = MigrationDryRun("0005", actions.map { ActionDryRun(it, allowed = true) }, canApply = false),
         )
         // The lines below are the ones of MigrationsWindowContent in Main.kt.
-        var testMessage by remember(inputs.connectionName) { mutableStateOf<TestMessageSession?>(null) }
+        var testMessage by remember(inputs.connectionName, inputs.publishingEnabled) { mutableStateOf<TestMessageSession?>(null) }
         MigrationsScreen(
             state = state.withTestMessageGates(inputs),
             onSelectVersion = {}, onApplyPending = {}, onApplySingle = {}, onImportJson = {}, onExportTopology = {},
@@ -202,5 +202,15 @@ class MigrationsTestMessageHostedFlowTest {
             assertTrue(publisher.publishedMessages.isEmpty(), "nothing was published")
             assertTrue(drawn("publishMqttDialog"), "the dialog stays so the user can change the topic")
         } finally { composition.close() }
+    }
+
+    @Test
+    fun `the open dialog is keyed on the connection name and on publishingEnabled in the window`() {
+        // MigrationsWindowContent is private; its one line is pinned by text. A dialog opened under a permission that is gone must be dropped.
+        val main = File("src/main/kotlin/dev/caerbannog/desktopapp/Main.kt").readText()
+        assertTrue(
+            main.contains("remember(inputs.connectionName, inputs.publishingEnabled) { mutableStateOf<TestMessageSession?>(null) }"),
+            "the open test message dialog is not keyed on connectionName and publishingEnabled in Main.kt",
+        )
     }
 }
