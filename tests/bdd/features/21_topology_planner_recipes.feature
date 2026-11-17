@@ -104,7 +104,7 @@ Feature: Streams, policies, dead-lettering and MQTT routes in the planner
   Scenario: A stream step with settings opens read-only and is kept as written
     Given a pending migration "0005" that declares the stream "audit" with "x-max-age" as the text "7D"
     When I choose "Edit steps" for "0005"
-    Then the step "Declare stream audit" is shown read-only with the detail "x-max-age 7D"
+    Then the step "Declare stream audit" is shown read-only with the detail "x-max-age=7D"
     And saving the plan without a change writes the same bytes
 
   @m9-07 @fake-broker
