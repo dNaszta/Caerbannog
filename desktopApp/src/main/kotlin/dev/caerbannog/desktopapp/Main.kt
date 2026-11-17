@@ -421,8 +421,8 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         }
     }
 
-    // M9-10b: one Publish MQTT dialog at a time, opened by "Send a test message"; dropped with the connection it was opened for.
-    var testMessage by remember(inputs.connectionName) { mutableStateOf<TestMessageSession?>(null) }
+    // M9-10b: one Publish MQTT dialog at a time, opened by "Send a test message"; dropped with the connection or the permission it was opened under.
+    var testMessage by remember(inputs.connectionName, inputs.publishingEnabled) { mutableStateOf<TestMessageSession?>(null) }
 
     MigrationsScreen(
         state = state.withTestMessageGates(inputs),

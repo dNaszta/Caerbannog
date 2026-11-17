@@ -3,11 +3,6 @@ package dev.caerbannog.ui.mqtt
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -268,16 +263,6 @@ fun PublishMqttDialog(
                             }
                         }
 
-                        state.headerNoticeText?.let { text -> HeaderNoticeBanner(text) }
-
-                        // Feedback Banners
-                        state.confirmation?.let { msg ->
-                            BannerBox(text = msg, isError = false, testTag = "publishMqttConfirmation")
-                        }
-                        state.error?.let { err ->
-                            BannerBox(text = err, isError = true, testTag = "publishMqttError")
-                        }
-
                     }
                     if (bodyScroll.maxValue > 0) {
                         VerticalScrollbar(
@@ -285,6 +270,15 @@ fun PublishMqttDialog(
                             Modifier.align(Alignment.CenterEnd).matchParentSize().testTag("publishMqttBodyScrollbar"),
                         )
                     }
+                }
+
+                // What the dialog tells the user now stays pinned with the buttons, so it is never below the fold: the notice, then the feedback.
+                state.headerNoticeText?.let { text -> HeaderNoticeBanner(text) }
+                state.confirmation?.let { msg ->
+                    BannerBox(text = msg, isError = false, testTag = "publishMqttConfirmation")
+                }
+                state.error?.let { err ->
+                    BannerBox(text = err, isError = true, testTag = "publishMqttError")
                 }
 
                 // Action Buttons
@@ -339,23 +333,14 @@ private fun WarningBanner(text: String) {
     }
 }
 
-/** The warning under the headers list. It appears and disappears with the header, so a polite live region lets a screen reader announce it. */
+/** The warning above the buttons. It appears and disappears with the header, so a polite live region lets a screen reader announce it. */
 @Composable
 private fun HeaderNoticeBanner(text: String) {
-    val inView = remember { BringIntoViewRequester() }
-    // The banner is the point of a test message: when it appears the body scrolls to it instead of leaving it below the fold.
-    // Two frames first: the scroll range is only known after the first layout, and a request before it is clamped to nothing (measured in the Compose test).
-    LaunchedEffect(text) {
-        withFrameNanos { }
-        withFrameNanos { }
-        inView.bringIntoView()
-    }
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         modifier = Modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(inView)
             .testTag("publishMqttHeaderNotice")
             .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
