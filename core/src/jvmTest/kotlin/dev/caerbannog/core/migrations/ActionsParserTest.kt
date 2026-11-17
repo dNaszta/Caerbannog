@@ -21,6 +21,7 @@ class ActionsParserTest {
         MigrationAction.DeclareBinding("events", "orders", "k", "/", BindingDestinationType.QUEUE, mapOf("x-match" to ArgumentValue.Text("all"))),
         MigrationAction.DeclareBinding("events", "audit", "", "/", BindingDestinationType.EXCHANGE),
         MigrationAction.DeclareStream("log", "/"),
+        MigrationAction.DeclareStream("audit", "/", mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-max-length-bytes" to ArgumentValue.Whole(1_000_000_000), "x-queue-leader-locator" to ArgumentValue.Text("balanced"))),
         MigrationAction.DeclarePolicy("limits", "^orders$", mapOf("max-length" to ArgumentValue.Whole(10)), "/", "queues", 3),
         MigrationAction.DeclareOperatorPolicy("op", "^orders$", mapOf("max-length" to ArgumentValue.Whole(10)), "/", "all", 0),
         MigrationAction.DeleteQueue("old-q"),
@@ -159,5 +160,19 @@ class ActionsParserTest {
         assertTrue((System.nanoTime() - started) < 20_000_000_000L, "took too long")
         val big = "[" + List(100_000) { """{"action":"declareQueue","name":"q$it"}""" }.joinToString(",") + "]"
         assertEquals(100_000, parsed(big).size)
+    }
+
+    // ---- M9-14c: the old rows above stay (the byte-for-byte proof of a stream without settings), these are the new ones ----
+
+    @Test
+    fun `a stream with settings parses and writes through the sheet, and a refused setting gives the same reason as a file`() {
+        val text = """[ { "action": "declareStream", "name": "audit", "arguments": { "x-max-age": "7d" } } ]"""
+        val reason = "stream setting \"x-max-age\" must be text such as 7D"
+        assertEquals(reason, invalid(text))
+        assertEquals(reason, (MigrationParser.parse("""{ "version": "0001", "description": "d", "up": $text }""") as MigrationValidationResult.Invalid).reason)
+        assertEquals(
+            listOf<MigrationAction>(MigrationAction.DeclareStream("audit", "/", mapOf("x-queue-leader-locator" to ArgumentValue.Text("random")))),
+            parsed("""[ { "action": "declareStream", "name": "audit", "arguments": { "x-queue-leader-locator": "random" } } ]"""),
+        )
     }
 }

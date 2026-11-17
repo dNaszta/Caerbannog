@@ -331,15 +331,28 @@ class MigrationsViewModelExportTest {
         assertNull(rig.vm.state.value.exportNote, "a stream with no arguments loses nothing")
     }
 
+    // M9-14c step 2b (brief table, row "MigrationsViewModelExportTest"): retention is WRITTEN now (owner decision O16), so the old test that
+    // pinned "the note says retention is left out and the file has no x-max-age" is replaced by its opposite.
     @Test
-    fun `a stream with retention is exported by name and the note names it and says retention is left out`() {
+    fun `a stream with retention is exported with its retention and the note says nothing about it`() {
         val rig = Rig(FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-max-length-bytes" to ArgumentValue.Whole(1_000_000_000))) })
         val file = runBlocking { rig.vm.exportCurrentTopology() }!!
-        assertEquals(listOf("audit"), file.up.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
-        val note = rig.vm.state.value.exportNote
-        assertNotNull(note, "retention was dropped silently")
-        assertTrue(note.contains("audit") && note.contains("retention", ignoreCase = true), note)
-        assertFalse(file.rawJson.contains("x-max-age"), "DeclareStream has no arguments; nothing may be invented")
+        assertEquals(
+            listOf(MigrationAction.DeclareStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-max-length-bytes" to ArgumentValue.Whole(1_000_000_000)))),
+            file.up.filterIsInstance<MigrationAction.DeclareStream>(),
+        )
+        assertNull(rig.vm.state.value.exportNote, "retention is carried by the file now")
+        assertTrue(file.rawJson.contains("\"x-max-age\": \"7D\""), file.rawJson)
+        assertTrue(Regex("\"x-max-length-bytes\": 1000000000(?![\\d\"])").containsMatchIn(file.rawJson), "a number stays a number: ${file.rawJson}")
+    }
+
+    @Test
+    fun `a stream with a setting the file cannot carry is exported with the rest and the note says other settings`() {
+        val rig = Rig(FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-initial-cluster-size" to ArgumentValue.Whole(3))) })
+        val file = runBlocking { rig.vm.exportCurrentTopology() }!!
+        assertEquals(mapOf("x-max-age" to ArgumentValue.Text("7D")), file.up.filterIsInstance<MigrationAction.DeclareStream>().single().arguments)
+        assertEquals("Left out: other settings of stream audit", rig.vm.state.value.exportNote)
+        assertFalse(file.rawJson.contains("x-initial-cluster-size"), "an unsupported setting is never written: ${file.rawJson}")
     }
 
     @Test
@@ -361,7 +374,7 @@ class MigrationsViewModelExportTest {
 
     @Test
     fun `a failed export has no note and a later export without losses clears an old one`() {
-        val fake = FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"))) }
+        val fake = FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-initial-cluster-size" to ArgumentValue.Whole(3))) }
         val rig = Rig(fake)
         runBlocking { rig.vm.exportCurrentTopology() }!!
         assertNotNull(rig.vm.state.value.exportNote)
@@ -409,7 +422,7 @@ class MigrationsViewModelExportTest {
 
     @Test
     fun `a not writable export clears the note of the export before it`() {
-        val fake = FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"))) }
+        val fake = FakeTopologyCatalog().apply { addStream("audit", arguments = mapOf("x-initial-cluster-size" to ArgumentValue.Whole(3))) }
         val rig = Rig(fake)
         runBlocking { rig.vm.exportCurrentTopology() }!!
         assertNotNull(rig.vm.state.value.exportNote)
@@ -434,12 +447,12 @@ class MigrationsViewModelExportTest {
     fun `the note shown after an export is the one line of the wording table`() {
         val rig = Rig(
             FakeTopologyCatalog().apply {
-                addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-queue-leader-locator" to ArgumentValue.Text("balanced")))
+                addStream("audit", arguments = mapOf("x-max-age" to ArgumentValue.Text("7D"), "x-initial-cluster-size" to ArgumentValue.Whole(3)))
                 declare(declared("session-1", "classic", durable = false, exclusive = true))
             },
         )
         runBlocking { rig.vm.exportCurrentTopology() }!!
-        assertEquals("Left out: retention and leader locator of stream audit; exclusive queue session-1", rig.vm.state.value.exportNote)
+        assertEquals("Left out: other settings of stream audit; exclusive queue session-1", rig.vm.state.value.exportNote)
     }
 
     // ---- M5-08a scope 7: every page is read, a failed read writes nothing ---------------------------------------------------

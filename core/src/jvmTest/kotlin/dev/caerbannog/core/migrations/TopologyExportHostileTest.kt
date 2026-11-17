@@ -12,11 +12,17 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** M9-14b step 4 (round 1) exploratory checks on the pure export: hostile names, shared partitions, odd bindings, the size of the note. */
+/**
+ * M9-14b step 4 (round 1) exploratory checks on the pure export: hostile names, shared partitions, odd bindings, the size of the note.
+ * M9-14c step 2b: the leader locator and the retention are written now, so they can no longer be "what the note names"; the examples use
+ * `x-initial-cluster-size` (a setting the file cannot carry), and the note says "other settings of ..." only. Hostile names still reach the note
+ * as they are, one line of plain text.
+ */
 class TopologyExportHostileTest {
 
     private val leader = "x-queue-leader-locator" to ArgumentValue.Text("balanced")
     private val age = "x-max-age" to ArgumentValue.Text("7D")
+    private val cluster = "x-initial-cluster-size" to ArgumentValue.Whole(3)
 
     private fun stream(name: String, vararg arguments: Pair<String, ArgumentValue>) = QueueDeclaration(name, "/", "stream", arguments = arguments.toMap())
     private fun superExchange(name: String) = ExchangeRow(name, "/", "direct", true, false, false, superStream = true)
@@ -31,25 +37,25 @@ class TopologyExportHostileTest {
 
     @Test
     fun `two super streams that share partitions, the first by name owns them and the other has no entry`() {
-        val decls = (0..2).map { stream("p$it", leader) }
+        val decls = (0..2).map { stream("p$it", cluster) }
         val bindings = (0..2).flatMap { listOf(toQueue("b", "p$it"), toQueue("a", "p$it")) }
-        assertEquals("Left out: leader locator of super stream a (3 partitions)", written(decls, listOf(superExchange("b"), superExchange("a")), bindings).note)
+        assertEquals("Left out: other settings of super stream a (3 partitions)", written(decls, listOf(superExchange("b"), superExchange("a")), bindings).note)
     }
 
     @Test
     fun `two super streams with their own partitions are two entries, sorted by exchange name`() {
-        val decls = listOf(stream("a-0", leader), stream("a-1", leader), stream("b-0", age))
+        val decls = listOf(stream("a-0", cluster), stream("a-1", cluster), stream("b-0", cluster))
         val bindings = listOf(toQueue("a", "a-0"), toQueue("a", "a-1"), toQueue("b", "b-0"))
         assertEquals(
-            "Left out: leader locator of super stream a (2 partitions); retention of super stream b (1 partition)",
+            "Left out: other settings of super stream a (2 partitions); other settings of super stream b (1 partition)",
             written(decls, listOf(superExchange("b"), superExchange("a")), bindings).note,
         )
     }
 
     @Test
     fun `a partition bound twice with different routing keys counts once`() {
-        val decls = listOf(stream("o-0", leader))
-        assertEquals("Left out: leader locator of super stream o (1 partition)", written(decls, listOf(superExchange("o")), listOf(toQueue("o", "o-0", "0"), toQueue("o", "o-0", "x"))).note)
+        val decls = listOf(stream("o-0", cluster))
+        assertEquals("Left out: other settings of super stream o (1 partition)", written(decls, listOf(superExchange("o")), listOf(toQueue("o", "o-0", "0"), toQueue("o", "o-0", "x"))).note)
     }
 
     @Test
@@ -58,21 +64,21 @@ class TopologyExportHostileTest {
             toQueue("o", "o-0"), toQueue("o", "ghost"),
             BindingRow("o", "/", "o-0", BindingDestinationType.EXCHANGE, "k"),
         )
-        val result = written(listOf(stream("o-0", leader)), listOf(superExchange("o")), bindings)
-        assertEquals("Left out: leader locator of super stream o (1 partition)", result.note)
+        val result = written(listOf(stream("o-0", cluster)), listOf(superExchange("o")), bindings)
+        assertEquals("Left out: other settings of super stream o (1 partition)", result.note)
         assertEquals(listOf("o-0"), result.actions.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
     }
 
     @Test
     fun `a super stream exchange without any bound stream gives no entry and its streams stay plain`() {
         assertNull(written(emptyList(), listOf(superExchange("o"))).note)
-        assertEquals("Left out: retention of stream s", written(listOf(stream("s", age)), listOf(superExchange("o"))).note)
+        assertEquals("Left out: other settings of stream s", written(listOf(stream("s", cluster)), listOf(superExchange("o"))).note)
     }
 
     @Test
     fun `a partition bound to a super stream exchange that is not flagged as one stays a plain stream`() {
         val plainExchange = ExchangeRow("o", "/", "direct", true, false, false, superStream = false)
-        assertEquals("Left out: leader locator of stream o-0", written(listOf(stream("o-0", leader)), listOf(plainExchange), listOf(toQueue("o", "o-0"))).note)
+        assertEquals("Left out: other settings of stream o-0", written(listOf(stream("o-0", cluster)), listOf(plainExchange), listOf(toQueue("o", "o-0"))).note)
     }
 
     @Test
@@ -109,12 +115,12 @@ class TopologyExportHostileTest {
     @Test
     fun `hostile names appear in the note as they are, one line of plain text, nothing is escaped or interpreted`() {
         val name = hostile + "n".repeat(100)
-        val note = written(listOf(stream(name, age))).note!!
-        assertEquals("Left out: retention of stream $name", note)
+        val note = written(listOf(stream(name, cluster))).note!!
+        assertEquals("Left out: other settings of stream $name", note)
     }
 
     @Test
-    fun `MEASURE the longest note a hostile topology can give, ten entries of 255 character names plus the closing entry`() {
+    fun `MEASURE the longest note a hostile topology can give, ten entries of 255 character names plus the closing entry, three words become one`() {
         val long = "n".repeat(255)
         val ten = (1..12).map { stream("%02d".format(it) + long.drop(2), age, leader, "x-other" to ArgumentValue.Flag(true)) }
         val note = written(ten).note!!
@@ -122,7 +128,7 @@ class TopologyExportHostileTest {
         assertTrue(note.endsWith("and 2 more"))
         println("M9-14b longest stream note, 10 streams of 255 characters with three words: ${note.length} characters")
         val supers = (1..12).map { "%02d".format(it) + long.drop(2) }
-        val decls = supers.map { stream("$it-0", leader) }
+        val decls = supers.map { stream("$it-0", cluster) }
         val exchanges = supers.map { superExchange(it) }
         val bindings = supers.map { toQueue(it, "$it-0") }
         val note2 = written(decls, exchanges, bindings).note!!
@@ -132,7 +138,7 @@ class TopologyExportHostileTest {
 
     @Test
     fun `5000 streams and 5000 exclusive queues give a note of eleven entries, and the work stays linear`() {
-        val decls = (1..5000).map { stream("s-$it", age) } + (1..5000).map { QueueDeclaration("e-$it", "/", "classic", durable = false, exclusive = true) }
+        val decls = (1..5000).map { stream("s-$it", cluster) } + (1..5000).map { QueueDeclaration("e-$it", "/", "classic", durable = false, exclusive = true) }
         val note = written(decls).note!!
         assertEquals(11, note.removePrefix("Left out: ").split("; ").size)
         assertTrue(note.endsWith("and 9990 more"), note.takeLast(40))
@@ -140,8 +146,8 @@ class TopologyExportHostileTest {
 
     @Test
     fun `a name with a semicolon cannot fake an entry boundary the cap counts`() {
-        val note = written(listOf(stream("a; retention of stream b", age))).note!!
-        assertEquals("Left out: retention of stream a; retention of stream b", note)
+        val note = written(listOf(stream("a; other settings of stream b", cluster))).note!!
+        assertEquals("Left out: other settings of stream a; other settings of stream b", note)
         assertFalse(note.contains("more"))
     }
 }

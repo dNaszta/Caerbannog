@@ -17,12 +17,18 @@ import kotlin.test.assertTrue
  * M9-14b: the pure rules of the export note (what each stream, super stream and connection queue says about what the file leaves out),
  * the cap of ten entries, the typed outcome (`Written` / `NotWritable`) and the completeness check that covers only what is written.
  * No broker, no view model: [TopologyExport.actions] is called directly.
+ *
+ * M9-14c step 2b: a stream now CARRIES its four settings (`x-max-age`, `x-max-length-bytes`, `x-stream-max-segment-size-bytes`,
+ * `x-queue-leader-locator`), so the words "retention" and "leader locator" are gone (`RETENTION_WORD`, `LEADER_LOCATOR_WORD` are removed): the
+ * note of a stream keeps ONLY "other settings" (an argument that is none of the four, a value `StreamSettingRules` refuses, or an argument that
+ * could not be typed). What the file writes is in `TopologyExportStreamSettingsTest`. The examples that used the leader locator or the retention
+ * as the thing left out use `x-initial-cluster-size`, a setting the file cannot carry.
  */
 class TopologyExportNoteTest {
 
-    private val retentionKeys = listOf("x-max-age", "x-max-length-bytes", "x-stream-max-segment-size-bytes")
     private val leader = "x-queue-leader-locator" to ArgumentValue.Text("balanced")
     private val age = "x-max-age" to ArgumentValue.Text("7D")
+    private val cluster = "x-initial-cluster-size" to ArgumentValue.Whole(3)
 
     private fun stream(name: String, vararg arguments: Pair<String, ArgumentValue>) = QueueDeclaration(name, "/", "stream", arguments = arguments.toMap())
     private fun exclusive(name: String) = QueueDeclaration(name, "/", "classic", durable = false, exclusive = true)
@@ -48,31 +54,45 @@ class TopologyExportNoteTest {
     // ---- the wording table, one stream ----------------------------------------------------------------------------------------
 
     @Test
-    fun `a stream with retention says retention, for each of the three retention arguments`() {
-        for (key in retentionKeys) {
-            assertEquals("Left out: retention of stream audit", note(listOf(stream("audit", key to ArgumentValue.Whole(5)))), key)
+    fun `a stream with any of the four settings says nothing, the file carries them`() {
+        for ((key, value) in listOf(age, "x-max-length-bytes" to ArgumentValue.Whole(5), "x-stream-max-segment-size-bytes" to ArgumentValue.Whole(5), leader)) {
+            assertNull(note(listOf(stream("audit", key to value))), key)
+        }
+        assertNull(note(listOf(stream("audit", age, leader))))
+    }
+
+    @Test
+    fun `a stream with any other argument says other settings, with the four settings or without`() {
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", cluster))))
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", age, "x-other" to ArgumentValue.Flag(true)))))
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", leader, "x-other" to ArgumentValue.Flag(true)))))
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", age, leader, "x-other" to ArgumentValue.Flag(true)))))
+    }
+
+    @Test
+    fun `a value of the four keys that the rules refuse is other settings too, never a word about retention`() {
+        for ((key, value) in listOf(
+            "x-max-age" to ArgumentValue.Text("7d"), "x-max-age" to ArgumentValue.Text("604800"), "x-max-age" to ArgumentValue.Whole(7),
+            "x-max-length-bytes" to ArgumentValue.Whole(0), "x-max-length-bytes" to ArgumentValue.Text("1gb"),
+            "x-stream-max-segment-size-bytes" to ArgumentValue.Whole(-1),
+            "x-queue-leader-locator" to ArgumentValue.Text("nearest"), "x-queue-leader-locator" to ArgumentValue.Text("Balanced"),
+        )) {
+            val note = note(listOf(stream("audit", key to value)))
+            assertEquals("Left out: other settings of stream audit", note, "$key $value")
+            assertFalse(note!!.contains("retention") || note.contains("leader locator"), note)
         }
     }
 
     @Test
-    fun `a stream with only a leader locator says leader locator and never retention`() {
-        val note = note(listOf(stream("audit", leader)))
-        assertEquals("Left out: leader locator of stream audit", note)
-        assertFalse(note!!.contains("retention"))
-    }
-
-    @Test
-    fun `a stream with both says both, a stream with any other argument says other settings, words are joined a, b and c`() {
-        assertEquals("Left out: retention and leader locator of stream audit", note(listOf(stream("audit", age, leader))))
-        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", "x-initial-cluster-size" to ArgumentValue.Whole(3)))))
-        assertEquals("Left out: retention and other settings of stream audit", note(listOf(stream("audit", age, "x-other" to ArgumentValue.Flag(true)))))
-        assertEquals("Left out: leader locator and other settings of stream audit", note(listOf(stream("audit", leader, "x-other" to ArgumentValue.Flag(true)))))
-        assertEquals("Left out: retention, leader locator and other settings of stream audit", note(listOf(stream("audit", age, leader, "x-other" to ArgumentValue.Flag(true)))))
-    }
-
-    @Test
-    fun `the words come in a fixed order whatever the order of the arguments`() {
-        assertEquals("Left out: retention, leader locator and other settings of stream audit", note(listOf(stream("audit", "x-other" to ArgumentValue.Flag(true), leader, age))))
+    fun `the words never name retention or the leader locator, whatever the arguments are`() {
+        val all = listOf(
+            listOf(age), listOf(leader), listOf(age, leader), listOf(age, leader, cluster), listOf(cluster, leader, age),
+            listOf("x-max-age" to ArgumentValue.Text("7d"), "x-queue-leader-locator" to ArgumentValue.Text("nearest")),
+        )
+        for (arguments in all) {
+            val text = note(listOf(stream("audit", *arguments.toTypedArray()))).orEmpty()
+            assertFalse(text.contains("retention") || text.contains("leader locator"), "$arguments gave: $text")
+        }
     }
 
     @Test
@@ -84,8 +104,8 @@ class TopologyExportNoteTest {
     fun `entries are joined with a semicolon, a stream first and the exclusive and the transient queue as before`() {
         val transient = QueueDeclaration("scratch", "/", "classic", durable = false, autoDelete = true)
         assertEquals(
-            "Left out: retention of stream audit; exclusive queue session-1; transient queue scratch (cannot be applied)",
-            note(listOf(stream("audit", age), exclusive("session-1"), transient)),
+            "Left out: other settings of stream audit; exclusive queue session-1; transient queue scratch (cannot be applied)",
+            note(listOf(stream("audit", cluster), exclusive("session-1"), transient)),
         )
     }
 
@@ -94,11 +114,10 @@ class TopologyExportNoteTest {
         assertEquals("Left out: ", TopologyExport.NOTE_PREFIX)
         assertEquals("; ", TopologyExport.NOTE_SEPARATOR)
         assertEquals(10, TopologyExport.MAX_NOTE_ENTRIES)
-        assertEquals(listOf("retention", "leader locator", "other settings"), listOf(TopologyExport.RETENTION_WORD, TopologyExport.LEADER_LOCATOR_WORD, TopologyExport.OTHER_SETTINGS_WORD))
-        assertEquals("retention of stream audit", TopologyExport.streamNote(listOf(TopologyExport.RETENTION_WORD), "audit"))
-        assertEquals("retention, leader locator and other settings of stream audit", TopologyExport.streamNote(listOf("retention", "leader locator", "other settings"), "audit"))
-        assertEquals("retention of super stream orders (3 partitions)", TopologyExport.superStreamNote(listOf("retention"), "orders", 3))
-        assertEquals("retention of super stream orders (1 partition)", TopologyExport.superStreamNote(listOf("retention"), "orders", 1))
+        assertEquals("other settings", TopologyExport.OTHER_SETTINGS_WORD)
+        assertEquals("other settings of stream audit", TopologyExport.streamNote(listOf(TopologyExport.OTHER_SETTINGS_WORD), "audit"))
+        assertEquals("other settings of super stream orders (3 partitions)", TopologyExport.superStreamNote(listOf(TopologyExport.OTHER_SETTINGS_WORD), "orders", 3))
+        assertEquals("other settings of super stream orders (1 partition)", TopologyExport.superStreamNote(listOf(TopologyExport.OTHER_SETTINGS_WORD), "orders", 1))
         assertEquals("and 2 more", TopologyExport.moreNote(2))
         assertEquals("exclusive queue session-1", TopologyExport.exclusiveQueueNote("session-1"))
         assertEquals("transient queue scratch (cannot be applied)", TopologyExport.transientQueueNote("scratch"))
@@ -111,15 +130,16 @@ class TopologyExportNoteTest {
         val result = written(outcome)
         assertEquals(listOf("audit"), result.actions.filterIsInstance<MigrationAction.DeclareStream>().map { it.name })
         assertEquals("Left out: other settings of stream audit", result.note)
-        assertEquals("Left out: retention and other settings of stream audit", note(listOf(stream("audit", age).copy(typedArgumentsComplete = false))))
-        assertEquals("Left out: leader locator and other settings of stream audit", note(listOf(stream("audit", leader).copy(typedArgumentsComplete = false))))
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", age).copy(typedArgumentsComplete = false))))
+        assertEquals("Left out: other settings of stream audit", note(listOf(stream("audit", leader).copy(typedArgumentsComplete = false))))
     }
 
     @Test
     fun `a super stream partition with a refused argument adds other settings to the union`() {
         val (decls, exchanges, bindings) = superStream("orders", 3) { arrayOf(leader) }
         val withRefused = decls.mapIndexed { i, d -> if (i == 1) d.copy(typedArgumentsComplete = false) else d }
-        assertEquals("Left out: leader locator and other settings of super stream orders (3 partitions)", note(withRefused, exchanges, bindings))
+        assertEquals("Left out: other settings of super stream orders (3 partitions)", note(withRefused, exchanges, bindings))
+        assertNull(noteOf(Triple(decls, exchanges, bindings)), "partitions that carry only the leader locator lose nothing")
         val onlyRefused = superStream("orders", 2) { emptyArray() }.let { (d, e, b) -> note(d.map { it.copy(typedArgumentsComplete = false) }, e, b) }
         assertEquals("Left out: other settings of super stream orders (2 partitions)", onlyRefused)
     }
@@ -137,20 +157,26 @@ class TopologyExportNoteTest {
 
     @Test
     fun `a super stream is one entry with its partition count, not one per partition`() {
-        assertEquals("Left out: leader locator of super stream orders (3 partitions)", noteOf(superStream("orders", 3) { arrayOf(leader) }))
+        assertEquals("Left out: other settings of super stream orders (3 partitions)", noteOf(superStream("orders", 3) { arrayOf(cluster, leader) }))
     }
 
     @Test
     fun `one partition says 1 partition`() {
-        assertEquals("Left out: retention of super stream orders (1 partition)", noteOf(superStream("orders", 1) { arrayOf(age) }))
+        assertEquals("Left out: other settings of super stream orders (1 partition)", noteOf(superStream("orders", 1) { arrayOf(cluster) }))
     }
 
     @Test
-    fun `the words are the union over the partitions, the count is all partitions also those without settings`() {
-        val parts = superStream("orders", 4) { i -> when (i) { 0 -> arrayOf(age); 1 -> arrayOf(leader); else -> emptyArray() } }
-        assertEquals("Left out: retention and leader locator of super stream orders (4 partitions)", noteOf(parts))
-        val onlyOne = superStream("orders", 3) { i -> if (i == 2) arrayOf(age) else emptyArray() }
-        assertEquals("Left out: retention of super stream orders (3 partitions)", noteOf(onlyOne))
+    fun `partitions that carry the leader locator and a retention lose nothing, the CLI gives every partition balanced`() {
+        assertNull(noteOf(superStream("orders", 3) { arrayOf(leader) }))
+        assertNull(noteOf(superStream("orders", 3) { arrayOf(age, leader) }))
+    }
+
+    @Test
+    fun `the entry is one line whatever the partitions hold, the count is all partitions also those without other settings`() {
+        val onlyOne = superStream("orders", 3) { i -> if (i == 2) arrayOf(cluster) else arrayOf(leader) }
+        assertEquals("Left out: other settings of super stream orders (3 partitions)", noteOf(onlyOne))
+        val mixed = superStream("orders", 4) { i -> when (i) { 0 -> arrayOf(age); 1 -> arrayOf(cluster); else -> emptyArray() } }
+        assertEquals("Left out: other settings of super stream orders (4 partitions)", noteOf(mixed))
     }
 
     @Test
@@ -160,24 +186,24 @@ class TopologyExportNoteTest {
 
     @Test
     fun `a stream that is not a partition keeps its own entry next to the super stream`() {
-        val (decls, exchanges, bindings) = superStream("orders", 2) { arrayOf(leader) }
-        val note = note(decls + stream("audit", age), exchanges, bindings)!!
-        assertEquals(setOf("retention of stream audit", "leader locator of super stream orders (2 partitions)"), note.removePrefix("Left out: ").split("; ").toSet())
+        val (decls, exchanges, bindings) = superStream("orders", 2) { arrayOf(cluster) }
+        val note = note(decls + stream("audit", cluster), exchanges, bindings)!!
+        assertEquals(setOf("other settings of stream audit", "other settings of super stream orders (2 partitions)"), note.removePrefix("Left out: ").split("; ").toSet())
         assertFalse(note.contains("orders-0"), note)
     }
 
     @Test
     fun `a partition belongs to the first super stream by exchange name`() {
-        val decls = listOf(stream("s", leader))
+        val decls = listOf(stream("s", cluster))
         val exchanges = listOf(superExchange("b"), superExchange("a"))
         val bindings = listOf(toQueue("b", "s"), toQueue("a", "s"))
-        assertEquals("Left out: leader locator of super stream a (1 partition)", note(decls, exchanges, bindings))
+        assertEquals("Left out: other settings of super stream a (1 partition)", note(decls, exchanges, bindings))
     }
 
     @Test
     fun `an ordinary exchange bound to a stream does not turn the stream into a partition`() {
-        val note = note(listOf(stream("audit", age)), listOf(ExchangeRow("events", "/", "direct", true, false, false)), listOf(toQueue("events", "audit")))
-        assertEquals("Left out: retention of stream audit", note)
+        val note = note(listOf(stream("audit", cluster)), listOf(ExchangeRow("events", "/", "direct", true, false, false)), listOf(toQueue("events", "audit")))
+        assertEquals("Left out: other settings of stream audit", note)
     }
 
     // ---- the cap ------------------------------------------------------------------------------------------------------------------
@@ -206,7 +232,7 @@ class TopologyExportNoteTest {
 
     @Test
     fun `the cap counts all kinds of entries together, a super stream is one`() {
-        val (decls, exchanges, bindings) = superStream("orders", 3) { arrayOf(leader) }
+        val (decls, exchanges, bindings) = superStream("orders", 3) { arrayOf(cluster) }
         val note = note(decls + exclusives(11), exchanges, bindings)!!
         val entries = note.removePrefix("Left out: ").split("; ")
         assertEquals(11, entries.size, note)
@@ -218,9 +244,9 @@ class TopologyExportNoteTest {
 
     @Test
     fun `a topology that can be written is Written with the actions and the note`() {
-        val result = written(run(declarations = listOf(QueueDeclaration("orders", "/", "quorum"), stream("audit", age))))
+        val result = written(run(declarations = listOf(QueueDeclaration("orders", "/", "quorum"), stream("audit", age, cluster))))
         assertEquals(listOf("orders"), result.actions.filterIsInstance<MigrationAction.DeclareQueue>().map { it.name })
-        assertEquals("Left out: retention of stream audit", result.note)
+        assertEquals("Left out: other settings of stream audit", result.note)
     }
 
     @Test
