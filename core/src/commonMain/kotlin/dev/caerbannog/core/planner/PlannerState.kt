@@ -42,6 +42,8 @@ sealed interface WizardState {
         val destinationSuggestions: List<Suggestion> = emptyList(),
         /** False for a fanout or headers exchange whose type is known: the routing key is not asked. */
         val asksRoutingKey: Boolean = true,
+        /** True for a binding from a known headers exchange, or a form that already holds headers (an opened file): the screen shows the headers section. */
+        val asksHeaders: Boolean = false,
         /** The response name a stream form suggests in the plan's naming style; empty for the other forms. The screen has no naming style of its own. */
         val suggestedResponseName: String = "",
     ) : WizardState {

@@ -2,7 +2,7 @@
 
 Milestone: M9 (follow-up)    Depends on: M9-10b    Size: S
 
-Proposed 2026-11-17 by the architect at step 5 of `M9-10b`. Not started, not scheduled. The owner may want it before a release (recommendation: yes, small).
+Proposed 2026-11-17 by the architect at step 5 of `M9-10b`. Not started. QUEUED: the owner said yes on 2026-11-17 ("accept all", spec O18).
 
 ## Goal
 Every place that opens the Publish MQTT dialog respects the profile's declared write permission the way "Send a test message" already does, and the AMQP Publish dialog is checked for the same "actions below the fold" defect that `M9-10b` fixed in the Publish MQTT dialog.

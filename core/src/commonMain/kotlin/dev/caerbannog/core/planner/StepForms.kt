@@ -1,5 +1,6 @@
 package dev.caerbannog.core.planner
 
+import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.DOT_NAME
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationParser
@@ -144,25 +145,96 @@ data class StreamForm(
     private fun build(streamName: String, ctx: FormContext) = MigrationAction.DeclareStream(name = streamName, vhost = ctx.plan.vhost)
 }
 
-/** A binding never hints: an exchange, a destination and a routing key are mostly names the broker has already (Q7). */
+/** The match rules the form offers; `-with-x` was not measured, so a file that holds one keeps it as [BindingForm.heldRule]. */
+enum class MatchRule(val wire: String) { ALL("all"), ANY("any") }
+
+/** The value types of a header the form offers; a decimal is not offered (not measured). */
+enum class HeaderValueType { TEXT, WHOLE, FLAG }
+
+/**
+ * One header of a headers binding. [value] is raw text, because a whole number is typed key by key; for [HeaderValueType.FLAG] it is `"true"`
+ * or `"false"`. Nothing is trimmed: a header `" format"` is another header on the broker.
+ */
+data class HeaderMatch(val name: String, val type: HeaderValueType = HeaderValueType.TEXT, val value: String = "") {
+    /** The typed value, or null when a whole number is not one that fits a `Long` (ASCII digits, an optional leading `-`) or a flag is neither word. */
+    fun argumentValue(): ArgumentValue? = when (type) {
+        HeaderValueType.TEXT -> ArgumentValue.Text(value)
+        HeaderValueType.WHOLE -> if (isWholeNumber(value)) value.toLongOrNull()?.let(ArgumentValue::Whole) else null
+        HeaderValueType.FLAG -> when (value) {
+            "true" -> ArgumentValue.Flag(true)
+            "false" -> ArgumentValue.Flag(false)
+            else -> null
+        }
+    }
+
+    /**
+     * The same header with another type. The value follows what the new type can hold: a boolean starts at `true`, and the words `true` and
+     * `false` are not carried into a text or number field (they were a choice, not typing).
+     */
+    fun withType(newType: HeaderValueType): HeaderMatch = when {
+        newType == type -> this
+        newType == HeaderValueType.FLAG -> copy(type = newType, value = "true")
+        type == HeaderValueType.FLAG -> copy(type = newType, value = "")
+        else -> copy(type = newType)
+    }
+
+    private fun isWholeNumber(text: String): Boolean {
+        val digits = text.removePrefix("-")
+        return digits.isNotEmpty() && digits.all { it in '0'..'9' }
+    }
+}
+
+/**
+ * A binding. On a headers exchange it carries [headers] and a match rule instead of a routing key (the key is never added; one an opened file
+ * holds is kept). [heldRule] is the `x-match` of an opened file when it is not `all` or `any`: it is written back unchanged until the user picks a
+ * rule ([withRule]). A binding never hints about names (Q7); its only hints are the two warnings for a headers binding with no header.
+ */
 data class BindingForm(
     val exchange: String,
     val destination: String,
     val destinationKind: BindingDestinationType = BindingDestinationType.QUEUE,
     val routingKey: String = "",
+    val headers: List<HeaderMatch> = emptyList(),
+    val matchRule: MatchRule = MatchRule.ALL,
+    val heldRule: String? = null,
 ) : StepForm {
+    /** An explicit choice of `all` or `any`: an edit, and the only way a held rule changes. */
+    fun withRule(rule: MatchRule): BindingForm = copy(matchRule = rule, heldRule = null)
+
     override fun problems(ctx: FormContext): List<FieldProblem> {
         val missing = buildList {
             if (exchange.isEmpty()) add(FieldProblem("exchange", PlannerTexts.BINDING_EXCHANGE_MISSING))
             if (destination.isEmpty()) add(FieldProblem("destination", PlannerTexts.BINDING_DESTINATION_MISSING))
         }
         if (missing.isNotEmpty()) return missing
+        val headerProblems = headerProblems()
+        if (headerProblems.isNotEmpty()) return headerProblems
         return FormChecks.parserReason(build(ctx))?.let { listOf(FieldProblem("exchange", it)) }.orEmpty()
+    }
+
+    /** One problem per mistake, rows in order; a name used twice is one problem on its later row. */
+    private fun headerProblems(): List<FieldProblem> {
+        val seen = mutableSetOf<String>()
+        return buildList {
+            for (header in headers) {
+                when {
+                    header.name.isEmpty() -> add(PlannerTexts.HEADER_NAME_MISSING)
+                    header.name == MATCH_KEY -> add(PlannerTexts.HEADER_NAME_IS_MATCH_RULE)
+                    !seen.add(header.name) -> add(PlannerTexts.HEADER_LISTED_TWICE)
+                }
+                if (header.type == HeaderValueType.WHOLE && header.argumentValue() == null) add(PlannerTexts.HEADER_WHOLE_DIGITS_ONLY)
+            }
+        }.map { FieldProblem("headers", it) }
     }
 
     override fun actions(ctx: FormContext): List<MigrationAction> = if (problems(ctx).isEmpty()) listOf(build(ctx)) else emptyList()
 
-    override fun hints(ctx: FormContext): List<FieldHint> = emptyList()
+    override fun hints(ctx: FormContext): List<FieldHint> =
+        if (headers.isEmpty() && ctx.exchangeType(exchange) == "headers") {
+            listOf(FieldHint("headers", if (matchRule == MatchRule.ANY) PlannerTexts.HEADERS_NONE_ANY else PlannerTexts.HEADERS_NONE_ALL))
+        } else {
+            emptyList()
+        }
 
     private fun build(ctx: FormContext) = MigrationAction.DeclareBinding(
         exchange = exchange,
@@ -170,10 +242,52 @@ data class BindingForm(
         routingKey = routingKey,
         vhost = ctx.plan.vhost,
         destinationType = destinationKind,
+        arguments = arguments(ctx),
     )
+
+    /** `x-match` and the headers when there are headers or the source is a known headers exchange; otherwise nothing, as before. */
+    private fun arguments(ctx: FormContext): Map<String, ArgumentValue> {
+        if (headers.isEmpty() && ctx.exchangeType(exchange) != "headers") return emptyMap()
+        return buildMap {
+            put(MATCH_KEY, ArgumentValue.Text(heldRule ?: matchRule.wire))
+            headers.forEach { header -> header.argumentValue()?.let { put(header.name, it) } }
+        }
+    }
+
+    companion object {
+        const val MATCH_KEY: String = "x-match"
+    }
 }
 
 object StepForms {
+    /**
+     * The headers form of a binding whose arguments are `x-match` (text) plus at least one header of a kind the form offers; null otherwise (A2).
+     * `x-match` alone is read-only: the form has no exchange context, and dropping the rule on a plain edit would lose what the file had.
+     * A rule other than `all` or `any` is kept as [BindingForm.heldRule].
+     */
+    private fun headersBindingForm(action: MigrationAction.DeclareBinding): BindingForm? {
+        val rule = (action.arguments[BindingForm.MATCH_KEY] as? ArgumentValue.Text)?.value ?: return null
+        val headers = action.arguments.filterKeys { it != BindingForm.MATCH_KEY }.map { (name, value) ->
+            when (value) {
+                is ArgumentValue.Text -> HeaderMatch(name, HeaderValueType.TEXT, value.value)
+                is ArgumentValue.Whole -> HeaderMatch(name, HeaderValueType.WHOLE, value.value.toString())
+                is ArgumentValue.Flag -> HeaderMatch(name, HeaderValueType.FLAG, value.value.toString())
+                else -> return null
+            }
+        }
+        if (headers.isEmpty()) return null
+        val known = MatchRule.entries.firstOrNull { it.wire == rule }
+        return BindingForm(
+            exchange = action.exchange,
+            destination = action.queue,
+            destinationKind = action.destinationType,
+            routingKey = action.routingKey,
+            headers = headers,
+            matchRule = known ?: MatchRule.ALL,
+            heldRule = if (known == null) rule else null,
+        )
+    }
+
     private val queueTypes = setOf("quorum", "classic")
     private val exchangeTypes = setOf("fanout", "direct", "topic", "headers")
 
@@ -200,7 +314,7 @@ object StepForms {
             } else if (action.arguments.isEmpty()) {
                 BindingForm(action.exchange, action.queue, action.destinationType, action.routingKey)
             } else {
-                null
+                headersBindingForm(action)
             }
         // The form writes a name only, so a stream with settings has no form (read-only step, kept as written): editing it would drop them.
         // A response stream of a pair is edited as an ordinary stream.

@@ -431,6 +431,9 @@ internal object PendingStandIn {
     private var version: String? = null
     private var count = 0
 
+    /** The one binding a Given put (M9-10, M9-11): "saving writes the binding back unchanged" compares the saved file with it. */
+    var binding: MigrationAction? = null
+
     fun put(d: PlannerDriver, version: String, actions: List<MigrationAction>) {
         this.version = version
         count = actions.size

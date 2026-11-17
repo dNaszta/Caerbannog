@@ -215,7 +215,10 @@ class PlannerSteps {
     fun formSays(message: String) {
         // M9-07: the fixed note of the stream form is also "said" by the form; it is a text of the page, not a problem.
         if (message == PlannerTexts.RESPONSE_STREAM_NOTE) return PlannerStreamSteps.noteSaid(message)
+        // M9-11: the two warnings of a headers binding are hints, not problems.
+        if (message == PlannerTexts.HEADERS_NONE_ALL || message == PlannerTexts.HEADERS_NONE_ANY) return PlannerHeadersSteps.warningSaid(message)
         assertEquals(listOf(message), d.formProblems().map { it.message }, "form problems")
+        PlannerHeadersSteps.problemOnScreen(message) // M9-11: only when the binding form holds header rows
         PlannerMqttSteps.filterErrorOnScreen(message) // M9-10: only when the MQTT route form is open
         PlannerStreamSteps.tickErrorOnScreen(message) // M9-07b: only when the stream form has an MQTT tick that is on
     }

@@ -117,7 +117,9 @@ class PlannerMqttSteps {
         PendingStandIn.put(d, version, listOf(MigrationAction.DeclareBinding(exchange, destination, key, vhost = d.vhost)))
 
     private val bindingTail = Regex("""^to the (exchange|queue) "([^"]*)" with routing key "([^"]*)"(?: and the argument "([^"]*)")?$""")
-    private var original: MigrationAction? = null
+    private var original: MigrationAction?
+        get() = PendingStandIn.binding
+        set(value) { PendingStandIn.binding = value }
 
     @Given("^a pending migration \"([^\"]*)\" with a binding from \"([^\"]*)\" (to the .*)$")
     fun pendingBinding(version: String, exchange: String, tail: String) {
@@ -166,6 +168,10 @@ class PlannerMqttSteps {
     @Then("saving writes the binding back unchanged")
     fun savingWritesUnchanged() {
         val expected = assertNotNull(original, "no binding was put by a Given")
+        // M9-11: a binding that holds arguments goes through its form first (Edit, change nothing, Add to plan), so "unchanged" is a claim about the form too.
+        if (expected is MigrationAction.DeclareBinding && expected.arguments.isNotEmpty() && dev.caerbannog.core.planner.StepForms.formOf(expected) is BindingForm) {
+            d.editStep(1) { it }
+        }
         d.chooseMigrationsFolder("/work/migrations", "0004")
         d.vm.saveAsMigration()
         val version = d.state.saved?.version ?: error("the plan was not saved; error: ${d.state.errorMessage}")

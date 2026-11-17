@@ -618,6 +618,7 @@ class PlannerViewModel(
                 else -> emptyList()
             },
             asksRoutingKey = binding?.let { ctx.asksRoutingKey(it.exchange) } ?: true,
+            asksHeaders = binding?.let { it.headers.isNotEmpty() || ctx.exchangeType(it.exchange) == "headers" } ?: false,
             suggestedResponseName = (form as? StreamForm)?.suggestedResponseName(ctx).orEmpty(),
         )
     }
