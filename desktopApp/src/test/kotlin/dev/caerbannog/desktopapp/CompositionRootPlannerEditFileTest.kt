@@ -242,4 +242,16 @@ class CompositionRootPlannerEditFileTest {
         assertFalse(c.navigation.plannerOpen.value, "the planner was opened")
         assertEquals(PlannerEntry.DraftUnreadable(draftFile.toString()), c.plannerEntry())
     }
+
+    @Test
+    fun `Copy refuses a file with keys the planner does not know and writes no draft`() = runBlocking<Unit> {
+        val c = compose()
+        c.withFolder()
+        File(migrationsDir, "0007.json").writeText("""{ "version": "0007", "description": "d", "up": [ { "action": "declareQueue", "name": "q", "comment": "keep me" } ] }""")
+        val file = runBlocking { FolderMigrationFileRepository(migrationsDir.toPath()).listFiles() }.single { it.version == "0007" }
+        c.navigation.open(AppDestination.Migrations)
+        assertFalse(c.copyIntoNewPlan(file, "/"))
+        assertFalse(Files.exists(draftFile), "a draft was written")
+        assertFalse(c.navigation.plannerOpen.value)
+    }
 }

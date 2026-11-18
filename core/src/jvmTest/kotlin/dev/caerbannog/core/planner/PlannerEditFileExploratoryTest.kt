@@ -103,14 +103,19 @@ class PlannerEditFileExploratoryTest {
     // ---- what the view model does NOT check itself (the Migrations screen is the one door) ----
 
     @Test
-    fun `finding - the planner in file mode does not recheck unknown keys, so a save would drop them (the screen is the only guard)`() {
+    fun `an unknown-keys file locks the planner in file mode, so a save can never drop its keys (F1 fixed)`() {
         val raw = """{ "version": "0005", "description": "d", "up": [ { "action": "declareQueue", "name": "orders", "comment": "keep me" } ] }"""
         val rig = EditFileFixtures.open(raw)
         try {
+            val reason = "This file holds entries the planner does not know. Edit it as JSON so nothing is lost."
+            assertEquals(SaveGate.Disabled(reason), rig.state.saveGate)
             rig.queue("invoices")
+            assertEquals(emptyList(), rig.state.plan.steps, "a step was added to a locked planner")
+            assertFalse(rig.state.hasChanges)
             rig.vm.saveAsMigration()
-            val written = rig.folder.files.getValue(VERSION).rawJson
-            assertFalse(written.contains("keep me"), "documents today's behaviour: the key is gone if the screen's refusal is bypassed")
+            assertEquals(emptyList(), rig.folder.updates)
+            assertEquals(raw, rig.folder.files.getValue(VERSION).rawJson)
+            assertTrue(rig.folder.files.getValue(VERSION).rawJson.contains("keep me"))
         } finally {
             rig.close()
         }

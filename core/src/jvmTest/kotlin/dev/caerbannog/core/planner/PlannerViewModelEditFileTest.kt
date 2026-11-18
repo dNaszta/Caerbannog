@@ -1,5 +1,6 @@
 package dev.caerbannog.core.planner
 
+import dev.caerbannog.core.json.SecretValue
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationParser
 import dev.caerbannog.core.planner.EditFileFixtures.VERSION
@@ -398,5 +399,86 @@ class PlannerViewModelEditFileTest {
         assertEquals(emptyList(), rig.folder.updates)
         assertEquals(original, fileText())
         assertNull(rig.state.saved)
+    }
+
+    // ---- round 2 (F1): a file the planner may not edit locks the planner in file mode ----
+
+    private fun lockedBy(raw: String, reason: String) {
+        val r = EditFileFixtures.open(raw)
+        try {
+            assertEquals(SaveGate.Disabled(reason), r.state.saveGate, "the gate")
+            assertEquals(emptyList(), r.state.plan.steps, "the plan of a refused file")
+            r.queue("invoices")
+            assertEquals(emptyList(), r.state.plan.steps, "a step was added to a locked planner")
+            assertFalse(r.state.hasChanges)
+            r.vm.saveAsMigration()
+            assertEquals(emptyList(), r.folder.updates, "the folder was asked to write")
+            assertEquals(emptyList(), r.folder.attempts)
+            assertEquals(raw, r.folder.files.getValue(VERSION).rawJson, "the file's bytes")
+            assertNull(r.state.saved)
+            assertFalse((r.state.errorMessage ?: "").contains("SENTINEL"), "the hash reached a text")
+        } finally {
+            r.close()
+        }
+    }
+
+    @Test
+    fun `a hash file locks the planner, Save says why and the file is never written`() = lockedBy(
+        raw(VERSION, "access", MigrationAction.DeclareUser("svc", SecretValue.of("SENTINEL-HASH"), "rabbit_password_hashing_sha256")),
+        "This file holds password hashes. Edit it outside the app.",
+    )
+
+    @Test
+    fun `an access file locks the planner, Save says why and the file is never written`() = lockedBy(
+        raw(VERSION, "access", MigrationAction.DeclareQueue("q"), MigrationAction.SetPermissions("orders", "svc")),
+        "This file holds virtual hosts, users or permissions. The planner works on topology only.",
+    )
+
+    @Test
+    fun `an unknown-keys file locks the planner, Save says why and the file is never written`() = lockedBy(
+        """{ "version": "0005", "description": "d", "up": [ { "action": "declareQueue", "name": "orders", "comment": "keep me" } ] }""",
+        "This file holds entries the planner does not know. Edit it as JSON so nothing is lost.",
+    )
+
+    @Test
+    fun `pressing Save on a refused file says the refusal and writes nothing`() {
+        val r = EditFileFixtures.open(raw(VERSION, "access", MigrationAction.DeclareVhost("v")))
+        try {
+            r.vm.saveAsMigration()
+            assertEquals("This file holds virtual hosts, users or permissions. The planner works on topology only.", r.state.errorMessage)
+            assertEquals(emptyList(), r.folder.updates)
+        } finally {
+            r.close()
+        }
+    }
+
+    @Test
+    fun `a file that became a hash file between open and save is not written`() {
+        rig.queue("invoices")
+        val hash = raw(VERSION, "access", MigrationAction.DeclareUser("svc", SecretValue.of("SENTINEL-HASH"), "rabbit_password_hashing_sha256"))
+        rig.folder.changeOnDisk(VERSION, hash)
+        vm.saveAsMigration()
+        assertEquals(emptyList(), rig.folder.updates)
+        assertEquals(hash, fileText())
+        assertNull(rig.state.saved)
+    }
+
+    @Test
+    fun `a file that became an unknown-keys file between open and save is not written`() {
+        rig.queue("invoices")
+        val theirs = """{ "version": "0005", "description": "d", "up": [ { "action": "declareQueue", "name": "o", "comment": "x" } ] }"""
+        rig.folder.changeOnDisk(VERSION, theirs)
+        vm.saveAsMigration()
+        assertEquals(emptyList(), rig.folder.updates)
+        assertEquals(theirs, fileText())
+    }
+
+    @Test
+    fun `a file deleted between open and save writes nothing and is not created again`() {
+        rig.queue("invoices")
+        rig.folder.deleteOnDisk(VERSION)
+        vm.saveAsMigration()
+        assertEquals(emptyList(), rig.folder.updates)
+        assertFalse(VERSION in rig.folder.files)
     }
 }
