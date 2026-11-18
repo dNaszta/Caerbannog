@@ -6,32 +6,30 @@ One line per task. Status vocabulary: `done (merged, <merge commit>, <date>)`, `
 
 **Keeping it in sync:** the coordinator updates the row of the task at every step with one short line; anything longer goes into the task's brief, not into this table.
 
-## Backlog (actual, 2026-11-17)
+## Backlog (actual, 2026-11-18)
 
-Reconciled against git (`main` eb0d16d): every task branch is merged; the only branches not on `main` are dependency bumps.
+Reconciled against git (`main` bba34a63): every task branch is merged; the only branches not on `main` are dependency bumps.
 
 ### Open work
 
-Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9-01b`, `M9-10e` and `M9-08` (`86ad0540`).
+Updated 2026-11-18 after the merges of `M9-08` (`86ad0540`), `M9-09` (`a926a453`) and `M9-12` (`bba34a63`). All of `M9-01` to `M9-12` are merged, so `M9-13` (the gate) is next.
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-08` policy step: DONE and merged (`86ad0540`, accepted with follow-ups) | M | done |
-| M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 | S | nothing (briefed) |
-| M9 | `M9-08d` retention column, detail and MCP show the byte limit too | S | nothing (briefed; owner chose b on 2026-11-17) |
-| M9 | `M9-08e` live rows for the claims `M9-08` left open | S | nothing (briefed) |
-| M9 | `M9-08f` policy step polish | XS | nothing (briefed) |
-| M9 | `M9-09` dead-lettering recipe | M | built, reviewed 2026-11-18: accepted with follow-ups (`M9-09b`); waits for a look at the dashed edge, then merge (m9-09-dead-lettering-recipe worktree) |
-| M9 | `M9-12` open a pending file as steps | M | DONE, not merged: accepted with follow-ups 2026-11-18 after round 2 (F1 closed; `M9-12b`); owner accepted the three sentences (O21); waits for the by-eye check, then merge (m9-12-open-pending-file-as-steps) |
-| M9 | `M9-12b` Migrations action row at 1000 px / font 1.5 | S | `M9-12` merged (briefed) |
-| M9 | `M9-13` gate on a real broker | M | last: after `M9-08` to `M9-12` |
+| M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): NEXT | M | nothing (all of `M9-01` to `M9-12` merged) |
+| M9 | `M9-08d` retention column, detail and MCP show the byte limit too (Retention `7D, 1 MB`, additive `maxLengthBytes`; five `@m9-08d` scenarios held with `@needs-M9-08d`) | S | nothing (briefed, ready; owner chose b on 2026-11-17) |
+| M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 (measure the base first) | S | nothing (briefed) |
+| M9 | `M9-08e` live checks for the policy claims `M9-08` left unmeasured | S | nothing (briefed) |
+| M9 | `M9-08f` policy step polish (keep last good names on a failed re-read, `canAddSetting` in core, labels into `PlannerTexts`) | XS | nothing (briefed) |
+| M9 | `M9-09b` live test of the own-argument read, helper rename, dashed-edge pixel check | S | nothing (briefed) |
+| M9 | `M9-12b` Migrations action row wraps at narrow widths (1000 px / font 1.5); also the `MigrationFile` import nit | S | nothing (briefed; owner layout choice pending, build on wrap) |
 | M9 | `M9-10f` AMQP publish dialog: bounded banners, gutter only on overflow | S | nothing (briefed) |
 | M9 | `M9-10d` radio label `Kind (optional, narrows the list)` | XS | nothing (decided yes) |
 | M9 | `M9-14c-f1` executor pre-read of a non-stream body | XS | nothing (no brief) |
 | M9 | `M9-00a-b` spike test hardening | S | nothing |
 | M9 | `M9-00b-d` undecodable property types | S | spike first (no brief file) |
 | M9 | `M9-10c` MQTT exchange hint | S | optional, unscheduled |
-| M9 | `M9-07d` | S | optional |
+| M9 | `M9-07d` graph notes out of view | S | optional |
 | M8 | `M8-06f` review view model cleanup | M | nothing |
 | M5 | `M5-09` read-only migration MCP tools (list, dry run) | S | nothing |
 | M1 | `M1-13` unreadable `connections.json` (owner chose option B, 2026-11-09) | M | nothing |
@@ -39,13 +37,19 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M2 | `M2-10` Testcontainers 2.x | S | owner approval of the bump |
 | Ideas, no brief | `M2-17e`, `M2-17f`, `M2-TESTHYGIENE-05`, `M2-TESTHYGIENE-06`, `M8-05c`, `M8-09b`, `M8-12b-polish` | S | a trigger named in the old status text (see `STATUS-HISTORY.md`) |
 
+Done and merged, not listed above: `M9-08` (with `M9-08b`) `86ad0540`, `M9-09` `a926a453`, `M9-12` `bba34a63`.
+
+Not run in the 2026-11-17/18 session: the whole `brokerTest` suite, a live 3.x run, screenshots and packaging.
+
 ### Open owner decisions
 
-1. Queue-route correlation-id warning: DECIDED 2026-11-17, "show text": "In the queue message this arrives as an entry of the headers table named correlation-id, not as the AMQP correlation_id property. Your service must read and write that header." (belongs to `M9-10`; the scenario variant for a queue destination can now be written).
-2. Leader locator in the export: DECIDED (owner, 2026-11-17, "accept all"): write it always (option a) (`M9-14c`).
-3. `M9-00b-c` rendering format of list and map values: `[a, b]` and `{key: value, key2: value2}`; DECIDED (owner, 2026-11-17, "accept all").
-4. `M9-14c` owner review list, eight wording lines (section 7 of `M9-14c-stream-arguments.md`); DECIDED (owner, 2026-11-17, "accept all"): ship as written. Also decided the same day: `M9-10b` owner list items 1 to 7 yes, the radio label `Kind (optional, narrows the list)` yes, `M9-10e` queued (spec O18).
-5. Not established from git: the owner review lists of `M9-03`, `M9-04`, `M9-06`, `M9-07` and the spikes are described as "open" in their briefs; the coordinator should confirm with the owner which are still open.
+All product decisions of M9 asked so far are answered (spec O12 to O21; for example `M9-08d` option b on 2026-11-17, `M9-09` wording O19, gap 10 of `M9-08` O20 option (a), the three `M9-12` sentences O21). The owner review lists of `M9-03`, `M9-04`, `M9-06` and `M9-07` are marked DECIDED in their briefs (2026-11-16, "do arch suggest"); an earlier note here that they might still be open was stale. What is really open:
+
+1. By-eye check of the dashed dead-letter edge in the review graph (`M9-09`). No test can see dashes; it was never looked at by a person. `M9-09b` adds a pixel check on top.
+2. By-eye check of the Migrations "Edit steps" screens and the planner file-mode bar (`M9-12`). Nobody has looked at them.
+3. Real-window checks of the `M9-10b` dialog before the release tag (manual, from its review).
+4. `M2-10`: owner approval of the Testcontainers 2.x bump (a new dependency version).
+5. `M9-12b`: the owner's layout choice for the Migrations action row at narrow widths (the brief builds on wrap meanwhile).
 
 ### Known follow-ups and tidy-ups
 
@@ -213,9 +217,9 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 
 ## Milestone M9 (Topology planner, PLANNED 2026-11-15; scenarios `19_topology_planner.feature`, `20_topology_planner_check.feature`, `21_topology_planner_recipes.feature`; mockup `docs/ux/Planner.dc.html`)
 
-**Status 2026-11-17 (M9): in progress.** The spikes, `M9-01` to `M9-07`, `M9-14`, `M9-14b` and `M9-14c` are merged; `M9-10` has started; the rest is in the Backlog section at the top of this file.
+**Status 2026-11-18 (M9): in progress, only the gate is left of the main line.** The spikes and `M9-01` to `M9-12` (with `M9-14`, `M9-14b`, `M9-14c`) are merged; `M9-13` (gate on a real broker) is next. The rest is in the Backlog section at the top of this file.
 
-**Build order.** (1) The three spikes in parallel: `M9-00a`, `M9-00b`, `M9-00c`. (2) The earliest working slice, which needs no spike and can start with the spikes: `M9-01`, `M9-02`, `M9-03` (queue, exchange and binding in the wizard, naming hints, the draft, save as migration, apply on the Migrations screen). (3) `M9-14` the export that keeps arguments and policies, ORDERED by the owner on 2026-11-15 to start right after `M9-03`; it depends on no planner task (it begins with its own small live spike) and runs next to the tasks below, which do not touch the export. (4) `M9-04` review graph (no spike). (5) `M9-05`, `M9-06` the check (after `M9-00c`). (6) `M9-07` streams and the plain response stream (after `M9-00b`; no MQTT in it). (7) `M9-08` policies and stream retention (after `M9-00c`). (8) `M9-09` dead-lettering (after `M9-00b`, `M9-08`). (9) `M9-10` MQTT routes and the test message with sample values, and `M9-11` headers bindings (after `M9-00a`). (10) `M9-07b` the optional MQTT routes of a stream pair (after `M9-07`, `M9-10`, `M9-00a`; the owner has confirmed the revised Q3, so nothing else holds it). (11) `M9-12` a pending file opened as steps (its scenarios for pairs and routes need `M9-07`, `M9-10`). (12) `M9-13` the gate (`M9-01` to `M9-10`; `M9-07b` has its own live scenario and `M9-14` its own tests, neither is part of the gate).
+**Build order.** (1) The three spikes in parallel: `M9-00a`, `M9-00b`, `M9-00c`. (2) The earliest working slice, which needs no spike and can start with the spikes: `M9-01`, `M9-02`, `M9-03` (queue, exchange and binding in the wizard, naming hints, the draft, save as migration, apply on the Migrations screen). (3) `M9-14` the export that keeps arguments and policies, ORDERED by the owner on 2026-11-15 to start right after `M9-03`; it depends on no planner task (it begins with its own small live spike) and runs next to the tasks below, which do not touch the export. (4) `M9-04` review graph (no spike). (5) `M9-05`, `M9-06` the check (after `M9-00c`). (6) `M9-07` streams and the plain response stream (after `M9-00b`; no MQTT in it). (7) `M9-08` policies and stream retention (after `M9-00c`). (8) `M9-09` dead-lettering (after `M9-00b`, `M9-08`). (9) `M9-10` MQTT routes and the test message with sample values, and `M9-11` headers bindings (after `M9-00a`). (10) `M9-07b` the optional MQTT routes of a stream pair (after `M9-07`, `M9-10`, `M9-00a`; the owner has confirmed the revised Q3, so nothing else holds it). (11) `M9-12` a pending file opened as steps (its scenarios for pairs and routes need `M9-07`, `M9-10`). (12) `M9-13` the gate (`M9-01` to `M9-10`; `M9-07b` has its own live scenario and `M9-14` its own tests, neither is part of the gate). **Progress 2026-11-18: steps (1) to (11) are done and merged (`M9-08` `86ad0540`, `M9-09` `a926a453`, `M9-12` `bba34a63`, the others earlier); step (12), `M9-13`, is next and last.**
 
 **Change of 2026-11-15 (owner's answers).** `M9-07` was cut in two: the plain pair stays in `M9-07` and no longer waits for any MQTT work; the two optional MQTT ticks of the owner's request and answer flow are the new brief `M9-07b`, which depends on `M9-10`. `M9-10` got the test message with sample values (a sample device id for the `+`, a pre-filled correlation-id header). `M9-00a` got the spike items S-A5 to S-A8.
 
@@ -242,14 +246,14 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M9-07-stream-step-and-response-stream | Stream kind with the optional tick "Also create its response stream (DLN)" (shown as "Response stream (DLN)"), suggested name with the suffix `dln`, the pair recognised by its name, link in the graph; no routing without an MQTT tick | M9 | S | done (merged, 652c42a, 2026-11-16) |
 |  M9-07b-stream-pair-mqtt-routes | The two optional ticks of a stream pair, "Answers arrive over MQTT" (a route into the response stream) and "Requests are also recorded from an MQTT topic" (one into the request stream), and the graph note "Your own service turns a request into an MQTT message; the planner does not plan that." | M9 | S | done (merged, 9765f506, 2026-11-17; accepted with follow-ups after round 2; owner review list "yes to all" 2026-11-17; follow-up M9-07d optional) |
 | M9-07d-graph-notes-out-of-view | With 2+ routes into the response stream or several pairs the graph note can slide below the stacked labels and be out of view on a short card; a pure rule in `placeNotes` tries the free band or stacks notes before searching downward | M9 (follow-up) | XS-S | briefed (optional, unscheduled; no owner-visible effect) |
-| M9-08-policy-step | Umbrella of two slices (unified 2026-11-17): slice 1 the stream list and MCP show a retention a policy sets (old M9-08b); slice 2 Policy kind with a catalog of measured settings per target, match preview, the one-policy notes in the plan and in the check, stream retention as one policy covering the pair; one `@broker` class `RealBrokerM9PolicyStepTest` | M9 | M | built, reviewed 2026-11-17 (accepted with follow-ups M9-08c to M9-08f) and merged at 86ad0540
-| M9-08b-stream-retention-from-policy | Folded into `M9-08` slice 1 (2026-11-17); the file keeps the measured facts; the `@m9-08b` tag stays | M9 | S | folded into M9-08 (reviewed with it, accepted with follow-ups)
-| M9-08c-wizard-short-window-buttons | Cancel and Next of the wizard reachable at 1280 x 420 and font scale 1.5 (measure base commit first) | M9 (follow-up) | S | briefed |
-| M9-08d-show-byte-limit-in-streams | Retention column, detail and MCP stream tools show the byte limit as well as the age | M9 (follow-up) | S | briefed (ready; owner chose b on 2026-11-17: age and byte limit in one cell, additive `maxLengthBytes`) |
-| M9-08e-policy-unmeasured-claims | Live rows for the claims M9-08 left open: precedence of policy over argument for max-age and segment size, at-least-once with reject-publish-dlx, apply-to queues and streams, the 0 boundaries | M9 (follow-up) | S | briefed |
-| M9-08f-policy-step-polish | Keep known names on a failed re-read, canAddSetting in core, policy form words into PlannerTexts, a row pinning the 3-binder overlap note | M9 (follow-up) | XS | briefed |
-| M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | built, reviewed 2026-11-18, accepted with follow-ups (`M9-09b`); merge after a look at the dashed edge |
-| M9-09b-dead-letter-follow-ups | Live proof of the own-argument read, graph link helper names, the dashed edge check | M9 | S | planned (after M9-09 merge) |
+| M9-08-policy-step | Umbrella of two slices (unified 2026-11-17): slice 1 the stream list and MCP show a retention a policy sets (old M9-08b); slice 2 Policy kind with a catalog of measured settings per target, match preview, the one-policy notes in the plan and in the check, stream retention as one policy covering the pair; one `@broker` class `RealBrokerM9PolicyStepTest` | M9 | M | done (merged, 86ad0540, 2026-11-18; accepted with follow-ups M9-08c to M9-08f) |
+| M9-08b-stream-retention-from-policy | Folded into `M9-08` slice 1 (2026-11-17); the file keeps the measured facts; the `@m9-08b` tag stays | M9 | S | folded into M9-08 (merged, 86ad0540, 2026-11-18) |
+| M9-08c-wizard-short-window-buttons | Cancel and Next of the wizard reachable at 1280 x 420 and font scale 1.5 (measure base commit first) | M9 (follow-up) | S | briefed (ready) |
+| M9-08d-show-byte-limit-in-streams | Retention column, detail and MCP stream tools show the byte limit as well as the age | M9 (follow-up) | S | briefed (ready; owner chose b on 2026-11-17: age and byte limit in one cell, additive `maxLengthBytes`; five `@m9-08d` scenarios held with `@needs-M9-08d`) |
+| M9-08e-policy-unmeasured-claims | Live rows for the claims M9-08 left open: precedence of policy over argument for max-age and segment size, at-least-once with reject-publish-dlx, apply-to queues and streams, the 0 boundaries | M9 (follow-up) | S | briefed (ready) |
+| M9-08f-policy-step-polish | Keep known names on a failed re-read, canAddSetting in core, policy form words into PlannerTexts, a row pinning the 3-binder overlap note | M9 (follow-up) | XS | briefed (ready) |
+| M9-09-dead-lettering-recipe | "Dead-lettering for a queue": fanout exchange, dead-letter queue or stream, binding, and last a policy on exactly the source queue; at most once by default; the dead-letter path in the graph | M9 | M | done (merged, a926a453, 2026-11-18; accepted with follow-ups M9-09b; O19; the dashed edge still needs a look by eye) |
+| M9-09b-dead-letter-follow-ups | Live proof of the own-argument read, graph link helper names, the dashed edge check | M9 | S | briefed (ready) |
 |  M9-10-mqtt-route-step | MQTT route kind: topic filter to a queue or stream as one binding on `amq.topic`, exact two-way translation, shown as a route again when a file is opened, "Send a test message" on an applied route that asks a sample value for every wildcard (a device id for the `+`) and opens the Publish MQTT dialog with a pre-filled correlation-id header, live test | M9 | M | done (merged, c014ea8b, 2026-11-17; accepted with follow-ups, round 3; owner review items 6 to 12 decided "yes to all" 2026-11-17; open: radio label item 12 to build as a small follow-up M9-10d) |
 | M9-10b-mqtt-test-message | The "Send a test message" with sample values dialog for an applied route (cut out of M9-10 on 2026-11-17) | M9 | M | done, merged 2026-11-17 (accepted with follow-ups after round 3; full suite, live MqttRoute 6/6, IoT 1/1, M5 14/14, mutation checks and screenshots re-verified; real-window checks still manual before the release tag) |
 | M9-10e-mqtt-publish-gates-and-dialog-fold | Write-permission gate on the older MQTT entry points, AMQP `PublishDialog` fold check, max height with own scrollbar for the Publish MQTT error banner | M9 | S | done, merged 2026-11-17 (accepted with follow-ups: `M9-10f`) | docs/tasks/M9-10e-mqtt-publish-gates-and-dialog-fold.md |
@@ -257,9 +261,9 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M9-10d-route-kind-radio-label | Label over the Queue/Stream radios of the MQTT route form: `Kind (optional, narrows the list)` (owner item 12, decided "yes to all" 2026-11-17) | M9 (follow-up) | XS | idea, decided wording; no brief |
 | M9-10c-mqtt-exchange-hint | Optional note when the broker's MQTT subscriber queues show an exchange other than `amq.topic` (S-B2 risk: a route on `amq.topic` routes nothing) | M9 | S | briefed (blocked: optional and unscheduled; owner item 9: only the assumption sentence now) |
 | M9-11-headers-bindings | Binding form for a headers exchange: headers with typed values and the match rule, written as binding arguments | M9 | S | done, merged 2026-11-17 (accepted with follow-ups; full suite green, 10 `@m9-11` scenarios, live `RealBrokerM9HeadersBindingTest` 5/5, 4 mutation checks, 46 planner screenshots byte-identical; graph edge of a headers binding shows only `new`, accepted) |
-| M9-12-open-pending-file-as-steps | "Edit steps" for a migration that is applied nowhere on this machine: steps from actions, read-only steps kept as written, same version saved, never without a change, gap 10 (two policy steps of one name, owner O20), refusals for hash, access and unknown-key files, checksum guard, "Copy into a new plan", step 2.5 rulings (menu leave, unreadable history and draft, empty plan) | M9 | M | done, not merged: accepted with follow-ups (M9-12b) 2026-11-18, branch m9-12-open-pending-file-as-steps |
-| M9-12b-migrations-action-row-narrow | The Migrations action row keeps Edit steps, Edit file, Validate and Apply at 1000 px / font 1.5, refusal row not clipped at 800 px | M9 (follow-up) | S | briefed (after M9-12 merge; owner layout choice pending, build on wrap) |
-| M9-13-gate-planner-on-a-real-broker | `@gate-M9` `RealBrokerM9GateTest`: plan, check, save, apply with the existing runner, check again, an MQTT message and a dead letter arrive, GET only during the check, nothing deleted | M9 | M | briefed (blocked: M9-08 to M9-12; it is the last task) |
+| M9-12-open-pending-file-as-steps | "Edit steps" for a migration that is applied nowhere on this machine: steps from actions, read-only steps kept as written, same version saved, never without a change, gap 10 (two policy steps of one name, owner O20), refusals for hash, access and unknown-key files, checksum guard, "Copy into a new plan", step 2.5 rulings (menu leave, unreadable history and draft, empty plan) | M9 | M | done (merged, bba34a63, 2026-11-18; accepted with follow-ups M9-12b; O20 option (a), O21; the Edit steps screens still need a look by eye) |
+| M9-12b-migrations-action-row-narrow | The Migrations action row keeps Edit steps, Edit file, Validate and Apply at 1000 px / font 1.5, refusal row not clipped at 800 px | M9 (follow-up) | S | briefed (ready; owner layout choice pending, build on wrap) |
+| M9-13-gate-planner-on-a-real-broker | `@gate-M9` `RealBrokerM9GateTest`: plan, check, save, apply with the existing runner, check again, an MQTT message and a dead letter arrive, GET only during the check, nothing deleted | M9 | M | briefed (ready, next: all of M9-01 to M9-12 are merged; it is the last task) |
 | M9-14-export-keeps-arguments-and-policies | The topology export writes queue flags and arguments, exchange and binding arguments and the policies, so an exported file reproduces the topology (today it drops them; `10` says otherwise) | M9 (follow-up) | M | done (merged, 342b0a7, 2026-11-16) |
 | M9-14b-export-polish | The export note names only the settings present (retention, leader locator), one entry per super stream, caps at ten entries; a setting the model refuses gets its own failure sentence; the completeness check covers only what is written | M9 (follow-up) | S | done (merged, 55dbc02, 2026-11-16) |
 | M9-07c-response-stream-sentence | Add the owner's one broker sentence to `RESPONSE_STREAM_NOTE` ("RabbitMQ does not move messages into it by itself: your applications write to it."); one constant, three tests that pin the old wording, one scenario | M9 (follow-up) | XS | done (merged, 4e42c7a, 2026-11-17) |

@@ -558,13 +558,19 @@ NEW, briefed (architect, 2026-11-15); 12 `@m9-07b` scenarios in `21` (1 `@broker
 
 briefed (architect, 2026-11-15); 11 `@m9-08` scenarios in `21`; depends on M9-00c, M9-03, M9-05, M9-07; Q4 decided (the retention block waits for S-F1)
 
+2026-11-17/18: built and reviewed (accepted with follow-ups M9-08c wizard buttons at 1280x420 / scale 1.5, M9-08d byte limit shown (owner chose option b), M9-08e live checks of unmeasured claims, M9-08f polish); merged 86ad0540 (with M9-08b). O20: two same-name policy steps are blocking when they differ, a note when equal (decided 2026-11-18).
+
 ## M9-08b-stream-retention-from-policy
 
 NEW, briefed (architect, M9-00c step 3, 2026-11-16); 3 `@m9-08b` scenarios (`03`, `14`; 1 `@broker`); depends on M9-00c; before the retention block of M9-08
 
+2026-11-17: folded into M9-08 slice 1; merged with it at 86ad0540.
+
 ## M9-09-dead-lettering-recipe
 
 briefed (architect, 2026-11-15); 12 `@m9-09` scenarios in `21`; depends on M9-00b, M9-00c, M9-08, M9-04; Q12 decided (the stream target and at-least-once wait for S-C)
+
+2026-11-18: built and reviewed, accepted with follow-ups (M9-09b: live test of the own-argument read, helper rename, dashed-edge pixel check); merged a926a453. O19: wording items 1, 2, 3, 8, 9, 10, 12 accepted. The dashed dead-letter edge was never looked at by eye (no test can see dashes): owner should look.
 
 ## M9-10-mqtt-route-step
 
@@ -582,9 +588,13 @@ briefed (architect, 2026-11-15); 8 `@m9-11` scenarios in `21` (after M9-00a; wor
 
 briefed (architect, 2026-11-15); 12 `@m9-12` scenarios in `19`; depends on M9-03; Q16 decided
 
+2026-11-18: built, round 2 closed F1 (locked planner for a refused file); accepted with follow-ups (M9-12b: action row wraps at narrow widths, MigrationFile import nit); merged bba34a63. O20 gap 10 option (a); O21 three sentences accepted (history unreadable, copy blocked by unreadable draft, "Nothing has changed yet"). By-eye check of the Edit steps screens and the planner file-mode bar not done by anyone.
+
 ## M9-13-gate-planner-on-a-real-broker
 
 briefed (architect, 2026-11-15); 1 scenario in `21`; depends on M9-01 to M9-10
+
+2026-11-18: ready and next; all of M9-01 to M9-12 are merged on main bba34a63.
 
 ## M9-14-export-keeps-arguments-and-policies
 

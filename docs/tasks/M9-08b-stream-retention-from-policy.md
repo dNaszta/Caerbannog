@@ -50,3 +50,5 @@ Tests written first and passing, no unrelated changes, spec updated (A5 sentence
 
 ## Status
 Folded into `M9-08` slice 1; reviewed with it on 2026-11-17 (architect, step 5): ACCEPTED WITH FOLLOW-UPS (see "Status" of `M9-08-policy-step.md`). Slice 1 is built (`RetentionSources.merge`, both parse sites of `ManagementJson`, `effective_policy_definition` added to `LIST_COLUMNS`, no detail fallback) and its scenarios in `03` and `14` run green; the `@broker` scenario is bound to `RealBrokerM9PolicyStepTest` (green on 4.4.0). It merges with the slice 2 commits, not alone. Open: showing the byte limit is `M9-08d` (owner decision); the precedence for `max-age` and the segment size is `M9-08e` row 1.
+
+Status: done (merged with M9-08, 86ad0540, 2026-11-18).

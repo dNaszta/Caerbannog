@@ -33,3 +33,5 @@ None for the owner.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes.
+
+Status 2026-11-18: briefed (ready); parent task merged.

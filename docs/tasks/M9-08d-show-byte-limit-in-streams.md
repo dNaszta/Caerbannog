@@ -1,6 +1,6 @@
 # The stream list and the MCP stream tools show the byte limit of a stream
 
-Milestone: M9 (follow-up)    Depends on: M9-08 slice 1 (merged)    Size: S    Status: briefed (ready)
+Milestone: M9 (follow-up)    Depends on: M9-08 slice 1 (merged)    Size: S    Status: briefed (ready; parent merged, 2026-11-18)
 
 ## Goal
 A stream limited by `max-length-bytes` no longer looks unlimited: the Retention column, the stream detail and the MCP stream tools show the byte limit as well as the age, for retention set by arguments and by a policy alike.

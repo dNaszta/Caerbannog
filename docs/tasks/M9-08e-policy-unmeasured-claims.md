@@ -28,3 +28,5 @@ None beyond the five rows.
 
 ## Definition of done
 Live rows run (or reported as not run), spec "Measured facts" updated, M9-08's "Open points" lines moved out.
+
+Status 2026-11-18: briefed (ready); parent task merged.

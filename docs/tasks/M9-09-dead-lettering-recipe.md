@@ -185,3 +185,5 @@ Architect, 2026-11-18, step 5 (review): ACCEPTED WITH FOLLOW-UPS, see "Step 5 re
 
 ## Step 5 review (architect, 2026-11-18)
 Verdict: Accepted with follow-ups. Rulings on the senior developer's deviations: (1) extra GET `queueDeclarations`: KEEP, the brief names it, it is GET only, only the one argument is read, a failed read keeps the names; (2) key (queue, known): KEEP, ruling 4 reworded above; (3) Details fields: KEEP (precedent `suggestedResponseName`; the screen has no context); (4) naming hints for typed names only: KEEP, the suggestions follow the queue; (5) no `nameProblem` on the source queue: KEEP, the name only goes into an escaped pattern and echoes go through `echoableName`, and an unknown name simply matches nothing; (6) dashed link in the shared canvas: KEEP, dotted style unchanged (rename of helpers in M9-09b); (7) `Summary.note` KDoc: KEEP; (8) `DEAD_LETTER_KIND`, `BUILT_KINDS == WIZARD_KINDS`: KEEP. Nothing sent back.
+
+Status: done (merged, a926a453, 2026-11-18). Follow-up M9-09b. The dashed dead-letter edge has not been looked at by eye; the owner should look.

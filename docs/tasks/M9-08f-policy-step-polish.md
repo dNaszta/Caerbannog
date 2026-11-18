@@ -20,3 +20,5 @@ None (internal).
 
 ## Definition of done
 Tests first; no unrelated changes.
+
+Status 2026-11-18: briefed (ready); parent task merged.

@@ -31,3 +31,5 @@ Owner layout choice (non-blocking, as M8-14c): (1) wrap onto a second line (reco
 
 ## Definition of done
 Tests first (the four un-disabled tests are the red ones), no unrelated change, a person checks the screen at 1000 px / 1.5 by eye.
+
+Status 2026-11-18: briefed (ready); parent task merged.

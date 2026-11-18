@@ -46,3 +46,5 @@ The gate's plan follows the decided answers (retention by policy, Q4; the respon
 The gate passes on a machine with Docker or rootless Podman, twice in a row; the two mutations were red; the milestone status in `docs/spec.md` and `docs/tasks/README.md` is updated by the architect.
 
 Note (architect, M9-00b step 3, 2026-11-16): the dead-letter part of the gate uses a message that EXPIRES in the source queue (S-C1: arrives with `x-first-death-reason` `expired`; the policy needs about 6 s to show, so a bounded poll). Do not use an at-least-once held dead letter in the gate: it was delivered only 165 to 175 s after the repair in the observations (`docs/spec.md` "Measured facts of M9-00b"). The gate's dead-letter policy is the at-most-once recipe (`dead-letter-exchange` only).
+
+Status 2026-11-18: briefed (ready, next); all of M9-01 to M9-12 are merged on main bba34a63.

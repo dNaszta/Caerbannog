@@ -30,3 +30,5 @@ Whether this is old or new (measure first; the answer goes into the brief's stat
 
 ## Definition of done
 Tests first and failing for the right reason, then green; no unrelated changes.
+
+Status 2026-11-18: briefed (ready); parent task merged.

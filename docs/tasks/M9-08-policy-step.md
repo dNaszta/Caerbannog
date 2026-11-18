@@ -226,3 +226,5 @@ Findings:
 
 Owner question (a real product decision, does not block the merge): whether the byte limit is shown in the Retention column, the detail and the MCP tools (`M9-08d`, recommendation b).
 Follow-up briefs: `M9-08c-wizard-short-window-buttons`, `M9-08d-show-byte-limit-in-streams` (blocked on the owner), `M9-08e-policy-unmeasured-claims`, `M9-08f-policy-step-polish`. Spec A5 gap sentence rewritten. Still open and not decided here: gap 10 (two policy steps of one name overwrite each other on apply) stays with `M9-12` and `M9-13`; a check note for a stream that already exists on the broker needs `policy` on `StreamSummary`.
+
+Status: done (merged, 86ad0540, 2026-11-18). Follow-ups M9-08c, M9-08d, M9-08e, M9-08f (see the index in `README.md`).
