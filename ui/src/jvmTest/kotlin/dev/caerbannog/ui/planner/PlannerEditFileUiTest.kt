@@ -269,3 +269,19 @@ internal object EditFileUiFixtures {
 
     fun rawOf(actions: List<MigrationAction>, version: String = "0005"): String = MigrationParser.exportToJson(version, "Orders", actions)
 }
+
+/** M9-12 step 4 (test developer): the file-mode bar on a narrow window at font scale 1.5. */
+@OptIn(ExperimentalTestApi::class)
+class PlannerEditFileNarrowExploratoryUiTest {
+    @Test
+    fun `at 900 wide and font scale 1_5 the file bar, the pills and the buttons are on screen`() = runDesktopComposeUiTest(900, 800) {
+        val raw = EditFileUiFixtures.rawOf(EditFileUiFixtures.threeSteps)
+        val r = UiRig(mode = PlannerMode.EditFile("0005", MigrationParser.computeChecksum(raw)), rawFiles = listOf(raw))
+        setContent { CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) { PlannerOver(r) } }
+        waitForIdle()
+        r.queue("invoices")
+        waitForIdle()
+        listOf("planner:saveBtn", "planner:discardBtn", "planner:editPill", "planner:unsavedPill").forEach { node(it).assertIsDisplayed() }
+        r.close()
+    }
+}
