@@ -1,6 +1,7 @@
 package dev.caerbannog.desktopapp
 
 import dev.caerbannog.core.migrate3x.SourceKind
+import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.SavedPlan
 import dev.caerbannog.ui.appframe.AppDestination
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,19 +68,28 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
     /** The plan that was just saved as a migration, waiting for the Migrations screen to select it and show its notice; null when none. */
     val savedPlan: StateFlow<SavedPlan?> = _savedPlan.asStateFlow()
 
-    /** Opens the planner. Only from Migrations; anything else does nothing. */
-    fun openPlanner() {
-        if (_screen.value == AppDestination.Migrations) _plannerOpen.value = true
+    private val _plannerMode = MutableStateFlow<PlannerMode>(PlannerMode.NewPlan)
+
+    /** What the open planner works on: the draft of a new plan, or a pending file chosen with "Edit steps" (M9-12). */
+    val plannerMode: StateFlow<PlannerMode> = _plannerMode.asStateFlow()
+
+    /** Opens the planner on [mode]. Only from Migrations; anything else does nothing. */
+    fun openPlanner(mode: PlannerMode = PlannerMode.NewPlan) {
+        if (_screen.value != AppDestination.Migrations) return
+        _plannerMode.value = mode
+        _plannerOpen.value = true
     }
 
     /** Back to the Migrations list; harmless when the planner is not open. */
     fun closePlanner() {
         _plannerOpen.value = false
+        _plannerMode.value = PlannerMode.NewPlan
     }
 
     /** The planner saved [saved]: it closes and Migrations is shown, with the new version waiting in [savedPlan]. */
     fun planSaved(saved: SavedPlan) {
         _plannerOpen.value = false
+        _plannerMode.value = PlannerMode.NewPlan
         _screen.value = AppDestination.Migrations
         _savedPlan.value = saved
     }
@@ -93,6 +103,7 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
         if (destination !in WITH_SCREEN) return
         // Any drawer item leads to a list or screen, never back into an open planner; a saved plan nobody took belongs to the save that made it.
         _plannerOpen.value = false
+        _plannerMode.value = PlannerMode.NewPlan
         if (destination != AppDestination.Migrations) _savedPlan.value = null
         _initialOffset.value = null
         // Streams or any other drawer item with a screen leads to a list or screen, never back into an old stream.

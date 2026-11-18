@@ -27,6 +27,7 @@ import dev.caerbannog.core.connections.createStreamGate
 import dev.caerbannog.core.connections.deleteStreamGate
 import dev.caerbannog.core.mqtt.PublishMqttViewModel
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.mqtt.StreamInboundRoute
 import dev.caerbannog.core.mqtt.UnavailableMqttMessagePublisher
@@ -459,7 +460,17 @@ private fun MigrationsWindowContent(composition: AppComposition, control: Connec
         controlEvents = composition.control,
         onNavigate = composition.navigation::open,
         plannerEntry = plannerEntry,
-        onOpenPlanner = composition.navigation::openPlanner,
+        onOpenPlanner = { composition.navigation.openPlanner() },
+        onEditSteps = { version ->
+            state.entries.firstOrNull { it.file.version == version }?.file?.let {
+                composition.navigation.openPlanner(PlannerMode.EditFile(version, it.checksum))
+            }
+        },
+        onCopyIntoNewPlan = { version ->
+            state.entries.firstOrNull { it.file.version == version }?.file?.let { file ->
+                scope.launch { withContext(Dispatchers.IO) { composition.copyIntoNewPlan(file, inputs.vhost) } }
+            }
+        },
         onDismissDraft = {
             scope.launch {
                 withContext(Dispatchers.IO) { composition.planDraftStore.clear() }
@@ -492,10 +503,11 @@ private fun PlannerWindowContent(composition: AppComposition, control: Connectio
     val inputs = composition.migrationsInputs(connections)
     val windowScope = remember { newPlannerScope() }
     val live = remember { LivePlanner() }
-    val plannerVm = remember(plannerKeyOf(inputs)) {
+    val mode by composition.navigation.plannerMode.collectAsState()
+    val plannerVm = remember(plannerKeyOf(inputs), mode) {
         live.retire(windowScope)
         val job = SupervisorJob(windowScope.coroutineContext[Job])
-        composition.createPlannerViewModel(inputs, CoroutineScope(windowScope.coroutineContext + job)).also { live.vm = it; live.job = job }
+        composition.createPlannerViewModel(inputs, CoroutineScope(windowScope.coroutineContext + job), mode).also { live.vm = it; live.job = job }
     }
     DisposableEffect(windowScope) {
         onDispose {

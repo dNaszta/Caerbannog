@@ -3,13 +3,16 @@ package dev.caerbannog.desktopapp
 import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.FolderOpener
+import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.planner.BrokerPolicyReader
 import dev.caerbannog.core.planner.KnownQueue
 import dev.caerbannog.core.planner.KnownTopology
 import dev.caerbannog.core.planner.KnownTopologyReader
 import dev.caerbannog.core.planner.NamingStyle
+import dev.caerbannog.core.planner.PlanOpening
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.PlannerViewModel
 import dev.caerbannog.core.planner.ReviewView
 import dev.caerbannog.core.planner.SavedPlan
@@ -129,8 +132,15 @@ class CatalogKnownTopologyReader(
  */
 fun newPlannerScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
 
-/** The planner view model for [inputs]: the draft store of the app and the same folder ports as the Migrations screen. */
-fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: CoroutineScope = newPlannerScope()): PlannerViewModel =
+/**
+ * The planner view model for [inputs]: the draft store of the app and the same folder ports as the Migrations screen. In [PlannerMode.EditFile] it
+ * works on a pending file of that folder and never uses the draft store.
+ */
+fun AppComposition.createPlannerViewModel(
+    inputs: MigrationsInputs,
+    scope: CoroutineScope = newPlannerScope(),
+    mode: PlannerMode = PlannerMode.NewPlan,
+): PlannerViewModel =
     PlannerViewModel(
         draftStore = planDraftStore,
         folderPorts = migrationFolderPorts,
@@ -142,7 +152,20 @@ fun AppComposition.createPlannerViewModel(inputs: MigrationsInputs, scope: Corou
         policies = inputs.policyReader,
         // The summary says when the check ran; the view model's own default clock is for tests and always says 0.
         clock = RefreshClock { System.currentTimeMillis() },
+        mode = mode,
     )
+
+/**
+ * "Copy into a new plan": the steps of [file] (applied elsewhere, so not edited) become the draft of a new plan, written through the real draft store, and
+ * the planner opens on it. The store refuses to write over a draft it cannot read: the answer is then false, nothing was written and the planner stays
+ * closed. A file with a broker-level action is never copied (a `declareUser` would put its hash in the draft); the screen does not offer it either.
+ */
+suspend fun AppComposition.copyIntoNewPlan(file: MigrationFile, vhost: String): Boolean {
+    if (file.up.any { it.isBrokerLevel }) return false
+    if (!planDraftStore.save(PlanOpening.planOf(file, vhost))) return false
+    navigation.openPlanner()
+    return true
+}
 
 /**
  * What the planner window keys its view model on: the context AND the check port. A reconnect to the same profile has the same context
