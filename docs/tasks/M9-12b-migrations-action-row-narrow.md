@@ -10,6 +10,7 @@ M9-12 review finding F2 (test report): "Edit steps" was added to a `Row` that do
 
 ## Scope
 In: the action row in `MigrationDetailPanel` and the `PlanNotOffered` row of `ui/migrations/MigrationsScreen.kt`. Keep every `testTag` (`migrations:editStepsBtn`, `migrations:editFileBtn`, `migrations:applyBtn` and the others, `migrations:planNotOffered`, `migrations:copyIntoPlanBtn`). No change to texts, order of buttons or enabled rules.
+Also (nit m1 of the M9-12 review): in `core/planner/PlannerViewModel.kt` `refusalOf`, import `MigrationFile` instead of the fully qualified name.
 Out: any other screen; the wizard.
 
 ## Acceptance

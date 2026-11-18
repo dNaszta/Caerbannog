@@ -22,7 +22,7 @@ Updated 2026-11-17 after the merges of `M9-10`, `M9-07b`, `M9-10b`, `M9-11`, `M9
 | M9 | `M9-08e` live rows for the claims `M9-08` left open | S | nothing (briefed) |
 | M9 | `M9-08f` policy step polish | XS | nothing (briefed) |
 | M9 | `M9-09` dead-lettering recipe | M | built, reviewed 2026-11-18: accepted with follow-ups (`M9-09b`); waits for a look at the dashed edge, then merge (m9-09-dead-lettering-recipe worktree) |
-| M9 | `M9-12` open a pending file as steps | M | DONE, not merged: accepted with follow-ups 2026-11-18 after round 2 (F1 closed; `M9-12b`); waits for the by-eye check and the owner sentences, then merge (m9-12-open-pending-file-as-steps) |
+| M9 | `M9-12` open a pending file as steps | M | DONE, not merged: accepted with follow-ups 2026-11-18 after round 2 (F1 closed; `M9-12b`); owner accepted the three sentences (O21); waits for the by-eye check, then merge (m9-12-open-pending-file-as-steps) |
 | M9 | `M9-12b` Migrations action row at 1000 px / font 1.5 | S | `M9-12` merged (briefed) |
 | M9 | `M9-13` gate on a real broker | M | last: after `M9-08` to `M9-12` |
 | M9 | `M9-10f` AMQP publish dialog: bounded banners, gutter only on overflow | S | nothing (briefed) |
