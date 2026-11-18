@@ -650,6 +650,36 @@ Feature: Topology planner
     Then "Copy into a new plan" is not offered
     And no draft was written
 
+  @m9-12 @fake-broker
+  Scenario: Leaving by the menu with unsaved changes asks first
+    Given the pending migration "0005" is open in the planner and I removed a step
+    When I open another screen from the menu
+    Then I am asked "Discard the changes to 0005?"
+    And "0005.json" still has exactly its original bytes
+
+  @m9-12 @negative @fake-broker
+  Scenario: A file whose steps were all removed cannot be saved
+    Given the pending migration "0005" is open in the planner and I removed every step
+    Then "Save 0005" is disabled with the reason "Add a step first"
+    And "0005.json" still has exactly its original bytes
+
+  @m9-12 @negative @fake-broker
+  Scenario: A file is not edited while the applied history cannot be read
+    Given the applied history of this machine cannot be read
+    And a pending migration "0005" that declares the quorum queue "orders"
+    When I select "0005" on the Migrations screen
+    Then "Edit steps" is not offered and I am told "The applied history cannot be read, so it is not known where 0005 is applied."
+    And "Copy into a new plan" is not offered
+    And "Edit file" is still offered
+
+  @m9-12 @negative @fake-broker
+  Scenario: A file cannot be copied into a plan while the draft file cannot be read
+    Given the draft file on disk is not a valid plan
+    And "0002" is applied to "prod-eu" on this machine and pending for "uat-eu"
+    When I select "0002" on the Migrations screen
+    Then "Copy into a new plan" is disabled with the reason "The current plan file could not be read. Open the planner and move it aside first."
+    And the draft file still has exactly its original bytes
+
   # ---- M9-12, gap 10 of M9-08: two policy steps of one name (wording decided by the owner on 2026-11-18, spec O20) ----
 
   @m9-12 @fake-broker
