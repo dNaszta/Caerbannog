@@ -23,8 +23,8 @@ import kotlin.test.assertTrue
  * the error under the filter, the key line, the matching topic, the assumption sentence, the step rows, the labelled edge of the review graph.
  * No broker: nothing here can send a request.
  *
- * Stand-ins until M9-12: the three Givens "a pending migration ..." put the file's actions in the draft file (`PendingStandIn`, defined in
- * PlannerStreamSteps) and the existing "I choose "Edit steps" for ..." restarts the planner on it. M9-12 must replace those, not add a second step.
+ * M9-12: the three Givens "a pending migration ..." write a real pending file into the fake folder (`PlannerFiles.put`) and "I choose "Edit steps" for ..."
+ * (PlannerEditFileSteps) clicks the real button on the real Migrations screen.
  */
 class PlannerMqttSteps {
     private val d get() = PlannerWorld.driver
@@ -105,21 +105,21 @@ class PlannerMqttSteps {
     // ---- a refusal is also on the screen ----
 
 
-    // ---- a pending file (stand-ins until M9-12) ----
+    // ---- a pending file: a real file in the fake folder, opened by "Edit steps" (M9-12) ----
 
     @Given("a pending migration {string} that declares the stream {string} and binds {string} to it with routing key {string}")
-    fun pendingStreamAndRoute(version: String, stream: String, exchange: String, key: String) = PendingStandIn.put(
-        d, version, listOf(MigrationAction.DeclareStream(stream, vhost = d.vhost), MigrationAction.DeclareBinding(exchange, stream, key, vhost = d.vhost)),
+    fun pendingStreamAndRoute(version: String, stream: String, exchange: String, key: String) = PlannerFiles.put(
+        version, listOf(MigrationAction.DeclareStream(stream, vhost = d.vhost), MigrationAction.DeclareBinding(exchange, stream, key, vhost = d.vhost)),
     )
 
     @Given("a pending migration {string} that binds {string} to {string} with routing key {string}")
     fun pendingRoute(version: String, exchange: String, destination: String, key: String) =
-        PendingStandIn.put(d, version, listOf(MigrationAction.DeclareBinding(exchange, destination, key, vhost = d.vhost)))
+        PlannerFiles.put(version, listOf(MigrationAction.DeclareBinding(exchange, destination, key, vhost = d.vhost)))
 
     private val bindingTail = Regex("""^to the (exchange|queue) "([^"]*)" with routing key "([^"]*)"(?: and the argument "([^"]*)")?$""")
-    private var original: MigrationAction?
-        get() = PendingStandIn.binding
-        set(value) { PendingStandIn.binding = value }
+    /** The action of the file that is open, read back from the file's own text through the parser (the field the stand-in kept is gone). */
+    private val original: MigrationAction?
+        get() = PlannerFiles.openedActions().singleOrNull()
 
     @Given("^a pending migration \"([^\"]*)\" with a binding from \"([^\"]*)\" (to the .*)$")
     fun pendingBinding(version: String, exchange: String, tail: String) {
@@ -130,8 +130,7 @@ class PlannerMqttSteps {
             destinationType = if (kindWord == "exchange") BindingDestinationType.EXCHANGE else BindingDestinationType.QUEUE,
             arguments = if (argument.isEmpty()) emptyMap() else mapOf(argument to ArgumentValue.Text("note")),
         )
-        original = action
-        PendingStandIn.put(d, version, listOf(action))
+        PlannerFiles.put(version, listOf(action))
     }
 
     // ---- what the planner shows ----
@@ -172,8 +171,8 @@ class PlannerMqttSteps {
         if (expected is MigrationAction.DeclareBinding && expected.arguments.isNotEmpty() && dev.caerbannog.core.planner.StepForms.formOf(expected) is BindingForm) {
             d.editStep(1) { it }
         }
-        d.chooseMigrationsFolder("/work/migrations", "0004")
-        d.vm.saveAsMigration()
+        // M9-12: an opened file is saved only after a change; the smallest one is a word after the description, the actions stay as they are
+        d.saveNow()
         val version = d.state.saved?.version ?: error("the plan was not saved; error: ${d.state.errorMessage}")
         val file = d.migrationFolder.files.getValue(version)
         assertEquals(listOf<MigrationAction>(expected), file.up, "the saved file's actions")

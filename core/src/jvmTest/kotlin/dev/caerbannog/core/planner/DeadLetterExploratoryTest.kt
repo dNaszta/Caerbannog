@@ -96,15 +96,20 @@ class DeadLetterExploratoryTest {
     }
 
     @Test
-    fun `the recipe twice for one queue is flagged for the exchange and the queue, the policy twice is known gap 10 of M9-08`() {
+    fun `the recipe twice for one queue is flagged for the exchange, the queue and the policy (gap 10 of M9-08, decided into M9-12)`() {
         val c = ctx(known = known("orders"))
         val once = DeadLetterForm("orders").actions(c)
         val plan = TopologyPlan().append(once).append(once)
         val problems = PlanValidation.problems(plan, c.known).map { it.message }
         assertEquals(8, plan.steps.size)
         assertEquals(
-            listOf("The plan declares orders-dlx twice with the same settings", "The plan declares orders-dlq twice with the same settings"), problems,
-            "known gap: the second policy step of the same name is not flagged",
+            listOf(
+                "The plan declares orders-dlx twice with the same settings",
+                "The plan declares orders-dlq twice with the same settings",
+                "The plan declares the policy orders-dlx twice with the same settings",
+            ),
+            problems,
+            "the second policy step of the same name is a note since M9-12 (spec O20)",
         )
     }
 

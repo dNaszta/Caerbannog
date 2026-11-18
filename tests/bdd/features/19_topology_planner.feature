@@ -607,6 +607,49 @@ Feature: Topology planner
     When I save "0005" and open the Migrations screen
     Then "Continue plan" still offers the draft with 3 steps
 
+  @m9-12 @fake-broker
+  Scenario: Discarding the changes leaves the file as it was
+    Given the pending migration "0005" is open in the planner and I removed a step
+    When I go back to the Migrations screen
+    And I choose "Discard changes"
+    Then the planner is closed
+    And "0005.json" still has exactly its original bytes
+    And no other file was written
+
+  @m9-12 @fake-broker
+  Scenario: Copying into a new plan asks first when a draft with steps exists
+    Given a plan with 3 steps
+    And "0002" is applied to "prod-eu" on this machine and pending for "uat-eu"
+    When I select "0002" on the Migrations screen
+    And I choose "Copy into a new plan" and am asked "Dismiss the current plan and copy 0002 into a new plan?"
+    And I answer "Keep the plan"
+    Then "Continue plan" still offers the draft with 3 steps
+    And "0002.json" still has exactly its original bytes
+
+  @m9-12 @fake-broker
+  Scenario: Confirming the copy replaces the draft with the steps of the file
+    Given a plan with 3 steps
+    And "0002" is applied to "prod-eu" on this machine and pending for "uat-eu"
+    When I select "0002" on the Migrations screen
+    And I choose "Copy into a new plan" and am asked "Dismiss the current plan and copy 0002 into a new plan?"
+    And I answer "Dismiss and copy"
+    Then a new plan holds the steps of "0002"
+    And "0002.json" still has exactly its original bytes
+
+  @m9-12 @negative @security @fake-broker
+  Scenario: A file with password hashes is not copied into a plan either
+    Given a pending migration "0001" that declares the user "svc" with a password hash
+    When I select "0001" on the Migrations screen
+    Then "Copy into a new plan" is not offered
+    And no draft was written
+
+  @m9-12 @negative @fake-broker
+  Scenario: A file with entries the planner does not know is not copied into a plan either
+    Given a pending migration "0007" whose queue action also holds the key "comment"
+    When I select "0007" on the Migrations screen
+    Then "Copy into a new plan" is not offered
+    And no draft was written
+
   # ---- M9-12, gap 10 of M9-08: two policy steps of one name (wording decided by the owner on 2026-11-18, spec O20) ----
 
   @m9-12 @fake-broker

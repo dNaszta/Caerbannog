@@ -110,8 +110,47 @@ class FakeMigrationFolder(
         return file
     }
 
-    override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult =
-        throw AssertionError("a saved migration is never rewritten: updateFile($version) was called")
+    /**
+     * M9-12: every [updateFile] attempt (version to the raw JSON it was given), in order, whatever its result. "Nothing was rewritten" is `updates.isEmpty()`.
+     * Honest like `FolderMigrationFileRepository.updateFile`: a read-only or unavailable folder, a file that is not there, text that does not parse and a
+     * version that differs from the file's all answer `Invalid` and write nothing; the file then holds the text as given (its bytes are the text).
+     */
+    val updates: MutableList<Pair<String, String>> = mutableListOf()
+
+    /** Versions rewritten by [updateFile], in order. */
+    val updated: MutableList<String> = mutableListOf()
+
+    override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult {
+        updates += version to newRawJson
+        unavailable?.let { return MigrationValidationResult.Invalid(it.message) }
+        if (readOnly) return MigrationValidationResult.Invalid(FOLDER_READ_ONLY_MESSAGE)
+        if (version !in files) return MigrationValidationResult.Invalid("the file could not be written")
+        failingVersions[version]?.let { return MigrationValidationResult.Invalid(it) }
+        val result = MigrationParser.parse(newRawJson)
+        if (result !is MigrationValidationResult.Valid) return result
+        if (result.migration.version != version) return MigrationValidationResult.Invalid("the version in the text must stay the same")
+        files[version] = result.migration
+        updated += version
+        return result
+    }
+
+    /** A valid file exactly as [rawJson] says (hand-written: key order, extra keys, layout), as it was in the folder before the app started. */
+    fun addRaw(rawJson: String): FakeMigrationFolder = apply {
+        val migration = (MigrationParser.parse(rawJson) as? MigrationValidationResult.Valid)?.migration
+            ?: error("the scenario's own file is not a valid migration: ${(MigrationParser.parse(rawJson) as MigrationValidationResult.Invalid).reason}")
+        files[migration.version] = migration
+    }
+
+    /** Someone else rewrote the file in the folder (not the app): no attempt is recorded. */
+    fun changeOnDisk(version: String, rawJson: String) {
+        require(version in files) { "no file $version to change" }
+        addRaw(rawJson)
+    }
+
+    /** Someone else removed the file from the folder. */
+    fun deleteOnDisk(version: String) {
+        files.remove(version)
+    }
 
     override suspend fun nextVersion(): String = ((files.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString().padStart(4, '0')
 }

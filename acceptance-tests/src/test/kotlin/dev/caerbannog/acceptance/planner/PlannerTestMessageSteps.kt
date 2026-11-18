@@ -218,6 +218,8 @@ class PlannerTestMessageSteps {
 
     @When("I select {string} on the Migrations screen")
     fun select(version: String) {
+        // M9-12: one sentence, two screens: when a Given of M9-12 put a real file in the folder, the REAL view model's Migrations screen is the one to click
+        if (PlannerFiles.active) return PlannerFiles.select(version)
         driver.click("migrationCard:$version")
         assertTrue(driver.isDrawn("dryRunAction:$routeRow"), "the actions of $version are not drawn")
     }
@@ -377,6 +379,8 @@ class PlannerTestMessageSteps {
     fun notOffered(button: String) {
         // M9-09: "At least once" is not offered by the dead-lettering form (one sentence, two screens)
         if (button == "At least once") return PlannerDeadLetterSteps().atLeastOnceNotOffered()
+        // M9-12: the buttons of the action row of a file on the real Migrations screen
+        if (button == "Copy into a new plan" || button == "Edit steps") return PlannerEditFileSteps().notDrawn(button)
         assertEquals("Send a test message", button)
         for (i in 0..5) {
             assertFalse(driver.isDrawn("migrations:testMessageBtn:$i"), "a button is drawn on row $i")

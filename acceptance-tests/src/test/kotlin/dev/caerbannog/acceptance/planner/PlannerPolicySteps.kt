@@ -69,7 +69,7 @@ internal object PolicyWorld {
  * in the check, the retention block of the stream form. The view model and the forms are the real ones over fakes ([PlannerDriver]); the check of the policy
  * notes runs the REAL `PlanCheck` and the REAL `ManagementBrokerPolicyReader` over the honest `FakeManagementBroker` (every request recorded in `CheckWorld.seen`).
  * What the screen draws (tags, error lines, the dropdowns) is pinned by the Compose tests `PolicyFormUiTest` and `StreamRetentionBlockUiTest`, not here.
- * Stand-ins until M9-12: "a plan opened from a file" puts the actions into the draft file and restarts the planner (`PendingStandIn`).
+ * M9-12: "a plan opened from a file" writes `0005.json` into the fake folder and clicks "Edit steps" on the real Migrations screen (`PlannerFiles`).
  */
 class PlannerPolicySteps {
     private val d get() = PlannerWorld.driver
@@ -148,6 +148,28 @@ class PlannerPolicySteps {
         d.newPlan()
         d.addWithWizard(form(name, "^orders", PolicyTarget.QUORUM_QUEUES, "0", key to value.toString()))
         assertEquals(listOf("Declare policy $name"), d.titles(), "the form did not add the policy: ${d.formProblems()}")
+    }
+
+    // ---- M9-12, gap 10: two policy steps of one name (owner decision O20) ----
+
+    @Given("the plan also holds a second policy {string} whose setting {string} is {int}")
+    fun secondPolicy(name: String, key: String, value: Int) {
+        d.addWithWizard(form(name, "^orders", PolicyTarget.QUORUM_QUEUES, "0", key to value.toString()))
+        assertEquals(2, d.plan.steps.size, "the form did not add the second policy: ${d.formProblems()}")
+    }
+
+    @Then("the second step carries the problem {string}")
+    fun secondStepProblem(message: String) {
+        val step = d.plan.steps[1].id
+        assertEquals(listOf(message to true), d.problems().filter { it.stepId == step }.map { it.message to it.blocking }, "problems of the second step")
+        assertTrue(PlannerScreens.forViewModel(d.vm).textOf("planStepProblem:1").orEmpty().contains(message), "the screen says: ${PlannerScreens.forViewModel(d.vm).textOf("planStepProblem:1")}")
+    }
+
+    @Then("the second step carries the note {string}")
+    fun secondStepNote(message: String) {
+        val step = d.plan.steps[1].id
+        assertEquals(listOf(message to false), d.problems().filter { it.stepId == step }.map { it.message to it.blocking }, "problems of the second step")
+        assertTrue(PlannerScreens.forViewModel(d.vm).textOf("planStepNote:1").orEmpty().contains(message), "the screen says: ${PlannerScreens.forViewModel(d.vm).textOf("planStepNote:1")}")
     }
 
     @Given("a plan with the policy {string} that applies to streams and whose setting {string} is {string}")
@@ -467,7 +489,7 @@ class PlannerPolicySteps {
     private fun savedRaw(): String {
         if (d.state.saved == null) {
             if (d.migrationsFolder.isEmpty()) d.chooseMigrationsFolder("/work/migrations", "0004")
-            d.vm.saveAsMigration()
+            d.saveNow()
         }
         val version = d.state.saved?.version ?: error("the plan was not saved; error: ${d.state.errorMessage}")
         return d.migrationFolder.files.getValue(version).rawJson
@@ -505,14 +527,14 @@ class PlannerPolicySteps {
         }
     }
 
-    private var original: MigrationAction.DeclarePolicy? = null
+    private val original: MigrationAction.DeclarePolicy?
+        get() = PlannerFiles.openedActions().singleOrNull() as? MigrationAction.DeclarePolicy
 
     @Given("a plan opened from a file with the policy {string} that holds {string} {string}")
     fun planFromFile(name: String, key: String, value: String) {
         val action = MigrationAction.DeclarePolicy(name, "^x", mapOf(key to ArgumentValue.Text(value)), vhost = d.vhost)
-        original = action
-        PendingStandIn.put(d, "0005", listOf(action))
-        PendingStandIn.open(d, "0005")
+        PlannerFiles.put("0005", listOf(action))
+        PlannerFiles.openInPlannerVia("0005")
     }
 
     @Then("the step {string} is shown read-only")

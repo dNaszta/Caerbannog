@@ -104,15 +104,19 @@ internal class UiRig(
     var nowMillis: Long = CHECK_TIME,
     /** M9-08: the read port for one policy of the broker (the check notes); null is a connection that gets none. */
     val policies: dev.caerbannog.core.planner.BrokerPolicyReader? = null,
+    /** M9-12: [dev.caerbannog.core.planner.PlannerMode.EditFile] opens a pending file of [folder] ("Edit steps"); the draft is then not read. */
+    private val mode: dev.caerbannog.core.planner.PlannerMode = dev.caerbannog.core.planner.PlannerMode.NewPlan,
+    /** M9-12: files that were in the folder before the app started, exactly as written. */
+    rawFiles: List<String> = emptyList(),
     prepare: UiRig.() -> Unit = {},
 ) {
     val folders = FakeMigrationFolders(folderPath)
-    val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
+    val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) }; rawFiles.forEach { f.addRaw(it) } }
     val settings = FakeAppSettings()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private fun build() = PlannerViewModel(
         store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
-        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies,
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies, mode = mode,
     )
 
     private var current: PlannerViewModel = build()

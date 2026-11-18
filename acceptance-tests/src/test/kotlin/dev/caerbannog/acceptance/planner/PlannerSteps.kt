@@ -36,10 +36,10 @@ class PlannerSteps {
     private val bindRow = Regex("^Bind (.+) to (.+) with (.+)$")
 
     @Before
-    fun setUp() { d = PlannerDriver(); PlannerWorld.driver = d }
+    fun setUp() { d = PlannerDriver(); PlannerWorld.driver = d; PlannerFiles.endScenario() }
 
     @After
-    fun tearDown() { PlannerScreens.endScenario(); d.close() }
+    fun tearDown() { PlannerScreens.endScenario(); PlannerFiles.endScenario(); d.close() }
 
     // ---- Background ----
 
@@ -150,6 +150,7 @@ class PlannerSteps {
             d.newPlan() // the planner is opened on the screen of the real composable: PlannerScreenSteps looks at it
         }
         "Keep the plan" -> d.vm.cancelQuestion()
+        "Discard changes" -> PlannerScreens.forViewModel(d.vm).click("planner:questionConfirmBtn") // M9-12: the question of leaving a file with changes
         "Start a new plan" -> d.vm.startNewPlan()
         "Continue plan" -> {
             assertTrue(d.entry() is PlannerEntry.ContinuePlan, "the Migrations screen offers ${d.entry()}, not \"Continue plan\"")
@@ -157,7 +158,8 @@ class PlannerSteps {
             d.vm
             Unit
         }
-        else -> error("no button \"$button\" is known to the steps")
+        "Copy into a new plan" -> PlannerFiles.chooseCopy() // M9-12: the real button of the Migrations screen, for the file that is selected
+        else -> if (button.startsWith("Save ")) PlannerEditFileSteps().chooseSave(button) else error("no button \"$button\" is known to the steps")
     }
 
     @When("I fill the {string} form with {}")
@@ -202,6 +204,8 @@ class PlannerSteps {
     @Then("I can choose {}")
     fun canChoose(list: String) {
         val expected = Regex("\"([^\"]*)\"").findAll(list).map { it.groupValues[1] }.toList()
+        // M9-12: the buttons of the action row of a selected file on the real Migrations screen
+        if (expected.isNotEmpty() && expected.all { it in listOf("Edit steps", "Edit file", "Copy into a new plan") }) return PlannerEditFileSteps().canChoose(expected)
         if (expected.size == 1 && expected.single() in listOf("New plan", "Continue plan")) {
             assertEquals(expected.single(), d.entry().label, "the button of the Migrations screen")
             return
@@ -260,7 +264,11 @@ class PlannerSteps {
             assertFalse(d.state.checkEnabled, "Check should be disabled")
             assertFalse(PlannerScreens.forViewModel(d.vm).isEnabled("planner:checkBtn"), "the Check button is enabled on the screen")
         }
-        else -> error("no button \"$button\" is known to the steps")
+        // M9-12: Save as migration and "Save 0005" are disabled by the state and on the real planner screen
+        else -> if (button == "Save as migration" || button.startsWith("Save ")) {
+            assertFalse(d.saveEnabled(), "$button should be disabled; the gate says ${d.saveGate()}")
+            assertFalse(PlannerScreens.forViewModel(d.vm).isEnabled("planner:saveBtn"), "the $button button is enabled on the screen")
+        } else error("no button \"$button\" is known to the steps")
     }
 
     @Then("{string} is enabled")
