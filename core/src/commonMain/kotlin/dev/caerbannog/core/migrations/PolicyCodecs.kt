@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 
+private val POLICY_KEYS = setOf("name", "pattern", "definition", "applyTo", "priority")
+
 private const val POLICY_NAME_REQUIRED = "policy name is required"
 
 /** What a policy and an operator policy have in common; both actions are built from it. */
@@ -41,6 +43,7 @@ private fun writePolicy(out: JsonObjectBuilder, name: String, pattern: String, d
 
 internal val declarePolicyCodec = codec<MigrationAction.DeclarePolicy>(
     name = "declarePolicy",
+    keys = POLICY_KEYS,
     read = { entry ->
         readPolicy(entry) { MigrationAction.DeclarePolicy(it.name, it.pattern, it.definition, it.vhost, it.applyTo, it.priority) }
     },
@@ -49,6 +52,7 @@ internal val declarePolicyCodec = codec<MigrationAction.DeclarePolicy>(
 
 internal val declareOperatorPolicyCodec = codec<MigrationAction.DeclareOperatorPolicy>(
     name = "declareOperatorPolicy",
+    keys = POLICY_KEYS,
     read = { entry ->
         readPolicy(entry) { MigrationAction.DeclareOperatorPolicy(it.name, it.pattern, it.definition, it.vhost, it.applyTo, it.priority) }
     },

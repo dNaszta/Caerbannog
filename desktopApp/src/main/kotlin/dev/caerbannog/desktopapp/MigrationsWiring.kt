@@ -123,6 +123,8 @@ fun AppComposition.createMigrationsViewModel(inputs: MigrationsInputs, scope: Co
         folderPorts = migrationFolderPorts,
         migrationUnavailableReason = inputs.unavailableReason,
         scope = scope,
+        // The applied history is per profile: a file applied on ANY saved profile of this machine is not edited (M9-12), read when the screen asks.
+        savedProfileNames = { viewModel.state.value.profiles.map { it.name } },
     )
 
 /** Stands in when there is no executor; the view model refuses to apply first, so this is the second lock, never the only one. */

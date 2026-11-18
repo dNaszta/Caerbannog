@@ -3,7 +3,10 @@ package dev.caerbannog.core.migrations.fakes
 import dev.caerbannog.core.migrations.FOLDER_READ_ONLY_MESSAGE
 import dev.caerbannog.core.migrations.FolderListing
 import dev.caerbannog.core.migrations.FolderProblem
+import dev.caerbannog.core.migrations.HistoryMoveResult
+import dev.caerbannog.core.migrations.HistoryResult
 import dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository
+import dev.caerbannog.core.migrations.MigrationHistoryRepository
 import dev.caerbannog.core.migrations.InvalidMigrationFile
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
@@ -110,8 +113,47 @@ class FakeMigrationFolder(
         return file
     }
 
-    override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult =
-        throw AssertionError("a saved migration is never rewritten: updateFile($version) was called")
+    /**
+     * M9-12: every [updateFile] attempt (version to the raw JSON it was given), in order, whatever its result. "Nothing was rewritten" is `updates.isEmpty()`.
+     * Honest like `FolderMigrationFileRepository.updateFile`: a read-only or unavailable folder, a file that is not there, text that does not parse and a
+     * version that differs from the file's all answer `Invalid` and write nothing; the file then holds the text as given (its bytes are the text).
+     */
+    val updates: MutableList<Pair<String, String>> = mutableListOf()
+
+    /** Versions rewritten by [updateFile], in order. */
+    val updated: MutableList<String> = mutableListOf()
+
+    override suspend fun updateFile(version: String, newRawJson: String): MigrationValidationResult {
+        updates += version to newRawJson
+        unavailable?.let { return MigrationValidationResult.Invalid(it.message) }
+        if (readOnly) return MigrationValidationResult.Invalid(FOLDER_READ_ONLY_MESSAGE)
+        if (version !in files) return MigrationValidationResult.Invalid("the file could not be written")
+        failingVersions[version]?.let { return MigrationValidationResult.Invalid(it) }
+        val result = MigrationParser.parse(newRawJson)
+        if (result !is MigrationValidationResult.Valid) return result
+        if (result.migration.version != version) return MigrationValidationResult.Invalid("the version in the text must stay the same")
+        files[version] = result.migration
+        updated += version
+        return result
+    }
+
+    /** A valid file exactly as [rawJson] says (hand-written: key order, extra keys, layout), as it was in the folder before the app started. */
+    fun addRaw(rawJson: String): FakeMigrationFolder = apply {
+        val migration = (MigrationParser.parse(rawJson) as? MigrationValidationResult.Valid)?.migration
+            ?: error("the scenario's own file is not a valid migration: ${(MigrationParser.parse(rawJson) as MigrationValidationResult.Invalid).reason}")
+        files[migration.version] = migration
+    }
+
+    /** Someone else rewrote the file in the folder (not the app): no attempt is recorded. */
+    fun changeOnDisk(version: String, rawJson: String) {
+        require(version in files) { "no file $version to change" }
+        addRaw(rawJson)
+    }
+
+    /** Someone else removed the file from the folder. */
+    fun deleteOnDisk(version: String) {
+        files.remove(version)
+    }
 
     override suspend fun nextVersion(): String = ((files.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString().padStart(4, '0')
 }
@@ -123,7 +165,7 @@ class FakeMigrationFolder(
 class FakeMigrationFolders(initialFolder: String? = null, vararg chooserAnswers: String?) {
     val store = InMemoryMigrationFolderStore(initialFolder)
     val chooser = FakeMigrationFolderChooser(*chooserAnswers)
-    val history = InMemoryMigrationHistoryRepository()
+    val history = SwitchableHistory()
     private val byPath = mutableMapOf<String, FakeMigrationFolder>()
     val repositoriesAsked = mutableListOf<String>()
 
@@ -136,4 +178,28 @@ class FakeMigrationFolders(initialFolder: String? = null, vararg chooserAnswers:
         repositoryFor = { path -> repositoriesAsked += path; folder(path) },
         history = history,
     )
+}
+
+/**
+ * M9-12: the one applied-history file of the machine, in memory. [unreadable] makes `load` answer [HistoryResult.Unreadable] (as `JsonFileMigrationHistoryRepository`
+ * does for a file that is not valid), until [moveAside] has been called, which then leaves an empty history (the old file is kept: [movedAside]).
+ * `getAppliedMigrations` answers what was recorded either way, as the real repository's default does not read the file's state.
+ */
+class SwitchableHistory(private val inner: InMemoryMigrationHistoryRepository = InMemoryMigrationHistoryRepository()) : MigrationHistoryRepository {
+    var unreadable: Boolean = false
+    var movedAside: Int = 0
+        private set
+
+    override suspend fun getAppliedMigrations(profileName: String): Map<String, String> = inner.getAppliedMigrations(profileName)
+    override suspend fun recordApplied(profileName: String, version: String, checksum: String) = inner.recordApplied(profileName, version, checksum)
+    override suspend fun load(profileName: String): HistoryResult =
+        if (unreadable) HistoryResult.Unreadable("/home/test/.caerbannog/migration-history.json", "The file is not valid JSON") else inner.load(profileName)
+    override fun asideFileName(): String = "migration-history.json.unreadable-20261118-100000"
+    override suspend fun moveAside(): HistoryMoveResult {
+        if (!unreadable) return HistoryMoveResult.Failed("There is no unreadable history to move aside")
+        unreadable = false
+        inner.clear()
+        movedAside++
+        return HistoryMoveResult.Moved(asideFileName())
+    }
 }

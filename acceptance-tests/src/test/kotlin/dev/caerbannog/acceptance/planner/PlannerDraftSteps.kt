@@ -195,7 +195,7 @@ class PlannerDraftSteps {
 
     @Then("{string} still has exactly its original bytes")
     fun originalBytesKept(fileName: String) {
-        val original = originalBytes[fileName] ?: error("no original bytes were noted for $fileName")
+        val original = originalBytes[fileName] ?: PlannerFiles.originals[fileName] ?: error("no original bytes were noted for $fileName")
         assertEquals(original, d.migrationFolder.files.getValue(fileName.removeSuffix(".json")).rawJson)
     }
 

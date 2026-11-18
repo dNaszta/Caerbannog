@@ -31,3 +31,10 @@ sealed interface HistoryKeyResult {
 /** A migration file could not be written; [reason] is fixed text, never file content or a system message. */
 class MigrationWriteException(val reason: String) : Exception(reason)
 
+
+/**
+ * The profiles in [profileNames] that have [version] in their applied history, in that order. Read only. The version is the key, not the checksum:
+ * a file changed after it was applied still counts as applied.
+ */
+suspend fun appliedOn(version: String, profileNames: List<String>, history: MigrationHistoryRepository): List<String> =
+    profileNames.filter { version in history.getAppliedMigrations(it) }

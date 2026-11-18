@@ -375,6 +375,53 @@ object PlannerTexts {
     const val KEEP_AT_MOST_LABEL: String = "Keep at most (bytes)"
     const val RETENTION_RESPONSE_TICK: String = "Same retention for the response stream"
 
+    // ---- M9-12: a pending file opened as steps ("Edit steps"), and policy steps that declare one name twice ----
+
+    const val PLANNER_TITLE: String = "Topology planner"
+    const val SAVE_AS_MIGRATION_LABEL: String = "Save as migration"
+    const val DISCARD_CHANGES_LABEL: String = "Discard changes"
+    const val KEEP_EDITING_LABEL: String = "Keep editing"
+    const val CLOSE_LABEL: String = "Close"
+    const val UNSAVED_CHANGES: String = "Unsaved changes"
+    const val NOTHING_CHANGED_YET: String = "Nothing has changed yet"
+    const val ACCESS_FILE_NOT_PLANNED: String = "This file holds virtual hosts, users or permissions. The planner works on topology only."
+    const val UNKNOWN_ENTRIES: String = "This file holds entries the planner does not know. Edit it as JSON so nothing is lost."
+    const val APPLIED_DETAIL: String = "Changing an applied file would mark it as modified there. Copy its steps into a new plan instead."
+    const val COPY_BLOCKED_BY_DRAFT: String = "The current plan file could not be read. Open the planner and move it aside first."
+    const val FILE_CHANGED_DETAIL: String = "It was not overwritten. Open it again to edit the new content."
+    const val COPY_OVER_DRAFT_CONFIRM_LABEL: String = "Dismiss and copy"
+
+    fun titleOf(version: String?): String = if (version == null) PLANNER_TITLE else "$PLANNER_TITLE \u00b7 $version"
+
+    fun saveLabelOf(version: String?): String = if (version == null) SAVE_AS_MIGRATION_LABEL else "Save $version"
+
+    fun editingPill(version: String): String = "Editing $version.json"
+
+    fun appliedElsewhere(version: String, profile: String): String =
+        "$version is applied on ${if (echoableName(profile)) profile else "a connection of this machine"}, so it is not edited"
+
+    fun historyUnreadableSoUnknown(version: String): String =
+        "The applied history cannot be read, so it is not known where ${named(version, "this file")} is applied."
+
+    fun discardChangesQuestion(version: String): String = "Discard the changes to ${named(version, "this file")}?"
+
+    fun copyOverDraftQuestion(version: String): String =
+        "Dismiss the current plan and copy ${named(version, "this file")} into a new plan?"
+
+    fun fileChangedOnDisk(version: String): String = "$version.json changed on disk since it was opened"
+
+    /** The sentences of a policy declared twice in one plan (owner decision O20); [what] is "policy" or "operator policy". */
+    fun policyDeclaredWithOtherSettings(what: String, name: String): String =
+        "The plan already declares ${kindAndName(what, name)} with other settings"
+
+    fun policyDeclaredTwice(what: String, name: String): String =
+        "The plan declares ${kindAndName(what, name)} twice with the same settings"
+
+    private fun kindAndName(what: String, name: String): String {
+        val article = if (what.first() in "aeiou") "an" else "a"
+        return if (echoableName(name)) "the $what $name" else "$article $what of that name"
+    }
+
     private fun named(name: String, fallback: String): String = if (echoableName(name)) name else fallback
 
     private fun subject(name: String, fallback: String): String = if (echoableName(name)) name else fallback

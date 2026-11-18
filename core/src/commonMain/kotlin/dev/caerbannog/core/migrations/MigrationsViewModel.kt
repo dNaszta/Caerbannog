@@ -1,6 +1,8 @@
 package dev.caerbannog.core.migrations
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.planner.PlanOpening
+import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.core.streams.CatalogResult
 import dev.caerbannog.core.topology.TopologyCatalog
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +47,8 @@ data class MigrationsScreenState(
     val hasMqtt: Boolean = false,
     /** M9-10b: the declared permission allows test publishing; false while the permission check is not finished. */
     val publishingEnabled: Boolean = false,
+    /** M9-12: whether the selected file may be opened as steps ("Edit steps"), or the fixed text that stands in place of the button. */
+    val planOpening: PlanOpeningDecision = PlanOpeningDecision.Openable,
 ) {
     /** True when a folder is chosen and exists, so "Show folder" has something to open; decided by the typed problem, never by text. */
     val canShowFolder: Boolean
@@ -86,6 +90,8 @@ class MigrationsViewModel(
     /** Non-null disables Apply pending and Apply single (import, export and the dry run keep working). */
     private val migrationUnavailableReason: String? = null,
     private val scope: CoroutineScope,
+    /** M9-12: every saved profile of this machine; the applied history is per profile, and a file applied on any of them is not edited. */
+    private val savedProfileNames: () -> List<String> = { emptyList() },
 ) {
     private val _state = MutableStateFlow(
         MigrationsScreenState(
@@ -131,6 +137,7 @@ class MigrationsViewModel(
             } ?: entries.firstOrNull()
 
             val selectedFile = selected?.file
+            val planOpening = planOpeningOf(selectedFile, historyProblem)
             val dryRun = selectedFile?.let {
                 runner.dryRun(it, hasConfigurePermission, controlLevel, vhost, userTags)
             }
@@ -169,12 +176,24 @@ class MigrationsViewModel(
                     folder = folder,
                     invalidFiles = (listing as? FolderListing.Listed)?.invalid.orEmpty(),
                     historyProblem = historyProblem,
+                    planOpening = planOpening,
                     isImportEnabled = canWrite,
                     isExportEnabled = canWrite,
                     unavailableReason = migrationUnavailableReason,
                 )
             }
         }
+    }
+
+    /**
+     * The decision of [PlanOpening] for [file], from the history of every saved profile (the current one always counts). The history is read through
+     * `getAppliedMigrations` only, and not at all while the history file cannot be read: the refusal then says so instead of guessing.
+     */
+    private suspend fun planOpeningOf(file: MigrationFile?, historyProblem: HistoryUnreadable?): PlanOpeningDecision {
+        if (file == null) return PlanOpeningDecision.Openable
+        val profiles = (savedProfileNames() + profileName).distinct()
+        val where = if (historyProblem == null && folderPorts != null) appliedOn(file.version, profiles, folderPorts.history) else emptyList()
+        return PlanOpening.decide(file, rawKeysKnown = !MigrationParser.hasUnknownKeys(file.rawJson), appliedOn = where, historyProblem = historyProblem)
     }
 
     /** [forFile]: an access file does not need the configure permission (its dry run decides by tag and level); null asks about a topology file. */
@@ -208,11 +227,13 @@ class MigrationsViewModel(
             val canApplySingle = entry?.status is MigrationStatus.Pending &&
                 (dryRun?.canApply == true) &&
                 mayChangeTopology(forFile = file.up.any { it.isBrokerLevel } == true)
+            val planOpening = planOpeningOf(file, _state.value.historyProblem)
 
             _state.update { current ->
                 current.copy(
                     selectedVersion = version,
                     selectedFile = file,
+                    planOpening = planOpening,
                     dryRun = dryRun,
                     isApplySingleEnabled = canApplySingle,
                     errorMessage = null,

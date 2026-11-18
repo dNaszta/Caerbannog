@@ -33,9 +33,13 @@ internal class PlannerRig(
     var nowMillis: Long = 1_700_000_000_000L,
     /** M9-08: the read port for one policy of the broker (the check notes); null is a connection that gets none (a 3.x broker, or not connected). */
     val policies: BrokerPolicyReader? = null,
+    /** M9-12: [PlannerMode.NewPlan] (the draft) or [PlannerMode.EditFile] (a pending file of [folder], opened by "Edit steps"). */
+    var mode: PlannerMode = PlannerMode.NewPlan,
+    /** M9-12: files that were in the folder before the app started, exactly as written (hand-written layout and keys kept); added before the view model is built. */
+    rawFiles: List<String> = emptyList(),
 ) {
     val folders = FakeMigrationFolders(folderPath)
-    val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) } }
+    val folder: FakeMigrationFolder = folders.folder(folderPath ?: FOLDER).allowExport().also { f -> latest?.let { f.addMigration(it) }; rawFiles.forEach { f.addRaw(it) } }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     var vm: PlannerViewModel = build()
@@ -43,13 +47,14 @@ internal class PlannerRig(
 
     private fun build() = PlannerViewModel(
         store, folders.ports, settings, context, scope, descriptionDebounceMillis = 0, reader = reader,
-        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies,
+        declareCheck = declareCheck, clock = RefreshClock { nowMillis }, policies = policies, mode = mode,
     )
 
     /** The app is closed and opened again, or the window rebuilt the view model for a changed [context] (or, for the same profile, a new check port). */
-    fun restart(newContext: PlannerContext = context, newDeclareCheck: DeclareCheck? = declareCheck): PlannerViewModel {
+    fun restart(newContext: PlannerContext = context, newDeclareCheck: DeclareCheck? = declareCheck, newMode: PlannerMode = mode): PlannerViewModel {
         context = newContext
         declareCheck = newDeclareCheck
+        mode = newMode
         vm = build()
         return vm
     }

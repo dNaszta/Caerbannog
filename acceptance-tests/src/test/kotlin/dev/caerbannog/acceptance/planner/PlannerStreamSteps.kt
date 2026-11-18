@@ -393,13 +393,12 @@ class PlannerStreamSteps {
         assertEquals(emptyList(), d.executor.executedActions, "a click on the note reached the broker")
     }
 
-    // ---- a saved file (stand-ins until M9-12) ----
+    // ---- a saved file: a real pending file in the fake folder, opened by "Edit steps" on the Migrations screen (M9-12; the stand-ins are gone) ----
 
-    // Stand-in until M9-12 (open a pending file as steps), like the two Givens of M9-07 and the three of M9-10: puts the file's actions in the draft file.
     @Given("a pending migration {string} that declares the streams {string} and {string} and binds {string} to {string} with routing key {string}")
     fun pendingPairWithRoute(version: String, first: String, second: String, exchange: String, destination: String, key: String) {
-        PendingStandIn.put(
-            d, version,
+        PlannerFiles.put(
+            version,
             listOf(
                 MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost),
                 MigrationAction.DeclareBinding(exchange, destination, key, vhost = d.vhost),
@@ -415,38 +414,6 @@ class PlannerStreamSteps {
 
     @Given("a pending migration {string} that declares the streams {string} and {string}")
     fun pendingStreams(version: String, first: String, second: String) {
-        PendingStandIn.put(d, version, listOf(MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost)))
-    }
-
-    @When("I choose {string} for {string}")
-    fun chooseFor(button: String, version: String) {
-        assertEquals("Edit steps", button, "this stand-in knows one button; M9-12 binds the real ones")
-        PendingStandIn.open(d, version)
-    }
-}
-
-/**
- * The one stand-in for M9-12 ("Edit steps" opens a pending file as steps), shared by every step class of the planner glue: [put] writes the actions of
- * the pending file into the draft file, [open] restarts the planner on it. M9-12 binds the sentence `I choose {string} for {string}` to the real
- * Migrations screen and must replace [open] (and the Givens that call [put]), not add a second step.
- */
-internal object PendingStandIn {
-    private var version: String? = null
-    private var count = 0
-
-    /** The one binding a Given put (M9-10, M9-11): "saving writes the binding back unchanged" compares the saved file with it. */
-    var binding: MigrationAction? = null
-
-    fun put(d: PlannerDriver, version: String, actions: List<MigrationAction>) {
-        this.version = version
-        count = actions.size
-        d.store.putDraft("", actions)
-    }
-
-    fun open(d: PlannerDriver, version: String) {
-        assertEquals(this.version, version, "no pending migration \"$version\" was put by a Given")
-        d.restart()
-        assertNotNull(d.vm)
-        assertTrue(d.plan.steps.size == count, "the file's steps were not opened: ${d.titles()}")
+        PlannerFiles.put(version, listOf(MigrationAction.DeclareStream(first, vhost = d.vhost), MigrationAction.DeclareStream(second, vhost = d.vhost)))
     }
 }

@@ -10,6 +10,7 @@ internal inline fun <reified A : MigrationAction> namedCodec(
     crossinline nameOf: (A) -> String,
 ): ActionCodec = codec<A>(
     name = name,
+    keys = setOf("name"),
     read = { entry ->
         val actionName = entry.identifier("name")
         if (actionName.isNullOrBlank()) refused(missingNameMessage) else accepted(create(actionName, entry.vhost()))
@@ -25,6 +26,7 @@ internal val deletePolicyCodec = namedCodec("deletePolicy", "policy name is requ
 /** `declareStream` carries the four settings of [StreamSettingRules] as typed arguments; a file without `arguments` is read and written as before. */
 internal val declareStreamCodec = codec<MigrationAction.DeclareStream>(
     name = "declareStream",
+    keys = setOf("name", "arguments"),
     read = { entry ->
         val name = entry.identifier("name")
         val arguments = entry.typedEntries("arguments")

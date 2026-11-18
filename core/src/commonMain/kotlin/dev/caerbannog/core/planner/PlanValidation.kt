@@ -14,24 +14,41 @@ object PlanValidation {
     fun problems(plan: TopologyPlan, known: KnownTopology = KnownTopology.None): List<PlanProblem> =
         duplicates(plan) + bindingsBeforeTheirTargets(plan) + parserRoundTrip(plan) + PlanPolicyNotes.of(plan, known)
 
-    /** The same queue, exchange or stream declared again, and a queue and a stream of one name. The later step carries the problem. */
+    /**
+     * The same queue, exchange or stream declared again, a queue and a stream of one name, and the same policy or operator policy twice (M9-12, owner
+     * decision O20: a policy is tracked by virtual host, kind and name). The later step carries the problem.
+     */
     private fun duplicates(plan: TopologyPlan): List<PlanProblem> {
         val result = mutableListOf<PlanProblem>()
         val declared = mutableListOf<Pair<PlanStep, Declared>>()
         for (step in plan.steps) {
             val now = declaredBy(step.action) ?: continue
-            val earlier = declared.firstOrNull { (_, d) -> d.name == now.name && (d.kind == now.kind || d.isQueueOrStream() && now.isQueueOrStream()) }
+            val earlier = declared.firstOrNull { (_, d) ->
+                d.name == now.name && (d.kind == now.kind || d.isQueueOrStream() && now.isQueueOrStream()) && (!now.isPolicy() || d.vhost == now.vhost)
+            }
             if (earlier != null) {
                 val (_, before) = earlier
                 result += when {
                     before.kind != now.kind -> PlanProblem(step.id, PlannerTexts.queueAndStreamOfOneName(now.name), blocking = true)
-                    before.action != now.action -> PlanProblem(step.id, PlannerTexts.declaredWithOtherSettings(now.name), blocking = true)
-                    else -> PlanProblem(step.id, PlannerTexts.declaredTwice(now.name), blocking = false)
+                    before.action != now.action -> PlanProblem(step.id, otherSettings(now), blocking = true)
+                    else -> PlanProblem(step.id, twice(now), blocking = false)
                 }
             }
             declared += step to now
         }
         return result
+    }
+
+    private fun otherSettings(now: Declared): String = when (now.kind) {
+        Kind.POLICY -> PlannerTexts.policyDeclaredWithOtherSettings("policy", now.name)
+        Kind.OPERATOR_POLICY -> PlannerTexts.policyDeclaredWithOtherSettings("operator policy", now.name)
+        else -> PlannerTexts.declaredWithOtherSettings(now.name)
+    }
+
+    private fun twice(now: Declared): String = when (now.kind) {
+        Kind.POLICY -> PlannerTexts.policyDeclaredTwice("policy", now.name)
+        Kind.OPERATOR_POLICY -> PlannerTexts.policyDeclaredTwice("operator policy", now.name)
+        else -> PlannerTexts.declaredTwice(now.name)
     }
 
     private fun bindingsBeforeTheirTargets(plan: TopologyPlan): List<PlanProblem> {
@@ -66,18 +83,21 @@ object PlanValidation {
         return listOf(PlanProblem(null, reason, blocking = true))
     }
 
-    private enum class Kind { QUEUE, EXCHANGE, STREAM }
+    private enum class Kind { QUEUE, EXCHANGE, STREAM, POLICY, OPERATOR_POLICY }
 
     private class Need(val kind: String, val name: String, val accepts: (Declared) -> Boolean)
 
-    private class Declared(val kind: Kind, val name: String, val action: MigrationAction) {
+    private class Declared(val kind: Kind, val name: String, val action: MigrationAction, val vhost: String = action.vhost) {
         fun isQueueOrStream(): Boolean = kind == Kind.QUEUE || kind == Kind.STREAM
+        fun isPolicy(): Boolean = kind == Kind.POLICY || kind == Kind.OPERATOR_POLICY
     }
 
     private fun declaredBy(action: MigrationAction): Declared? = when (action) {
         is MigrationAction.DeclareQueue -> Declared(Kind.QUEUE, action.name, action)
         is MigrationAction.DeclareExchange -> Declared(Kind.EXCHANGE, action.name, action)
         is MigrationAction.DeclareStream -> Declared(Kind.STREAM, action.name, action)
+        is MigrationAction.DeclarePolicy -> Declared(Kind.POLICY, action.name, action)
+        is MigrationAction.DeclareOperatorPolicy -> Declared(Kind.OPERATOR_POLICY, action.name, action)
         else -> null
     }
 }

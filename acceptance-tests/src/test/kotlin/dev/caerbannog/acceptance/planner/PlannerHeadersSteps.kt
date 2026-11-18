@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
  * `BindingFormHeadersUiTest`. No broker: nothing here can send a request. A binding is built from the plan's own exchange and queue unless the
  * sentence names them.
  *
- * Stand-ins until M9-12: the two Givens "a pending migration ... with the arguments ..." use `PendingStandIn` like the M9-10 ones.
+ * M9-12: the two Givens "a pending migration ... with the arguments ..." write a real pending file (`PlannerFiles.put`) like the M9-10 ones.
  */
 class PlannerHeadersSteps {
     private val d get() = PlannerWorld.driver
@@ -246,12 +246,11 @@ class PlannerHeadersSteps {
         }
     }
 
-    // ---- a pending file (stand-ins until M9-12) ----
+    // ---- a pending file: a real file in the fake folder, opened by "Edit steps" (M9-12) ----
 
     private fun pending(version: String, exchange: String, queue: String, arguments: Map<String, ArgumentValue>) {
         val action = MigrationAction.DeclareBinding(exchange = exchange, queue = queue, vhost = d.vhost, arguments = arguments)
-        PendingStandIn.binding = action
-        PendingStandIn.put(d, version, listOf(action))
+        PlannerFiles.put(version, listOf(action))
     }
 
     @Given("a pending migration {string} with a binding from the headers exchange {string} to the queue {string} with the arguments {string} {string} and {string} {string}")

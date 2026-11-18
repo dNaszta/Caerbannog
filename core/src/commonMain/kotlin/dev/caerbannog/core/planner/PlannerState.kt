@@ -93,6 +93,20 @@ sealed interface PlannerQuestion {
         override val cancelLabel: String get() = "Keep the plan"
     }
 
+    /** Leaving a file that has unsaved changes (M9-12). Nothing is written when it is confirmed: the file stays as it was. */
+    data class DiscardChanges(val version: String) : PlannerQuestion {
+        override val text: String get() = PlannerTexts.discardChangesQuestion(version)
+        override val confirmLabel: String get() = PlannerTexts.DISCARD_CHANGES_LABEL
+        override val cancelLabel: String get() = PlannerTexts.KEEP_EDITING_LABEL
+    }
+
+    /** Asked on the Migrations screen before the steps of [version] replace a draft that has steps (M9-12). */
+    data class CopyOverDraft(val version: String) : PlannerQuestion {
+        override val text: String get() = PlannerTexts.copyOverDraftQuestion(version)
+        override val confirmLabel: String get() = PlannerTexts.COPY_OVER_DRAFT_CONFIRM_LABEL
+        override val cancelLabel: String get() = "Keep the plan"
+    }
+
     data class StartNewPlan(val asideFileName: String) : PlannerQuestion {
         override val text: String get() = PlannerTexts.startNewPlanQuestion(asideFileName)
         override val confirmLabel: String get() = "Move file and start"
@@ -179,7 +193,19 @@ data class PlannerState(
     val connectionName: String? = null,
     /** Why the check cannot start, in the order of `PlanCheck.run`; null when it can. A hand-made state has no port, so it says so. */
     val checkDisabledReason: String? = PlanCheck.NO_CHECK,
+    /** M9-12: a new plan, or a pending file opened as steps. */
+    val mode: PlannerMode = PlannerMode.NewPlan,
+    /** M9-12: in file mode, the steps or the description differ from the file as opened; always false for a new plan. */
+    val hasChanges: Boolean = false,
 ) {
+    private val fileVersion: String? get() = (mode as? PlannerMode.EditFile)?.version
+
+    /** "Topology planner", or "Topology planner · 0005" on a file. */
+    val title: String get() = PlannerTexts.titleOf(fileVersion)
+
+    /** "Save as migration", or "Save 0005" on a file. */
+    val saveLabel: String get() = PlannerTexts.saveLabelOf(fileVersion)
+
     val description: String get() = plan.description
 
     /** The plan is not a migration until it is saved (spec A3). */
@@ -204,7 +230,13 @@ data class PlannerState(
     val blockingCount: Int get() = problems.count { it.blocking }
 
     /** The second line of the error banner, for the one error that has it. */
-    val errorDetail: String? get() = if (errorMessage == PlannerTexts.FILE_NOT_WRITTEN) PlannerTexts.FILE_NOT_WRITTEN_DETAIL else null
+    val errorDetail: String?
+        get() = when {
+            // The draft sentence would be wrong for a file: its steps are not a draft, and the file may be as it was.
+            errorMessage == PlannerTexts.FILE_NOT_WRITTEN -> if (mode is PlannerMode.NewPlan) PlannerTexts.FILE_NOT_WRITTEN_DETAIL else null
+            fileVersion?.let { errorMessage == PlannerTexts.fileChangedOnDisk(it) } == true -> PlannerTexts.FILE_CHANGED_DETAIL
+            else -> null
+        }
 
     /** The button: usable when nothing says otherwise and no check runs. A running check has no reason; the progress banner is the explanation. */
     val checkEnabled: Boolean get() = checkDisabledReason == null && check !is CheckState.Running

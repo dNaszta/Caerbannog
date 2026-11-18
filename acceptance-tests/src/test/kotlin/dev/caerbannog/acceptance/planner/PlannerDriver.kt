@@ -24,6 +24,7 @@ import dev.caerbannog.core.planner.PolicyForm
 import dev.caerbannog.core.planner.PlanStep
 import dev.caerbannog.core.planner.PlannerContext
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerTexts
@@ -71,6 +72,12 @@ class PlannerDriver {
     var unavailableReason: String? = null
     var controlLevel = TopologyControlLevel.FULL_CONTROL
     var migrationsFolder = ""
+
+    /** M9-12: [PlannerMode.NewPlan] (the draft) or [PlannerMode.EditFile] ("Edit steps" on a pending file); a restart keeps it, `newPlan` resets it. */
+    var mode: PlannerMode = PlannerMode.NewPlan
+
+    /** M9-12: the other saved profiles of this machine; their history is in [folders]`.history`, which "applied on any connection" reads. */
+    var otherProfiles: List<String> = emptyList()
 
     /** M9-05: what the Migrations screen applies with; the recording fake unless a scenario puts the real executor over the honest management API. */
     var migrationExecutor: dev.caerbannog.core.migrations.TopologyMigrationExecutor? = null
@@ -123,6 +130,7 @@ class PlannerDriver {
         ), scope, descriptionDebounceMillis = 0, reader = readerForNewViewModel(),
             declareCheck = if (connected && unavailableReason == null) (declareChecks[profile] ?: realDeclareCheck) else null, clock = RefreshClock { nowMillis },
             policies = if (connected && unavailableReason == null) policyReader else null,
+            mode = mode,
         ).also { created ->
             current = created
             scope.launch { created.state.collect { s -> s.question?.let { q -> if (questions.lastOrNull() != q) questions += q } } }
@@ -160,6 +168,7 @@ class PlannerDriver {
         controlLevel = controlLevel,
         folderPorts = folders.ports,
         scope = scope,
+        savedProfileNames = { (listOf(profile) + otherProfiles).distinct() },
     )
 
     /** The button of the Migrations screen, from what the draft store answers. */
@@ -180,7 +189,7 @@ class PlannerDriver {
 
     fun context() = FormContext(plan = plan, namingStyle = state.namingStyle, known = known)
 
-    fun newPlan() { restart(); vm }
+    fun newPlan() { mode = PlannerMode.NewPlan; restart(); vm }
 
     fun openWizard() = vm.openWizard()
 
@@ -204,6 +213,15 @@ class PlannerDriver {
     fun summaryTitle(): String = PlannerTexts.summaryTitle(summaryActions().size)
 
     fun addToPlan() = vm.addToPlan()
+
+    /**
+     * "Save": a plan opened from a file can be saved only after a change (M9-12), so a step that wants to look at the file the save writes (and not at the
+     * change) makes the smallest one first: a word after the description. The actions are not touched.
+     */
+    fun saveNow() {
+        if (state.mode is PlannerMode.EditFile && !state.hasChanges) vm.setDescription(state.description + " (edited)")
+        vm.saveAsMigration()
+    }
 
     fun cancelWizard() = vm.cancelWizard()
 
