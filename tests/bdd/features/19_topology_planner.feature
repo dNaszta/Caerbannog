@@ -606,3 +606,26 @@ Feature: Topology planner
     And the pending migration "0005" is open in the planner
     When I save "0005" and open the Migrations screen
     Then "Continue plan" still offers the draft with 3 steps
+
+  # ---- M9-12, gap 10 of M9-08: two policy steps of one name (the wording needs the owner's OK; the proposed text is in the scenarios) ----
+
+  @m9-12 @needs-decision @fake-broker
+  Scenario: Two policy steps of one name with other settings are refused
+    Given a plan with the policy "orders-dlx" whose setting "max-length" is 1000
+    And the plan also holds a second policy "orders-dlx" whose setting "max-length" is 2000
+    Then the second step carries the problem "The plan already declares the policy orders-dlx with other settings"
+    And "Save as migration" is disabled
+
+  @m9-12 @needs-decision @fake-broker
+  Scenario: Two identical policy steps are pointed out but do not block
+    Given a plan with the policy "orders-dlx" whose setting "max-length" is 1000
+    And the plan also holds a second policy "orders-dlx" whose setting "max-length" is 1000
+    Then the second step carries the note "The plan declares the policy orders-dlx twice with the same settings"
+    And "Save as migration" is enabled
+
+  @m9-12 @needs-decision @fake-broker
+  Scenario: A hand-written file with two policies of one name opens with the problem
+    Given a pending migration "0008" that declares the policy "orders-dlx" twice with different settings
+    When I choose "Edit steps" for "0008"
+    Then the second step carries the problem "The plan already declares the policy orders-dlx with other settings"
+    And "Save 0008" is disabled
