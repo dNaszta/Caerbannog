@@ -63,6 +63,7 @@ import dev.caerbannog.core.connections.ConnectionControlState
 import dev.caerbannog.core.planner.CheckState
 import dev.caerbannog.core.planner.NamingStyle
 import dev.caerbannog.core.planner.PlannerBanner
+import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.PlannerState
 import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.core.planner.ReviewView
@@ -137,15 +138,24 @@ fun PlannerScreen(
         }
     }
 
+    // A file with unsaved changes is never left silently, by the menu or the app bar either: the same question as Discard changes is asked, and a
+    // confirmed discard closes the planner through the state (to Migrations, not to the item that was asked for).
+    val fileWithChanges = state.mode is PlannerMode.EditFile && state.hasChanges
+    val navigate: (AppDestination) -> Unit = { destination -> if (fileWithChanges) events.dismiss() else onNavigate(destination) }
+
     AppFrameLayout(
-        title = "Topology planner",
+        title = state.title,
         modifier = modifier,
-        onNavigate = onNavigate,
+        onNavigate = navigate,
         actions = { PlannerActions(state, events) },
         chip = { ConnectionControl(control, controlEvents) },
         activeItem = AppDestination.Migrations.name,
         leading = {
-            IconButton(onClick = { onNavigate(AppDestination.Migrations) }, modifier = Modifier.testTag("planner:backBtn")) {
+            // A file is left through "dismiss" (the view model closes at once without a change, and asks with one); a new plan keeps its draft and goes.
+            IconButton(
+                onClick = { if (state.mode is PlannerMode.EditFile) events.dismiss() else onNavigate(AppDestination.Migrations) },
+                modifier = Modifier.testTag("planner:backBtn"),
+            ) {
                 ConnectionIcon(AppIcon.ArrowBack, IconSize, contentDescription = "Back to Migrations")
             }
         },
@@ -172,14 +182,23 @@ fun PlannerScreen(
 @Composable
 private fun PlannerActions(state: PlannerState, events: PlannerEvents) {
     if (state.isLocked) return
-    TextButton(
-        onClick = events::dismiss,
-        enabled = state.canDismiss,
-        modifier = Modifier.testTag("planner:dismissBtn"),
-    ) {
-        ConnectionIcon(AppIcon.DeleteSweep, SmallIconSize)
-        Spacer(Modifier.width(8.dp))
-        Text(PlannerTexts.DISMISS_LABEL)
+    if (state.mode is PlannerMode.EditFile) {
+        // Nothing is discarded while nothing changed, so the word "Discard" would only alarm: the button then reads "Close".
+        TextButton(onClick = events::dismiss, modifier = Modifier.testTag("planner:discardBtn")) {
+            ConnectionIcon(AppIcon.Close, SmallIconSize)
+            Spacer(Modifier.width(8.dp))
+            Text(if (state.hasChanges) PlannerTexts.DISCARD_CHANGES_LABEL else PlannerTexts.CLOSE_LABEL)
+        }
+    } else {
+        TextButton(
+            onClick = events::dismiss,
+            enabled = state.canDismiss,
+            modifier = Modifier.testTag("planner:dismissBtn"),
+        ) {
+            ConnectionIcon(AppIcon.DeleteSweep, SmallIconSize)
+            Spacer(Modifier.width(8.dp))
+            Text(PlannerTexts.DISMISS_LABEL)
+        }
     }
     val checkReason = state.checkDisabledReason
     val check: @Composable () -> Unit = {
@@ -197,7 +216,7 @@ private fun PlannerActions(state: PlannerState, events: PlannerEvents) {
     ) {
         ConnectionIcon(AppIcon.Save, SmallIconSize)
         Spacer(Modifier.width(8.dp))
-        Text("Save as migration")
+        Text(state.saveLabel)
     }
 }
 
@@ -315,12 +334,30 @@ private fun PlanHeader(state: PlannerState, events: PlannerEvents, onEdited: () 
         )
         VirtualHostPill(state.plan.vhost, events)
         NamingChip(state.namingStyle, events)
-        Pill(
-            label = state.draftLabel,
-            background = MaterialTheme.colorScheme.tertiaryContainer,
-            textColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier.testTag("planner:draftPill"),
-        )
+        val file = state.mode as? PlannerMode.EditFile
+        if (file == null) {
+            Pill(
+                label = state.draftLabel,
+                background = MaterialTheme.colorScheme.tertiaryContainer,
+                textColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.testTag("planner:draftPill"),
+            )
+        } else {
+            Pill(
+                label = PlannerTexts.editingPill(file.version),
+                background = MaterialTheme.colorScheme.secondaryContainer,
+                textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.testTag("planner:editPill"),
+            )
+            if (state.hasChanges) {
+                Pill(
+                    label = PlannerTexts.UNSAVED_CHANGES,
+                    background = MaterialTheme.colorScheme.tertiaryContainer,
+                    textColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.testTag("planner:unsavedPill"),
+                )
+            }
+        }
     }
 }
 

@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -69,8 +70,10 @@ import dev.caerbannog.core.planner.MqttTestMessageTexts
 import dev.caerbannog.core.planner.MqttTopicSample
 import dev.caerbannog.core.planner.TestMessageOffer
 import dev.caerbannog.core.planner.TestMessageOpening
+import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerQuestion
+import dev.caerbannog.core.planner.PlannerTexts
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
@@ -117,7 +120,12 @@ fun MigrationsScreen(
     onSendTestMessage: (TestMessageOpening) -> Unit = {},
     /** Where the generated `correlation-id` of a test message comes from; the window passes a UUID source. */
     correlationIds: CorrelationIdSource = CorrelationIdSource { "" },
+    /** M9-12: "Edit steps" of the selected file; called with its version. */
+    onEditSteps: (String) -> Unit = {},
+    /** M9-12: "Copy into a new plan" of a file that is applied elsewhere; called with its version, after the question when a draft with steps exists. */
+    onCopyIntoNewPlan: (String) -> Unit = {},
 ) {
+    var copyAsk by remember { mutableStateOf<String?>(null) }
     var sampleFor by remember { mutableStateOf<MqttRoute?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var askDismissDraft by remember { mutableStateOf(false) }
@@ -325,6 +333,13 @@ fun MigrationsScreen(
                         file = selectedFile,
                         state = state,
                         onEdit = { showEditDialog = true },
+                        plannerEntry = plannerEntry,
+                        onEditSteps = { onEditSteps(selectedFile.version) },
+                        onCopyIntoNewPlan = {
+                            // A draft with steps is never replaced without the question; one with only a description is not worth asking about.
+                            if ((plannerEntry as? PlannerEntry.ContinuePlan)?.stepCount?.let { it > 0 } == true) copyAsk = selectedFile.version
+                            else onCopyIntoNewPlan(selectedFile.version)
+                        },
                         onValidateAgain = onValidateAgain,
                         onApply = { onApplySingle(selectedFile.version) },
                         onTestMessage = { route ->
@@ -359,6 +374,17 @@ fun MigrationsScreen(
             onConfirm = {
                 askDismissDraft = false
                 onDismissDraft()
+            },
+        )
+    }
+
+    copyAsk?.let { version ->
+        DismissDraftDialog(
+            question = PlannerQuestion.CopyOverDraft(version),
+            onCancel = { copyAsk = null },
+            onConfirm = {
+                copyAsk = null
+                onCopyIntoNewPlan(version)
             },
         )
     }
@@ -493,6 +519,9 @@ private fun MigrationDetailPanel(
     file: MigrationFile,
     state: MigrationsScreenState,
     onEdit: () -> Unit,
+    plannerEntry: PlannerEntry,
+    onEditSteps: () -> Unit,
+    onCopyIntoNewPlan: () -> Unit,
     onValidateAgain: () -> Unit,
     onApply: () -> Unit,
     onTestMessage: (MqttRoute) -> Unit,
@@ -616,6 +645,10 @@ private fun MigrationDetailPanel(
                 }
             }
 
+            // Why the file is not opened as steps, in place of "Edit steps" (the hash text above is the same case for a file with a password hash).
+            val refusal = state.planOpening as? PlanOpeningDecision.NotOffered
+            if (refusal != null && !holdsHash) PlanNotOffered(refusal, plannerEntry, onCopyIntoNewPlan)
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Action row
@@ -624,6 +657,17 @@ private fun MigrationDetailPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (!holdsHash && refusal == null) {
+                    FilledTonalButton(
+                        onClick = onEditSteps,
+                        enabled = state.canEditFile,
+                        modifier = Modifier.testTag("migrations:editStepsBtn"),
+                    ) {
+                        ConnectionIcon(AppIcon.Edit, size = SmallIconSize)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Edit steps")
+                    }
+                }
                 if (!holdsHash) {
                     TextButton(
                         onClick = onEdit,
@@ -654,6 +698,50 @@ private fun MigrationDetailPanel(
                 ) {
                     Text("Apply ${file.version}")
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The fixed text that stands in place of "Edit steps" (M9-12), with its second line and, for a file applied elsewhere, "Copy into a new plan". The
+ * button stays visible but disabled while the draft file cannot be read (a copy would write over it), with the reason under it.
+ */
+@Composable
+private fun PlanNotOffered(refusal: PlanOpeningDecision.NotOffered, plannerEntry: PlannerEntry, onCopy: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(refusal.reason, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("migrations:planNotOffered"))
+            refusal.detail?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("migrations:planNotOfferedDetail"),
+                )
+            }
+            if (refusal.canCopy && plannerEntry is PlannerEntry.DraftUnreadable) {
+                Text(
+                    PlannerTexts.COPY_BLOCKED_BY_DRAFT,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("migrations:copyIntoPlanBlocked"),
+                )
+            }
+        }
+        if (refusal.canCopy) {
+            FilledTonalButton(
+                onClick = onCopy,
+                enabled = plannerEntry !is PlannerEntry.DraftUnreadable,
+                modifier = Modifier.testTag("migrations:copyIntoPlanBtn"),
+            ) {
+                ConnectionIcon(AppIcon.ContentCopy, size = SmallIconSize)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Copy into a new plan")
             }
         }
     }
