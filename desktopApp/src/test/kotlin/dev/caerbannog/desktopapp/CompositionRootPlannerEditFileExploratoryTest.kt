@@ -169,7 +169,6 @@ class CompositionRootPlannerEditFileExploratoryTest {
      * but nothing then keeps Save from overwriting that file (its checksum does match). Only reachable by bypassing the Migrations screen, which offers no button
      * for such a file. Expected: Save stays disabled for it (or the planner refuses to open it).
      */
-    @org.junit.jupiter.api.Disabled("F1: a forced planner on a hash file can overwrite it; the screen never offers the door")
     @Test
     fun `a forced planner on a hash file cannot overwrite it`() {
         val c = compose()

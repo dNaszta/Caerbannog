@@ -4,6 +4,7 @@ import dev.caerbannog.core.json.ArgumentValue
 import dev.caerbannog.core.migrations.DeclareCheck
 import dev.caerbannog.core.migrations.FolderOpener
 import dev.caerbannog.core.migrations.MigrationFile
+import dev.caerbannog.core.migrations.MigrationParser
 import dev.caerbannog.core.planner.BrokerPolicyReader
 import dev.caerbannog.core.planner.KnownQueue
 import dev.caerbannog.core.planner.KnownTopology
@@ -161,7 +162,7 @@ fun AppComposition.createPlannerViewModel(
  * closed. A file with a broker-level action is never copied (a `declareUser` would put its hash in the draft); the screen does not offer it either.
  */
 suspend fun AppComposition.copyIntoNewPlan(file: MigrationFile, vhost: String): Boolean {
-    if (file.up.any { it.isBrokerLevel }) return false
+    if (file.up.any { it.isBrokerLevel } || MigrationParser.hasUnknownKeys(file.rawJson)) return false
     if (!planDraftStore.save(PlanOpening.planOf(file, vhost))) return false
     navigation.openPlanner()
     return true

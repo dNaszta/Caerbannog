@@ -100,6 +100,9 @@ class PlannerViewModel(
     private var baseActions: List<MigrationAction> = emptyList()
     private var baseDescription: String = ""
 
+    /** File mode only: why the file is not edited here (gone, a password hash, access actions, keys the planner does not know); locks the planner and the save. */
+    private var fileRefusal: String? = null
+
     /**
      * The policy note of a dead-lettering form (M9-09): [formNotes] belong to [notesKey] (the queue and the names read when it was asked), and
      * [notesJob] is the one read behind them. [notesGeneration] tells a late answer from the current one.
@@ -311,6 +314,8 @@ class PlannerViewModel(
     /** Writes the plan as the next migration of the folder in use. Refused, and nothing is asked of the folder, unless [PlannerState.saveGate] is enabled. */
     fun saveAsMigration() = act(allowedWhenLocked = true) {
         readFolder()
+        // A press on Save of a file that may not be edited says why, with the same fixed text as the gate; nothing is read or written.
+        fileRefusal?.let { error = it; return@act }
         if (gate() != SaveGate.Enabled) return@act
         if (editing != null) return@act saveFile(editing)
         val repository = folderPorts.store.folder?.let(folderPorts.repositoryFor) ?: return@act
@@ -334,7 +339,7 @@ class PlannerViewModel(
         val repository = folderPorts.store.folder?.let(folderPorts.repositoryFor) ?: return
         error = null
         val onDisk = (repository.load() as? FolderListing.Listed)?.files?.firstOrNull { it.version == edit.version }
-        if (onDisk == null || MigrationParser.computeChecksum(onDisk.rawJson) != baseChecksum) {
+        if (refusalOf(onDisk, edit.version) != null || MigrationParser.computeChecksum(onDisk?.rawJson.orEmpty()) != baseChecksum) {
             error = PlannerTexts.fileChangedOnDisk(edit.version)
             return
         }
@@ -563,7 +568,7 @@ class PlannerViewModel(
         }
     }
 
-    private fun locked(): Boolean = context.unavailableReason != null || unreadable != null
+    private fun locked(): Boolean = context.unavailableReason != null || unreadable != null || fileRefusal != null
 
     private fun formContext() = FormContext(
         plan = plan,
@@ -709,8 +714,9 @@ class PlannerViewModel(
     }
 
     /**
-     * The plan of the opened file. A file that is gone, or one the planner may not open (a broker-level action), gives an empty plan; the save then
-     * refuses, because the checksum cannot match. Nothing of the draft is read, so an unreadable draft cannot lock a file.
+     * The plan of the opened file. A file that is gone, or one the planner may not open (a password hash, access actions, keys it does not know), gives an
+     * empty plan and sets [fileRefusal], which locks the planner: nothing can be changed and the file is never written. Nothing of the draft is read, so an
+     * unreadable draft cannot lock a file.
      */
     private suspend fun readFile(edit: PlannerMode.EditFile) {
         page = null
@@ -719,9 +725,17 @@ class PlannerViewModel(
         unreadable = null
         val path = folderPorts.store.folder
         val file = path?.let { (folderPorts.repositoryFor(it).load() as? FolderListing.Listed)?.files }?.firstOrNull { it.version == edit.version }
-        plan = if (file == null || file.up.any { it.isBrokerLevel }) TopologyPlan(vhost = context.vhost) else PlanOpening.planOf(file, context.vhost)
+        fileRefusal = refusalOf(file, edit.version)
+        plan = if (file == null || fileRefusal != null) TopologyPlan(vhost = context.vhost) else PlanOpening.planOf(file, context.vhost)
         baseActions = plan.steps.map { it.action }
         baseDescription = plan.description
+    }
+
+    /** The fixed reason [file] may not be edited here, or null: the one rule of [PlanOpening] (the applied history is the Migrations screen's to ask). */
+    private fun refusalOf(file: dev.caerbannog.core.migrations.MigrationFile?, version: String): String? {
+        if (file == null) return PlannerTexts.fileChangedOnDisk(version)
+        val decision = PlanOpening.decide(file, rawKeysKnown = !MigrationParser.hasUnknownKeys(file.rawJson), appliedOn = emptyList())
+        return (decision as? PlanOpeningDecision.NotOffered)?.reason
     }
 
     private fun hasChanges(): Boolean =
@@ -736,6 +750,7 @@ class PlannerViewModel(
         val blocking = PlanValidation.problems(plan).count { it.blocking }
         val reason = when {
             context.unavailableReason != null -> context.unavailableReason
+            fileRefusal != null -> fileRefusal
             plan.steps.isEmpty() -> PlannerTexts.ADD_A_STEP_FIRST
             blocking > 0 -> PlannerTexts.saveBlocked(blocking)
             editing != null && !hasChanges() -> PlannerTexts.NOTHING_CHANGED_YET
