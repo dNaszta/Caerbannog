@@ -99,6 +99,8 @@ internal abstract class ScreenDriver(content: @Composable () -> Unit) {
 
     fun click(tag: String) = exec {
         waitForIdle()
+        // a detail panel that scrolls as a whole can have its action row below the window: bring the node into view first (nothing to scroll is fine)
+        runCatching { onNodeWithTag(tag).performScrollTo() }
         onNodeWithTag(tag).performClick()
         waitForIdle()
     }

@@ -214,16 +214,7 @@ class PlannerEditFileSteps {
         d.folders.history.unreadable = true
     }
 
-    private var draftBytes: String? = null
-
-    @Given("the draft file on disk is not a valid plan")
-    fun draftNotValid() {
-        d.store.putUnreadable()
-        draftBytes = d.store.rawText
-    }
-
-    @Then("the draft file still has exactly its original bytes")
-    fun draftBytesKept() = assertEquals(draftBytes, d.store.rawText, "the draft file")
+    // "the draft file on disk is not a valid plan" and "the draft file still has exactly its original bytes" are bound once, in PlannerDraftSteps.
 
     @Given("the pending migration {string} is open in the planner and I removed every step")
     fun pendingOpenEmpty(version: String) {
@@ -362,6 +353,8 @@ class PlannerEditFileSteps {
 
     @When("I save {string} and open the Migrations screen")
     fun saveAndOpen(version: String) {
+        // Save is enabled only after a change: the smallest one is a word after the description, the steps stay as they are
+        if (!d.state.hasChanges) d.vm.setDescription(d.state.description + " (edited)")
         chooseSave("Save $version")
         assertEquals(version, d.state.saved?.version, "the file was not saved: ${d.state.errorMessage}")
     }
@@ -393,7 +386,14 @@ class PlannerEditFileSteps {
 
     @Then("no other file was written")
     fun noOtherFile() {
-        val version = checkNotNull(d.state.saved?.version) { "nothing was saved: ${d.state.errorMessage}" }
+        val saved = d.state.saved?.version
+        if (saved == null) { // nothing was saved (a discard, a refusal): the folder was not asked to write anything
+            assertEquals(emptyList(), d.migrationFolder.written, "files the folder wrote")
+            assertEquals(emptyList(), d.migrationFolder.attempts, "the import or export path was used")
+            assertEquals(emptyList(), d.migrationFolder.updates, "files the folder was asked to rewrite")
+            return
+        }
+        val version = saved
         assertEquals(emptyList(), d.migrationFolder.written, "files the folder wrote")
         assertEquals(emptyList(), d.migrationFolder.attempts, "the import or export path was used")
         assertEquals(listOf(version), d.migrationFolder.updated, "files the folder rewrote")
