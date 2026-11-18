@@ -3,7 +3,10 @@ package dev.caerbannog.core.migrations.fakes
 import dev.caerbannog.core.migrations.FOLDER_READ_ONLY_MESSAGE
 import dev.caerbannog.core.migrations.FolderListing
 import dev.caerbannog.core.migrations.FolderProblem
+import dev.caerbannog.core.migrations.HistoryMoveResult
+import dev.caerbannog.core.migrations.HistoryResult
 import dev.caerbannog.core.migrations.InMemoryMigrationHistoryRepository
+import dev.caerbannog.core.migrations.MigrationHistoryRepository
 import dev.caerbannog.core.migrations.InvalidMigrationFile
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
@@ -162,7 +165,7 @@ class FakeMigrationFolder(
 class FakeMigrationFolders(initialFolder: String? = null, vararg chooserAnswers: String?) {
     val store = InMemoryMigrationFolderStore(initialFolder)
     val chooser = FakeMigrationFolderChooser(*chooserAnswers)
-    val history = InMemoryMigrationHistoryRepository()
+    val history = SwitchableHistory()
     private val byPath = mutableMapOf<String, FakeMigrationFolder>()
     val repositoriesAsked = mutableListOf<String>()
 
@@ -175,4 +178,28 @@ class FakeMigrationFolders(initialFolder: String? = null, vararg chooserAnswers:
         repositoryFor = { path -> repositoriesAsked += path; folder(path) },
         history = history,
     )
+}
+
+/**
+ * M9-12: the one applied-history file of the machine, in memory. [unreadable] makes `load` answer [HistoryResult.Unreadable] (as `JsonFileMigrationHistoryRepository`
+ * does for a file that is not valid), until [moveAside] has been called, which then leaves an empty history (the old file is kept: [movedAside]).
+ * `getAppliedMigrations` answers what was recorded either way, as the real repository's default does not read the file's state.
+ */
+class SwitchableHistory(private val inner: InMemoryMigrationHistoryRepository = InMemoryMigrationHistoryRepository()) : MigrationHistoryRepository {
+    var unreadable: Boolean = false
+    var movedAside: Int = 0
+        private set
+
+    override suspend fun getAppliedMigrations(profileName: String): Map<String, String> = inner.getAppliedMigrations(profileName)
+    override suspend fun recordApplied(profileName: String, version: String, checksum: String) = inner.recordApplied(profileName, version, checksum)
+    override suspend fun load(profileName: String): HistoryResult =
+        if (unreadable) HistoryResult.Unreadable("/home/test/.caerbannog/migration-history.json", "The file is not valid JSON") else inner.load(profileName)
+    override fun asideFileName(): String = "migration-history.json.unreadable-20261118-100000"
+    override suspend fun moveAside(): HistoryMoveResult {
+        if (!unreadable) return HistoryMoveResult.Failed("There is no unreadable history to move aside")
+        unreadable = false
+        inner.clear()
+        movedAside++
+        return HistoryMoveResult.Moved(asideFileName())
+    }
 }

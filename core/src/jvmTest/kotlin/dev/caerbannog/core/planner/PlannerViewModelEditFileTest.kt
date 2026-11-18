@@ -385,4 +385,18 @@ class PlannerViewModelEditFileTest {
             r.close()
         }
     }
+
+    // ---- step 2.5, ruling 8: a file with no step is not a migration ----
+
+    @Test
+    fun `with every step removed Save is disabled with Add a step first and nothing is written`() {
+        rig.state.plan.steps.map { it.id }.forEach { vm.removeStep(it) }
+        assertEquals(emptyList(), rig.state.plan.steps)
+        assertTrue(rig.state.hasChanges)
+        assertEquals(SaveGate.Disabled(PlannerTexts.ADD_A_STEP_FIRST), rig.state.saveGate)
+        vm.saveAsMigration()
+        assertEquals(emptyList(), rig.folder.updates)
+        assertEquals(original, fileText())
+        assertNull(rig.state.saved)
+    }
 }

@@ -1,6 +1,7 @@
 package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.json.SecretValue
+import dev.caerbannog.core.migrations.HistoryUnreadable
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationParser
@@ -36,7 +37,11 @@ class PlanOpeningTest {
     private val user = MigrationAction.DeclareUser("svc", SecretValue.of("SENTINEL-HASH"), "rabbit_password_hashing_sha256")
     private val vhost = MigrationAction.DeclareVhost("orders")
 
-    private fun decide(f: MigrationFile, keysKnown: Boolean = true, appliedOn: List<String> = emptyList()) = PlanOpening.decide(f, keysKnown, appliedOn)
+    private val unreadable = HistoryUnreadable("/home/test/.caerbannog/migration-history.json", "not json")
+    private val historyText = "The applied history cannot be read, so it is not known where 0005 is applied."
+
+    private fun decide(f: MigrationFile, keysKnown: Boolean = true, appliedOn: List<String> = emptyList(), historyProblem: HistoryUnreadable? = null) =
+        PlanOpening.decide(f, keysKnown, appliedOn, historyProblem)
 
     @Test
     fun `a topology file that is applied nowhere and holds only known keys is openable`() {
@@ -129,5 +134,39 @@ class PlanOpeningTest {
     fun `planOf takes the virtual host of the first action and the default for an empty file`() {
         assertEquals("orders", PlanOpening.planOf(file("1", MigrationAction.DeclareQueue("q", vhost = "orders")), "/").vhost)
         assertEquals("uat", PlanOpening.planOf(file("2"), "uat").vhost)
+    }
+
+    // ---- step 2.5, ruling 4: the applied history of the machine cannot be read ----
+
+    @Test
+    fun `an unreadable history refuses with its own text, no detail and no copy`() {
+        val d = assertIs<PlanOpeningDecision.NotOffered>(decide(file("0005", queue), historyProblem = unreadable))
+        assertEquals(historyText, d.reason)
+        assertEquals(null, d.detail)
+        assertEquals(false, d.canCopy)
+    }
+
+    @Test
+    fun `the history refusal comes after hash, access and unknown keys and before applied elsewhere`() {
+        val applied = listOf("prod-eu")
+        assertEquals(hashText, (decide(file("1", vhost, user), keysKnown = false, appliedOn = applied, historyProblem = unreadable) as PlanOpeningDecision.NotOffered).reason)
+        assertEquals(accessText, (decide(file("1", vhost), keysKnown = false, appliedOn = applied, historyProblem = unreadable) as PlanOpeningDecision.NotOffered).reason)
+        assertEquals(unknownText, (decide(file("1", queue), keysKnown = false, appliedOn = applied, historyProblem = unreadable) as PlanOpeningDecision.NotOffered).reason)
+        val both = decide(file("0005", queue), appliedOn = applied, historyProblem = unreadable) as PlanOpeningDecision.NotOffered
+        assertEquals(historyText, both.reason, "the history problem beats applied elsewhere")
+        assertEquals(false, both.canCopy)
+    }
+
+    @Test
+    fun `a version that may not be echoed reads this file in the history sentence`() {
+        listOf("a \"b\"", "x".repeat(65), "").forEach { v ->
+            val d = assertIs<PlanOpeningDecision.NotOffered>(decide(file(v, queue), historyProblem = unreadable))
+            assertEquals("The applied history cannot be read, so it is not known where this file is applied.", d.reason, v.take(10))
+        }
+    }
+
+    @Test
+    fun `no history problem leaves the ordinary decision`() {
+        assertEquals(PlanOpeningDecision.Openable, decide(file("0005", queue), historyProblem = null))
     }
 }

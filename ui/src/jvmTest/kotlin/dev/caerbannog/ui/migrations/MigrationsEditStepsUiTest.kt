@@ -213,6 +213,36 @@ class MigrationsEditStepsUiTest {
         assertEquals(listOf("0002"), calls.copies)
     }
 
+    // ---- step 2.5, ruling 3: an unreadable draft file blocks the copy ----
+
+    private val blocked = "The current plan file could not be read. Open the planner and move it aside first."
+
+    @Test
+    fun `with an unreadable draft the copy button is shown but disabled and the reason is drawn`() = runDesktopComposeUiTest(1280, 800) {
+        val calls = Calls()
+        show(state(file = fileOf("0002", queue), decision = refusal("r", "d", canCopy = true)), PlannerEntry.DraftUnreadable("/home/x/planner-draft.json"), calls)
+        node("migrations:copyIntoPlanBtn").assertIsDisplayed().assertIsNotEnabled()
+        assertEquals("Copy into a new plan", textOf("migrations:copyIntoPlanBtn").trim())
+        assertEquals(blocked, textOf("migrations:copyIntoPlanBlocked").trim())
+        node("migrations:copyIntoPlanBtn").performClick()
+        assertEquals(emptyList(), calls.copies, "a click on a disabled copy reached the window")
+        assertNotDrawn("migrations:draftDismissDialog")
+    }
+
+    @Test
+    fun `with a readable draft or none the blocked line is not drawn`() = runDesktopComposeUiTest(1280, 800) {
+        show(state(file = fileOf("0002", queue), decision = refusal("r", "d", canCopy = true)), PlannerEntry.ContinuePlan(2, ""))
+        assertNotDrawn("migrations:copyIntoPlanBlocked")
+        node("migrations:copyIntoPlanBtn").assertIsEnabled()
+    }
+
+    @Test
+    fun `an unreadable draft draws no blocked line when the file offers no copy`() = runDesktopComposeUiTest(1280, 800) {
+        show(state(decision = refusal("r")), PlannerEntry.DraftUnreadable("/p"))
+        assertNotDrawn("migrations:copyIntoPlanBtn")
+        assertNotDrawn("migrations:copyIntoPlanBlocked")
+    }
+
     // ---- layout ----
 
     @Test

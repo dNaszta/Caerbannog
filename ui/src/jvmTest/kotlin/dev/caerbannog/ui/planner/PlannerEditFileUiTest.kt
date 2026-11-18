@@ -187,6 +187,60 @@ class PlannerEditFileUiTest {
         r.close()
     }
 
+    // ---- step 2.5, ruling 2: a navigation request of the menu or the app bar ----
+
+    @Test
+    fun `with changes a request from the menu sends dismiss and does not navigate`() = runDesktopComposeUiTest(1280, 800) {
+        val r = open()
+        val navigated = mutableListOf<AppDestination>()
+        showPlanner(r) { navigated += it }
+        r.queue("invoices")
+        waitForIdle()
+        node("navItem:${AppDestination.Streams.name}").performClick()
+        assertTrue("dismiss" in r.events.calls, "the menu did not send dismiss: ${r.events.calls}")
+        assertEquals(PlannerQuestion.DiscardChanges("0005"), r.state.question)
+        assertEquals(emptyList(), navigated, "the screen was left with unsaved changes")
+        r.close()
+    }
+
+    @Test
+    fun `without changes a request from the menu navigates at once and asks nothing`() = runDesktopComposeUiTest(1280, 800) {
+        val r = open()
+        val navigated = mutableListOf<AppDestination>()
+        showPlanner(r) { navigated += it }
+        node("navItem:${AppDestination.Streams.name}").performClick()
+        assertEquals(listOf(AppDestination.Streams), navigated)
+        assertEquals(null, r.state.question)
+        r.close()
+    }
+
+    @Test
+    fun `a confirmed discard lands on Migrations, not on the menu target`() = runDesktopComposeUiTest(1280, 800) {
+        val r = open()
+        val navigated = mutableListOf<AppDestination>()
+        showPlanner(r) { navigated += it }
+        r.queue("invoices")
+        waitForIdle()
+        node("navItem:${AppDestination.Streams.name}").performClick()
+        node("planner:questionConfirmBtn").performClick()
+        assertTrue(r.state.dismissed, "the state does not say the planner closed")
+        assertTrue(AppDestination.Streams !in navigated, "the menu target was opened after the discard: $navigated")
+        assertEquals(emptyList(), r.folder.updates)
+        r.close()
+    }
+
+    @Test
+    fun `a new plan still navigates straight from the menu`() = runDesktopComposeUiTest(1280, 800) {
+        val r = UiRig()
+        val navigated = mutableListOf<AppDestination>()
+        showPlanner(r) { navigated += it }
+        r.queue("a")
+        waitForIdle()
+        node("navItem:${AppDestination.Streams.name}").performClick()
+        assertEquals(listOf(AppDestination.Streams), navigated)
+        r.close()
+    }
+
     // ---- layout ----
 
     private fun androidx.compose.ui.test.DesktopComposeUiTest.exercise(scale: Float) {

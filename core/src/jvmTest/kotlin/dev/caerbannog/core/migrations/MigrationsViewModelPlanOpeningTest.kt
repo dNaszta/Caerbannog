@@ -125,4 +125,30 @@ class MigrationsViewModelPlanOpeningTest {
         assertEquals(emptyList(), folder.updates)
         assertEquals(emptyList(), folder.attempts)
     }
+
+    // ---- step 2.5, ruling 4: an unreadable history (one file for the whole machine) ----
+
+    @Test
+    fun `an unreadable history refuses a pending file with its text and the ordinary decision returns once it is moved aside`() {
+        put("0005", MigrationAction.DeclareQueue("orders"))
+        folders.history.unreadable = true
+        val vm = vm()
+        vm.selectVersion("0005")
+        val refused = assertIs<PlanOpeningDecision.NotOffered>(vm.state.value.planOpening)
+        assertEquals("The applied history cannot be read, so it is not known where 0005 is applied.", refused.reason)
+        assertEquals(null, refused.detail)
+        assertEquals(false, refused.canCopy)
+        vm.startWithEmptyHistory()
+        vm.confirmEmptyHistory()
+        vm.selectVersion("0005")
+        assertEquals(1, folders.history.movedAside)
+        assertEquals(PlanOpeningDecision.Openable, vm.state.value.planOpening, "after the history is moved aside")
+    }
+
+    @Test
+    fun `an unreadable history refuses even a file applied nowhere, never guesses`() {
+        put("0006", MigrationAction.DeclareQueue("orders"))
+        folders.history.unreadable = true
+        assertIs<PlanOpeningDecision.NotOffered>(decisionFor("0006"))
+    }
 }

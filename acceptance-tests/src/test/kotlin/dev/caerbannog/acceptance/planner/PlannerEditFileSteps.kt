@@ -206,6 +206,56 @@ class PlannerEditFileSteps {
         version, listOf(MigrationAction.DeclareQueue(queue, "quorum", vhost = d.vhost), MigrationAction.DeclareBinding(exchange, queue, key, vhost = d.vhost)),
     )
 
+    @Given("a pending migration {string} that declares the quorum queue {string}")
+    fun pendingQueue(version: String, queue: String) = PlannerFiles.put(version, listOf(MigrationAction.DeclareQueue(queue, "quorum", vhost = d.vhost)))
+
+    @Given("the applied history of this machine cannot be read")
+    fun historyUnreadable() {
+        d.folders.history.unreadable = true
+    }
+
+    private var draftBytes: String? = null
+
+    @Given("the draft file on disk is not a valid plan")
+    fun draftNotValid() {
+        d.store.putUnreadable()
+        draftBytes = d.store.rawText
+    }
+
+    @Then("the draft file still has exactly its original bytes")
+    fun draftBytesKept() = assertEquals(draftBytes, d.store.rawText, "the draft file")
+
+    @Given("the pending migration {string} is open in the planner and I removed every step")
+    fun pendingOpenEmpty(version: String) {
+        pendingOpen(version)
+        d.plan.steps.map { it.id }.forEach { d.vm.removeStep(it) }
+        assertEquals(0, d.plan.steps.size)
+    }
+
+    @When("I open another screen from the menu")
+    fun menu() = PlannerScreens.forViewModel(d.vm).click("navItem:Streams")
+
+    @Then("{string} is disabled with the reason {string}")
+    fun disabledWithReason(button: String, reason: String) {
+        if (button.startsWith("Save ")) {
+            assertEquals(dev.caerbannog.core.planner.SaveGate.Disabled(reason), d.state.saveGate, "the gate")
+            val screen = PlannerScreens.forViewModel(d.vm)
+            assertEquals(button, screen.textOf("planner:saveBtn")?.trim())
+            assertFalse(screen.isEnabled("planner:saveBtn"), "$button is enabled on the screen")
+            assertEquals(reason, screen.textOf("planner:saveReason")?.trim(), "the reason on the screen")
+            assertEquals(emptyList(), d.migrationFolder.updates, "a file was written")
+        } else {
+            assertEquals("Copy into a new plan", button)
+            val s = PlannerFiles.migrations
+            assertTrue(s.isDrawn("migrations:copyIntoPlanBtn"), "the button is not drawn")
+            assertFalse(s.isEnabled("migrations:copyIntoPlanBtn"), "the button is enabled")
+            assertEquals(reason, s.textOf("migrations:copyIntoPlanBlocked")?.trim(), "the reason")
+            s.click("migrations:copyIntoPlanBtn")
+            assertFalse(s.isDrawn("migrations:draftDismissDialog"), "a question was asked")
+            assertEquals(0, PlannerFiles.openedPlanners, "a planner was opened")
+        }
+    }
+
     @Given("a pending migration {string}")
     fun pendingDefault(version: String) = PlannerFiles.put(version, PlannerFiles.defaultActions())
 
