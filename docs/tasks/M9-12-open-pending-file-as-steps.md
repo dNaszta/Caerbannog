@@ -2,10 +2,7 @@
 
 Milestone: M9    Depends on: M9-03 (M9-07 and M9-10 add their recognition when they exist)    Size: M
 
-PLANNED 2026-11-15. Brief confirmed and completed 2026-11-18 against main a926a453 (see "Step 1 record" and "## Definition of done
-Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
-
-## Status" at the end).
+PLANNED 2026-11-15. Brief confirmed and completed 2026-11-18 against main a926a453 (see "Step 1 record" and the Status block at the end).
 
 ## Goal
 A migration file that is applied on no connection of this machine can be opened in the planner as steps, changed with the wizard and saved back under the same version. Everything the wizard cannot build is kept as written. A file is never rewritten without a change, never opened when it holds access actions or keys the app does not know, and never overwritten when it changed on disk meanwhile.
@@ -86,6 +83,9 @@ The sentence is carried by the later step, like the existing duplicates.
 
 ### Owner questions (product wording and scope only)
 1. Gap 10 wording and severity (above). Options: (a) blocking problem when the two steps differ, non-blocking note when equal, the sentences above; (b) both are notes, nothing blocks (the later step wins on apply and the user is told); (c) leave as is, document it. Recommendation: (a): two settings for one name cannot both hold, and saving it would send the user a silent loss, the same reason `declaredWithOtherSettings` blocks for queues.
+
+## Definition of done
+Tests written first and passing, no unrelated changes, spec and scenarios updated if behaviour changed.
 
 ## Status
 Architect, 2026-11-18, branch `m9-12-open-pending-file-as-steps` (worktree `../Caerbannog-m9-12`), step 1 done: the brief is confirmed and completed (opening rules checked against main, recipes and policies, replace list for the two stand-ins, gap 10 scoped in with proposed sentences). Three held `@needs-decision` scenarios written at the end of `19`; `tests/bdd/README.md` row updated. Next: step 2, the test developer writes the tests first (the owner's answer to question 1 only releases the three held scenarios and the `PlanValidation` change). No production code touched.
