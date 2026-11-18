@@ -10,6 +10,7 @@ private fun JsonObject.destinationName(): String? = identifier("queue") ?: ident
 
 internal val declareBindingCodec = codec<MigrationAction.DeclareBinding>(
     name = "declareBinding",
+    keys = setOf("exchange", "queue", "destination", "routingKey", "destinationType", "arguments"),
     read = { entry ->
         val exchange = entry.identifier("exchange")
         val destination = entry.destinationName()
@@ -42,6 +43,7 @@ internal val declareBindingCodec = codec<MigrationAction.DeclareBinding>(
 
 internal val deleteBindingCodec = codec<MigrationAction.DeleteBinding>(
     name = "deleteBinding",
+    keys = setOf("exchange", "queue", "destination", "routingKey"),
     read = { entry ->
         val exchange = entry.identifier("exchange")
         val destination = entry.destinationName()

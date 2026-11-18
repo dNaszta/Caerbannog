@@ -32,6 +32,7 @@ private fun JsonObjectBuilder.putTags(tags: List<String>) {
 
 internal val declareVhostCodec = codec<MigrationAction.DeclareVhost>(
     name = "declareVhost",
+    keys = setOf("name", "description", "tags", "defaultQueueType"),
     read = { entry ->
         val name = entry.identifier("name")
         if (name.isNullOrBlank()) refused(VHOST_INCOMPLETE)
@@ -47,6 +48,7 @@ internal val declareVhostCodec = codec<MigrationAction.DeclareVhost>(
 
 internal val declareUserCodec = codec<MigrationAction.DeclareUser>(
     name = "declareUser",
+    keys = setOf("name", "passwordHash", "hashingAlgorithm", "tags"),
     read = { entry ->
         val name = entry.identifier("name")
         val hash = entry.string("passwordHash")
@@ -69,6 +71,7 @@ internal val declareUserCodec = codec<MigrationAction.DeclareUser>(
 
 internal val setPermissionsCodec = codec<MigrationAction.SetPermissions>(
     name = "setPermissions",
+    keys = setOf("user", "configure", "write", "read"),
     read = { entry ->
         val user = entry.identifier("user")
         if (user.isNullOrBlank()) refused(PERMISSION_INCOMPLETE)
@@ -84,6 +87,7 @@ internal val setPermissionsCodec = codec<MigrationAction.SetPermissions>(
 
 internal val setTopicPermissionsCodec = codec<MigrationAction.SetTopicPermissions>(
     name = "setTopicPermissions",
+    keys = setOf("user", "exchange", "write", "read"),
     read = { entry ->
         val user = entry.identifier("user")
         val exchange = entry.string("exchange")

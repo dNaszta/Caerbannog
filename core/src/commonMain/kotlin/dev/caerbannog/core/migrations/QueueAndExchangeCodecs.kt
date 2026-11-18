@@ -2,6 +2,7 @@ package dev.caerbannog.core.migrations
 
 internal val declareQueueCodec = codec<MigrationAction.DeclareQueue>(
     name = "declareQueue",
+    keys = setOf("name", "type", "durable", "autoDelete", "arguments"),
     read = { entry ->
         val name = entry.identifier("name")
         val arguments = entry.typedEntries("arguments")
@@ -32,6 +33,7 @@ internal val declareQueueCodec = codec<MigrationAction.DeclareQueue>(
 
 internal val declareExchangeCodec = codec<MigrationAction.DeclareExchange>(
     name = "declareExchange",
+    keys = setOf("name", "type", "durable", "autoDelete", "internal", "arguments"),
     read = { entry ->
         val name = entry.identifier("name")
         val arguments = entry.typedEntries("arguments")

@@ -17,6 +17,12 @@ internal interface ActionCodec {
     /** The value of the `action` key. */
     val name: String
 
+    /**
+     * The keys [read] looks at, besides `action` and `vhost`, which every action has. [MigrationParser.hasUnknownKeys] relies on it: a key that is not
+     * listed here is dropped by a save, so a file holding one must not be opened as steps. A guard test proves the list matches [read].
+     */
+    val keys: Set<String>
+
     /** Reads the keys of [entry] (the `action` key is already known to be [name]). */
     fun read(entry: JsonObject): ActionReadResult
 
@@ -27,10 +33,12 @@ internal interface ActionCodec {
 /** Builds a codec for the action type [A]; [write] is only called for an [A], so no cast is needed. */
 internal inline fun <reified A : MigrationAction> codec(
     name: String,
+    keys: Set<String>,
     crossinline read: (JsonObject) -> ActionReadResult,
     crossinline write: (A, JsonObjectBuilder) -> Unit,
 ): ActionCodec = object : ActionCodec {
     override val name: String = name
+    override val keys: Set<String> = keys
     override fun read(entry: JsonObject): ActionReadResult = read(entry)
     override fun write(action: MigrationAction, out: JsonObjectBuilder) {
         if (action is A) write(action, out)

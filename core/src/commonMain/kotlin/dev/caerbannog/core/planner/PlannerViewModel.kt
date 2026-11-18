@@ -2,7 +2,10 @@ package dev.caerbannog.core.planner
 
 import dev.caerbannog.core.connections.TopologyControlLevel
 import dev.caerbannog.core.migrations.DeclareCheck
+import dev.caerbannog.core.migrations.FolderListing
 import dev.caerbannog.core.migrations.MigrationFolderPorts
+import dev.caerbannog.core.migrations.MigrationParser
+import dev.caerbannog.core.migrations.MigrationValidationResult
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationWriteException
@@ -30,6 +33,9 @@ import kotlinx.coroutines.sync.withLock
  * State in, events out: one [state], and every public method hops onto [scope] (so the fields below are read and written there only, and
  * [state] is published from there). Within the scope one [Mutex] makes each call whole, because a call can suspend in the draft store or the
  * folder; the effect of a call is visible in [state] after the scope has run it, not on return.
+ *
+ * In file mode the same state and events serve a pending file: `saveAsMigration` is "Save <version>" (enabled only after a change, refused when the
+ * file changed on disk since it was opened), `dismiss` asks before it throws a change away, and nothing is written without a change.
  *
  * The planner is locked (no wizard, no change, no draft write) while the connection cannot run migrations or the draft file cannot be read:
  * a plan typed over an unreadable file would replace it. The step ids the view model keeps (selection, the step being edited) are live in
@@ -59,6 +65,11 @@ class PlannerViewModel(
      * to a 3.x connection.
      */
     private val policies: BrokerPolicyReader? = null,
+    /**
+     * M9-12: [PlannerMode.NewPlan] works on the draft of this machine. [PlannerMode.EditFile] works on a pending migration file chosen on the
+     * Migrations screen: the plan is the file's steps, "Save" rewrites that one file, and the draft is never read, written, cleared or moved.
+     */
+    private val mode: PlannerMode = PlannerMode.NewPlan,
 ) {
     /** The pages of the wizard; the screen sees [WizardState], derived from this and the current plan. */
     private sealed interface Page {
@@ -82,6 +93,12 @@ class PlannerViewModel(
     private var dismissed = false
     private var loaded = false
     private var reviewView: ReviewView = ReviewView.Graph
+
+    /** File mode only: the file as it was opened (what [hasChanges] compares with) and the checksum a save must still find on disk. */
+    private val editing: PlannerMode.EditFile? = mode as? PlannerMode.EditFile
+    private var baseChecksum: String = editing?.baseChecksum.orEmpty()
+    private var baseActions: List<MigrationAction> = emptyList()
+    private var baseDescription: String = ""
 
     /**
      * The policy note of a dead-lettering form (M9-09): [formNotes] belong to [notesKey] (the queue and the names read when it was asked), and
@@ -131,7 +148,7 @@ class PlannerViewModel(
             }
         }
         act(allowedWhenLocked = true) {
-            readDraft()
+            if (editing == null) readDraft() else readFile(editing)
             readFolder()
             loaded = true
         }
@@ -295,6 +312,7 @@ class PlannerViewModel(
     fun saveAsMigration() = act(allowedWhenLocked = true) {
         readFolder()
         if (gate() != SaveGate.Enabled) return@act
+        if (editing != null) return@act saveFile(editing)
         val repository = folderPorts.store.folder?.let(folderPorts.repositoryFor) ?: return@act
         error = null
         val file = try {
@@ -308,10 +326,40 @@ class PlannerViewModel(
         saved = SavedPlan(version = file.version, fileName = "${file.version}.json")
     }
 
+    /**
+     * "Save <version>": rewrites the opened file with the steps as the app writes every export, but only if the file on disk still has the checksum it
+     * had when it was opened. A file that changed or vanished is never overwritten or created again; the plan keeps the change.
+     */
+    private suspend fun saveFile(edit: PlannerMode.EditFile) {
+        val repository = folderPorts.store.folder?.let(folderPorts.repositoryFor) ?: return
+        error = null
+        val onDisk = (repository.load() as? FolderListing.Listed)?.files?.firstOrNull { it.version == edit.version }
+        if (onDisk == null || MigrationParser.computeChecksum(onDisk.rawJson) != baseChecksum) {
+            error = PlannerTexts.fileChangedOnDisk(edit.version)
+            return
+        }
+        val actions = plan.steps.map { it.action }
+        val result = try {
+            repository.updateFile(edit.version, MigrationParser.exportToJson(edit.version, plan.description, actions))
+        } catch (_: MigrationWriteException) {
+            null
+        }
+        if (result !is MigrationValidationResult.Valid) {
+            error = PlannerTexts.FILE_NOT_WRITTEN
+            return
+        }
+        baseChecksum = MigrationParser.computeChecksum(result.migration.rawJson)
+        baseActions = actions
+        baseDescription = plan.description
+        saved = SavedPlan(version = edit.version, fileName = "${edit.version}.json")
+    }
+
     /** With a step the plan asks first; an empty plan goes at once. A locked planner just leaves: it never deletes a file it could not read. */
     fun dismiss() = act(allowedWhenLocked = true) {
         when {
             locked() -> dismissed = true
+            // A file is never deleted or rewritten by leaving it: with a change the user is asked, without one the planner just closes.
+            editing != null -> if (hasChanges()) question = PlannerQuestion.DiscardChanges(editing.version) else dismissed = true
             plan.steps.isNotEmpty() -> question = PlannerQuestion.Dismiss(plan.steps.size)
             else -> discard()
         }
@@ -327,6 +375,12 @@ class PlannerViewModel(
         when (question) {
             null -> Unit
             is PlannerQuestion.Dismiss -> if (locked()) question = null else discard()
+            is PlannerQuestion.DiscardChanges -> {
+                question = null
+                dismissed = true
+            }
+            // Asked by the Migrations screen only; the planner never shows it.
+            is PlannerQuestion.CopyOverDraft -> question = null
             is PlannerQuestion.StartNewPlan -> moveDraftAside()
         }
     }
@@ -595,6 +649,8 @@ class PlannerViewModel(
     /** A plan with a step or a description is kept as the draft; an empty one clears it. */
     private suspend fun persist() {
         descriptionPending = false
+        // A file's steps are not the draft: the draft file stays exactly as the user left it.
+        if (editing != null) return
         val kept = plan.steps.isNotEmpty() || plan.description.isNotEmpty()
         if (kept) {
             if (!draftStore.save(plan)) error = PlannerTexts.DRAFT_NOT_SAVED
@@ -652,6 +708,25 @@ class PlannerViewModel(
         }
     }
 
+    /**
+     * The plan of the opened file. A file that is gone, or one the planner may not open (a broker-level action), gives an empty plan; the save then
+     * refuses, because the checksum cannot match. Nothing of the draft is read, so an unreadable draft cannot lock a file.
+     */
+    private suspend fun readFile(edit: PlannerMode.EditFile) {
+        page = null
+        selected = null
+        question = null
+        unreadable = null
+        val path = folderPorts.store.folder
+        val file = path?.let { (folderPorts.repositoryFor(it).load() as? FolderListing.Listed)?.files }?.firstOrNull { it.version == edit.version }
+        plan = if (file == null || file.up.any { it.isBrokerLevel }) TopologyPlan(vhost = context.vhost) else PlanOpening.planOf(file, context.vhost)
+        baseActions = plan.steps.map { it.action }
+        baseDescription = plan.description
+    }
+
+    private fun hasChanges(): Boolean =
+        editing != null && (plan.steps.map { it.action } != baseActions || plan.description != baseDescription)
+
     private suspend fun readFolder() {
         val path = folderPorts.store.folder
         folder = folderStateOf(path?.let { folderPorts.repositoryFor(it).load() }, path)
@@ -663,6 +738,7 @@ class PlannerViewModel(
             context.unavailableReason != null -> context.unavailableReason
             plan.steps.isEmpty() -> PlannerTexts.ADD_A_STEP_FIRST
             blocking > 0 -> PlannerTexts.saveBlocked(blocking)
+            editing != null && !hasChanges() -> PlannerTexts.NOTHING_CHANGED_YET
             else -> when (val f = folder) {
                 MigrationFolderState.ChooseFolder -> PlannerTexts.NO_FOLDER
                 is MigrationFolderState.FolderUnavailable -> f.reason
@@ -761,6 +837,8 @@ class PlannerViewModel(
         errorMessage = error,
         dismissed = dismissed,
         isLoaded = loaded,
+        mode = mode,
+        hasChanges = hasChanges(),
     )
 
     private fun publish() {

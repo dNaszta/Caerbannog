@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -38,6 +39,23 @@ object MigrationParser {
             ActionsParseResult.Invalid(refusal.reason)
         }
     }
+
+    /**
+     * True when [rawJson], or an action in it, holds a key that a save would drop: the planner refuses such a file so nothing is lost (A2). Text that is not
+     * a JSON object, or an action the format does not have, answers true: nothing can be said to be known about it.
+     */
+    fun hasUnknownKeys(rawJson: String): Boolean {
+        val root = (parseUntrustedJson(rawJson, MAX_FILE_DEPTH, lenientJson) as? UntrustedJson.Parsed)?.element as? JsonObject ?: return true
+        if (!root.keys.all { it in FILE_KEYS }) return true
+        val up = root["up"] as? JsonArray ?: return false
+        return up.any { item ->
+            val entry = item as? JsonObject ?: return@any true
+            val codec = (entry["action"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let(ActionCodecs::find) ?: return@any true
+            !entry.keys.all { it == "action" || it == "vhost" || it in codec.keys }
+        }
+    }
+
+    private val FILE_KEYS = setOf("version", "description", "up")
 
     /** The inverse of [parseActions] for the prefill: a pretty JSON array, same fields and the same omission of `"vhost": "/"` as [exportToJson]. */
     fun actionsToJson(actions: List<MigrationAction>): String = prettyJson.encodeToString(JsonArray.serializer(), actionsArray(actions))
