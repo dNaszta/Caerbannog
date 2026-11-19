@@ -1,8 +1,8 @@
 # M9-13: Gate: a plan built in the planner does on a real broker what its steps say
 
-Milestone: M9    Depends on: M9-01 to M9-10 (M9-11 and M9-12 are not part of the gate)    Size: M
+Milestone: M9    Depends on: M9-01 to M9-10, M9-08, M9-09 (all merged; M9-11 and M9-12 are not part of the gate)    Size: M
 
-PLANNED 2026-11-15. Not started.
+PLANNED 2026-11-15. Not started. Re-confirmed 2026-11-19 (step 1 of /iterate).
 
 ## Goal
 One live test, `RealBrokerM9GateTest` (`@gate-M9`, tag `broker`), builds a plan through the planner's core as a user would, checks it, saves it, applies it with the existing runner and executor on a real RabbitMQ 4.x broker, checks it again, and proves with messages that the route and the dead-letter path work.
@@ -47,4 +47,22 @@ The gate passes on a machine with Docker or rootless Podman, twice in a row; the
 
 Note (architect, M9-00b step 3, 2026-11-16): the dead-letter part of the gate uses a message that EXPIRES in the source queue (S-C1: arrives with `x-first-death-reason` `expired`; the policy needs about 6 s to show, so a bounded poll). Do not use an at-least-once held dead letter in the gate: it was delivered only 165 to 175 s after the repair in the observations (`docs/spec.md` "Measured facts of M9-00b"). The gate's dead-letter policy is the at-most-once recipe (`dead-letter-exchange` only).
 
-Status 2026-11-18: briefed (ready, next); all of M9-01 to M9-12 are merged on main bba34a63.
+## Status
+
+Step 1 done (architect, 2026-11-19). Step 2 done (test-developer, 2026-11-19): `RealBrokerM9GateTest` written, GREEN at once (see below). Briefed (ready). All of M9-01 to M9-12, M9-14, M9-14b and M9-14c are merged on main bba34a63.
+Branch: `M9-13-gate-planner-on-a-real-broker` (worktree `.claude/worktrees/m9-13-test`)
+
+Brief refresh (2026-11-19), nothing else changed:
+- Use the merged building blocks, not hand-made actions: the dead-letter part is the `M9-09` recipe (policy on exactly the source queue, at most once, `dead-letter-exchange` only); the retention is the `M9-08` policy step covering the pair; the stream with retention goes through the `M9-14c` export path.
+- Do not rely on claims `M9-08e` and `M9-09b` still hold unmeasured (policy over argument precedence, at-least-once with reject-publish-dlx, own-argument read live proof). If the gate needs one, measure it inside the gate or leave it out.
+- The scenario exists: `tests/bdd/features/21_topology_planner_recipes.feature` line 1010, tags `@m9-13 @broker @gate-M9`. No new scenario is needed.
+- Follow-ups (`M9-08c..f`, `M9-09b`, `M9-12b`, `M9-14c-f1`) do not block the gate: none touches the executor, the check or the allow-list in a way the gate uses. `M9-14c-f1` (executor pre-read of a non-stream body) is XS and has no brief; run it after the gate unless the gate's apply step hits it.
+- Not run yet in this milestone: the whole `brokerTest` suite; run M5, M7, M8 gates once before the merge proposal because the executor's reader and `ManagementHttp` changed during M9.
+
+Step 2 (test-developer, 2026-11-19):
+- Written: `data-rabbit/src/test/kotlin/dev/caerbannog/datarabbit/RealBrokerM9GateTest.kt` (tags `broker`, `gate-M9`), one test named as the scenario. Real `PlannerViewModel` and its forms (the wizard calls of the screen), real `ManagementDeclareCheck` and `ManagementBrokerPolicyReader` behind a request recorder, real `FolderMigrationFileRepository` and `FilePlanDraftStore` in temp folders, real `MigrationRunner` and `ManagementTopologyMigrationExecutor` (behind a recorder), `RabbitMqConnectionGateway` for the connection. Broker: `m9SpikeBroker()` (rabbitmq:4-management with stream, stream management and MQTT plugins), plain profile.
+- Run: `./gradlew :data-rabbit:brokerTest --tests '*M9Gate*'` passes in about 25 s (Docker present). It is NOT red at step 2: every block the gate uses is merged, so there is no missing production behaviour to wait for.
+- Proof that it can fail: mutation 2 (the `+` of the MQTT filter translated to `#`, temporary, reverted) is RED with "the stream telemetry holds the messages whose topic the route sensors/+/temp matches, and only those: expected [MATCH, CONTROL] but was [NO-MATCH-TWO-LEVELS, NO-MATCH-NO-LEVEL, MATCH, CONTROL]". The first version of the test let this mutation through (it published no multi-level topic); it now publishes the three topics the filter must not match.
+- Mutation 1 (the dead-letter policy moved before its exchange, queue and binding) is NOT red: the apply works, the check shows every step "Will be created" then "Already there", the expired message reaches `orders-dlq`. The broker resolves `dead-letter-exchange` when a message dies, not when the policy is set. The gate does catch the order of the recipe's steps by asserting the names of the plan in plan order (policy last). Question to the architect: keep the order assertion as the guard, or drop mutation 1 from the brief.
+- Not relied on: `M9-08e` and `M9-09b` claims. Not in the test: the at-least-once strategy, a stream as dead-letter target, the MQTT ticks of the stream pair.
+- Not recorded: the planner's read of the broker's names (`HeldKnownTopologyReader` in the test, same catalogs as `CatalogKnownTopologyReader` of the app, list calls) and the stream-protocol part of the apply (stream creation). `CatalogKnownTopologyReader` lives in `desktopApp`, which `data-rabbit` tests cannot use, so the test has its own twin of it.
