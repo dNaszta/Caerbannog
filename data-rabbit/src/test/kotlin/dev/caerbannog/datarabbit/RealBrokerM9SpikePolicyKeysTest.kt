@@ -177,7 +177,7 @@ class RealBrokerM9SpikePolicyKeysTest {
     }
 
     @Test
-    fun `S-F1d retention set by policy on an existing stream does not appear in the stream arguments, so the stream list shows no retention`() {
+    fun `S-F1d retention set by policy on an existing stream does not appear in the stream arguments, but the app's stream row reads it from the effective policy`() {
         val stream = unique("ret")
         val profile = ConnectionProfile(
             name = "m9c", host = container.host, virtualHost = "/", username = container.adminUsername, tls = false,
@@ -193,8 +193,9 @@ class RealBrokerM9SpikePolicyKeysTest {
             assertFalse(detail.args().containsKey("x-max-age"), "the stream's own arguments carry no x-max-age: ${detail.args()}")
             assertFalse(detail.args().containsKey("x-max-length-bytes"), "nor x-max-length-bytes: ${detail.args()}")
             val summary = (ManagementJson.parseStreamDetail(api.get("/api/queues/%2F/$stream").body) as CatalogResult.Success).value
-            assertEquals(null, summary.retention.maxAge, "what the app's stream list reads (arguments.x-max-age) stays empty")
-            assertEquals(null, summary.retention.maxLengthBytes)
+            // Since M9-08 slice 1 (53d65383) the parser merges effective_policy_definition into the row (RetentionSources), so the app does show it.
+            assertEquals("7D", summary.retention.maxAge, "the app's stream row takes max-age from the effective policy, the arguments have none")
+            assertEquals(1_000_000L, summary.retention.maxLengthBytes, "and max-length-bytes")
         }
     }
 
