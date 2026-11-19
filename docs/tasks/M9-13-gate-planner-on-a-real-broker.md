@@ -2,7 +2,7 @@
 
 Milestone: M9    Depends on: M9-01 to M9-10, M9-08, M9-09 (all merged; M9-11 and M9-12 are not part of the gate)    Size: M
 
-PLANNED 2026-11-15. Not started. Re-confirmed 2026-11-19 (step 1 of /iterate).
+DONE 2026-11-19 (step 5 verdict: Accepted). Merge proposal pending the owner's word.
 
 ## Goal
 One live test, `RealBrokerM9GateTest` (`@gate-M9`, tag `broker`), builds a plan through the planner's core as a user would, checks it, saves it, applies it with the existing runner and executor on a real RabbitMQ 4.x broker, checks it again, and proves with messages that the route and the dead-letter path work.
@@ -79,3 +79,5 @@ Step 4 (test-developer, 2026-11-19), verdict pass:
 - Fast suite (`task test`): BUILD SUCCESSFUL in 4m 32s, no failures.
 - Order mutation (dead-letter policy moved first in `DeadLetterForm.actions`, temporary, reverted): RED on the plan-order assertion (`RealBrokerM9GateTest.kt:242`, message lists the plan with the policy at position 3); the worktree is clean after the revert.
 - Gaps (minor, no action needed): the binding position is not pinned (architect idea 3); the BDD scenario's last line "no queue message was read by the app" is covered by the recorder (no `/get`) and the single test-code peek.
+
+Step 5 (architect, 2026-11-19), verdict ACCEPTED: the test covers the nine steps of the brief; the `+` mutation and the order mutation (on the plan-order assertion) were red; gate green twice (24.2 s, 29.2 s); M5, M7, M8 gates and `task test` green; no production change; no rule violation (checks GET only, no DELETE, no `/get`, no `/publish` by the app, stream read with `noTrackingStrategy()`, no password in the file). Finding 1 (the M5 gate silently needs the dev broker): fixed by a doc section in `dev/README.md` ("Gate tests that need this broker"). Finding 2 (binding position not pinned): dropped; the order assertion exists to guard the policy-last rule, and the binding's position carries no safety rule (the queue exists before the plan). Not run: full `brokerTest`, TLS, Podman. No follow-up brief.
