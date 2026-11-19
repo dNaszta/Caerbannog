@@ -1,4 +1,4 @@
-# Move the broker tests to Testcontainers 2.x (optional)
+# Move the broker tests to Testcontainers 2.x
 
 Milestone: M2 (optional, any time)    Depends on: none    Size: S
 
@@ -15,7 +15,7 @@ In: rename artifacts (`testcontainers-junit-jupiter`, `testcontainers-rabbitmq`,
 Out: any production code; changing assertions of existing tests, except deleting the spike test `Q6 RabbitMQContainer withPluginsEnabled is annotated Deprecated...` in `StreamManagementApiSpikeTest` (it asserts the 1.x annotation and the class it reflects on moves).
 
 ## Acceptance
-- `./gradlew :data-rabbit:brokerTest --rerun-tasks` green twice (same test count as before the change, 25 or more at the time of writing).
+- `./gradlew :data-rabbit:brokerTest --rerun-tasks` green twice (same test count as before the change, 25 or more at the time of writing). **Amended at step 5 (2026-11-19):** the whole task no longer fits its 40 minute timeout (about 326 tests, about 80 minutes; same on main, see `M2-18`), so the accepted evidence is the chunked run in step 4 (all 55 classes, every test green after the S-F1d test fix and the Q3 re-run) plus the M5, M7, M8 and M9 gates.
 - Compile output of `:data-rabbit:compileTestKotlin` has no `withPluginsEnabled` or `RabbitMQContainer` deprecation warning.
 - The two stream plugins are enabled and the TLS conf still applies (the spike's Q7 tests prove it).
 - `docs/spec.md` Risks entries (Testcontainers deprecation, API version pin) updated with the result.
@@ -48,3 +48,7 @@ Step 4 (test developer, 2026-11-19): verified in three chunks, because the whole
 - S-F1d: root cause is a stale test, not the broker and not the image. M9-08 slice 1 (53d65383, 2026-11-17) made the stream row merge `effective_policy_definition` into the retention; the test still asserted that the row shows none. The raw-argument assertions (no `x-max-age`) still hold on the current image. Fixed in the test only (d8cb5310); class `RealBrokerM9SpikePolicyKeysTest` green after the fix (12 tests). CI would have failed on it too (same test, same floating image, ci.yml runs the whole `brokerTest` on main).
 - Timeout: `brokerTest` needs about 80 minutes here (12m40s + 17m36s + 39m22s, with load); the slowest classes are `StreamClientSpikeTest` (11 to 21 min under load, 2 min idle), `StreamManagementApiSpikeTest` (up to 29 min under load), `RealBrokerM9SpikeDeadLetterTest` (534 s: S-C3 slow retry 203 s, S-C4 104 s), `RealBrokerM8SpikeUpgradeFollowUpTest` (183 s), `RealBrokerM8SpikeUpgradeTest` (146 s). Recommendation (not changed): split `brokerTest` (for example spikes as their own task) or raise the timeout; follow-up brief.
 - Fast suite (`task test`, branch tip d8cb5310): BUILD SUCCESSFUL, 685 test classes reported done, 0 failed, 2h00m under the same machine load.
+
+Step 5 (architect, 2026-11-19): ACCEPTED. Merge pending the owner. Reviewed: the diff to main (64 files: 59 import swaps, `RabbitContainers.kt`, `data-rabbit/build.gradle.kts`, `THIRD_PARTY_NOTICES.md`, spec Risks, brief, README), the test report, `ci.yml` and the root `build.gradle.kts`. Not reviewed: the broker runs themselves (taken from the report), Podman, the two `acceptance-tests` files tagged `broker`.
+- Chunked acceptance accepted: the "twice" and the 40 minute limit cannot hold on main either (CI run 44511906155 on main hit the 40m task timeout, `BUILD FAILED in 41m 28s`). Follow-up `M2-18` covers the timeout and split and the Q3 clock point; neither blocks the merge. The CI live-broker job stays red on main until M2-18 is done; that was already so before this branch.
+- Test-side only, no production code, no safety rule touched; the S-F1d fix changes an assertion that was stale since M9-08 (53d65383) and keeps the raw-argument assertions.
