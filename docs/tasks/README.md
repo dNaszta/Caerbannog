@@ -16,7 +16,7 @@ Updated 2026-11-18 after the merges of `M9-08` (`86ad0540`), `M9-09` (`a926a453`
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): NEXT; steps 1 and 2 done (test written, green at once, `+` mutation red, order mutation guarded by the plan-order assertion, decided 2026-11-19), step 3 not needed, step 4 (verify) next, branch `M9-13-gate-planner-on-a-real-broker` | M | nothing (all of `M9-01` to `M9-12` merged) |
+| M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): NEXT; steps 1 and 2 done (test written, green at once, `+` mutation red, order mutation guarded by the plan-order assertion, decided 2026-11-19), step 3 not needed, step 4 (verify) done 2026-11-19 (pass: gate twice, M5/M7/M8 gates, fast suite, order mutation red), step 5 (architect verdict) next, branch `M9-13-gate-planner-on-a-real-broker` | M | nothing (all of `M9-01` to `M9-12` merged) |
 | M9 | `M9-08d` retention column, detail and MCP show the byte limit too (Retention `7D, 1 MB`, additive `maxLengthBytes`; five `@m9-08d` scenarios held with `@needs-M9-08d`) | S | nothing (briefed, ready; owner chose b on 2026-11-17) |
 | M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 (measure the base first) | S | nothing (briefed) |
 | M9 | `M9-08e` live checks for the policy claims `M9-08` left unmeasured | S | nothing (briefed) |

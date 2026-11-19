@@ -49,7 +49,7 @@ Note (architect, M9-00b step 3, 2026-11-16): the dead-letter part of the gate us
 
 ## Status
 
-Step 1 done (architect, 2026-11-19). Step 2 done (test-developer): `RealBrokerM9GateTest` written, GREEN at once (no red phase: every block is merged). Step 2b done (architect, 2026-11-19): the four questions answered (below). Step 3 (senior developer): NOT NEEDED, no production change or refactor is required. NEXT: step 4 (verify: run the gate twice in a row, then M5, M7, M8 gates once, then the fast suite) and the merge proposal. All of M9-01 to M9-12, M9-14, M9-14b and M9-14c are merged on main bba34a63.
+Step 1 done (architect, 2026-11-19). Step 2 done (test-developer): `RealBrokerM9GateTest` written, GREEN at once (no red phase: every block is merged). Step 2b done (architect, 2026-11-19): the four questions answered (below). Step 3 (senior developer): NOT NEEDED, no production change or refactor is required. Step 4 done (test-developer, 2026-11-19): see "Step 4" below. NEXT: step 5 (architect verdict) and the merge proposal. All of M9-01 to M9-12, M9-14, M9-14b and M9-14c are merged on main bba34a63.
 Branch: `M9-13-gate-planner-on-a-real-broker` (worktree `.claude/worktrees/m9-13-test`)
 
 Brief refresh (2026-11-19), nothing else changed:
@@ -72,3 +72,10 @@ Step 2b (architect, 2026-11-19), decisions:
 2. `saveAsMigration` via `repository.exportTopology` (PlannerViewModel line 324) satisfies the export-path line; the test also asserts the parsed file equals the plan's actions. It does not exercise `declareStream` with retention arguments (retention is a policy here); that stays with the `M9-14c` live test.
 3. Step 3 not needed. Optional idea, not required: pin the binding step's position too (the assertion lists only exchange, queue, stream and policy names).
 4. Test review: no blocker. Bounded waits everywhere (`awaitUntil` with deadline, 90 s policy polls, `withTimeout` on apply and check, stream reader 30 s); no password in the file or in messages; the app's requests are recorded and asserted GET only for the checks, no DELETE, no `/get`, no `/publish` for check and apply; the stream is read with `noTrackingStrategy()`; the only queue peek is `m9Peek` (requeue peek, test code). Minor notes: the 300 ms poll sleep lives in the shared `awaitUntil` (bounded, accepted); `CatalogKnownTopologyReader` twin can drift from the app's (idea: a test that names the twin in its KDoc, already done).
+
+Step 4 (test-developer, 2026-11-19), verdict pass:
+- `RealBrokerM9GateTest` twice in a row (`--rerun`): green, 24.2 s and 29.2 s.
+- M7 gate green (4 tests, 33.3 s), M8 gate green (1 test, 14.8 s), both on Testcontainers. M5 gate (5 tests) needs the local dev broker (`localhost`, `dev/broker/docker-compose.yml`, not Testcontainers): it failed in 0.3 s with "The broker could not be reached" while no dev broker ran (environment, not a regression); after `compose up` it was green (13.4 s); the dev broker was stopped again.
+- Fast suite (`task test`): BUILD SUCCESSFUL in 4m 32s, no failures.
+- Order mutation (dead-letter policy moved first in `DeadLetterForm.actions`, temporary, reverted): RED on the plan-order assertion (`RealBrokerM9GateTest.kt:242`, message lists the plan with the policy at position 3); the worktree is clean after the revert.
+- Gaps (minor, no action needed): the binding position is not pinned (architect idea 3); the BDD scenario's last line "no queue message was read by the app" is covered by the recorder (no `/get`) and the single test-code peek.
