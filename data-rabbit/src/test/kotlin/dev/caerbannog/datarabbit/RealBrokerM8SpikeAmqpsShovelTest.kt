@@ -115,7 +115,8 @@ class RealBrokerM8SpikeAmqpsShovelTest {
     private fun assertMoved(r: Result, count: Int = 5) { assertTrue(r.finished && r.onDestination == count && r.onSource == 0, r.toString()) }
     private fun assertRefused(r: Result) {
         assertEquals("terminated", r.state, r.toString())
-        assertEquals("\"failed to connect to source\"", r.reason, "the status reason hides the TLS detail")
+        // 3.x and 4.0 to 4.3 send the reason Erlang-quoted ("\"failed...\""), 4.4 sends it plain; both hide the TLS detail
+        assertEquals("failed to connect to source", r.reason.removeSurrounding("\""), "the status reason hides the TLS detail")
         assertTrue(r.onDestination == 0 && r.onSource == 5, r.toString())
     }
 
