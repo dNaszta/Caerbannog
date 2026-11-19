@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.testcontainers.containers.RabbitMQContainer
+import org.testcontainers.rabbitmq.RabbitMQContainer
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.MountableFile
 import java.net.URI
@@ -750,13 +750,6 @@ class StreamManagementApiSpikeTest {
     }
 
     // ================= Question 6: Testcontainers deprecation =================
-
-    @Test
-    fun `Q6 RabbitMQContainer withPluginsEnabled is annotated Deprecated in the pinned Testcontainers version`() {
-        val m = RabbitMQContainer::class.java.getMethod("withPluginsEnabled", Array<String>::class.java)
-        assertTrue(m.isAnnotationPresent(java.lang.Deprecated::class.java),
-            "the Kotlin compiler warning 'withPluginsEnabled is deprecated. Deprecated in Java.' comes from this annotation; Testcontainers source says: use execInContainer instead")
-    }
 
     // ================= Question 7: plugins and fixture =================
 

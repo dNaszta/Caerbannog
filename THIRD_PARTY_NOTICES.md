@@ -14,6 +14,6 @@ desktop app's runtime classpath (versions pinned in the Gradle build files).
 | dbus-java, secret-service, SLF4J | MIT |
 | OpenJDK runtime embedded by jpackage | GPL-2.0 with Classpath Exception |
 
-Test-only dependencies (JUnit, Testcontainers, Ktor mock engine, and, from M8-13, `com.rabbitmq:amqp-client` 5.37.0, the RabbitMQ Java AMQP 0-9-1 client; used under its Apache-2.0 license option, the client being offered under Apache-2.0, MPL-2.0 or GPL-2.0-or-later) are not shipped in the installers. `amqp-client` is added to test source sets only (approved by the product owner on 2026-11-09) and must never appear on the runtime classpath of `desktopApp` or `mcp-server`.
+Test-only dependencies (JUnit, Testcontainers 2.0.5 (MIT, from M2-10; modules `testcontainers`, `testcontainers-junit-jupiter`, `testcontainers-rabbitmq`), Ktor mock engine, and, from M8-13, `com.rabbitmq:amqp-client` 5.37.0, the RabbitMQ Java AMQP 0-9-1 client; used under its Apache-2.0 license option, the client being offered under Apache-2.0, MPL-2.0 or GPL-2.0-or-later) are not shipped in the installers. `amqp-client` is added to test source sets only (approved by the product owner on 2026-11-09) and must never appear on the runtime classpath of `desktopApp` or `mcp-server`.
 
 The application icon (`desktopApp/src/main/resources/rabbit.png` and `rabbit.icns`) is original artwork made for this project and covered by the MIT license; it is not the RabbitMQ logo.

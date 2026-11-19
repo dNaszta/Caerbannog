@@ -66,10 +66,12 @@ dependencies {
     // plain JUnit test via runBlocking.
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+    // M2-10: Testcontainers 2.x (product owner approved 2026-11-19; MIT). 2.0.5 is the newest release older than two weeks
+    // (released 2026-04-20). 2.x renames the modules and moves RabbitMQContainer to org.testcontainers.rabbitmq.
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:testcontainers")
-    testImplementation("org.testcontainers:junit-jupiter")
-    testImplementation("org.testcontainers:rabbitmq")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-rabbitmq")
     // M8-13 (S-O): AMQP 0-9-1 client for the spike that needs real consumers (exclusive consumers, redelivery, global QoS).
     // TEST-ONLY, owner approved 2026-11-09. Licence: the POM offers AL 2.0 / MPL 2.0 / GPL v2; used under Apache-2.0.
     // 5.37.0 (2026-10-01) is the newest release older than two weeks; 5.37.1 (2026-11-06) is not.
@@ -98,17 +100,8 @@ tasks.register<Test>("brokerTest") {
     useJUnitPlatform {
         includeTags("broker")
     }
-    // M1-01 finding: Testcontainers 1.21.3 (latest as of this spike) probes Docker with a
-    // hardcoded fallback API version of 1.32 (org.testcontainers.dockerclient.
-    // DockerClientProviderStrategy#getTransportConfig) whenever no api.version is resolved from
-    // the JVM's own system properties/environment. The Docker Desktop engine on this machine
-    // (29.8.2, API 1.56) reports MinAPIVersion 1.40 and rejects 1.32 with HTTP 400, so every
-    // provider strategy fails and the container never starts - confirmed by bytecode inspection
-    // and by curling the daemon socket directly at /v1.32/info (400) vs /v1.40/info (200).
-    // Pinning a supported version here (set directly on the forked test JVM, since a `-D` on the
-    // `gradlew` command line only reaches the long-lived Gradle daemon, not the test process)
-    // works around it until Testcontainers ships a fix. Record of the finding: docs/spec.md Risks.
-    systemProperty("api.version", "1.43")
+    // M1-01 pinned api.version 1.43 because Testcontainers 1.21.x probed Docker with a hardcoded API 1.32, which
+    // Docker Desktop 29 (min API 1.40) rejects. M2-10: Testcontainers 2.x negotiates the version, so the pin is gone.
 
     // M2-15: Rootless Podman support on Fedora / Linux.
     // Precedence: `-PcontainerEngine=podman|docker` > `CONTAINER_ENGINE=podman|docker` > auto-detect `$XDG_RUNTIME_DIR/podman/podman.sock`.

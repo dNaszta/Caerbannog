@@ -34,7 +34,7 @@ Updated 2026-11-18 after the merges of `M9-08` (`86ad0540`), `M9-09` (`a926a453`
 | M5 | `M5-09` read-only migration MCP tools (list, dry run) | S | nothing |
 | M1 | `M1-13` unreadable `connections.json` (owner chose option B, 2026-11-09) | M | nothing |
 | M2 | `F-C2` lazy stream list | S/M | nothing (spike first) |
-| M2 | `M2-10` Testcontainers 2.x | S | owner approval of the bump |
+| M2 | `M2-18` `brokerTest` timeout and split, Q3 clock point | S/M | `M2-10` merged first; CI live-broker job is red on main until done |
 | Ideas, no brief | `M2-17e`, `M2-17f`, `M2-TESTHYGIENE-05`, `M2-TESTHYGIENE-06`, `M8-05c`, `M8-09b`, `M8-12b-polish` | S | a trigger named in the old status text (see `STATUS-HISTORY.md`) |
 
 Done and merged, not listed above: `M9-08` (with `M9-08b`) `86ad0540`, `M9-09` `a926a453`, `M9-12` `bba34a63`.
@@ -48,7 +48,7 @@ All product decisions of M9 asked so far are answered (spec O12 to O21; for exam
 1. By-eye check of the dashed dead-letter edge in the review graph (`M9-09`). No test can see dashes; it was never looked at by a person. `M9-09b` adds a pixel check on top.
 2. By-eye check of the Migrations "Edit steps" screens and the planner file-mode bar (`M9-12`). Nobody has looked at them.
 3. Real-window checks of the `M9-10b` dialog before the release tag (manual, from its review).
-4. `M2-10`: owner approval of the Testcontainers 2.x bump (a new dependency version).
+4. `M2-10`: owner approval of the Testcontainers 2.x bump: given 2026-11-19; task done, merge pending.
 5. `M9-12b`: the owner's layout choice for the Migrations action row at narrow widths (the brief builds on wrap meanwhile).
 
 ### Known follow-ups and tidy-ups
@@ -114,7 +114,8 @@ All product decisions of M9 asked so far are answered (spec O12 to O21; for exam
 | M2-12-local-dev-environment | Optional developer tooling, not product: `docker-compose.yml` for a local TLS RabbitMQ with the stream plugins, numbered definition files (vhosts, users per tag, queues, streams, 1000-queue file), Kotlin `dev-seed` module that publishes messages (own TLS code, no dependency on data-rabbit, not in the installer); super-stream declaration to be checked first | M2 | done (merged, 0a387c9, 2026-11-05) |
 | M2-12b-dev-seed-hardening | Follow-up of the M2-12 review: wrong-CA hint when the failure message is null or empty, reject `--max-age` with `--queues N` off `/`, dev README notes | M2 | done (merged, 1669ba6, 2026-11-05) |
 | M2-06-f1-dev-seed-hold | `task dev:seed -- --hold`: one named publisher and one named consumer per dev stream stay connected until Ctrl+C, so the Publishers and consumers tab has rows | M2 | done (merged, 95cdbbf, 2026-11-05) |
-| M2-10-testcontainers-2x-migration | Optional: move broker tests to Testcontainers 2.x, drop the deprecated plugin call | M2 | briefed (blocked: owner approval of the Testcontainers bump; data-rabbit still on 1.21.4) |
+| M2-10-testcontainers-2x-migration | Move broker tests to Testcontainers 2.x, drop the deprecated plugin call and the `api.version` pin | M2 | done (accepted at step 5, 2026-11-19, acceptance amended to the chunked run; branch `M2-10-testcontainers-2x`, merge pending the owner) |
+| M2-18-brokertest-timeout-and-split | `brokerTest` exceeds its 40 min task timeout (about 80 min loaded; CI "Live broker tests" on main red since before M2-10, run 44511906155): split into regression and spike halves with own CI steps, interim timeout raise; fix the load-sensitive Q3 clock point in `StreamManagementApiSpikeTest` | M2 (test infra) | ready (not written yet as code; not a blocker of M2-10) |
 | M2-09-gate-stats-match | `@gate-M2` scenario: statistics agree with the Management UI on a real broker | M2 | done (merged, 666a3cb, 2026-11-06) |
 | M-MCP-01-stdio-server | Headless MCP stdio server exposing connection profiles, streams, and topology tools to AI agents | Tooling / M2 | done (merged, 7bdd3f4, 2026-11-06) |
 | M2-15-podman-fedora-dev | Podman on Fedora local development and broker test support (`docker-compose.yml` SELinux `:ro,z`, qualified image and `gosu rabbitmq` healthcheck, `Taskfile.yml` `podman compose` default, `brokerTest` rootless Podman wiring, `gradle.properties`, `docs/DEVELOPING_ON_FEDORA.md`) | Tooling / M2 | done (merged, 27f000f, 2026-11-06) |
@@ -343,4 +344,4 @@ Raised in the architect's M2 plan (2026-11-04). Spike decisions S1 to S3 live in
 | S3 | Non-admin visibility of stream data | decided (product owner, 2026-11-04): S3a no management tag = clear message, no lists; S3b `management` tag only = lists with a fixed own-connections notice |
 | D10 | What the Connection cell of the publishers and consumers tab shows | decided (a) (product owner, 2026-11-05): keep the socket pair (`connection_details.name`) plus the user, no extra call, no client-name-first, no name-on-request. Revisit (c) (name on request) in M3 or M4 only if the owner's own services set connection names. Options and spike result in `docs/tasks/M2-06-publishers-consumers.md` (F-E) |
 | N1 | Size column in the stream list has no data source | decided (c) (product owner, 2026-11-04): left blank until M3 |
-| T1 | Testcontainers bump | no decision given; default stays "no bump now" (M2-10 optional) |
+| T1 | Testcontainers bump | approved by the owner 2026-11-19; done in M2-10 |
