@@ -7,7 +7,7 @@ import com.rabbitmq.client.ConnectionFactory
 import com.rabbitmq.client.DefaultConsumer
 import com.rabbitmq.client.Envelope
 import com.rabbitmq.client.ShutdownSignalException
-import org.testcontainers.containers.RabbitMQContainer
+import org.testcontainers.rabbitmq.RabbitMQContainer
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** M8-13 (S-O, S-T) spike helper: a plain AMQP 0-9-1 connection to a Testcontainers broker. Test-only, never product code. */

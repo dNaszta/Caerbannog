@@ -2,7 +2,7 @@
 
 Milestone: M2 (optional, any time)    Depends on: none    Size: S
 
-Branch: `m2-10-testcontainers-2x` from `main`. Needs Docker. Needs product owner approval of the dependency bump before starting (rule: dependency changes are decided).
+Branch: `M2-10-testcontainers-2x` from `main`. Needs Docker. Product owner approved the dependency bump on 2026-11-19.
 
 ## Goal
 `data-rabbit` broker tests run on Testcontainers 2.x with no deprecation warnings from our own code and without the `api.version` pin, all `@broker` tests unchanged in behaviour.
@@ -29,3 +29,11 @@ Test source set only. The container for "plugin missing" (Q7) still starts with 
 
 ## Definition of done
 Tests green twice, no unrelated changes, spec Risks updated, task index row updated.
+
+## Status
+Step 3 (senior developer, 2026-11-19): built, ready for test. Test source set and `data-rabbit/build.gradle.kts` only; no production code.
+- Dependency: Testcontainers BOM 2.0.5 (released 2026-04-20, the newest release older than two weeks; MIT), artifacts `testcontainers`, `testcontainers-junit-jupiter`, `testcontainers-rabbitmq`. Only `data-rabbit` uses Testcontainers (mcp-server, acceptance-tests, dev-seed do not). `THIRD_PARTY_NOTICES.md` updated.
+- Code: `org.testcontainers.rabbitmq.RabbitMQContainer` in all 59 usages (import swap). The one shared factory already existed (`RabbitContainers.kt`, `brokerWithPlugins`); it now copies an `enabled_plugins` file (`[rabbitmq_management,<plugins>].`) with `withCopyToContainer(Transferable.of(...))` instead of running `rabbitmq-plugins enable` after start; the file lists `rabbitmq_management` because it replaces the image's own. Q7 "plugin missing" container still gets only `rabbitmq_stream` (plus management). Spike test Q6 (asserted the 1.x `@Deprecated`) deleted as the brief says.
+- `api.version` pin: removed from `brokerTest`; the tests start on Docker Desktop 29.8.2 without it. Podman not re-run.
+- `:data-rabbit:compileTestKotlin --rerun-tasks`: no Testcontainers warning.
+- Finding: the full `brokerTest` suite is now about 326 tests (the brief said 25) and needs more than the 40 minute task timeout on this machine, on main too (baseline on main: timed out at 40m23s after 295 tests, with `StreamClientSpikeTest` and `StreamManagementApiSpikeTest` not reached). Also on main and after: `RealBrokerM9SpikePolicyKeysTest` "S-F1d" fails (a spike assertion about broker 4.x retention-by-policy behaviour, floating image `rabbitmq:4-management`; unrelated to this task). Follow-up brief candidate: split `brokerTest` or raise its timeout; look at S-F1d.

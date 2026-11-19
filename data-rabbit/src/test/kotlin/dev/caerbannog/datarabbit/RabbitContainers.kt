@@ -1,26 +1,20 @@
 package dev.caerbannog.datarabbit
 
-import com.github.dockerjava.api.command.InspectContainerResponse
-import org.testcontainers.containers.ContainerLaunchException
-import org.testcontainers.containers.RabbitMQContainer
+import org.testcontainers.images.builder.Transferable
+import org.testcontainers.rabbitmq.RabbitMQContainer
 
 /**
- * A broker container that enables the given plugins once it is up, with the same command
- * (`rabbitmq-plugins enable ...`) that Testcontainers' `withPluginsEnabled` runs. That method
- * is deprecated in Java in the pinned version, its replacement (`org.testcontainers.rabbitmq`)
- * has no plugin API, and the deprecation note points at `execInContainer`, which is what this does.
+ * The single place that builds a broker container for the live tests. Testcontainers 2.x has no plugin API on
+ * `RabbitMQContainer`, so the plugins are enabled the way the image documents it: the `enabled_plugins` file is
+ * copied to `/etc/rabbitmq/enabled_plugins` before the broker starts. The file replaces the image's own, so it
+ * lists `rabbitmq_management` too (the `-management` images ship it; every test talks to the management API).
  */
-private class PluginRabbitMQContainer(image: String, private val plugins: List<String>) : RabbitMQContainer(image) {
-    override fun containerIsStarted(containerInfo: InspectContainerResponse) {
-        super.containerIsStarted(containerInfo)
-        if (plugins.isEmpty()) return
-        val result = execInContainer("rabbitmq-plugins", "enable", *plugins.toTypedArray())
-        if (result.exitCode != 0) {
-            throw ContainerLaunchException("rabbitmq-plugins enable ${plugins.joinToString(" ")} failed: ${result.stderr}")
-        }
-    }
-}
+private const val ENABLED_PLUGINS_PATH = "/etc/rabbitmq/enabled_plugins"
 
-/** A [RabbitMQContainer] of [image] with [plugins] enabled after start. */
+/** An Erlang term file for `enabled_plugins`: `[rabbitmq_management,rabbitmq_stream].` */
+internal fun enabledPluginsFile(vararg plugins: String): String =
+    (listOf("rabbitmq_management") + plugins).distinct().joinToString(prefix = "[", postfix = "].\n", separator = ",")
+
+/** A [RabbitMQContainer] of [image] that starts with [plugins] enabled (plus the management plugin). */
 internal fun brokerWithPlugins(image: String, vararg plugins: String): RabbitMQContainer =
-    PluginRabbitMQContainer(image, plugins.toList())
+    RabbitMQContainer(image).withCopyToContainer(Transferable.of(enabledPluginsFile(*plugins)), ENABLED_PLUGINS_PATH)

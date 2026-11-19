@@ -47,7 +47,7 @@ import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
-import org.testcontainers.containers.RabbitMQContainer
+import org.testcontainers.rabbitmq.RabbitMQContainer
 import org.testcontainers.images.builder.Transferable
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
