@@ -1,30 +1,45 @@
-# Make `brokerTest` fit its timeout, and stop the Q3 timing assertion failing under load
+# Make `brokerTest` fit its timeout: split it into a regression half and a spike half, and fix the Q3 clock point
 
-Milestone: M2 (test infrastructure)    Depends on: M2-10 (merged first)    Size: S to M
+Milestone: M2 (test infrastructure)    Depends on: M2-10 (merged)    Size: M    Runs in parallel with `M8-15`; before `M2-19`
 
 ## Goal
-`./gradlew :data-rabbit:brokerTest` (CI job "Live broker tests" on main) finishes green inside its task timeout, and `StreamManagementApiSpikeTest` Q3 no longer fails because the host was busy.
+CI "Live broker tests" on main is green inside its limits as two Gradle tasks with their own CI steps: `brokerTest` (gates and product `RealBroker*` classes, the regression guard) and `brokerSpikeTest` (the classes that record broker facts); `StreamManagementApiSpikeTest` Q3 no longer fails because the host was busy; each half has a task timeout and a job timeout that were measured, not guessed.
 
 ## Why
-Found in M2-10 step 4 and confirmed on CI. The whole `brokerTest` is about 326 tests in 55 classes and takes about 80 minutes on a loaded developer machine (12m40s + 17m36s + 39m22s in three chunks). The root `build.gradle.kts` gives `brokerTest` a 40 minute task timeout. CI run 44511906155 (main, merge of M9-13) shows `Requesting stop of task ':data-rabbit:brokerTest' as it has exceeded its configured timeout of 40m`, `BUILD FAILED in 41m 28s`: so the job is red on main today, with or without M2-10 (the M2-10 baseline on main also stopped at 40m23s). `ci.yml` has no job-level `timeout-minutes` for `broker-tests` (GitHub default 360), so the Gradle task timeout is the only limit. Until this is fixed the live-broker job cannot show a regression after test 295 or so, and `StreamClientSpikeTest` and `StreamManagementApiSpikeTest` are never reached.
+Found in M2-10 step 4 and confirmed on CI. The whole live suite is about 326 tests in 55 classes (24 of them spike classes) and took about 80 minutes on a loaded developer machine (12m40s + 17m36s + 39m22s in three chunks); the root `build.gradle.kts` gives `brokerTest` a 40 minute task timeout. CI run 44511906155 (main) shows `exceeded its configured timeout of 40m`, `BUILD FAILED in 41m 28s`, so the job is red on main with or without M2-10. `ci.yml` has no `timeout-minutes` on `broker-tests` (GitHub default 360). Until this is fixed a regression after about test 295 cannot show, and `StreamClientSpikeTest` and `StreamManagementApiSpikeTest` are never reached. Since 2026-11-19 there is also a second cost: a red spike class hides the verdict of the product classes in one long log.
+
+## Checked on 2026-11-19 (architect)
+- Q3 is NOT fixed: `StreamManagementApiSpikeTest` line 579 still takes `now = System.currentTimeMillis()` after `awaitMessages` and asserts `first_timestamp in (now - 600_000)..(now + 60_000)`.
+- Of the `acceptance-tests` files that mention `@broker` (`connections/Fakes.kt`, `connections/RunConnectionsAcceptanceTest.kt`, and the `Run*AcceptanceTest` KDoc of clients, topology, migrations), none runs a `@broker` scenario: every suite filters `not @broker`. The real-broker proof of those scenarios is the data-rabbit class named in each KDoc. Nothing in `acceptance-tests` needs a live broker, so the split does not touch that module; say it in the task report and in the `CLAUDE.md` line.
+- The Podman block of `brokerTest` (engine choice, `DOCKER_HOST`, Ryuk) lives inline in `data-rabbit/build.gradle.kts` lines 95 to 130. Podman was not run for M2-10.
+- 55 files carry `@Tag("broker")`; 24 of them are spike classes by name (`*Spike*`, including the `RealBrokerM8Spike*` and `RealBrokerM9Spike*` families and the two stream spike classes).
 
 ## Scope
-In:
-1. Slowest classes first (measured, idle / loaded): `StreamClientSpikeTest` (2 min / 11 to 21 min), `StreamManagementApiSpikeTest` (up to 29 min under load), `RealBrokerM9SpikeDeadLetterTest` (534 s: S-C3 203 s, S-C4 104 s), `RealBrokerM8SpikeUpgradeFollowUpTest` (183 s), `RealBrokerM8SpikeUpgradeTest` (146 s). Find out why the two stream spike classes take 10 times longer under load (waits for broker statistics windows are the likely cause; bound them by the broker's documented interval, not by guesses).
-2. Split by what the test protects. Proposed: keep `brokerTest` for the gates and the product `RealBroker*` classes that are not `Spike` (the regression guard), add `brokerSpikeTest` (tag `spike` or class-name filter, decide in the task) for the `*Spike*` classes that record broker facts. CI runs both as two steps with their own timeouts (like the fast job), so a hang shows which half. `task test:broker` keeps running both. Update `CLAUDE.md` ("`brokerTest`" lines), `Taskfile.yml` and `ci.yml` in the same change.
-3. Interim, one line, if the split takes longer: raise the `brokerTest` timeout in `build.gradle.kts` to 90 minutes and set `timeout-minutes: 100` on the `broker-tests` job.
-4. Q3 (`StreamManagementApiSpikeTest`, first_timestamp window `(now - 600 s)..(now + 60 s)`): the test body took 943 s under load, so a wall-clock window measured after the wait fails. Take `now` at the moment the message is published (or compare to the broker's own clock from the same response), not at the assertion. Assertion meaning does not change.
-Out: any production code; changing what the spike tests assert (except the Q3 clock point); the Podman run (see Open points).
+In (one task, this order, one commit per numbered step):
+1. **Q3 clock point.** In the Q3 test take `val publishedAt = System.currentTimeMillis()` immediately before `publishViaManagement(name, 1000)` (the first message is published after it) and assert `first_timestamp in (publishedAt - 5_000)..(publishedAt + 600_000)`: the first message is published after `publishedAt`, and at most the publishing time later (generous, bounded by the 600 s the test may take). Assertion meaning is unchanged. Red-before, green-after without a sleep: add a clock parameter or a test hook (an `internal var clock: () -> Long` on the test class, default `System::currentTimeMillis`) and one fast test of the window helper with a clock that is 15 minutes later at assert time; show it red against the old window and green against the new one.
+2. **Find the stream spikes' load sensitivity.** Look at the waits in `StreamClientSpikeTest` (2 min idle, 11 to 21 loaded) and `StreamManagementApiSpikeTest` (up to 29 loaded). If a wait is a fixed poll for a statistics window, bound it by the broker's documented interval (management statistics `collect_statistics_interval`, default 5 s; stream stats refresh) with a clear failure message, never `Thread.sleep`. If the cost is the 1,000-message publishes and the 500-queue setup, say so and leave it: the split makes it harmless. Do not change what any spike asserts.
+3. **The split.**
+   - Tag: spike classes get a second tag `spike` next to `broker` (`@Tag("broker") @Tag("spike")`); rule: every class that carries `broker` and has `Spike` in its simple name carries `spike`, and no other class does. A fast guard test `BrokerTestSplitGuardTest` (data-rabbit, no container, reads the compiled test classes by reflection or the sources; follow how `verifyTestDiscovery` is built at the root) enforces both directions, so a new spike class cannot silently land in the regression half.
+   - `brokerTest`: `includeTags("broker")` and `excludeTags("spike")` (JUnit tag expression `broker & !spike`). The gates (`RealBrokerM7GateTest`, `RealBrokerM8GateTest`, M9 gate) and all non-spike `RealBroker*` classes stay here.
+   - `brokerSpikeTest`: new task, tag expression `broker & spike`. Description says what it protects (recorded broker facts, not product behaviour).
+   - One shared function in `data-rabbit/build.gradle.kts` (`fun Test.configureLiveBroker()`) holds the Podman and Docker engine selection and is called by both tasks; no copy-paste of the block. The root `build.gradle.kts` `slowTaskNames` gets `brokerSpikeTest`; both keep the `TEST START` / `TEST DONE` / `SLOW TEST` logging.
+   - Taskfile: `test:broker` runs both (`./gradlew :data-rabbit:brokerTest :data-rabbit:brokerSpikeTest --continue`); add `test:broker:spikes` and keep `test:broker:podman` and `test:broker:docker` running both with `-PcontainerEngine=...`.
+   - `ci.yml` job `broker-tests`: two steps, `Run regression broker tests` (`./gradlew :data-rabbit:brokerTest`, own `timeout-minutes`) then `Run spike broker tests` (`./gradlew :data-rabbit:brokerSpikeTest`, `if: always()` so a red first half still runs the second and shows both verdicts, own `timeout-minutes`); job-level `timeout-minutes` set to the sum plus 10; report upload on failure unchanged.
+   - `CLAUDE.md`: the "`brokerTest`" lines (Commands: one line for `brokerSpikeTest`; Testing: the timeout sentence names both tasks and the measured limits). Task README and `docs/spec.md` mentions of `brokerTest` as the whole suite are checked (`grep -n brokerTest`).
+4. **Timeouts, measured.** After the split run each half once on an idle machine and once on the CI runner (a `workflow_dispatch` run) and record the times in the task report. Set the task timeout to measured CI time times 1.5, rounded up to 5 minutes, for each half; the step `timeout-minutes` equal to that; the job timeout as above. Do not set the 90-minute interim value except as a throwaway first commit if the split is not ready (then remove it in step 3).
+5. **Podman once.** Run `./gradlew :data-rabbit:brokerTest -PcontainerEngine=podman` on Fedora (owner's machine; the developer agent cannot, so if it cannot run it, the report says "Podman NOT RUN" and the open point stays). If Podman rejects the Testcontainers 2.x API default, add `systemProperty("api.version", ...)` back inside `configureLiveBroker()` only for the Podman branch (spec Risks, "Docker API version pin").
+Out: production code; changing what spike tests assert (except the Q3 clock point); image pinning (`M2-19`); the shovel rule (`M8-15`); a third task or a per-milestone split.
 
 ## Acceptance
-- BDD: none (test infrastructure). The scenarios behind the `@broker` tests stay as they are.
-- `:data-rabbit:brokerTest` and the new spike task each green on CI on main inside their timeout, test count together equal to 326 (or the current count; state it).
-- A deliberately failing product `RealBroker*` test turns the first CI step red without waiting for the spike step.
-- Q3 passes when a `Thread.sleep`-free load simulation (the test paused for 15 minutes between publish and assert, by a test hook or a clock parameter) is applied: show the red-before, green-after.
-- Every `Test` task still logs `TEST START` / `TEST DONE`.
+- BDD: none (test infrastructure); the scenarios behind the `@broker` tests stay as they are.
+- `:data-rabbit:brokerTest` and `:data-rabbit:brokerSpikeTest` each green on CI on main inside their limits; the two test counts add up to the count before the split (state both numbers and the total; 326 on 2026-11-18, plus the tests added since).
+- A deliberately failing product `RealBroker*` test turns the first CI step red and the second step still runs (show it on a branch with `workflow_dispatch`, then drop the failing test).
+- `BrokerTestSplitGuardTest` red when a spike class lacks the `spike` tag and when a non-spike class has it.
+- Q3: red-before, green-after as in step 1.
+- Every `Test` task still logs `TEST START` / `TEST DONE`; `keychainTest` and `screenshotTest` keep 40 minutes.
 
 ## Design notes
-Build and CI files only (`build.gradle.kts`, `data-rabbit/build.gradle.kts`, `Taskfile.yml`, `.github/workflows/ci.yml`, `CLAUDE.md`) plus the one Q3 test. Keep the tag `broker` on both halves so `includeTags("broker")` users are not surprised; the split is by a second tag or class filter. The 40 minute limit for the other slow tasks (`keychainTest`, `screenshotTest`) stays.
+Files: `build.gradle.kts` (root, one set entry), `data-rabbit/build.gradle.kts`, `Taskfile.yml`, `.github/workflows/ci.yml`, `CLAUDE.md`, the tag line on the 24 spike classes, `StreamManagementApiSpikeTest` (Q3 and the waits), the new guard test. Keep tag `broker` on both halves so `includeTags("broker")` users are not surprised. Conflicts to expect: `M8-15` edits `RealBrokerM8SpikeShovelTest` and `RealBrokerM8ShovelTest` (this task only adds a tag line to the spike one: trivial merge); `M2-19` edits `ci.yml`, `CLAUDE.md` and the same test files after this task, so it starts after this one merges.
 
 ## UX
 None.
@@ -33,9 +48,8 @@ None.
 None (internal test infrastructure).
 
 ## Open points
-- Is the CI runner faster than the developer machine? CI timing: the job stopped at 40m on main, so even idle runners need more than 40 minutes for the whole suite.
-- Podman (rootless, Fedora) was not run for M2-10; run `brokerTest` there once, drop or restore `api.version` in the task if Podman rejects the 2.x default (spec Risks, "Docker API version pin").
-- The two `acceptance-tests` files tagged `broker` are not run by `data-rabbit:brokerTest`; say in the task where they run.
+- Is the CI runner faster than the developer machine? Unknown until step 4 measures it; the 40-minute stop on main says even idle runners need more than 40 minutes for the whole suite.
+- Podman (rootless, Fedora) not run for M2-10: step 5, owner's machine.
 
 ## Definition of done
-CI "Live broker tests" green on main in two consecutive runs, Q3 fixed, docs (`CLAUDE.md`, task index) updated, no unrelated changes.
+CI "Live broker tests" green on main in two consecutive runs (both steps), Q3 fixed, docs (`CLAUDE.md`, task index) updated, report states the measured times and the two counts, no unrelated changes.
