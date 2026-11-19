@@ -314,8 +314,8 @@ class RealBrokerM9StreamArgumentsTest {
         for (d in listOf(Duration.ofDays(7), Duration.ofSeconds(1), Duration.ZERO, Duration.ofMillis(1500))) p("T x-max-age $d", "tage") { it.maxAge(d) }
         for (v in listOf("0", "1", Long.MAX_VALUE.toString(), "-1", "1.5", "1GB", "abc")) p("R max-length-bytes '$v'", "len") { it.argument("max-length-bytes", v) }
         for (b in listOf(0L, 1L, Long.MAX_VALUE, -1L)) p("T x-max-length-bytes $b", "tlen") { it.maxLengthBytes(ByteCapacity.B(b)) }
-        for (v in listOf("0", "1", "3000000000", "4000000000", "-1", "1.5")) p("R stream-max-segment-size-bytes '$v'", "seg") { it.argument("stream-max-segment-size-bytes", v) }
-        for (b in listOf(0L, 1L, 3_000_000_000L, 4_000_000_000L)) p("T x-stream-max-segment-size-bytes $b", "tseg") { it.maxSegmentSizeBytes(ByteCapacity.B(b)) }
+        for (v in listOf("0", "1", "4095", "4096", "1000000", "1048576", "3000000000", "4000000000", "-1", "1.5")) p("R stream-max-segment-size-bytes '$v'", "seg") { it.argument("stream-max-segment-size-bytes", v) }
+        for (b in listOf(0L, 1L, 4096L, 1_048_576L, 3_000_000_000L, 4_000_000_000L)) p("T x-stream-max-segment-size-bytes $b", "tseg") { it.maxSegmentSizeBytes(ByteCapacity.B(b)) }
         finish("6", "value-shapes", o, raw)
     }
 
@@ -467,14 +467,21 @@ private val PINNED_FACTS: Map<String, String> = mapOf(
     "6/T x-max-length-bytes 1" to "accepted | x-max-length-bytes=number:1, x-queue-leader-locator=text:balanced, x-queue-type=text:stream",
     "6/T x-max-length-bytes 9223372036854775807" to "accepted | x-max-length-bytes=number:9223372036854775807, x-queue-leader-locator=text:balanced, x-queue-type=text:stream",
     "6/T x-max-length-bytes -1" to "accepted | x-max-length-bytes=number:-1, x-queue-leader-locator=text:balanced, x-queue-type=text:stream",
-    "6/R stream-max-segment-size-bytes '0'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:0",
-    "6/R stream-max-segment-size-bytes '1'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:1",
+    // RabbitMQ 4.4 refuses a segment size below 4096 bytes (4.3 accepted 0, 1 and -1): the 4.4.1 measurement, 2026-11-19
+    "6/R stream-max-segment-size-bytes '0'" to "refused StreamException code=17 | absent",
+    "6/R stream-max-segment-size-bytes '1'" to "refused StreamException code=17 | absent",
+    "6/R stream-max-segment-size-bytes '4095'" to "refused StreamException code=17 | absent",
+    "6/R stream-max-segment-size-bytes '4096'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:4096",
+    "6/R stream-max-segment-size-bytes '1000000'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:1000000",
+    "6/R stream-max-segment-size-bytes '1048576'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:1048576",
     "6/R stream-max-segment-size-bytes '3000000000'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:3000000000",
     "6/R stream-max-segment-size-bytes '4000000000'" to "refused StreamException code=17 | absent",
-    "6/R stream-max-segment-size-bytes '-1'" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:-1",
+    "6/R stream-max-segment-size-bytes '-1'" to "refused StreamException code=17 | absent",
     "6/R stream-max-segment-size-bytes '1.5'" to "refused StreamException code=-1 | absent",
     "6/T x-stream-max-segment-size-bytes 0" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream",
-    "6/T x-stream-max-segment-size-bytes 1" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:1",
+    "6/T x-stream-max-segment-size-bytes 1" to "refused StreamException code=17 | absent",
+    "6/T x-stream-max-segment-size-bytes 4096" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:4096",
+    "6/T x-stream-max-segment-size-bytes 1048576" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:1048576",
     "6/T x-stream-max-segment-size-bytes 3000000000" to "accepted | x-queue-leader-locator=text:balanced, x-queue-type=text:stream, x-stream-max-segment-size-bytes=number:3000000000",
     "6/T x-stream-max-segment-size-bytes 4000000000" to "refused IllegalArgumentException | absent",
 )
