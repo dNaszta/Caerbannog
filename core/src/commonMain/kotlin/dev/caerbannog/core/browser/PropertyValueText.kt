@@ -11,21 +11,83 @@ object PropertyValueText {
     /** Top-level null is empty text; nested null is "null"; nothing is capped or sorted. */
     fun of(value: Any?): String = if (value == null) "" else render(value)
 
-    private fun render(value: Any?): String = when (value) {
-        null -> "null"
-        is String -> value
-        is ByteArray -> value.joinToString(" ") { hex(it) }
-        is Map<*, *> -> value.entries.joinToString(prefix = "{", postfix = "}") { "${render(it.key)}: ${render(it.value)}" }
-        is Iterable<*> -> value.joinToString(prefix = "[", postfix = "]") { render(it) }
-        is Array<*> -> value.joinToString(prefix = "[", postfix = "]") { render(it) }
-        is IntArray -> value.joinToString(prefix = "[", postfix = "]")
-        is LongArray -> value.joinToString(prefix = "[", postfix = "]")
-        is ShortArray -> value.joinToString(prefix = "[", postfix = "]")
-        is DoubleArray -> value.joinToString(prefix = "[", postfix = "]")
-        is FloatArray -> value.joinToString(prefix = "[", postfix = "]")
-        is BooleanArray -> value.joinToString(prefix = "[", postfix = "]")
-        is CharArray -> value.joinToString(prefix = "[", postfix = "]")
-        else -> value.toString()
+    /** Literal text queued between the parts of a container; a private type so no property value can be mistaken for it. */
+    private class Literal(val text: String)
+
+    /**
+     * Iterative on purpose: a recursive renderer overflows the thread stack at a depth that depends on the platform
+     * (it failed on the Linux CI at 1,000 levels). The explicit stack holds one token iterator per open container.
+     */
+    private fun render(root: Any?): String {
+        val out = StringBuilder()
+        val stack = ArrayDeque<Iterator<Any?>>()
+        var next: Any? = root
+        var pending = true
+        while (true) {
+            if (!pending) {
+                val top = stack.lastOrNull() ?: break
+                if (!top.hasNext()) {
+                    stack.removeLast()
+                    continue
+                }
+                next = top.next()
+            }
+            pending = false
+            when (val v = next) {
+                is Literal -> out.append(v.text)
+                null -> out.append("null")
+                is String -> out.append(v)
+                is ByteArray -> v.joinTo(out, " ") { hex(it) }
+                is Map<*, *> -> {
+                    out.append('{')
+                    stack.addLast(mapTokens(v))
+                }
+                is Iterable<*> -> {
+                    out.append('[')
+                    stack.addLast(listTokens(v.iterator()))
+                }
+                is Array<*> -> {
+                    out.append('[')
+                    stack.addLast(listTokens(v.iterator()))
+                }
+                is IntArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is LongArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is ShortArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is DoubleArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is FloatArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is BooleanArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                is CharArray -> out.append(v.joinToString(prefix = "[", postfix = "]"))
+                else -> out.append(v.toString())
+            }
+        }
+        return out.toString()
+    }
+
+    private val COMMA = Literal(", ")
+    private val COLON = Literal(": ")
+    private val CLOSE_LIST = Literal("]")
+    private val CLOSE_MAP = Literal("}")
+
+    private fun listTokens(items: Iterator<Any?>): Iterator<Any?> = iterator {
+        var first = true
+        for (item in items) {
+            if (!first) yield(COMMA)
+            first = false
+            yield(item)
+        }
+        yield(CLOSE_LIST)
+    }
+
+    private fun mapTokens(map: Map<*, *>): Iterator<Any?> = iterator {
+        var first = true
+        for ((k, v) in map) {
+            if (!first) yield(COMMA)
+            first = false
+            yield(k)
+            yield(COLON)
+            yield(v)
+        }
+        yield(CLOSE_MAP)
     }
 
     private fun hex(b: Byte): String {

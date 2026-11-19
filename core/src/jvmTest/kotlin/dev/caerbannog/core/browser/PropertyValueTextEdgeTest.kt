@@ -9,8 +9,8 @@ import kotlin.test.assertTrue
 
 /**
  * M9-00b-c step 4: edges the step 2 tests did not pin. Measured at step 4 (not pinned here because a cap would change the decided
- * "no length cap" rule): a list nested 5,000 deep, a map or list that contains itself throw StackOverflowError in
- * `PropertyValueText.of`. The wire cannot deliver such a value: the stream client's decoder refuses nesting beyond about 30 levels
+ * "no length cap" rule): a map or list that contains itself is not pinned (the renderer is iterative since the Linux CI
+ * overflowed its stack at 1,000 levels, so such a value now ends in OutOfMemoryError, not StackOverflowError). The wire cannot deliver such a value: the stream client's decoder refuses nesting beyond about 30 levels
  * (see `StreamMessageMappingTest`, `a value nested beyond the decoder limit never reaches the renderer`).
  */
 class PropertyValueTextEdgeTest {
@@ -64,6 +64,23 @@ class PropertyValueTextEdgeTest {
         var value: Any? = "x"
         repeat(1000) { value = listOf(value) }
         assertEquals(2001, PropertyValueText.of(value).length)
+    }
+
+    @Test
+    fun `nesting of ten thousand levels, in lists and maps, is rendered on a small thread stack`() {
+        var value: Any? = "x"
+        repeat(10_000) { value = if (it % 2 == 0) listOf(value) else mapOf("k" to value) }
+        var text = ""
+        // a 256 KB stack is far below any CI default, so a recursive renderer cannot pass by luck of the platform
+        val t = Thread(null, { text = PropertyValueText.of(value) }, "small-stack", 256 * 1024)
+        t.start(); t.join()
+        assertEquals(5_000 * 2 + 5_000 * 5 + 1, text.length)
+        assertTrue(text.startsWith("{k: [{k: [") && text.contains("[x]}]}"), text.take(30) + " ... " + text.takeLast(30))
+    }
+
+    @Test
+    fun `a map used as a key of a map is rendered`() {
+        assertEquals("{{a: 1}: [2]}", PropertyValueText.of(mapOf<Any?, Any?>(mapOf("a" to 1) to listOf(2))))
     }
 
     // --- the null value of an existing key (step 3 note: it now matches the empty filter text) ---
