@@ -15,6 +15,7 @@ Built with Kotlin and Compose Multiplatform (JVM desktop). Supports RabbitMQ 4.x
 - **Publish:** send a test message to a stream, exchange or queue, or over MQTT with QoS, retain flag and headers (MQTT 5 user properties).
 - **MQTT:** the broker's MQTT client sessions and subscriptions (needs the `rabbitmq_mqtt` plugin).
 - **Topology and queues:** quorum queues, exchanges and bindings with statistics (and a bindings graph); declare and edit them where your permissions allow.
+- **Topology planner:** build a plan step by step (queues, exchanges, bindings, streams with an optional response stream, policies, a dead-lettering recipe, MQTT routes with a test message, headers bindings), see it as a graph, check it read-only against the broker, and save it as an ordinary migration file; or open a pending migration file as steps with Edit steps. Nothing is written to the broker until you apply the saved file on the Migrations screen.
 - **Migrations:** export and apply topology as versioned JSON migration files from a folder you choose; dry run first, history per connection, conflicts never overwrite anything.
 - **Queue message inspection:** peek at the first messages of a queue through the management API in requeue mode; they are returned to the queue and shown as "Not acknowledged (requeued)".
 - **Global search** across streams, queues and exchanges by name.

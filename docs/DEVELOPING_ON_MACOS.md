@@ -75,7 +75,7 @@ task test:broker                  # or: ./gradlew :data-rabbit:brokerTest
 ./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM7GateTest*'    # one class
 ```
 
-`brokerTest` sets `api.version=1.43` for Testcontainers on purpose: recent Docker Desktop engines reject Testcontainers' built-in fallback API version (1.32) with HTTP 400, and the pin works around it (see the comment in `data-rabbit/build.gradle.kts` and the Risks section of `spec.md`). If Docker connection errors appear, check that Docker Desktop is running before anything else.
+Since `M2-10` (Testcontainers 2.0.5) `brokerTest` no longer pins `api.version`: the 2.x default starts on Docker Desktop 29.8.2 without it (see the Risks section of `spec.md`). If a Docker engine ever rejects that default, put `systemProperty("api.version", ...)` back in `brokerTest`. If Docker connection errors appear, check that Docker Desktop is running before anything else.
 
 ### Opt-in tests
 
