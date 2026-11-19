@@ -42,6 +42,10 @@ Behaviours worth knowing:
 The definitions in `dev/broker/definitions/` (`001-base.json`, `002-super-streams.json`) are **re-applied at every
 boot**, in file name order; anything deleted by hand comes back, data is only cleared by `dev:reset`.
 
+## Gate tests that need this broker
+
+`RealBrokerM5GateTest` (`@gate-M5`, 5 tests) runs against this dev broker on `localhost`, not against Testcontainers. Start it first with `docker compose -f dev/broker/docker-compose.yml up -d --wait` (or `task dev:up`), otherwise it fails within a second with "The broker could not be reached". The M7, M8 and M9 gates start their own containers and need only Docker or rootless Podman.
+
 ## Ports and certificates
 
 TLS (the default): stream **5551**, management API (HTTPS) **15671**, AMQP **5671**, MQTT **8883**. Plain, not encrypted:
