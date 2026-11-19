@@ -6,17 +6,17 @@ One line per task. Status vocabulary: `done (merged, <merge commit>, <date>)`, `
 
 **Keeping it in sync:** the coordinator updates the row of the task at every step with one short line; anything longer goes into the task's brief, not into this table.
 
-## Backlog (actual, 2026-11-18)
+## Backlog (actual, 2026-11-19)
 
-Reconciled against git (`main` bba34a63): every task branch is merged; the only branches not on `main` are dependency bumps.
+Reconciled against git (`main` b1f1a981, release 1.1.0 prepared on branch `release-1.1`): every task branch is merged; the only branches not on `main` are dependency bumps.
 
 ### Open work
 
-Updated 2026-11-18 after the merges of `M9-08` (`86ad0540`), `M9-09` (`a926a453`) and `M9-12` (`bba34a63`). All of `M9-01` to `M9-12` are merged, so `M9-13` (the gate) is next.
+Updated 2026-11-19 after the merges of `M9-13` (`cc4b1b40`) and `M2-10` (`b1f1a981`). The main line of M9 is complete: `M9-01` to `M9-14c` and the gate `M9-13` are merged. Release 1.1.0 (`docs/RELEASE_NOTES_1.1.0.md`) was ordered by the owner on 2026-11-19; the owner's formal acceptance of M9 is not recorded, so it stays pending. The rows below are follow-ups, not blockers of the main line.
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): DONE 2026-11-19, accepted at step 5, merge pending the owner; steps 1 and 2 done (test written, green at once, `+` mutation red, order mutation guarded by the plan-order assertion, decided 2026-11-19), step 3 not needed, step 4 (verify) done 2026-11-19 (pass: gate twice, M5/M7/M8 gates, fast suite, order mutation red), step 5 (architect verdict) accepted, branch `M9-13-gate-planner-on-a-real-broker` | M | nothing (all of `M9-01` to `M9-12` merged) |
+| M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): done (merged, `cc4b1b40`, 2026-11-19); accepted at step 5 | M | none |
 | M9 | `M9-08d` retention column, detail and MCP show the byte limit too (Retention `7D, 1 MB`, additive `maxLengthBytes`; five `@m9-08d` scenarios held with `@needs-M9-08d`) | S | nothing (briefed, ready; owner chose b on 2026-11-17) |
 | M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 (measure the base first) | S | nothing (briefed) |
 | M9 | `M9-08e` live checks for the policy claims `M9-08` left unmeasured | S | nothing (briefed) |
@@ -218,7 +218,7 @@ All product decisions of M9 asked so far are answered (spec O12 to O21; for exam
 
 ## Milestone M9 (Topology planner, PLANNED 2026-11-15; scenarios `19_topology_planner.feature`, `20_topology_planner_check.feature`, `21_topology_planner_recipes.feature`; mockup `docs/ux/Planner.dc.html`)
 
-**Status 2026-11-18 (M9): in progress, only the gate is left of the main line.** The spikes and `M9-01` to `M9-12` (with `M9-14`, `M9-14b`, `M9-14c`) are merged; `M9-13` (gate on a real broker) is next. The rest is in the Backlog section at the top of this file.
+**Status 2026-11-19 (M9): main line complete and released in 1.1.0 on the owner's order; the owner's formal acceptance is pending.** The spikes, `M9-01` to `M9-12` (with `M9-14`, `M9-14b`, `M9-14c`) and the gate `M9-13` (`cc4b1b40`) are merged. The rest is in the Backlog section at the top of this file.
 
 **Build order.** (1) The three spikes in parallel: `M9-00a`, `M9-00b`, `M9-00c`. (2) The earliest working slice, which needs no spike and can start with the spikes: `M9-01`, `M9-02`, `M9-03` (queue, exchange and binding in the wizard, naming hints, the draft, save as migration, apply on the Migrations screen). (3) `M9-14` the export that keeps arguments and policies, ORDERED by the owner on 2026-11-15 to start right after `M9-03`; it depends on no planner task (it begins with its own small live spike) and runs next to the tasks below, which do not touch the export. (4) `M9-04` review graph (no spike). (5) `M9-05`, `M9-06` the check (after `M9-00c`). (6) `M9-07` streams and the plain response stream (after `M9-00b`; no MQTT in it). (7) `M9-08` policies and stream retention (after `M9-00c`). (8) `M9-09` dead-lettering (after `M9-00b`, `M9-08`). (9) `M9-10` MQTT routes and the test message with sample values, and `M9-11` headers bindings (after `M9-00a`). (10) `M9-07b` the optional MQTT routes of a stream pair (after `M9-07`, `M9-10`, `M9-00a`; the owner has confirmed the revised Q3, so nothing else holds it). (11) `M9-12` a pending file opened as steps (its scenarios for pairs and routes need `M9-07`, `M9-10`). (12) `M9-13` the gate (`M9-01` to `M9-10`; `M9-07b` has its own live scenario and `M9-14` its own tests, neither is part of the gate). **Progress 2026-11-18: steps (1) to (11) are done and merged (`M9-08` `86ad0540`, `M9-09` `a926a453`, `M9-12` `bba34a63`, the others earlier); step (12), `M9-13`, is next and last.**
 

@@ -53,7 +53,7 @@ compose.desktop {
             packageName = "Caerbannog"
             // jpackage requires MAJOR > 0 (dotted MAJOR[.MINOR][.PATCH]); this is a packaging-format
             // version, unrelated to any app-visible version string.
-            packageVersion = "1.0.1"
+            packageVersion = "1.1.0"
             licenseFile.set(rootProject.file("LICENSE"))
             // Add required Java modules that are not included by default in the bundled JRE.
             // java.net.http is required by Ktor client for HTTP requests (HttpClient, HttpRequest, etc.)
