@@ -114,7 +114,7 @@ class RealBrokerM8ShovelTest {
             assertEquals(3L, ready.facts.source.ready)
             assertEquals(DestinationQueue.Exists(DestinationQueueType.QUORUM), ready.facts.destination)
             assertTrue(ready.facts.shovelPluginsOn)
-            assertTrue("policymaker" in ready.facts.userTags)
+            assertTrue("administrator" in ready.facts.userTags)
             assertEquals(StartResult.Started, run { svc.start(req, q) })
             var state: ForwardingState = ForwardingState.Started()
             awaitUntil("the shovel finishes") { state = run { svc.poll(req, state) }; state == ForwardingState.Finished }
