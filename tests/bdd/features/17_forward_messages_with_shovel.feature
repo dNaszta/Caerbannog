@@ -244,3 +244,71 @@ Feature: Forward the messages of a RabbitMQ 3.x queue with a Shovel
     Then I am told which plugins to enable
     And with the level Read-only I am told that topology changes are locked on "new-eu"
     And with "Use TLS" turned off on "legacy-eu" the progress view says "Not encrypted"
+
+  # M8-15 (2026-11-19, owner decision A): since RabbitMQ 4.4.1 the broker refuses the direct destination
+  # `amqp://` (measured: HTTP 400 "may not use a URI without a hostname or a username") from a user who is not
+  # an administrator. The app keeps the credential-free destination and blocks with a message. The fake
+  # destination broker is RabbitMQ 4.3.7 unless a step says otherwise, so the scenarios above are unchanged.
+
+  @negative @safety @fake-broker @m8-15
+  Scenario Outline: A policymaker who is not an administrator is blocked on RabbitMQ 4.4.1 and later
+    Given the destination broker "new-eu" is RabbitMQ <version>
+    And the user of "new-eu" has the policymaker and monitoring tags but not the administrator tag
+    When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
+    Then forwarding is blocked
+    And I am told that RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker
+    And no shovel is created and nothing is written to either broker
+
+    Examples:
+      | version |
+      | 4.4.1   |
+      | 4.4.2   |
+      | 4.5.0   |
+      | 5.0.0   |
+
+  @fake-broker @m8-15
+  Scenario Outline: A broker before 4.4.1 does not block a policymaker for this reason
+    Given the destination broker "new-eu" is RabbitMQ <version>
+    And the user of "new-eu" has the policymaker and monitoring tags but not the administrator tag
+    When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
+    Then forwarding is not blocked
+    And the destination of the shovel is still the local broker without credentials
+
+    Examples:
+      | version |
+      | 4.4.0   |
+      | 4.3.7   |
+      | 4.0.2   |
+
+  @fake-broker @m8-15
+  Scenario: An administrator is not blocked on RabbitMQ 4.4.1
+    Given the destination broker "new-eu" is RabbitMQ 4.4.1
+    And the user of "new-eu" has the administrator tag
+    When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
+    Then forwarding is not blocked
+
+  @negative @safety @fake-broker @m8-15
+  Scenario: A broker that hides its version is not blocked in advance and the refusal at the start is told the same way
+    Given the version of the destination broker "new-eu" cannot be read
+    And the user of "new-eu" has the policymaker and monitoring tags but not the administrator tag
+    And the broker will refuse the direct destination
+    And I confirmed forwarding "orders" from "legacy-eu" to "new-eu"
+    When the forwarding starts
+    Then no shovel exists on "new-eu"
+    And I am told that RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker
+    And the text I see contains no broker text and no credentials
+
+  @security @fake-broker @m8-15
+  Scenario: The refusal never makes the app put credentials into the destination
+    Given the destination broker "new-eu" is RabbitMQ 4.4.1
+    And the user of "new-eu" has the policymaker and monitoring tags but not the administrator tag
+    When I run a dry run of forwarding "orders" from "legacy-eu" to "new-eu"
+    Then forwarding is blocked
+    And no request was sent that names a destination address with a user or a host
+
+  @broker @safety @m8-15
+  Scenario: On a real RabbitMQ 4.4.1 the policymaker is blocked and the administrator forwards
+    Given a RabbitMQ 4.4.1 broker with the user "pm" (management, policymaker, monitoring) and the user "adm" (administrator)
+    When "pm" runs a dry run of forwarding a queue and then tries to start it
+    Then forwarding is blocked with the 4.4.1 message and no shovel exists
+    And "adm" starts the same forwarding and the messages arrive in the destination queue
