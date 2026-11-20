@@ -21,6 +21,7 @@ import java.nio.file.Files
  * No AMQP client is on the test class path (part A adds one), so the AMQP handshake is a few bytes written by hand.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeGuestLoopbackTest {
 

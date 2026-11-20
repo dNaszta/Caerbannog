@@ -17,19 +17,24 @@ tasks:
       - ./gradlew test
 
   test:broker:
-    desc: Run the @broker test suite (uses rootless Podman socket when present, or Docker).
+    desc: Run both halves of the @broker suite, regression then spikes (uses rootless Podman socket when present, or Docker).
     cmds:
-      - ./gradlew :data-rabbit:brokerTest
+      - ./gradlew :data-rabbit:brokerTest :data-rabbit:brokerSpikeTest --continue
+
+  test:broker:spikes:
+    desc: Run only the spike half of the @broker suite (classes that record broker facts, tag `spike`).
+    cmds:
+      - ./gradlew :data-rabbit:brokerSpikeTest
 
   test:broker:podman:
-    desc: Run the @broker test suite explicitly against rootless Podman (requires `systemctl --user start podman.socket`).
+    desc: Run both halves of the @broker suite explicitly against rootless Podman (requires `systemctl --user start podman.socket`).
     cmds:
-      - ./gradlew :data-rabbit:brokerTest -PcontainerEngine=podman
+      - ./gradlew :data-rabbit:brokerTest :data-rabbit:brokerSpikeTest --continue -PcontainerEngine=podman
 
   test:broker:docker:
-    desc: Run the @broker test suite explicitly against Docker.
+    desc: Run both halves of the @broker suite explicitly against Docker.
     cmds:
-      - ./gradlew :data-rabbit:brokerTest -PcontainerEngine=docker
+      - ./gradlew :data-rabbit:brokerTest :data-rabbit:brokerSpikeTest --continue -PcontainerEngine=docker
 
   test:keychain:
     desc: Run the real OS keychain tests (touches the real keychain and may prompt; run on demand).

@@ -71,7 +71,7 @@ task test                         # or: ./gradlew test
 These start RabbitMQ in Testcontainers and need Docker Desktop running:
 
 ```sh
-task test:broker                  # or: ./gradlew :data-rabbit:brokerTest
+task test:broker                  # both halves; or: ./gradlew :data-rabbit:brokerTest (regression) and :data-rabbit:brokerSpikeTest
 ./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM7GateTest*'    # one class
 ```
 

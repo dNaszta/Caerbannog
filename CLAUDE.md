@@ -18,7 +18,8 @@
 Prefer the `task` wrappers (`task --list`); Fedora installs it as `go-task`.
 
 - `./gradlew :<module>:jvmTest` (`:data-rabbit:test`, `:mcp-server:test`): the fast, no-container suite per module. `task test` runs all.
-- `./gradlew :data-rabbit:brokerTest --tests '*Name*'`: live-broker tests (tag `broker`, Testcontainers, needs Docker or rootless Podman). They are excluded from `test` on purpose.
+- `./gradlew :data-rabbit:brokerTest --tests '*Name*'`: live-broker regression half (gates and product `RealBroker*` classes; tag `broker`, not `spike`; Testcontainers, needs Docker or rootless Podman). They are excluded from `test` on purpose.
+- `./gradlew :data-rabbit:brokerSpikeTest`: the spike half (classes that record broker facts; tags `broker` and `spike`, rule: `broker` and `Spike` in the class name, enforced by `BrokerTestSplitGuardTest`). `task test:broker` runs both. Nothing in `acceptance-tests` needs a live broker: every suite filters `not @broker`.
 - `task test:keychain` touches the real OS keychain, `task test:screenshots` writes screenshots: both are opt-in.
 - `task run` launches the app. `task dev:up` / `dev:seed -- --password dev-password` start and fill a local broker (see `dev/README.md`).
 - CI: `.github/workflows/ci.yml` (fast tests on every push/PR, live broker tests on main) and `package.yml` (all four installers on native runners; tag `v*` attaches them to a release).
@@ -27,8 +28,8 @@ Prefer the `task` wrappers (`task --list`); Fedora installs it as `go-task`.
 ## Testing
 
 - Test first: unit tests with fakes behind the `core` interfaces, BDD scenarios for user-visible behaviour, Compose UI tests for screens, Testcontainers for anything that depends on real broker behaviour. When a claim about the broker is unverified, write a live test instead of guessing (see `RealBrokerStreamExchangeAnnotationsTest`, `RealBrokerMqttHeadersTest`).
-- Run the affected module's tests while working; run the whole suite once before proposing a merge. Do not run `brokerTest` in full unless shared transport code changed.
-- Every Test task logs `TEST START`/`TEST DONE` per class (and `SLOW TEST` over 30 s). Fast tasks time out after 15 min; `brokerTest`, `keychainTest` and `screenshotTest` after 40 min (root `build.gradle.kts`).
+- Run the affected module's tests while working; run the whole suite once before proposing a merge. Do not run `brokerTest` or `brokerSpikeTest` in full unless shared transport code changed.
+- Every Test task logs `TEST START`/`TEST DONE` per class (and `SLOW TEST` over 30 s). Fast tasks time out after 15 min; `brokerTest` after 25 min, `brokerSpikeTest`, `keychainTest` and `screenshotTest` after 40 min (root `build.gradle.kts`; the two broker limits are CI time x 1.5, measured in M2-18, and the CI steps use the same numbers).
 - Give UI elements a `testTag`; keep existing tags stable, tests and BDD steps rely on them.
 - Tests must be deterministic: bounded polling with a clear failure message, never a bare `Thread.sleep`.
 

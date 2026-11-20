@@ -92,23 +92,19 @@ tasks.test {
     }
 }
 
-tasks.register<Test>("brokerTest") {
-    description = "Runs the data-rabbit tests tagged \"broker\" (uses rootless Podman socket when present, or Docker)."
+// M2-18: the container engine choice lives here once; `brokerTest` and `brokerSpikeTest` both call it.
+// M1-01 pinned api.version 1.43 because Testcontainers 1.21.x probed Docker with a hardcoded API 1.32, which
+// Docker Desktop 29 (min API 1.40) rejects. M2-10: Testcontainers 2.x negotiates the version, so the pin is gone.
+// M2-15: Rootless Podman support on Fedora / Linux.
+// Precedence: `-PcontainerEngine=podman|docker` > `CONTAINER_ENGINE=podman|docker` > auto-detect `$XDG_RUNTIME_DIR/podman/podman.sock`.
+// When targeting rootless Podman:
+//   1. Point Testcontainers at `unix://$XDG_RUNTIME_DIR/podman/podman.sock` (unless DOCKER_HOST is already set).
+//   2. Disable the Ryuk reaper container (`TESTCONTAINERS_RYUK_DISABLED=true`, unless already set), because
+//      rootless Podman + SELinux Enforcing blocks Ryuk from mounting the Podman socket inside the reaper container.
+fun Test.configureLiveBroker() {
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
-    useJUnitPlatform {
-        includeTags("broker")
-    }
-    // M1-01 pinned api.version 1.43 because Testcontainers 1.21.x probed Docker with a hardcoded API 1.32, which
-    // Docker Desktop 29 (min API 1.40) rejects. M2-10: Testcontainers 2.x negotiates the version, so the pin is gone.
-
-    // M2-15: Rootless Podman support on Fedora / Linux.
-    // Precedence: `-PcontainerEngine=podman|docker` > `CONTAINER_ENGINE=podman|docker` > auto-detect `$XDG_RUNTIME_DIR/podman/podman.sock`.
-    // When targeting rootless Podman:
-    //   1. Point Testcontainers at `unix://$XDG_RUNTIME_DIR/podman/podman.sock` (unless DOCKER_HOST is already set).
-    //   2. Disable the Ryuk reaper container (`TESTCONTAINERS_RYUK_DISABLED=true`, unless already set), because
-    //      rootless Podman + SELinux Enforcing blocks Ryuk from mounting the Podman socket inside the reaper container.
     val requestedEngine = (project.findProperty("containerEngine") as String?)
         ?.trim()
         ?.lowercase()
@@ -127,6 +123,27 @@ tasks.register<Test>("brokerTest") {
         if (System.getenv("TESTCONTAINERS_RYUK_DISABLED").isNullOrBlank()) {
             environment("TESTCONTAINERS_RYUK_DISABLED", "true")
         }
+    }
+}
+
+// M2-18: the live suite is two tasks so the product verdict is not buried in one long log and each half fits its timeout.
+// Tag rule (enforced by BrokerTestSplitGuardTest): `spike` = `broker` plus "Spike" in the class name.
+tasks.register<Test>("brokerTest") {
+    description = "Regression half of the live suite: gates and product RealBroker* classes (tag expression broker & !spike). " +
+        "Uses rootless Podman socket when present, or Docker."
+    configureLiveBroker()
+    useJUnitPlatform {
+        includeTags("broker")
+        excludeTags("spike")
+    }
+}
+
+tasks.register<Test>("brokerSpikeTest") {
+    description = "Spike half of the live suite: classes that record broker facts, not product behaviour (tag expression " +
+        "broker & spike). Uses rootless Podman socket when present, or Docker."
+    configureLiveBroker()
+    useJUnitPlatform {
+        includeTags("broker & spike")
     }
 }
 

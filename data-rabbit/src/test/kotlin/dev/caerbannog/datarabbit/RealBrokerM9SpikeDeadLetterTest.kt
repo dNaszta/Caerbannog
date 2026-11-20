@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM9SpikeDeadLetterTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM9SpikeDeadLetterTest {
 

@@ -58,6 +58,7 @@ import javax.net.ssl.X509TrustManager
  * (bounded [awaitUntil] polling on the value, failing with the last body).
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class StreamManagementApiSpikeTest {
 

@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit
  * Kept as a small regression check that the shared fixture keeps offering plain listeners. Needs Docker.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class PlainListenersSpikeTest {
 

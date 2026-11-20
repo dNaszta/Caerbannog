@@ -2,6 +2,9 @@
 
 Milestone: M2 (test infrastructure)    Depends on: M2-10 (merged)    Size: M    Runs in parallel with `M8-15`; before `M2-19`
 
+## Status
+Built 2026-11-20 on branch `M2-18-brokertest-timeout-and-split` (steps 1 to 4 locally). Step 2: no fixed polls found, the waits are already bounded `awaitUntil`; the cost is the 1,000-message publishes and the 500-queue setup, left as is. Timeouts from CI run 44631907581 (regression 836 s, spike 1520 s; earlier run 915 s regression): task limits 25 and 40 min, job 75 min. Open: a `workflow_dispatch` run on the CI runner, the deliberately-failing-test CI demo, and step 5 (Podman on Fedora, NOT RUN).
+
 ## Goal
 CI "Live broker tests" on main is green inside its limits as two Gradle tasks with their own CI steps: `brokerTest` (gates and product `RealBroker*` classes, the regression guard) and `brokerSpikeTest` (the classes that record broker facts); `StreamManagementApiSpikeTest` Q3 no longer fails because the host was busy; each half has a task timeout and a job timeout that were measured, not guessed.
 

@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  * Findings: docs/tasks/M8-00-spike-results.md, section "S-T". Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8SpikeInMemoryLimitTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeInMemoryLimitTest {
 

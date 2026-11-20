@@ -61,6 +61,7 @@ import javax.net.ssl.X509TrustManager
  * No named consumer, no browsing, nothing published by a non-admin user, no fixed sleeps (bounded [awaitUntil] polling).
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class StreamClientSpikeTest {
 

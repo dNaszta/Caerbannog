@@ -23,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM9SpikeNamesTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM9SpikeNamesTest {
 
