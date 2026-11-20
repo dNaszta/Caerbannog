@@ -25,3 +25,15 @@ private val VERSION_SHAPE = Regex("[0-9]+(\\.[0-9]+)*([-+~][0-9A-Za-z.+~_-]*)?")
  */
 fun displayableBrokerVersion(text: String?): String? =
     text?.trim()?.takeIf { it.length <= MAX_VERSION_LENGTH && VERSION_SHAPE.matches(it) }
+
+private val THREE_NUMBERS = Regex("([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:[-+~].*)?")
+
+/**
+ * True when [text] (`rabbitmq_version`) is at least major.minor.patch, comparing the three numbers; a suffix such as `-rc.1` after them is
+ * ignored. False for null, a text with fewer or other than three numbers, or a number that does not fit an Int: the caller decides what
+ * "unknown" means (the shovel rule never blocks in advance on an unknown version).
+ */
+fun brokerVersionAtLeast(text: String?, major: Int, minor: Int, patch: Int): Boolean {
+    val parts = THREE_NUMBERS.matchEntire(text ?: return false)?.destructured?.toList()?.map { it.toIntOrNull() ?: return false } ?: return false
+    return compareValuesBy(parts, listOf(major, minor, patch), { it[0] }, { it[1] }, { it[2] }) >= 0
+}

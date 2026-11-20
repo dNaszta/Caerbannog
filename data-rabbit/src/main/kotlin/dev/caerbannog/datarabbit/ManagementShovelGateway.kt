@@ -48,6 +48,7 @@ internal class ManagementShovelGateway(
         val whoami = get(WHOAMI) as? ManagementReply.Response ?: return DryRunOutcome.DestinationUnreachable
         if (whoami.status != 200) return DryRunOutcome.Failed("The 4.x broker did not answer who you are (HTTP ${whoami.status})")
         val tags = tagsOf(whoami.body)
+        val version = readVersion()
 
         val shovels = get(SHOVELS) as? ManagementReply.Response ?: return DryRunOutcome.DestinationUnreachable
         val plugins = shovels.status != 404
@@ -63,7 +64,7 @@ internal class ManagementShovelGateway(
             is Probe.Counts -> probed.counts
             is Probe.Stop -> return probed.outcome
         }
-        return DryRunOutcome.Done(DryRunResult(counts, destination, plugins, tags, existing))
+        return DryRunOutcome.Done(DryRunResult(counts, destination, plugins, tags, existing, version))
     }
 
     override suspend fun start(request: ForwardingRequest): StartOutcome {
@@ -91,7 +92,8 @@ internal class ManagementShovelGateway(
         return when (reply.status) {
             201, 204 -> StartOutcome.Submitted
             401, 403 -> StartOutcome.NotPermitted
-            400 -> StartOutcome.Failed("The broker did not accept the shovel definition")
+            // The broker's words are matched, never shown or logged (safeguard 7); the URI is never retried with credentials.
+            400 -> if (reply.body.contains(DIRECT_REFUSAL_WORDS)) StartOutcome.DirectDestinationRefused else StartOutcome.Failed("The broker did not accept the shovel definition")
             else -> StartOutcome.Failed("The broker did not create the shovel (HTTP ${reply.status})")
         }
     }
@@ -145,6 +147,14 @@ internal class ManagementShovelGateway(
 
     // ---- helpers ----
 
+    /** `rabbitmq_version` from one GET of the overview; null for any failure, status or shape (a user without the management tag gets 401). */
+    private suspend fun readVersion(): String? {
+        val reply = get(OVERVIEW) as? ManagementReply.Response ?: return null
+        if (reply.status != 200) return null
+        val primitive = parse(reply.body)?.asObject()?.get("rabbitmq_version") as? JsonPrimitive
+        return primitive?.takeIf { it.isString }?.content
+    }
+
     private suspend fun get(path: String): ManagementReply = http.get(requests.absolute(ShovelPathAllowList.checked("GET", path)))
 
     private fun queuePath(vhost: String, queue: String) = "/api/queues/${ManagementRequests.encode(vhost)}/${ManagementRequests.encode(queue)}"
@@ -173,5 +183,7 @@ internal class ManagementShovelGateway(
     private companion object {
         const val WHOAMI = "/api/whoami"
         const val SHOVELS = "/api/shovels"
+        const val OVERVIEW = "/api/overview"
+        const val DIRECT_REFUSAL_WORDS = "without a hostname or a username"
     }
 }

@@ -88,9 +88,10 @@ internal object ShovelFx {
         """{"name":"$name","vhost":"$vhost","type":"dynamic","state":"$state","forwarded":$forwarded,"remaining":$remaining${reason?.let { ""","reason":${kotlinx.serialization.json.JsonPrimitive(it)}""" } ?: ""}}"""
 
     /** The destination script of a healthy 4.x broker: whoami, shovel list, destination queue. */
-    fun healthy(shovels: String = NO_SHOVELS, dest: String = queueJson("quorum", "0", "0")): (String, String) -> Pair<Int, String>? = { m, p ->
+    fun healthy(shovels: String = NO_SHOVELS, dest: String = queueJson("quorum", "0", "0"), overview: Pair<Int, String> = 200 to """{"rabbitmq_version":"4.3.7"}"""): (String, String) -> Pair<Int, String>? = { m, p ->
         when {
             m == "GET" && p == "/api/whoami" -> 200 to WHOAMI
+            m == "GET" && p == "/api/overview" -> overview
             m == "GET" && p == "/api/shovels" -> 200 to shovels
             m == "GET" && p.startsWith("/api/queues/") -> 200 to dest
             else -> null

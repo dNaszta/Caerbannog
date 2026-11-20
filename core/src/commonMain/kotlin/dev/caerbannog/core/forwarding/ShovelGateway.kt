@@ -35,6 +35,8 @@ data class DryRunResult(
     val shovelPluginsOn: Boolean,
     val userTags: Set<String>,
     val existingShovel: ShovelStatus?,
+    /** `rabbitmq_version` of the destination broker (M8-15); null when it could not be read. */
+    val brokerVersion: String? = null,
 )
 
 sealed interface DryRunOutcome {
@@ -50,6 +52,8 @@ sealed interface StartOutcome {
     data class Refused(val reason: String) : StartOutcome
     data object NotPermitted : StartOutcome
     data object Unreachable : StartOutcome
+    /** The broker answered 400 "without a hostname or a username" (RabbitMQ 4.4.1+, not an administrator). Carries no broker text. */
+    data object DirectDestinationRefused : StartOutcome
     data class Failed(val reason: String) : StartOutcome
 }
 

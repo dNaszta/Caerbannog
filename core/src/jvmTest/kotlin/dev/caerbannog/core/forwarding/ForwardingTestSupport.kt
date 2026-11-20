@@ -36,7 +36,8 @@ internal object Fwd {
         plugins: Boolean = true,
         tags: Set<String> = tagsOk,
         existing: ShovelStatus? = null,
-    ) = DryRunResult(QueueCounts(ready, 0), destination, plugins, tags, existing)
+        brokerVersion: String? = null,
+    ) = DryRunResult(QueueCounts(ready, 0), destination, plugins, tags, existing, brokerVersion)
 
     fun context(level: TopologyControlLevel = TopologyControlLevel.DECLARE_AND_EDIT, unlocked: Boolean = true) = ForwardingContext(level, unlocked)
 

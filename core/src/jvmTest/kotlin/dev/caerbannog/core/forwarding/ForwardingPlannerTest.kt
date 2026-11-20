@@ -102,4 +102,35 @@ class ForwardingPlannerTest {
             p.warnings,
         )
     }
+
+    // ---- M8-15: the direct destination needs an administrator from 4.4.1 ----
+
+    @Test
+    fun `M8-15 a policymaker is blocked from 4_4_1 on, an administrator never, and before 4_4_1 nobody`() {
+        val noAdmin = Fwd.tagsOk
+        for (v in listOf("4.4.1", "4.4.2", "4.5.0", "5.0.0", "4.4.1-rc.1", "4.10.0")) {
+            assertEquals(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), plan(Fwd.facts(tags = noAdmin, brokerVersion = v)).blocks, v)
+            assertEquals(emptyList(), plan(Fwd.facts(tags = noAdmin + "administrator", brokerVersion = v)).blocks, "administrator on $v")
+        }
+        for (v in listOf("4.4.0", "4.3.7", "4.0.2", "3.13.7")) assertEquals(emptyList(), plan(Fwd.facts(tags = noAdmin, brokerVersion = v)).blocks, v)
+    }
+
+    @Test
+    fun `M8-15 an unknown or unparsable version never blocks in advance`() {
+        for (v in listOf<String?>(null, "", "x", "4.4", "garbage 4.4.1")) assertEquals(emptyList(), plan(Fwd.facts(tags = Fwd.tagsOk, brokerVersion = v)).blocks, "[$v]")
+    }
+
+    @Test
+    fun `M8-15 the new block comes last, after every other block`() {
+        val existing = Fwd.status(request)
+        val p = plan(Fwd.facts(destination = DestinationQueue.Missing, plugins = false, tags = emptySet(), existing = existing, brokerVersion = "4.4.1"), Fwd.context(READ_ONLY))
+        assertEquals(
+            listOf(
+                ForwardingBlock.TopologyLocked, ForwardingBlock.NoPolicymakerTag, ForwardingBlock.CannotReadStatus,
+                ForwardingBlock.ShovelPluginsOff, ForwardingBlock.DestinationMissing, ForwardingBlock.ShovelExists(existing),
+                ForwardingBlock.DirectDestinationNeedsAdministrator,
+            ),
+            p.blocks,
+        )
+    }
 }

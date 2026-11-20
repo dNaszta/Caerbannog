@@ -84,4 +84,15 @@ class ForwardingTextsTest {
         assertEquals(RemoveResult.Failed(ForwardingTexts.BROKER_UNREACHABLE), service(Fwd.gateway().apply { removeOutcome(RemoveOutcome.Unreachable) }).remove(ref))
         assertNotEquals("", ForwardingTexts.BROKER_UNREACHABLE)
     }
+
+    @Test
+    fun `M8-15 the direct destination block text is the approved wording and carries no broker text`() {
+        val text = ForwardingTexts.block(ForwardingBlock.DirectDestinationNeedsAdministrator, "new-eu", "orders")
+        assertEquals(
+            "RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker. The user of new-eu is not an administrator. " +
+                "Use an administrator user for this connection, or ask the administrator of new-eu to create the shovel.",
+            text,
+        )
+        for (leak in listOf("hostname", "amqp", "400", "Validation", "password")) assertTrue(!text.contains(leak, ignoreCase = true), "the text contains \"$leak\": $text")
+    }
 }
