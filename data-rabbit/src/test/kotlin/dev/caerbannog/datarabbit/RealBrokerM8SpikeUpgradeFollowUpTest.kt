@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class RealBrokerM8SpikeUpgradeFollowUpTest {
 
     private companion object {
-        const val OLD = "rabbitmq:3.13-management"
+        const val OLD = BrokerImages.LEGACY_3X
         const val HOST = "upg-host"
     }
 
@@ -86,7 +86,7 @@ class RealBrokerM8SpikeUpgradeFollowUpTest {
 
     @Test
     fun `S-N classic_queue_default_version 2 makes new classic queues version 2 on 3_13 and 4_x, and an explicit x-queue-version still wins`() {
-        for (image in listOf(OLD, "rabbitmq:4-management")) {
+        for (image in listOf(OLD, BrokerImages.CURRENT_4X)) {
             RabbitMQContainer(image).withRabbitMQConfig(MountableFile.forClasspathResource("spike/classic-default-v2.conf")).use { withConf ->
                 withConf.start()
                 val api = MgmtApi(withConf)
@@ -112,7 +112,7 @@ class RealBrokerM8SpikeUpgradeFollowUpTest {
 
     @Test
     fun `S-N messages published over MQTT into a version-1 classic queue and the upgrade to 4_0 and 4_4`() {
-        for (target in listOf("rabbitmq:4.0-management", "rabbitmq:4-management")) {
+        for (target in listOf(BrokerImages.UPGRADE_4_0, BrokerImages.CURRENT_4X)) {
             val volume = newVolume()
             val (old, api) = start(brokerWithPlugins(OLD, "rabbitmq_mqtt").apply { addExposedPort(1883) }, volume)
             api.declareQueue("from-mqtt")
@@ -160,7 +160,7 @@ class RealBrokerM8SpikeUpgradeFollowUpTest {
             pauseSeconds(seconds)
             val apiLater = api.get("/api/queues/%2F/t-q").obj["storage_version"]
             stopGracefully(old)
-            val (_, api2) = start("rabbitmq:4-management", volume)
+            val (_, api2) = start(BrokerImages.CURRENT_4X, volume)
             val survived = count(api2, "t-q")
             println("S-N policy-without-restart, stop ${seconds}s after the policy: API storage_version right after the policy=$apiAfterPolicy and ${seconds}s later=$apiLater; messages on 4.4: $survived of 3")
             assertEquals(3, survived, "stopped ${seconds}s after the policy (the loss seen once in the S-N run at 3 s did not reproduce)")

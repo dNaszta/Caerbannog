@@ -44,7 +44,7 @@ class Dev3xBrokerSetupTest {
 
     @Test
     fun `the 3x broker is a 3 13 image and the 4x broker has the shovel plugins`() {
-        assertTrue(Files.readString(dir.resolve("docker-compose.yml")).contains("rabbitmq:3.13-management"))
+        assertTrue(Files.readString(dir.resolve("docker-compose.yml")).contains("rabbitmq:3.13."))
         val plugins = Files.readString(root.resolve("dev/broker/enabled_plugins"))
         assertTrue("rabbitmq_shovel," in plugins && "rabbitmq_shovel_management" in plugins, "plugins: $plugins")
     }

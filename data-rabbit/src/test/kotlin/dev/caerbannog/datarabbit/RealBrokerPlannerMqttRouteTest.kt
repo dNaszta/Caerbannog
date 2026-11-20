@@ -42,7 +42,7 @@ import java.util.UUID
 
 /**
  * M9-10 step 2, the live proof of `@m9-10` scenario "A message published over MQTT to a planned route reaches a stream and a queue" (bound by name).
- * A throwaway `rabbitmq:4-management` with `rabbitmq_stream` and `rabbitmq_mqtt` ([m9SpikeBroker]); a fresh virtual host per test, unique names, all removed
+ * A throwaway current 4.x image (`BrokerImages.CURRENT_4X`) with `rabbitmq_stream` and `rabbitmq_mqtt` ([m9SpikeBroker]); a fresh virtual host per test, unique names, all removed
  * with the virtual host in `@AfterEach`.
  *
  * The plan is built with the REAL forms (`StreamForm`, `QueueForm`, `MqttRouteForm`), saved as migration JSON, parsed back and applied by the REAL

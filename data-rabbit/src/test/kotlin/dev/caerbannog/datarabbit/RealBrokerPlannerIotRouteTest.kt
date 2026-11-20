@@ -42,7 +42,7 @@ import java.util.UUID
 
 /**
  * M9-07b step 2, the live proof of `@m9-07b @broker` scenario "A device answer published over MQTT lands in the response stream, with its correlation id
- * where the processing can read it" (bound by name). A throwaway `rabbitmq:4-management` with `rabbitmq_stream` and `rabbitmq_mqtt` ([m9SpikeBroker]); a
+ * where the processing can read it" (bound by name). A throwaway current 4.x image (`BrokerImages.CURRENT_4X`) with `rabbitmq_stream` and `rabbitmq_mqtt` ([m9SpikeBroker]); a
  * fresh virtual host per test, unique names, all removed with the virtual host in `@AfterEach`.
  *
  * The plan is what the stream form with the pair tick and the answers tick builds: the two streams and the route `devices/+/answer` into the response

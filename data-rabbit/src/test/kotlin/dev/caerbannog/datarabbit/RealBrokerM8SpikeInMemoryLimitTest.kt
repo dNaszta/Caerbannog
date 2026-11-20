@@ -21,8 +21,8 @@ import org.testcontainers.junit.jupiter.Testcontainers
 class RealBrokerM8SpikeInMemoryLimitTest {
 
     companion object {
-        private val old: RabbitMQContainer = broker("rabbitmq:3.13-management")
-        private val new: RabbitMQContainer = broker("rabbitmq:4-management")
+        private val old: RabbitMQContainer = broker(BrokerImages.LEGACY_3X)
+        private val new: RabbitMQContainer = broker(BrokerImages.CURRENT_4X)
         private val quorum = mapOf<String, Any>("x-queue-type" to "quorum")
         private val both get() = listOf("3.13" to old, "4.x" to new)
 

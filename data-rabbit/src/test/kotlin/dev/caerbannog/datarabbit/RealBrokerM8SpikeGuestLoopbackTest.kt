@@ -75,7 +75,7 @@ class RealBrokerM8SpikeGuestLoopbackTest {
 
     @Test
     fun `S-P with the default loopback_users guest is refused from outside the container on AMQP and management API, another user is not`() {
-        strictBroker("rabbitmq:4-management").use { broker ->
+        strictBroker(BrokerImages.CURRENT_4X).use { broker ->
             broker.start()
             val api = MgmtApi(broker)
             val http = api.get("/api/overview")
@@ -99,7 +99,7 @@ class RealBrokerM8SpikeGuestLoopbackTest {
 
     @Test
     fun `S-P control, the stock image config lets guest in from outside`() {
-        RabbitMQContainer("rabbitmq:4-management").use { broker ->
+        RabbitMQContainer(BrokerImages.CURRENT_4X).use { broker ->
             broker.start()
             assertEquals(200, MgmtApi(broker).get("/api/overview").status)
             assertEquals("tune", amqpLogin(broker, "guest", "guest"))

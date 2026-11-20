@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class RealBrokerM8SpikeUpgradeTest {
 
     private companion object {
-        const val OLD = "rabbitmq:3.13-management"
+        const val OLD = BrokerImages.LEGACY_3X
         const val HOST = "upg-host"
         /** Bound for the broker's confirms of one batch of messages; a slow runner may need seconds, a missing confirm must fail. */
         const val CONFIRM_TIMEOUT_MS = 60_000L
@@ -217,7 +217,7 @@ class RealBrokerM8SpikeUpgradeTest {
         seedMatrix(oldApi)
         stopGracefully(old)
 
-        val (new, api) = start("rabbitmq:4-management", volume)
+        val (new, api) = start(BrokerImages.CURRENT_4X, volume)
         // The node boots and serves; what is lost is only found by looking.
         for (lost in listOf("v1-persist", "default-persist", "v1-large", "v1-lazy", "v1-prio", "v1-empty")) {
             assertEquals(0, count(api, lost), "$lost is a version-1 queue: its messages are gone on 4.4")
@@ -240,7 +240,7 @@ class RealBrokerM8SpikeUpgradeTest {
 
     @Test
     fun `the loss starts with RabbitMQ 4_3, direct upgrades to 4_0, 4_1 and 4_2 convert version-1 queues and keep their messages`() {
-        for ((image, loses) in listOf("rabbitmq:4.0-management" to false, "rabbitmq:4.1-management" to false, "rabbitmq:4.2-management" to false, "rabbitmq:4.3-management" to true)) {
+        for ((image, loses) in listOf(BrokerImages.UPGRADE_4_0 to false, BrokerImages.UPGRADE_4_1 to false, BrokerImages.UPGRADE_4_2 to false, BrokerImages.UPGRADE_4_3 to true)) {
             val volume = newVolume()
             val (old, oldApi) = start(OLD, volume)
             seed(oldApi, "v1", """{"x-queue-version":1}""")
@@ -262,13 +262,13 @@ class RealBrokerM8SpikeUpgradeTest {
         seedMatrix(oldApi)
         stopGracefully(old)
 
-        val (mid, midApi) = start("rabbitmq:4.0-management", volume)
+        val (mid, midApi) = start(BrokerImages.UPGRADE_4_0, volume)
         for (queue in listOf("v1-persist", "default-persist", "v1-large", "v1-lazy", "v1-prio", "v2-persist", "v2-large", "v2-prio", "quorum")) {
             assertEquals(3, count(midApi, queue), "$queue after the hop to 4.0")
         }
         stopGracefully(mid)
 
-        val (_, api) = start("rabbitmq:4-management", volume)
+        val (_, api) = start(BrokerImages.CURRENT_4X, volume)
         for (queue in listOf("v1-persist", "default-persist", "v1-large", "v1-lazy", "v1-prio", "v2-persist", "v2-large", "v2-prio", "quorum")) {
             assertEquals(3, count(api, queue), "$queue after 3.13 -> 4.0 -> 4.4")
         }
@@ -299,7 +299,7 @@ class RealBrokerM8SpikeUpgradeTest {
         assertEquals(1, storageVersion(api2, "stays-v1"))
         stopGracefully(second)
 
-        val (_, api) = start("rabbitmq:4-management", volume)
+        val (_, api) = start(BrokerImages.CURRENT_4X, volume)
         assertEquals(3, count(api, "conv-restart"), "policy plus node restart on 3.13: survives 4.4")
         assertEquals(0, count(api, "stays-v1"), "never converted: lost on 4.4")
     }
@@ -318,7 +318,7 @@ class RealBrokerM8SpikeUpgradeTest {
         waitForCount(againApi, "k-v2", 3)
         kill(again)
 
-        val (_, api) = start("rabbitmq:4-management", volume)
+        val (_, api) = start(BrokerImages.CURRENT_4X, volume)
         assertEquals(3, count(api, "k-v2"), "version 2 survives a kill and the upgrade")
         assertEquals(0, count(api, "k-v1"), "version 1 is lost on 4.4 with a kill just as with a graceful stop")
     }

@@ -12,16 +12,16 @@ import java.util.concurrent.TimeUnit
  * `awaitUntil` of `M8SpikeSupport.kt` and `brokerWithPlugins` of `RabbitContainers.kt`, unchanged.
  */
 internal object M9c {
-    const val IMAGE = "rabbitmq:4-management"
+    val IMAGE: String = BrokerImages.CURRENT_4X
 
     /** A throwaway 4.x broker with the stream plugins (the stream manager of S-G3 and S-H needs the stream port, so 5552 is exposed). */
     fun newBroker(): RabbitMQContainer =
         brokerWithPlugins(IMAGE, "rabbitmq_stream", "rabbitmq_stream_management").also { it.addExposedPort(5552) }
 
-    /** The first test of each class: the floating tag `4-management` still is a 4.x (the facts are measured on 4.x only). */
+    /** The first test of each class: the current 4.x image still is a 4.x (the facts are measured on 4.x only). */
     fun assertFourX(api: MgmtApi) {
         val version = api.get("/api/overview").obj["rabbitmq_version"]!!.jsonPrimitive.content
-        assertTrue(version.startsWith("4."), "rabbitmq:4-management answered version $version; the M9-00c facts are measured on 4.x")
+        assertTrue(version.startsWith("4."), "${BrokerImages.CURRENT_4X} answered version $version; the M9-00c facts are measured on 4.x")
     }
 
     fun fixture(name: String): String =

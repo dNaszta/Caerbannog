@@ -29,9 +29,9 @@ class RealBrokerM8SpikeAmqpsShovelTest {
 
     companion object {
         private val network: Network = Network.newNetwork()
-        private val old: RabbitMQContainer = broker("rabbitmq:3.13-management").withNetwork(network).withNetworkAliases("tlsold")
+        private val old: RabbitMQContainer = broker(BrokerImages.LEGACY_3X).withNetwork(network).withNetworkAliases("tlsold")
             .withRabbitMQConfig(MountableFile.forClasspathResource("tls/amqps-only.conf"))
-        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_shovel", "rabbitmq_shovel_management")
+        private val new: RabbitMQContainer = brokerWithPlugins(BrokerImages.CURRENT_4X, "rabbitmq_shovel", "rabbitmq_shovel_management")
             .withNetwork(network).withNetworkAliases("new")
         private lateinit var o: MgmtApi
         private lateinit var n: MgmtApi
