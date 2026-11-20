@@ -50,7 +50,7 @@ Repeat until the architect says Accepted and your report has no open blocker or 
 - Test the sad path as much as the happy path: broker refuses, connection drops, permission missing, retention deletes data mid-browse, empty stream, huge payload, invalid regex, malformed migration file.
 - Never test against a production broker. Never put real credentials in tests or fixtures.
 - Queue messages are never consumed, acknowledged, rejected, deleted or purged by the app's own process. The only read path is the requeue peek (`ManagementQueueMessageInspector`); the only accepted way messages move is a broker-side dynamic Shovel with the safeguards in `docs/spec.md` (M8). RabbitMQ 3.x is a read-only migration source: send it GET requests only.
-- Real-broker setup for M8: `rabbitmq:3.13-management` plus `rabbitmq:4-management` on one Testcontainers network (tag `broker-3x`), shovel plugins enabled by exec. Use a request recorder that asserts the app sends only GETs to the 3.x broker, and a log guard that asserts no password or Shovel URI is ever logged or returned.
+- Real-broker setup for M8: `BrokerImages.LEGACY_3X` plus `BrokerImages.CURRENT_4X` (explicit patch tags, M2-19) on one Testcontainers network (tag `broker-3x`), shovel plugins enabled by exec. Use a request recorder that asserts the app sends only GETs to the 3.x broker, and a log guard that asserts no password or Shovel URI is ever logged or returned.
 - A flaky test is a bug: fix it, quarantine it with a tag and a note to the architect, or delete it. Never ignore it.
 
 # Exploratory checks (beyond the scenarios)
