@@ -1,6 +1,7 @@
 package dev.caerbannog.core.forwarding
 
 import dev.caerbannog.core.connections.TopologyControlLevel
+import dev.caerbannog.core.connections.brokerVersionAtLeast
 
 data class ForwardingContext(val level: TopologyControlLevel, val topologyUnlocked: Boolean)
 
@@ -11,6 +12,8 @@ sealed interface ForwardingBlock {
     data object ShovelPluginsOff : ForwardingBlock
     data object DestinationMissing : ForwardingBlock
     data class ShovelExists(val status: ShovelStatus) : ForwardingBlock
+    /** RabbitMQ 4.4.1+ refuses the credential-free destination `amqp://` from a user who is not an administrator. */
+    data object DirectDestinationNeedsAdministrator : ForwardingBlock
 }
 
 sealed interface ForwardingWarning {
@@ -38,6 +41,8 @@ object ForwardingPlanner {
             ForwardingBlock.ShovelPluginsOff.takeIf { !facts.shovelPluginsOn },
             ForwardingBlock.DestinationMissing.takeIf { facts.destination == DestinationQueue.Missing },
             facts.existingShovel?.let { ForwardingBlock.ShovelExists(it) },
+            // Unknown version never blocks here: the broker is the authority and the start maps its refusal to the same block.
+            ForwardingBlock.DirectDestinationNeedsAdministrator.takeIf { "administrator" !in tags && brokerVersionAtLeast(facts.brokerVersion, 4, 4, 1) },
         )
         val type = (facts.destination as? DestinationQueue.Exists)?.type
         val warnings = listOfNotNull(

@@ -64,6 +64,9 @@ object ForwardingTexts {
             "The user of $destination cannot read the shovel status and needs the monitoring tag. Without it the app could not see a failed shovel or remove it."
         ForwardingBlock.ShovelPluginsOff -> "The shovel plugins are not enabled on $destination. Enable rabbitmq_shovel and rabbitmq_shovel_management."
         ForwardingBlock.DestinationMissing -> "The queue $queue does not exist on $destination. Apply the migration that declares it first."
+        ForwardingBlock.DirectDestinationNeedsAdministrator ->
+            "RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker. The user of $destination is not an administrator. " +
+                "Use an administrator user for this connection, or ask the administrator of $destination to create the shovel."
         is ForwardingBlock.ShovelExists -> {
             val s = block.status
             "A shovel named ${s.ref.name} already exists on $destination (${s.state.name.lowercase()}, ${s.forwarded ?: 0} forwarded). The app never replaces a shovel."

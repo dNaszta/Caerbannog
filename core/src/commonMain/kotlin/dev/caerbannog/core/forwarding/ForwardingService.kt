@@ -58,6 +58,8 @@ class ForwardingService(private val gateway: ShovelGateway, private val context:
             is StartOutcome.Refused -> StartResult.Refused(started.reason)
             StartOutcome.NotPermitted -> StartResult.Failed(ForwardingTexts.CREATE_NOT_ALLOWED)
             StartOutcome.Unreachable -> StartResult.Failed(ForwardingTexts.BROKER_UNREACHABLE)
+            StartOutcome.DirectDestinationRefused ->
+                StartResult.Blocked(ForwardingPlan(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), emptyList()))
             is StartOutcome.Failed -> StartResult.Failed(started.reason)
         }
     }
