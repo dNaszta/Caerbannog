@@ -26,7 +26,7 @@ Out: pinning by digest (a tag is enough; document that a tag can be re-pushed), 
 - `RealBrokerM8GateTest` and `RealBrokerM7GateTest` green.
 
 ## Design notes
-Test code, two compose files, `ci.yml`, `data-rabbit/build.gradle.kts` (the one system property pass-through in `brokerTest`), `dev/README.md`, `docs/spec.md`. No production code. `BrokerImages.CURRENT_4X` reads `System.getProperty("caerbannog.brokerImage")` once; nothing else may read it. Keep tag `broker` on all classes.
+Test code, two compose files, `ci.yml`, `data-rabbit/build.gradle.kts` (the one system property pass-through in `brokerTest`), `dev/README.md`, `docs/spec.md`. No production code, with one exception: the `ForwardingViewModel` defect fix of the 2026-11-20 decision below (its own commit). `BrokerImages.CURRENT_4X` reads `System.getProperty("caerbannog.brokerImage")` once; nothing else may read it. Keep tag `broker` on all classes.
 
 ## UX
 None.
@@ -38,8 +38,22 @@ None (internal test infrastructure).
 - Does the dev broker pin need an owner word? Decision (B) says "live-test images"; the dev compose file is the CI job's dev broker and a hand-trial tool. Recommendation: pin (above). If the owner wants the dev broker to float, drop item 2 and keep the CI job.
 - Which patch to move to next is not decided here; the procedure is.
 
+## Decision 2026-11-20 (architect): the M8-15 view-model defect is fixed inside M2-19, as its own commit
+Defect (found by the test developer, red test `ForwardingViewModelTest` `M2-19 a broker that refuses the direct destination ends in Blocked ...`): `ForwardingViewModel.confirm` answers `StartResult.Blocked` with `prepareNow()` and throws the returned plan away. When the broker refuses at the start (4.4.1 rule) but the dry run did not block (version hidden or unknown, the very case the second line of defence in `M8-15` exists for), the fresh dry run plans normally and the screen returns to `Confirm` with no text; the user can click for ever.
+
+Why it slipped past the `M8-15` review: the architect review accepted it with follow-up (b), "the view model path is covered only through the service", and judged that gap minor. It was not: the service test proves the mapping to `StartResult.Blocked`, but nothing proved that the view model shows what `Blocked` carries. The gap was named and under-rated, not missed; follow-up (b) was the test that found the bug.
+
+Why inside M2-19 and not an `M8-16`: `M8-15` is merged but unreleased, the red test and its fixture already live on this branch, the fix is a few lines in one function, and a separate branch would need the test cherry-picked and would conflict on the same test file. Cost: M2-19 was "no production code"; the exception is limited to one separate commit ("Show the blocks the start returned instead of re-preparing", body: the symptom and the cause) so it can be reviewed or reverted alone, and the `BrokerImages` sweep stays free of it.
+
+Shape of the fix (`core`, `ForwardingViewModel.confirm`, the `when` arm; `prepareNow` stays as it is):
+- `StartResult.NotConfirmed` keeps `prepareNow()` (nothing was refused; back to Confirm is right).
+- `is StartResult.Blocked`: run `prepareNow()` as today (fresh facts, and a `ShovelExists` block still gets its Remove button), and if the resulting state is not `ForwardingScreenState.Blocked`, replace it with `Blocked(queue, dest, result.plan.blocks, result.plan.warnings, facts, remove = null)` built from the plan the service returned, with `facts` the last known facts. Rule: the screen may never answer a refused start with `Confirm`. Do not keep a flag; a small private function (for example `blockedFrom(plan)`) is enough.
+- Not changed: the service (it already returns the right plan), the planner, the gateway, the UI (`forward-block-<n>` renders any block through `ForwardingTexts.block`), the wording, `dest-uri`, the spec safeguards. Re-checked against the `M8-15` brief and `docs/spec.md` "Forwarding messages with a dynamic Shovel": typed confirmation, dry run, `on-confirm`, no source deletion, no 3.x write, no URI shown, no MCP tool: all untouched. No spec text changes; the spec already says the start is blocked with the administrator message, the screen just failed to show it.
+
+Instructions for the senior developer: work in the M2-19 worktree (`/Users/dnaszta/Projects/Caerbannog/.claude/worktrees/M2-19-pin-live-test-images`, branch `M2-19-pin-live-test-images`). Order: (1) this fix commit first: `./gradlew :core:jvmTest --tests '*ForwardingViewModelTest*'` must turn the M2-19 test green and keep `a shovel that appeared after the dry run ...` and the locked-level test green; then `:core:jvmTest`, `:acceptance-tests` (the `@m8-07 or @m8-15` forwarding suite) and `:ui:jvmTest --tests '*MigrateFromThreeForwardingUiTest*'`. (2) then the `BrokerImages` sweep as in Scope. Do not run `brokerTest` for the fix commit; run it for the sweep as the Acceptance says. Mutation check for the fix: put `prepareNow()` alone back, the M2-19 test must go red.
+
 ## Definition of done
-Tests first (the guard test red before the sweep), no unrelated change, `dev/README.md` and spec updated, floating job run once.
+Tests first (the guard test red before the sweep), no unrelated change (the view-model fix is its own commit and is the only production change), `dev/README.md` and spec updated, floating job run once.
 
 ## Status
 - Step 2 (tests first, test developer, 2026-11-20), branch `M2-19-pin-live-test-images`, RED, no production or build change yet. Tags checked with `docker manifest inspect`: `4.4.1`, `3.13.7`, `4.0.9`, `4.1.8`, `4.2.9`, `4.3.8` (all `-management`) exist.
