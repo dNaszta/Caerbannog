@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  * Findings are written in docs/tasks/M8-00-spike-results.md. Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8SpikeShovelTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeShovelTest {
 

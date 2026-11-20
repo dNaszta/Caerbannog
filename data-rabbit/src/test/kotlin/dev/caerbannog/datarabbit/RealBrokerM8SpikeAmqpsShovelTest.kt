@@ -23,6 +23,7 @@ import org.testcontainers.utility.MountableFile
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8SpikeAmqpsShovelTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeAmqpsShovelTest {
 

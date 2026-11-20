@@ -67,6 +67,7 @@ import java.util.UUID
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM9ExportSpikeTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.MethodName::class)
 class RealBrokerM9ExportSpikeTest {

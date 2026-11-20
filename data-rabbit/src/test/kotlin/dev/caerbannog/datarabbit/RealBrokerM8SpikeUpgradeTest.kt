@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Counting uses a requeueing peek (`ack_requeue_true`), which is exact, so there is no statistics lag to wait for.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeUpgradeTest {
 

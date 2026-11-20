@@ -130,7 +130,7 @@ If Docker Desktop is running, you can run the integration tests against a real R
 task test:broker
 
 # Or using Gradle Wrapper directly:
-.\gradlew.bat :data-rabbit:brokerTest
+.\gradlew.bat :data-rabbit:brokerTest :data-rabbit:brokerSpikeTest --continue
 ```
 
 ---

@@ -23,6 +23,7 @@ import java.util.Base64
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM8SpikeDefinitionsTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM8SpikeDefinitionsTest {
 

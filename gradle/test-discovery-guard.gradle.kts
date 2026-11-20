@@ -26,7 +26,7 @@ val moduleNames = rootProject.subprojects.map { it.name }
 val testSourceDirs = moduleNames.flatMap { m -> listOf("jvmTest", "commonTest", "test").map { "$m/src/$it" } }
 val resultRoots = moduleNames.map { m -> rootProject.file("$m/build/test-results") }
 val allResultDirs = resultRoots.flatMap { root ->
-    listOf("test", "jvmTest", "brokerTest", "keychainTest", "screenshotTest").map { root.resolve(it) }
+    listOf("test", "jvmTest", "brokerTest", "brokerSpikeTest", "keychainTest", "screenshotTest").map { root.resolve(it) }
 }
 
 val fixtureTask = rootProject.tasks.register<VerifyTestDiscoveryFixtures>("verifyTestDiscoveryFixtures") {
@@ -52,7 +52,7 @@ val guardTask = rootProject.tasks.register<VerifyTestDiscovery>("verifyTestDisco
     // Ordering only (the tagged tasks stay optional): when both run in one call, the guard reads their result
     // directories after they finish, which also clears Gradle's implicit-dependency error.
     moduleNames.forEach { m ->
-        listOf("brokerTest", "keychainTest", "screenshotTest", "jvmTest").forEach { t ->
+        listOf("brokerTest", "brokerSpikeTest", "keychainTest", "screenshotTest", "jvmTest").forEach { t ->
             mustRunAfter(rootProject.provider { rootProject.findProject(":$m")?.tasks?.matching { it.name == t } ?: emptyList<Task>() })
         }
     }

@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM9SpikeHeadersBindingTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class RealBrokerM9SpikeHeadersBindingTest {

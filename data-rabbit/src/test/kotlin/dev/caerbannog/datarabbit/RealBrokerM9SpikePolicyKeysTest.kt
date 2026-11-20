@@ -31,6 +31,7 @@ import java.util.UUID
  * Run: `./gradlew :data-rabbit:brokerTest --tests '*RealBrokerM9SpikePolicyKeysTest*'`.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RealBrokerM9SpikePolicyKeysTest {
 

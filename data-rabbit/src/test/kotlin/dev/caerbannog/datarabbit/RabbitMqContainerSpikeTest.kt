@@ -28,6 +28,7 @@ import java.net.URI
  * or JUnit 5 dependency yet.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class RabbitMqContainerSpikeTest {
 

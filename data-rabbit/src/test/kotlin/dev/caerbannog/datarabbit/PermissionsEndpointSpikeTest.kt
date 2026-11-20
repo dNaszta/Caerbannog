@@ -26,6 +26,7 @@ import javax.net.ssl.X509TrustManager
  * trust-all SSLContext is spike-only test code against a throwaway container, never product code.
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class PermissionsEndpointSpikeTest {
 

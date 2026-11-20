@@ -52,6 +52,8 @@ jobs:
     # Real RabbitMQ in Testcontainers (Docker is preinstalled on the runner). Only on main and on demand: slower than the fast suite.
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # M2-18: sum of the two step limits (25 + 45) plus 10 for checkout, Gradle setup, the dev broker and teardown.
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
@@ -63,8 +65,15 @@ jobs:
       # as `task dev:up` starts it; the other broker tests start their own Testcontainers broker.
       - name: Start the dev broker
         run: docker compose -f dev/broker/docker-compose.yml up -d --wait
-      - name: Run broker tests
+      # M2-18: two halves. Limits = the Gradle task timeouts in the root build.gradle.kts (measured CI time x 1.5).
+      - name: Run regression broker tests
+        timeout-minutes: 25
         run: ./gradlew :data-rabbit:brokerTest
+      # always(): a red regression half still runs the spike half, so both verdicts show.
+      - name: Run spike broker tests
+        if: always()
+        timeout-minutes: 45
+        run: ./gradlew :data-rabbit:brokerSpikeTest
       - name: Stop the dev broker
         if: always()
         run: docker compose -f dev/broker/docker-compose.yml down -v

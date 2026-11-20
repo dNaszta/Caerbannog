@@ -58,6 +58,7 @@ import javax.net.ssl.X509TrustManager
  * (bounded [awaitUntil] polling on the value, failing with the last body).
  */
 @Tag("broker")
+@Tag("spike")
 @Testcontainers(disabledWithoutDocker = true)
 class StreamManagementApiSpikeTest {
 
@@ -562,6 +563,7 @@ class StreamManagementApiSpikeTest {
     fun `Q3 management has no offsets - first and last offset come from queryStreamStats, messages is the count`() {
         val name = unique("spike-q3a-")
         declareStream(name)
+        val publishedAt = System.currentTimeMillis() // read before publishing: the wait below can take minutes on a busy host
         publishViaManagement(name, 1000) // each message its own chunk
         val q = awaitMessages(name, 1000)
         assertAbsent(q.obj, listOf("first_offset", "last_offset", "committed_offset", "committed_chunk_id", "first_offset_timestamp", "last_timestamp", "last_offset_timestamp"), "queue object")
@@ -575,8 +577,7 @@ class StreamManagementApiSpikeTest {
         assertEquals(q.obj["messages"]!!.jsonPrimitive.long, stats.committedChunkId() - stats.firstOffset() + 1,
             "with single-message chunks the 03 formula (committed - first + 1) equals messages")
         // the first message was published after the stream was created: first_timestamp is a recent epoch in ms
-        val now = System.currentTimeMillis()
-        assertTrue(q.obj["first_timestamp"]!!.jsonPrimitive.long in (now - 600_000)..(now + 60_000), "first_timestamp ${q.obj["first_timestamp"]} vs now $now")
+        assertTrue(q.obj["first_timestamp"]!!.jsonPrimitive.long in SpikeClockWindow.firstTimestampWindow(publishedAt), "first_timestamp ${q.obj["first_timestamp"]} vs publishedAt $publishedAt")
     }
 
     @Test

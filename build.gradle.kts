@@ -20,7 +20,7 @@ apply(from = "gradle/test-discovery-guard.gradle.kts")
 // until the step timeout. Every Test task now logs one line when a test class starts and one when it ends (with the
 // duration), plus a line for any single test slower than 30 s. Each Test task also gets a task timeout, so Gradle
 // fails the task and names the test instead of Actions killing the step silently. Broker, keychain and screenshot
-// tasks get a larger limit (broker tests take about 17 minutes on CI). Test behaviour is unchanged.
+// tasks get a larger limit (see slowTaskMinutes). Test behaviour is unchanged.
 subprojects {
     tasks.withType<Test>().configureEach {
         val slowTestMillis = 30_000L
@@ -50,8 +50,11 @@ subprojects {
                 }
             }
         })
-        val slowTaskNames = setOf("brokerTest", "keychainTest", "screenshotTest")
-        timeout.set(java.time.Duration.ofMinutes(if (name in slowTaskNames) 40 else 15))
+        // M2-18: measured, not guessed. CI run 44631907581 (main, 2026-11-19, the only complete run): regression half
+        // 836 s (earlier run 915 s), spike half 1520 s. Limit = slowest CI time x 1.5, rounded up to 5 minutes:
+        // brokerTest 915 s -> 23 -> 25 min; brokerSpikeTest 1520 s -> 38 -> 40 min, raised to 45 at review: the idle local time is 1644 s and the half grows with every spike. ci.yml step limits equal these.
+        val slowTaskMinutes = mapOf("brokerTest" to 25L, "brokerSpikeTest" to 45L, "keychainTest" to 40L, "screenshotTest" to 40L)
+        timeout.set(java.time.Duration.ofMinutes(slowTaskMinutes[name] ?: 15L))
     }
 }
 
