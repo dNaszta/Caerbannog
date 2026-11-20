@@ -71,7 +71,7 @@ class RealBrokerM9SpikePolicyKeysTest {
     private fun valueOf(json: String) = kotlinx.serialization.json.Json.parseToJsonElement(json)
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9c.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9c.assertFourX(api)
 
     @Test
     fun `S-F1a every key is accepted for every apply-to, an unknown key is the one refusal`() {

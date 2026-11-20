@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * M8-00 spike helper: plain management API calls against a Testcontainers broker (3.13 or 4.x), with any user.
- * Spike tests are living proof of the findings written in docs/tasks/M8-00-spike-results.md; they use floating image tags
- * (the pinned 3.x and 4.x images in `BrokerImages`), so a finding that a newer 4.x changes fails here on purpose.
+ * Spike tests are living proof of the findings written in docs/tasks/M8-00-spike-results.md; they use the pinned images
+ * (3.x and 4.x in `BrokerImages`), so a finding that a newer 4.x changes fails here on purpose.
  */
 internal class MgmtApi(private val container: RabbitMQContainer) {
 

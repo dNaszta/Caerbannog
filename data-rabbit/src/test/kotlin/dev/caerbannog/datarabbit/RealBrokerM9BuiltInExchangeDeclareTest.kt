@@ -41,7 +41,7 @@ class RealBrokerM9BuiltInExchangeDeclareTest {
     }
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9c.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9c.assertFourX(api)
 
     @Test
     fun `Control an ordinary exchange declared again with the same settings answers 204`() {

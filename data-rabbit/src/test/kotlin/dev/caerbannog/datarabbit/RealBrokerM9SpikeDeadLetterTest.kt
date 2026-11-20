@@ -81,7 +81,7 @@ class RealBrokerM9SpikeDeadLetterTest {
     }
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9SpikeDl.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9SpikeDl.assertFourX(api)
 
     // ---- S-C1: arrival per cause, by policy on a queue that exists without arguments ----
 

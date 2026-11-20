@@ -83,7 +83,7 @@ class RealBrokerM9SpikeDeclareEquivalenceTest {
     }
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9c.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9c.assertFourX(api)
 
     @Test
     fun `S-G1 a repeated queue declare, per type, answers like the table`() {
