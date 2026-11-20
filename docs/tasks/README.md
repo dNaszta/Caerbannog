@@ -34,7 +34,7 @@ Updated 2026-11-19 after the merges of `M9-13` (`cc4b1b40`) and `M2-10` (`b1f1a9
 | M5 | `M5-09` read-only migration MCP tools (list, dry run) | S | nothing |
 | M1 | `M1-13` unreadable `connections.json` (owner chose option B, 2026-11-09) | M | nothing |
 | M2 | `F-C2` lazy stream list | S/M | nothing (spike first) |
-| M8 | `M8-15` shovel direct destination refused on RabbitMQ 4.4.1 for a non-administrator: block with a message (owner decision A, 2026-11-19) | S/M | none; parallel with `M2-18`; turns `RealBrokerM8ShovelTest` and S-F green; done (merge pending) |
+| M8 | `M8-15` shovel direct destination refused on RabbitMQ 4.4.1 for a non-administrator: block with a message (owner decision A, 2026-11-19) | S/M | none; parallel with `M2-18`; turns `RealBrokerM8ShovelTest` and S-F green |
 | M2 | `M2-18` split `brokerTest` into regression and spike tasks with own CI steps and measured timeouts, Q3 clock point (not yet fixed), Podman once | M | `M2-10` merged; parallel with `M8-15` |
 | M2 | `M2-19` pin live-test images (`BrokerImages`: 4.4.1, 3.13.7, ladder 4.0.9 to 4.3.8), dev compose files, bump procedure in `dev/README.md`, one non-blocking floating-tag CI job (owner decision B) | S/M | `M2-18` and `M8-15` merged first |
 | Ideas, no brief | `M2-17e`, `M2-17f`, `M2-TESTHYGIENE-05`, `M2-TESTHYGIENE-06`, `M8-05c`, `M8-09b`, `M8-12b-polish` | S | a trigger named in the old status text (see `STATUS-HISTORY.md`) |
