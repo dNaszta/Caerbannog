@@ -52,8 +52,8 @@ subprojects {
         })
         // M2-18: measured, not guessed. CI run 44631907581 (main, 2026-11-19, the only complete run): regression half
         // 836 s (earlier run 915 s), spike half 1520 s. Limit = slowest CI time x 1.5, rounded up to 5 minutes:
-        // brokerTest 915 s -> 23 -> 25 min; brokerSpikeTest 1520 s -> 38 -> 40 min. ci.yml step limits equal these.
-        val slowTaskMinutes = mapOf("brokerTest" to 25L, "brokerSpikeTest" to 40L, "keychainTest" to 40L, "screenshotTest" to 40L)
+        // brokerTest 915 s -> 23 -> 25 min; brokerSpikeTest 1520 s -> 38 -> 40 min, raised to 45 at review: the idle local time is 1644 s and the half grows with every spike. ci.yml step limits equal these.
+        val slowTaskMinutes = mapOf("brokerTest" to 25L, "brokerSpikeTest" to 45L, "keychainTest" to 40L, "screenshotTest" to 40L)
         timeout.set(java.time.Duration.ofMinutes(slowTaskMinutes[name] ?: 15L))
     }
 }

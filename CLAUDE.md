@@ -29,7 +29,7 @@ Prefer the `task` wrappers (`task --list`); Fedora installs it as `go-task`.
 
 - Test first: unit tests with fakes behind the `core` interfaces, BDD scenarios for user-visible behaviour, Compose UI tests for screens, Testcontainers for anything that depends on real broker behaviour. When a claim about the broker is unverified, write a live test instead of guessing (see `RealBrokerStreamExchangeAnnotationsTest`, `RealBrokerMqttHeadersTest`).
 - Run the affected module's tests while working; run the whole suite once before proposing a merge. Do not run `brokerTest` or `brokerSpikeTest` in full unless shared transport code changed.
-- Every Test task logs `TEST START`/`TEST DONE` per class (and `SLOW TEST` over 30 s). Fast tasks time out after 15 min; `brokerTest` after 25 min, `brokerSpikeTest`, `keychainTest` and `screenshotTest` after 40 min (root `build.gradle.kts`; the two broker limits are CI time x 1.5, measured in M2-18, and the CI steps use the same numbers).
+- Every Test task logs `TEST START`/`TEST DONE` per class (and `SLOW TEST` over 30 s). Fast tasks time out after 15 min; `brokerTest` after 25 min, `brokerSpikeTest` after 45 min, `keychainTest` and `screenshotTest` after 40 min (root `build.gradle.kts`; the two broker limits are CI time x 1.5, measured in M2-18, and the CI steps use the same numbers).
 - Give UI elements a `testTag`; keep existing tags stable, tests and BDD steps rely on them.
 - Tests must be deterministic: bounded polling with a clear failure message, never a bare `Thread.sleep`.
 
