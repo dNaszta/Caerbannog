@@ -15,5 +15,5 @@ import org.junit.platform.suite.api.Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("17_forward_messages_with_shovel.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.forwarding")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@m8-07 and @fake-broker")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "(@m8-07 or @m8-15) and @fake-broker")
 class RunForwardingCoreAcceptanceTest

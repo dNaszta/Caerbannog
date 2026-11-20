@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Test
 /** M8-08 scenario "The app never reads the shovel parameters": the allow-list refuses everything but the five shovel requests. */
 class ShovelPathAllowListTest {
     @Test
-    fun `the five shovel requests are allowed`() {
+    fun `the six shovel requests are allowed`() {
         listOf(
-            "GET" to "/api/whoami", "GET" to "/api/shovels", "GET" to "/api/queues/%2F/orders", "GET" to "/api/queues/my%20vhost/a%20b%2Fc%25d",
+            "GET" to "/api/whoami", "GET" to "/api/overview", "GET" to "/api/shovels", "GET" to "/api/queues/%2F/orders", "GET" to "/api/queues/my%20vhost/a%20b%2Fc%25d",
             "PUT" to "/api/parameters/shovel/%2F/caerbannog-migrate-orders", "DELETE" to "/api/parameters/shovel/%2F/caerbannog-migrate-a%20b%2Fc%25d",
         ).forEach { (m, p) -> assertTrue(ShovelPathAllowList.isAllowed(m, p), "$m $p should be allowed") }
     }
@@ -25,7 +25,8 @@ class ShovelPathAllowListTest {
             "DELETE" to "/api/queues/%2F/orders/contents", "DELETE" to "/api/queues/%2F/orders", "PUT" to "/api/queues/%2F/orders",
             "POST" to "/api/shovels", "PUT" to "/api/shovels", "DELETE" to "/api/shovels", "PUT" to "/api/whoami", "POST" to "/api/whoami",
             "POST" to "/api/parameters/shovel/%2F/x", "GET" to "/api/exchanges/%2F/amq.default/publish", "POST" to "/api/exchanges/%2F/amq.default/publish",
-            "GET" to "/api/overview", "GET" to "/api/vhosts", "GET" to "/api/queues/%2F", "GET" to "/api/queues",
+            "PUT" to "/api/overview", "POST" to "/api/overview", "DELETE" to "/api/overview", "GET" to "/api/overview?columns=x", "GET" to "/api/overview/x",
+            "GET" to "/api/overview#x", "GET" to "/api/extensions", "GET" to "/api/vhosts", "GET" to "/api/queues/%2F", "GET" to "/api/queues",
             "PUT" to "/api/parameters/shovel/%2F", "DELETE" to "/api/parameters/shovel/%2F/a/b", "PUT" to "/api/parameters/federation-upstream/%2F/x",
             "DELETE" to "/api/parameters/shovel/%2F/..", "GET" to "/api/queues/%2F/..", "GET" to "/api/queues/%2F/a?x=1", "GET" to "/api/shovels#x",
             "GET" to "/api/queues/%2F/ord ers", "GET" to "api/shovels", "GET" to "/other/api/shovels", "GET" to "", "TRACE" to "/api/shovels",

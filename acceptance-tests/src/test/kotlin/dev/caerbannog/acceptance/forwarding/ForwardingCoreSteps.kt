@@ -8,6 +8,8 @@ import dev.caerbannog.core.forwarding.DestinationQueueType
 import dev.caerbannog.core.forwarding.DryRunResult
 import dev.caerbannog.core.forwarding.ForwardingBlock
 import dev.caerbannog.core.forwarding.ForwardingConfirmation
+import dev.caerbannog.core.forwarding.ForwardingRequest
+import dev.caerbannog.core.forwarding.ForwardingTexts
 import dev.caerbannog.core.forwarding.ForwardingState
 import dev.caerbannog.core.forwarding.ForwardingWarning
 import dev.caerbannog.core.forwarding.Prepared
@@ -416,4 +418,66 @@ class ForwardingCoreSteps {
     }
 
     private fun initialState(): ForwardingState? = w.state
+
+    // ---- M8-15: the direct destination needs an administrator from RabbitMQ 4.4.1 ----
+
+    private val blockSentence = "RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker"
+
+    @Given("the destination broker {string} is RabbitMQ {word}")
+    fun destinationVersion(name: String, version: String) = w.gateway.brokerVersion(version)
+
+    @Given("the version of the destination broker {string} cannot be read")
+    fun versionHidden(name: String) = w.gateway.brokerVersion(null)
+
+    @Given("the user of {string} has the policymaker and monitoring tags but not the administrator tag")
+    fun noAdministrator(name: String) = w.gateway.userTags("policymaker", "monitoring")
+
+    @Given("the user of {string} has the administrator tag")
+    fun administrator(name: String) = w.gateway.userTags("administrator")
+
+    @Given("the broker will refuse the direct destination")
+    fun refuseDirect() = w.gateway.refuseDirectDestination()
+
+    @Then("forwarding is not blocked")
+    fun notBlocked() { assertIs<Prepared.Ready>(w.prepared, "forwarding is blocked: ${w.prepared}"); assertEquals(emptyList(), blocks()) }
+
+    /** The blocks the user sees: those of the dry run, or those the start came back with. */
+    private fun seenBlocks(): List<ForwardingBlock> = (w.started as? StartResult.Blocked)?.plan?.blocks ?: blocks()
+
+    private fun seenText(): String = seenBlocks().joinToString("\n") { ForwardingTexts.block(it, "new-eu", "orders") }
+
+    @Then("I am told that RabbitMQ 4.4.1 and later lets only an administrator create a shovel that sends to its own broker")
+    fun toldDirect() {
+        assertTrue(ForwardingBlock.DirectDestinationNeedsAdministrator in seenBlocks(), "blocks: ${seenBlocks()}, start: ${w.started}")
+        assertTrue(seenText().contains(blockSentence), seenText())
+    }
+
+    @Then("no shovel is created and nothing is written to either broker")
+    fun nothingWrittenEither() {
+        assertTrue(w.gateway.calls.all { it is ShovelCall.DryRun }, "calls: ${w.gateway.calls}")
+        assertTrue(w.gateway.shovels.isEmpty())
+    }
+
+    @Then("no shovel exists on {string}")
+    fun noShovelExists(name: String) = assertTrue(w.gateway.shovels.isEmpty(), "shovels: ${w.gateway.shovels.keys}")
+
+    @Then("the text I see contains no broker text and no credentials")
+    fun cleanText() {
+        assertIs<StartResult.Blocked>(w.started, "the start must come back with the block, got ${w.started}")
+        for (leak in listOf("hostname", "username", "amqp", "400", "Validation", "password", "SENTINEL")) assertTrue(!seenText().contains(leak, ignoreCase = true), "the text contains \"$leak\": ${seenText()}")
+        assertTrue(!w.started.toString().contains("hostname"), w.started.toString())
+    }
+
+    @Then("the destination of the shovel is still the local broker without credentials")
+    fun destinationLocal() {
+        // The request has no destination address at all: the gateway writes the constant "amqp://" (pinned in ManagementShovelGatewayTest).
+        val fields = ForwardingRequest::class.java.declaredFields.map { it.name.lowercase() }
+        assertTrue(fields.none { it.contains("uri") || it.contains("address") || it.contains("password") || it.contains("user") }, "fields: $fields")
+    }
+
+    @Then("no request was sent that names a destination address with a user or a host")
+    fun noDestinationAddress() {
+        assertTrue(w.gateway.calls.none { it is ShovelCall.Start }, "calls: ${w.gateway.calls}")
+        destinationLocal()
+    }
 }

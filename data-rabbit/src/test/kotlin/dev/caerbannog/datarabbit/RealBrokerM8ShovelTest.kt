@@ -49,16 +49,17 @@ class RealBrokerM8ShovelTest {
     companion object {
         private val network: Network = Network.newNetwork()
         private val old: RabbitMQContainer = broker("rabbitmq:3.13-management").withNetwork(network).withNetworkAliases("old")
-        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
+        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4.4.1-management", "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
         private lateinit var o: MgmtApi
         private lateinit var n: MgmtApi
 
         @JvmStatic @BeforeAll fun start() {
             old.start(); new.start()
             o = MgmtApi(old); n = MgmtApi(new)
-            n.put("/api/users/svc", """{"password":"svc-pass","tags":"management,policymaker,monitoring"}""")
+            n.put("/api/users/svc", """{"password":"svc-pass","tags":"administrator"}""")
             n.put("/api/users/pm", """{"password":"pm-pass","tags":"management,policymaker"}""")
-            for (u in listOf("svc", "pm")) n.put("/api/permissions/%2F/$u", """{"configure":".*","write":".*","read":".*"}""")
+            n.put("/api/users/pmm", """{"password":"pmm-pass","tags":"management,policymaker,monitoring"}""")
+            for (u in listOf("svc", "pm", "pmm")) n.put("/api/permissions/%2F/$u", """{"configure":".*","write":".*","read":".*"}""")
         }
 
         @JvmStatic @AfterAll fun stop() { new.stop(); old.stop(); network.close() }
@@ -208,5 +209,29 @@ class RealBrokerM8ShovelTest {
             awaitUntil("the odd queue finishes") { state = run { svc.poll(req, state) }; state == ForwardingState.Finished }
             awaitUntil("2 messages arrived") { n.peek(enc(odd)).size == 2 }
         } finally { cleanup(odd) }
+    }
+
+    @Test
+    fun `M8-15 on 4_4_1 a policymaker is blocked with the new block and the gateway reports the refusal, the administrator forwards`() {
+        val q = "m8-15-direct"
+        try {
+            o.declareQueue(q); repeat(2) { o.publish(q, "m$it") }
+            n.declareQueue(q, """{"x-queue-type":"quorum"}""")
+            awaitUntil("the source reports 2 ready messages") { o.get("/api/queues/%2F/$q").body.contains("\"messages_ready\":2") }
+            val pmGateway = gateway("pmm", "pmm-pass"); val pmService = service(pmGateway); val req = request(q)
+            val blocked = run { pmService.prepare(req) } as? Prepared.Blocked ?: error("a policymaker must be blocked on 4.4.1")
+            assertTrue(ForwardingBlock.DirectDestinationNeedsAdministrator in blocked.plan.blocks, "blocks: ${blocked.plan.blocks}")
+            assertTrue(run { pmService.start(req, q) } is StartResult.Blocked)
+            assertFalse(shovelExists(q), "no shovel may exist after the blocked start")
+            // the gateway called directly: the broker's own 400 maps to the outcome, with no broker text
+            assertEquals(StartOutcome.DirectDestinationRefused, run { pmGateway.start(req) })
+            assertFalse(shovelExists(q))
+            // the administrator forwards
+            val admService = service(gateway()); 
+            assertEquals(StartResult.Started, run { admService.start(req, q) })
+            var state: ForwardingState = ForwardingState.Started()
+            awaitUntil("the shovel finishes") { state = run { admService.poll(req, state) }; state == ForwardingState.Finished }
+            awaitUntil("2 messages arrived") { n.peek(q).size == 2 }
+        } finally { cleanup(q) }
     }
 }

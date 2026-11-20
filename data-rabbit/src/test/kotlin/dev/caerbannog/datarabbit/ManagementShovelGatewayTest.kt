@@ -38,7 +38,7 @@ class ManagementShovelGatewayTest {
         assertEquals(true, done.result.shovelPluginsOn)
         assertEquals(setOf("policymaker", "monitoring"), done.result.userTags)
         assertEquals(null, done.result.existingShovel)
-        assertEquals(setOf("GET /api/whoami", "GET /api/shovels", "GET /api/queues/%2F/orders"), r.destinationSeen.map { "${it.method} ${it.path}" }.toSet())
+        assertEquals(setOf("GET /api/whoami", "GET /api/overview", "GET /api/shovels", "GET /api/queues/%2F/orders"), r.destinationSeen.map { "${it.method} ${it.path}" }.toSet())
         assertEquals(listOf("GET /api/queues/%2F/orders"), r.sourceSeen.map { "${it.method} ${it.path}" }, "the probe sends ONE GET")
     }
 
@@ -290,5 +290,62 @@ class ManagementShovelGatewayTest {
         ShovelRig.run { gateway.dryRun(ShovelFx.request()); gateway.start(ShovelFx.request()); gateway.status(ref); gateway.remove(ref) }
         assertTrue(r.allSeen.size >= 7, "the premise: the four operations sent requests, got ${r.allSeen.size}")
         r.allSeen.forEach { assertTrue(ShovelPathAllowList.isAllowed(it.method, it.path), "${it.method} ${it.path} is not on the allow-list") }
+    }
+
+    // ---- M8-15: the version read and the refusal of the direct destination ----
+
+    @Test
+    fun `M8-15 the dry run reads the version with one GET of the overview and passes it on`() {
+        val r = rig(ShovelFx.healthy(overview = 200 to """{"rabbitmq_version":"4.4.1","management_version":"4.4.1"}"""))
+        val done = ShovelRig.run { r.gateway().dryRun(ShovelFx.request()) }.expect<DryRunOutcome.Done>()
+        assertEquals("4.4.1", done.result.brokerVersion)
+        assertEquals(1, r.destinationSeen.count { it.path == "/api/overview" }, "the overview is read once")
+    }
+
+    @Test
+    fun `M8-15 a 401, a failure, a body without the version or a body that is not json gives a null version and the dry run still succeeds`() {
+        val base = ShovelFx.healthy()
+        for (reply in listOf(401 to "", 403 to "BODY-secret", 500 to "", 200 to "{}", 200 to "not json", 200 to """{"rabbitmq_version":5}""")) {
+            val done = ShovelRig.run { rig({ m, p -> if (p == "/api/overview") reply else base(m, p) }).gateway().dryRun(ShovelFx.request()) }.expect<DryRunOutcome.Done>()
+            assertEquals(null, done.result.brokerVersion, "$reply")
+        }
+        val failing = ShovelRig.run { rig({ m, p -> if (p == "/api/overview") throw IOException("refused") else base(m, p) }).gateway().dryRun(ShovelFx.request()) }.expect<DryRunOutcome.Done>()
+        assertEquals(null, failing.result.brokerVersion)
+    }
+
+    @Test
+    fun `M8-15 start never reads the overview, only the dry run does`() {
+        val r = ShovelRig(destination = { _, _ -> 201 to "" })
+        ShovelRig.run { r.gateway().start(ShovelFx.request()) }
+        assertTrue(r.destinationSeen.none { it.path == "/api/overview" }, "requests: ${r.destinationSeen.map { it.path }}")
+    }
+
+    @Test
+    fun `M8-15 a 400 with the words without a hostname or a username is DirectDestinationRefused, and the broker text is not carried`() {
+        val text = """{"error":"bad_request","reason":"Validation failed\n\nuser \"pm\" may not use a URI without a hostname or a username"}"""
+        val out = ShovelRig.run { ShovelRig(destination = { _, _ -> 400 to text }).gateway().start(ShovelFx.request()) }
+        assertEquals(StartOutcome.DirectDestinationRefused, out)
+        assertEquals("DirectDestinationRefused", out.toString().substringAfterLast('.').substringBefore('@').substringBefore('('))
+    }
+
+    @Test
+    fun `M8-15 a 400 of another text, an empty 400 or the same words with another status still follow the old mapping`() {
+        fun start(status: Int, body: String) = ShovelRig.run { ShovelRig(destination = { _, _ -> status to body }).gateway().start(ShovelFx.request()) }
+        assertEquals(StartOutcome.Failed("The broker did not accept the shovel definition"), start(400, """{"reason":"bad uri"}"""))
+        assertEquals(StartOutcome.Failed("The broker did not accept the shovel definition"), start(400, ""))
+        assertEquals(StartOutcome.Failed("The broker did not accept the shovel definition"), start(400, """{"reason":"user \"pm\" may not use the username \"pm\" without a password"}"""))
+        assertEquals(StartOutcome.NotPermitted, start(401, "without a hostname or a username"))
+        assertTrue(start(500, "without a hostname or a username") is StartOutcome.Failed)
+    }
+
+    @Test
+    fun `M8-15 the refused start sends exactly one PUT, with the constant destination, and the source password only inside src-uri`() {
+        val r = ShovelRig(destination = { _, _ -> 400 to "may not use a URI without a hostname or a username" })
+        val out = ShovelRig.run { r.gateway().start(ShovelFx.request(credentials = ShovelFx.creds("mover", "typed-SENTINEL"))) }
+        assertEquals(StartOutcome.DirectDestinationRefused, out)
+        assertEquals(listOf("PUT"), r.allSeen.map { it.method }, "no retry, no other request")
+        val body = startBody(r)
+        assertEquals("amqp://", body["dest-uri"]!!.jsonPrimitive.content)
+        body.filterKeys { it != "src-uri" }.values.forEach { assertFalse(it.toString().contains("typed-SENTINEL"), "the password is outside src-uri: $it") }
     }
 }

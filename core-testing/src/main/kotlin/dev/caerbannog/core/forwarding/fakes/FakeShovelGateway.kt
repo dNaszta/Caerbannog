@@ -48,6 +48,8 @@ class FakeShovelGateway : ShovelGateway {
     private var startOutcome: StartOutcome = StartOutcome.Submitted
     private var removeOutcome: RemoveOutcome = RemoveOutcome.Removed
     private var dryRunFailure: DryRunOutcome? = null
+    private var version: String? = "4.3.7"
+    private var directRefused = false
 
     fun sourceQueue(connection: String, vhost: String, queue: String, ready: Long, unacked: Long = 0) {
         sources[Triple(connection, vhost, queue)] = QueueCounts(ready, unacked)
@@ -64,6 +66,12 @@ class FakeShovelGateway : ShovelGateway {
     fun removeOutcome(outcome: RemoveOutcome) { removeOutcome = outcome }
     fun failDryRun(outcome: DryRunOutcome) { dryRunFailure = outcome }
 
+    /** M8-15: the `rabbitmq_version` the dry run reads; null is a broker that hides it (or a user who cannot read the overview). Default 4.3.7. */
+    fun brokerVersion(text: String?) { version = text }
+
+    /** M8-15: the broker answers the start with its 400 "without a hostname or a username" (a non-administrator on 4.4.1 or later); nothing is created. */
+    fun refuseDirectDestination() { directRefused = true }
+
     private fun record(call: ShovelCall) { synchronized(log) { log += call } }
 
     override suspend fun dryRun(request: ForwardingRequest): DryRunOutcome {
@@ -75,12 +83,13 @@ class FakeShovelGateway : ShovelGateway {
         if (dryRuns >= 2) lateShovel?.let { shovels[it.ref] = it }
         val type = destinations[request.destinationVhost to request.destinationQueue]
         return DryRunOutcome.Done(
-            DryRunResult(counts, if (type == null) DestinationQueue.Missing else DestinationQueue.Exists(type), pluginsOn, tags, shovels[request.shovel]),
+            DryRunResult(counts, if (type == null) DestinationQueue.Missing else DestinationQueue.Exists(type), pluginsOn, tags, shovels[request.shovel], version),
         )
     }
 
     override suspend fun start(request: ForwardingRequest): StartOutcome {
         record(ShovelCall.Start(request))
+        if (directRefused) return StartOutcome.DirectDestinationRefused
         if (startOutcome == StartOutcome.Submitted) {
             if (request.shovel in shovels) replaced += request.shovel
             shovels[request.shovel] = ShovelStatus(request.shovel, ShovelRunState.STARTING, null, null, null)

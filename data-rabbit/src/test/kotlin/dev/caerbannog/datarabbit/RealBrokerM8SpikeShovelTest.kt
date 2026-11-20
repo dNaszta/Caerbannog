@@ -24,7 +24,7 @@ class RealBrokerM8SpikeShovelTest {
     companion object {
         private val network: Network = Network.newNetwork()
         private val old: RabbitMQContainer = broker("rabbitmq:3.13-management").withNetwork(network).withNetworkAliases("old")
-        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
+        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4.4.1-management", "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
         private lateinit var o: MgmtApi
         private lateinit var n: MgmtApi
 
@@ -34,6 +34,8 @@ class RealBrokerM8SpikeShovelTest {
             o.put("/api/users/mon", """{"password":"mon-pass","tags":"monitoring"}""")
             n.put("/api/users/svc", """{"password":"svc-pass","tags":"management,policymaker"}""")
             n.put("/api/users/mon", """{"password":"mon-pass","tags":"monitoring"}""")
+            n.put("/api/users/adm", """{"password":"adm-pass","tags":"administrator"}""")
+            n.put("/api/permissions/%2F/adm", """{"configure":".*","write":".*","read":".*"}""")
             n.put("/api/permissions/%2F/svc", """{"configure":".*","write":".*","read":".*"}""")
         }
 
@@ -140,13 +142,18 @@ class RealBrokerM8SpikeShovelTest {
         o.declareQueue("ship5")
         val body = shovelBody("ship5", "ship5-q", "queue-length")
         try {
-            assertEquals(201, n.put("/api/parameters/shovel/%2F/tag-svc", body, "svc", "svc-pass").status, "management+policymaker may create")
-            assertEquals(401, n.get("/api/shovels", "svc", "svc-pass").status, "but may not read the status list")
+            // M8-15 (measured 2026-11-19): from 4.4.1 a policymaker may not use the direct destination "amqp://"; before 4.4.1 it could.
+            val refused = n.put("/api/parameters/shovel/%2F/tag-svc", body, "svc", "svc-pass")
+            assertEquals(400, refused.status, "management+policymaker is refused the direct destination on 4.4.1")
+            assertTrue(refused.body.contains("without a hostname or a username"), "the broker words the app matches: ${refused.body}")
+            assertEquals(201, n.put("/api/parameters/shovel/%2F/tag-adm", body, "adm", "adm-pass").status, "an administrator may create")
+            assertEquals(401, n.get("/api/shovels", "svc", "svc-pass").status, "but management+policymaker may not read the status list")
             assertEquals(401, n.put("/api/parameters/shovel/%2F/tag-mon", body, "mon", "mon-pass").status, "monitoring may not create")
             assertEquals(200, n.get("/api/shovels", "mon", "mon-pass").status, "monitoring may read the status list")
         } finally {
             n.delete("/api/parameters/shovel/%2F/tag-svc")
             n.delete("/api/parameters/shovel/%2F/tag-mon")
+            n.delete("/api/parameters/shovel/%2F/tag-adm")
             n.delete("/api/queues/%2F/ship5-q")
         }
         val whoami = n.get("/api/whoami", "svc", "svc-pass").obj["tags"]!!.jsonArray.map { it.jsonPrimitive.content }

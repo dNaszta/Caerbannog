@@ -72,5 +72,10 @@ None. CLAUDE.md forbids an MCP tool that creates or removes a Shovel. `caerbanno
 ## Spec changes (made with this brief, by the architect)
 `docs/spec.md`: the Shovel bullet in "Milestones" item 3, safeguard 6 and the Shovel measured-facts row now say that the policymaker tag is enough only before 4.4.1, and that from 4.4.1 the broker refuses the direct destination `amqp://` from anyone who is not an administrator, with the block and its message; a new Risks line records the owner decision (A).
 
+## Status
+- Step 2 (tests first) written 2026-11-20 on branch `M8-15-shovel-direct-uri-on-4-4`, RED, nothing built. Names the tests expect from production: `brokerVersionAtLeast(text: String?, major, minor, patch): Boolean` (top-level in `BrokerVersion.kt`, false for null or unparsable), `DryRunResult.brokerVersion: String?` (last parameter), `ForwardingBlock.DirectDestinationNeedsAdministrator`, `StartOutcome.DirectDestinationRefused` (an object), and in `ForwardingService.start` that outcome becomes `StartResult.Blocked(ForwardingPlan(listOf(DirectDestinationNeedsAdministrator), emptyList()))` (same place and text as the block; no new result type).
+- Fake: `FakeShovelGateway.brokerVersion(text)` (default 4.3.7) and `refuseDirectDestination()`. Steps in `ForwardingCoreSteps`; suite filter widened to `(@m8-07 or @m8-15) and @fake-broker`.
+- Live: `RealBrokerM8ShovelTest` (administrator `svc`, `pmm` policymaker+monitoring+management, image `rabbitmq:4.4.1-management`, new M8-15 test) and `RealBrokerM8SpikeShovelTest` S-F split. `RealBrokerM8GateTest` uses `guest` (administrator): unchanged. `RealBrokerM8SpikeAmqpsShovelTest` still on `4-management` with a policymaker `svc`: see the report.
+
 ## Definition of done
 Tests written first and red for the right reason (the planner test fails because the block does not exist; the live tests fail with the 400), then green; the three red live classes green on 4.4.1; gates green; no unrelated change; `THIRD_PARTY_NOTICES.md` untouched (no dependency).

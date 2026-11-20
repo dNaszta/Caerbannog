@@ -281,4 +281,36 @@ class ForwardingServiceTest {
         assertTrue(prepared is Prepared.Ready, "the premise: the run was prepared, got $prepared")
         seen.forEach { assertTrue(!it.toString().contains(Fwd.SENTINEL), "the password is in: $it") }
     }
+
+    // ---- M8-15 ----
+
+    @Test
+    fun `M8-15 a policymaker on 4_4_1 is blocked at prepare and at start, and no start is sent`() = runTest {
+        val gateway = Fwd.gateway().apply { brokerVersion("4.4.1") }
+        val svc = service(gateway)
+        val prepared = assertIs<Prepared.Blocked>(svc.prepare(request))
+        assertEquals(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), prepared.plan.blocks)
+        val started = assertIs<StartResult.Blocked>(svc.start(request, "orders"))
+        assertEquals(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), started.plan.blocks)
+        assertTrue(gateway.calls.none { it is ShovelCall.Start }, "calls: ${gateway.calls}")
+        assertTrue(gateway.shovels.isEmpty())
+    }
+
+    @Test
+    fun `M8-15 an administrator on 4_4_1 starts`() = runTest {
+        val gateway = Fwd.gateway().apply { brokerVersion("4.4.1"); userTags("administrator") }
+        assertEquals(StartResult.Started, service(gateway).start(request, "orders"))
+    }
+
+    @Test
+    fun `M8-15 a refusal at the start with an unreadable version is the same block, sends nothing more and leaks no broker text`() = runTest {
+        val gateway = Fwd.gateway().apply { brokerVersion(null); refuseDirectDestination() }
+        val svc = service(gateway)
+        assertIs<Prepared.Ready>(svc.prepare(request))
+        val result = assertIs<StartResult.Blocked>(svc.start(request, "orders"))
+        assertEquals(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), result.plan.blocks)
+        assertEquals(1, gateway.calls.count { it is ShovelCall.Start }, "no retry and no other URI: ${gateway.calls}")
+        assertTrue(gateway.shovels.isEmpty())
+        assertTrue(!result.toString().contains("hostname"), result.toString())
+    }
 }
