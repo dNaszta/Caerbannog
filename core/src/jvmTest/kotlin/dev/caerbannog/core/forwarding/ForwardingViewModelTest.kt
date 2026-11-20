@@ -194,6 +194,20 @@ class ForwardingViewModelTest {
     }
 
     @Test
+    fun `M2-19 a broker that refuses the direct destination ends in Blocked with the administrator text and no shovel is left`() = runTest {
+        val r = FwdRig(this); r.pickOrders()
+        assertIs<ForwardingScreenState.Confirm>(r.state)
+        r.gateway.refuseDirectDestination()
+        r.typeAndConfirm()
+        val blocked = assertIs<ForwardingScreenState.Blocked>(r.state, "the screen is stuck: ${r.state}")
+        assertEquals(listOf(ForwardingBlock.DirectDestinationNeedsAdministrator), blocked.blocks)
+        val text = ForwardingTexts.block(blocked.blocks.single(), blocked.destination, blocked.queue)
+        assertTrue(text.contains("only an administrator") && text.contains("new-eu"), "block text: $text")
+        assertEquals(1, r.starts.size, "calls: ${r.gateway.calls}")
+        assertTrue(r.gateway.calls.none { it is ShovelCall.Remove }, "nothing was created, nothing to remove: ${r.gateway.calls}")
+    }
+
+    @Test
     fun `a level that dropped while the dialog was open blocks the start with the locked block and sends no request`() = runTest {
         val r = FwdRig(this); r.pickOrders()
         val calls = r.gateway.calls.size
