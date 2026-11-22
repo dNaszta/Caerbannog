@@ -31,4 +31,7 @@ class WideFontLayoutGuardUiTest {
 
     /** Original: PlanPairLayoutExploratoryUiTest "the stacked and the side by side layouts ...". Promise asserted: the stacked card is in the window or the page scrolls. */
     @Test fun `at 1025 by 800 the stacked review card is in the window or the page scrolls to it with a wide font`() = check(WideFontScenarios.stackedCard(pinned = true))
+
+    /** Original: MigrationsEditStepsNarrowExploratoryUiTest "at 1000 wide and font scale 1_5 the four buttons are on screen" (finding F2). */
+    @Test fun `at 1000 wide and font scale 1_5 the four buttons of the Migrations action row are intact with a wide font`() = check(WideFontScenarios.narrowActionRow(pinned = true))
 }

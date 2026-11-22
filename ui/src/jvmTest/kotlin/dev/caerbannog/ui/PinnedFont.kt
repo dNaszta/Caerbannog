@@ -16,6 +16,9 @@ import androidx.compose.ui.text.platform.Font
  * install), so the pin is the widest realistic face, DejaVu Sans 2.37 (Book and Bold, as in the Debian package `fonts-dejavu-core`). A layout that holds
  * with this face holds with the narrower ones. The two TTF files are test resources (`ui/src/jvmTest/resources/fonts`, with their licence text); they do not ship in
  * the app, so `THIRD_PARTY_NOTICES.md` is not touched.
+ *
+ * Rule (M2-21 D4): a new UI test that asserts positions, sizes or overflow (`boundsInRoot`, `positionInRoot`, `size`, or `isDisplayed` used as a layout check)
+ * is written with [setPinnedContent] or added to `WideFontLayoutGuardUiTest`. The other UI tests keep the machine's own font on purpose.
  */
 internal object PinnedFont {
     private fun bytes(name: String): ByteArray =

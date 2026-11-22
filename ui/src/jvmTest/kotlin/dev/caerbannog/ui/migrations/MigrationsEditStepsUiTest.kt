@@ -20,6 +20,7 @@ import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.ui.layout.assertIntact
 import dev.caerbannog.ui.planner.assertDrawn
 import dev.caerbannog.ui.planner.assertNotDrawn
 import dev.caerbannog.ui.planner.node
@@ -248,7 +249,10 @@ class MigrationsEditStepsUiTest {
     @Test
     fun `at font scale 1_5 the four buttons of the action row are all on screen`() = runDesktopComposeUiTest(1280, 800) {
         show(state(), scale = 1.5f)
-        listOf("migrations:editStepsBtn", "migrations:editFileBtn", "migrations:validateBtn", "migrations:applySingleBtn").forEach { node(it).assertIsDisplayed() }
+        val tags = listOf("migrations:editStepsBtn", "migrations:editFileBtn", "migrations:validateBtn", "migrations:applySingleBtn")
+        tags.forEach { node(it).assertIsDisplayed() }
+        // isDisplayed passes a 2 px wide Apply; assertIntact is the promise (M2-21): inside the window, one label line, not narrower than the label, no overlap.
+        assertIntact(tags, 1280, 800, scroll = true)
     }
 
     @Test

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -83,7 +85,7 @@ import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
 
 /** Compact buttons: five of them and the connection chip share one line at 1280 px. */
-private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
 
 @Composable
 fun MigrationsScreen(
@@ -514,6 +516,7 @@ private fun StatusPill(status: MigrationStatus) {
 
 private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MigrationDetailPanel(
     file: MigrationFile,
@@ -651,11 +654,13 @@ private fun MigrationDetailPanel(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Action row
-            Row(
+            // Action row. A FlowRow, not a Row: at font scale 1.5 the four buttons need more than the detail panel is wide, and a Row squeezed the last ones to
+            // zero width (M2-21 D2). Every button keeps its natural width; the weighted spacer pushes Validate and Apply to the right, or starts their line when it wraps.
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                itemVerticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (!holdsHash && refusal == null) {
                     FilledTonalButton(

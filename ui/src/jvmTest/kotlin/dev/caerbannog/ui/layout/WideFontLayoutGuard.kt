@@ -75,6 +75,14 @@ internal object WideFontScenarios {
                     "sum of widths of 5 buttons and chip=${r1(widthSum)} px, chip=${b.getValue("connectionChip")}, tops=${bar.map { it.top }}"
                 val tops = bar.map { it.top }
                 if (!tops.all { Math.abs(it - tops.first()) < 8f }) run.problems += "the app bar wrapped for ${entry.label}: $tops"
+                val chip = b.getValue("connectionChip")
+                if (chip.right > 1280f - 24f) run.problems += "the chip of ${entry.label} ends at ${chip.right}, past the 24 px page padding"
+                // Headroom: the slack left on the line between the bar title and the first button, after the 8 dp row spacing (buttons sit at the end);
+                // M2-21 D1 asks for at least 8 px under DejaVu Sans, so that a small font change does not wrap the chip again.
+                val headroom = firstLeft - title.right - 8f
+                run.facts += "app bar ${entry.label}: headroom=${r1(headroom)} px"
+                if (pinned && headroom < 8f) run.problems += "the app bar of ${entry.label} has only ${r1(headroom)} px of headroom, 8 are asked"
+                run.problems += intactProblems(tags.drop(1).dropLast(1), 1280, 800)
             }
         }
     }
@@ -99,9 +107,8 @@ internal object WideFontScenarios {
                 val n = node(tag).fetchSemanticsNode()
                 val bd = n.boundsInRoot
                 run.facts += "action row $width wide, scale 1.5: $tag left=${r1(bd.left)} right=${r1(bd.right)} top=${r1(bd.top)} size=${bd.width.toInt()}x${bd.height.toInt()}"
-                val shown = runCatching { node(tag).assertIsDisplayed() }.isSuccess
-                if (!shown) run.problems += "$tag is not displayed at $width wide, scale 1.5 (bounds $bd)"
             }
+            run.problems += intactProblems(tags, width, 800, scroll = true)
         }
     }
 
@@ -117,8 +124,9 @@ internal object WideFontScenarios {
             listOf("planner:saveBtn", "planner:discardBtn", "planner:editPill", "planner:unsavedPill").forEach { tag ->
                 val bd = node(tag).fetchSemanticsNode().boundsInRoot
                 run.facts += "file bar 900 wide, scale 1.5: $tag left=${r1(bd.left)} right=${r1(bd.right)} top=${r1(bd.top)} size=${bd.width.toInt()}x${bd.height.toInt()}"
-                if (!runCatching { node(tag).assertIsDisplayed() }.isSuccess) run.problems += "$tag is not displayed at 900 wide, scale 1.5 (bounds $bd)"
             }
+            run.problems += intactProblems(listOf("planner:saveBtn", "planner:discardBtn"), 900, 800)
+            run.problems += intactProblems(listOf("planner:editPill", "planner:unsavedPill"), 900, 800, minWidthPx = 0f)
             r.close()
         }
     }
@@ -184,6 +192,18 @@ internal object WideFontScenarios {
             node("planner:stepList").performScrollToIndex(n - 1)
             waitForIdle()
             r.close()
+        }
+    }
+
+    /** 6. `MigrationsEditStepsNarrowExploratoryUiTest` at 1000 wide, font scale 1.5: the four buttons with Edit steps (F2). */
+    fun narrowActionRow(pinned: Boolean): Run = Run().also { run ->
+        runDesktopComposeUiTest(1000, 800) {
+            val s = migrationsState.copy(planOpening = dev.caerbannog.core.planner.PlanOpeningDecision.Openable)
+            setContent { CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) { Fonted(pinned) { MigrationsScreen(s, {}, {}, {}, {}, {}, { _, _ -> }, {}, {}) } } }
+            waitForIdle()
+            val tags = listOf("migrations:editStepsBtn", "migrations:editFileBtn", "migrations:validateBtn", "migrations:applySingleBtn")
+            tags.forEach { run.facts += "action row 1000 wide, scale 1.5: $it ${node(it).fetchSemanticsNode().boundsInRoot}" }
+            run.problems += intactProblems(tags, 1000, 800, scroll = true)
         }
     }
 }

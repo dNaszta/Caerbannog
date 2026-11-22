@@ -384,8 +384,10 @@ internal fun AppFrameLayout(
 }
 
 /**
- * The app bar. The title keeps its natural width and the screen's actions and the chip share the rest in a [FlowRow], so a narrow window
- * wraps the buttons onto a second line instead of squeezing the title or a button (the defect M8-14c describes on the Migrations screen).
+ * The app bar. The screen's actions and the chip are measured first, in a [FlowRow] that keeps every button at its natural width and wraps onto a second
+ * line only when the window is too narrow for them; the title takes what is left and is cut with an ellipsis before a button gets narrower than its label
+ * (M2-21: at 900 px and font scale 1.5 the old order gave the title its full width and squeezed Save and Discard to 4-line labels, the defect M8-14c
+ * describes on the Migrations screen). The title sits in a weighted box, so it keeps its own natural width when there is room and the actions stay at the end.
  */
 @Composable
 private fun AppBar(
@@ -401,16 +403,17 @@ private fun AppBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         leading()
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = if (titleTag != null) Modifier.testTag(titleTag) else Modifier,
-        )
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (titleTag != null) Modifier.testTag(titleTag) else Modifier,
+            )
+        }
         FlowRow(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
