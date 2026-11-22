@@ -155,7 +155,7 @@ class MigrateFromThreeForwardingUiTest {
         val status = ShovelStatus(ref, ShovelRunState.RUNNING, null, 40, 80)
         val blocks = listOf(
             ForwardingBlock.TopologyLocked, ForwardingBlock.NoPolicymakerTag, ForwardingBlock.CannotReadStatus, ForwardingBlock.ShovelPluginsOff,
-            ForwardingBlock.DestinationMissing, ForwardingBlock.ShovelExists(status),
+            ForwardingBlock.DestinationMissing, ForwardingBlock.DirectDestinationNeedsAdministrator, ForwardingBlock.ShovelExists(status),
         )
         val warnings = listOf(
             ForwardingWarning.DestinationNotQuorumOrStream(DestinationQueueType.CLASSIC), ForwardingWarning.KeepsShovelAndCredentials, ForwardingWarning.NotEncrypted("legacy-eu"),

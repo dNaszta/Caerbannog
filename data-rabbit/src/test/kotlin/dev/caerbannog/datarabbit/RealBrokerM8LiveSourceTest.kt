@@ -36,7 +36,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * M8-02b, the three `@broker-3x @m8-02` scenarios against a REAL RabbitMQ 3.13 broker (floating tag `rabbitmq:3.13-management`, one container for the
+ * M8-02b, the three `@broker-3x @m8-02` scenarios against a REAL RabbitMQ 3.13 broker (`BrokerImages.LEGACY_3X`, one container for the
  * class, no 4.x container). The app's own gateway opens the connection, `ManagementThreeXReads` reads over the management API, and `analyseLive`
  * analyses what came back. The production retry of the storage version scan is the polling: the test never sleeps, it only waits inside
  * `LiveDefinitionsSource` with the production pause (`delay`), and it asserts that the bound (`STORAGE_VERSION_READS` reads one second apart) is enough
@@ -53,7 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class RealBrokerM8LiveSourceTest {
 
     companion object {
-        private val old: RabbitMQContainer = broker("rabbitmq:3.13-management")
+        private val old: RabbitMQContainer = broker(BrokerImages.LEGACY_3X)
         private lateinit var api: MgmtApi
 
         @JvmStatic @BeforeAll fun start() { old.start(); api = MgmtApi(old) }
@@ -229,7 +229,7 @@ class RealBrokerM8LiveSourceTest {
         val filtered = api.get("/api/queues/%2F?page=1&page_size=500&columns=name,storage_version")
         assertTrue(filtered.ok, "columns= must be accepted: $filtered")
         val carries = Regex("\"name\":\"$name\"[^}]*\"storage_version\"|\"storage_version\":\\d[^}]*\"name\":\"$name\"").containsMatchIn(filtered.body)
-        // ANSWER (measured on rabbitmq:3.13-management, 2026-11-10): YES, `columns=name,storage_version` returns `storage_version` for a classic queue
+        // ANSWER (measured on the 3.13 image (`BrokerImages.LEGACY_3X`), 2026-11-10): YES, `columns=name,storage_version` returns `storage_version` for a classic queue
         // that has statistics, so a later optimisation could use it. The production call still sends NO columns filter (less to go wrong); the
         // value is absent until the queue's first statistics, with or without the filter. If a newer 3.13 changes this, this fails on purpose.
         assertTrue(carries, "columns=name,storage_version should return storage_version; body: ${filtered.body.take(400)}")

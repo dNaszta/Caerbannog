@@ -56,7 +56,7 @@ import java.util.UUID
 
 /**
  * M9-14 spike, items E1 to E7 of `docs/tasks/M9-14-export-keeps-arguments-and-policies.md`: what the topology export may rely on, MEASURED on a
- * throwaway `rabbitmq:4-management` (plugins `rabbitmq_stream`, `rabbitmq_stream_management`, `rabbitmq_mqtt`). Results and the exact versions are in
+ * throwaway current 4.x image (`BrokerImages.CURRENT_4X`) (plugins `rabbitmq_stream`, `rabbitmq_stream_management`, `rabbitmq_mqtt`). Results and the exact versions are in
  * `docs/tasks/M9-14-spike-results.md`; raw answers in `fixtures/m9-14/` (recorded when the environment variable `RECORD_M9_14_FIXTURES` is set).
  * The image tag floats: a 4.x that answers differently fails here on purpose.
  *
@@ -73,7 +73,7 @@ import java.util.UUID
 class RealBrokerM9ExportSpikeTest {
 
     companion object {
-        private const val IMAGE = "rabbitmq:4-management"
+        private val IMAGE: String = BrokerImages.CURRENT_4X
         private const val QUEUE_COLUMNS = "name,type,durable,auto_delete,exclusive,arguments"
 
         private val rabbit: RabbitMQContainer =

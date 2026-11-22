@@ -28,8 +28,8 @@ import java.util.Base64
 class RealBrokerM8SpikeDefinitionsTest {
 
     companion object {
-        private val old: RabbitMQContainer = broker("rabbitmq:3.13-management")
-        private val new: RabbitMQContainer = broker("rabbitmq:4-management")
+        private val old: RabbitMQContainer = broker(BrokerImages.LEGACY_3X)
+        private val new: RabbitMQContainer = broker(BrokerImages.CURRENT_4X)
         private lateinit var o: MgmtApi
         private lateinit var n: MgmtApi
 

@@ -75,7 +75,7 @@ class RealBrokerStatsMatchTest {
     companion object {
         private const val STREAM_TLS_PORT = 5551
 
-        private val rabbit: RabbitMQContainer = brokerWithPlugins("rabbitmq:4-management", "rabbitmq_stream", "rabbitmq_stream_management")
+        private val rabbit: RabbitMQContainer = brokerWithPlugins(BrokerImages.CURRENT_4X, "rabbitmq_stream", "rabbitmq_stream_management")
             .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
             .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")

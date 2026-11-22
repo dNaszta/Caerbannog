@@ -41,7 +41,7 @@ import kotlin.test.assertNotNull
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * M5-08a live test (`@broker @m5-08 @m5-08a`, `@gate-M5`): the REAL executor against `rabbitmq:4-management` (Testcontainers, plain HTTP: the
+ * M5-08a live test (`@broker @m5-08 @m5-08a`, `@gate-M5`): the REAL executor against the current 4.x image (`BrokerImages.CURRENT_4X`) (Testcontainers, plain HTTP: the
  * profile has TLS off, D9a). Scenarios: "Apply a migration to a real broker" (through the connection's `migrationExecutor` of the real gateway),
  * "Exported topology can be applied to an empty broker", a queue conflict (400, queue unchanged), a policy that is equal (no PUT) and one that is
  * different (no PUT, unchanged), read-back, delete of an absent resource (404 is a no-op), binding delete with an empty and a non-empty routing key
@@ -56,7 +56,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class RealBrokerM5MigrationTest {
 
     companion object {
-        private val container: RabbitMQContainer = broker("rabbitmq:4-management")
+        private val container: RabbitMQContainer = broker(BrokerImages.CURRENT_4X)
         private lateinit var api: MgmtApi
 
         @JvmStatic @BeforeAll fun start() { container.start(); api = MgmtApi(container) }
@@ -172,7 +172,7 @@ class RealBrokerM5MigrationTest {
         )
         val exported = runBlocking { viewModel.exportCurrentTopology() }!!
 
-        broker("rabbitmq:4-management").use { b ->
+        broker(BrokerImages.CURRENT_4X).use { b ->
             b.start()
             val apiB = MgmtApi(b)
             assertTrue(apiB.put("/api/vhosts/$vhost", "{}").ok)
@@ -255,7 +255,7 @@ class RealBrokerM5MigrationTest {
         assertEquals(ActionResult.Success, exec(MigrationAction.DeclareBinding(exchange, queue, "")))
         assertEquals(ActionResult.Success, exec(MigrationAction.DeclareBinding(exchange, queue, "order.created")))
         val keys = api.get("/api/bindings/%2F/e/$exchange/q/$queue").arr.map { it.jsonObject["routing_key"]!!.jsonPrimitive.content to it.jsonObject["properties_key"]!!.jsonPrimitive.content }.toMap()
-        println("M5-08a measured properties_key on rabbitmq:4-management: $keys")
+        println("M5-08a measured properties_key on ${BrokerImages.CURRENT_4X}: $keys")
         assertEquals("~", keys[""], "properties key of an empty routing key: $keys")
         assertEquals("order.created", keys["order.created"], "properties key of a non-empty routing key: $keys")
 
@@ -406,7 +406,7 @@ class RealBrokerM5MigrationTest {
         m("queue.delete.present", api.delete("/api/queues/%2F/$q"))
         m("queue.delete.absent", api.delete("/api/queues/%2F/$q"))
 
-        println("M5-08a MEASURED STATUS TABLE on rabbitmq:4-management: " + measured.map { (id, r) -> "$id=${r.status}" })
+        println("M5-08a MEASURED STATUS TABLE on ${BrokerImages.CURRENT_4X}: " + measured.map { (id, r) -> "$id=${r.status}" })
         val mismatches = mutableListOf<String>()
         for (row in ManagementStatusTable.rows) {
             val reply = measured[row.id]
@@ -420,7 +420,7 @@ class RealBrokerM5MigrationTest {
 
     @Test
     fun `a 3x broker gets no executor through the real gateway and nothing is created on it`() {
-        val old = broker("rabbitmq:3.13-management")
+        val old = broker(BrokerImages.LEGACY_3X)
         old.start()
         try {
             val secrets = object : SecretStore {

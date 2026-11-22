@@ -30,7 +30,7 @@ import java.util.UUID
 class RealBrokerM8MigrationRequestsTest {
 
     companion object {
-        private val container: RabbitMQContainer = broker("rabbitmq:4-management")
+        private val container: RabbitMQContainer = broker(BrokerImages.CURRENT_4X)
         private lateinit var api: MgmtApi
 
         @JvmStatic @BeforeAll fun start() { container.start(); api = MgmtApi(container) }
@@ -135,7 +135,7 @@ class RealBrokerM8MigrationRequestsTest {
             val readBack = if (reply.ok) api.get("/api/policies/%2F/$name").obj["apply-to"]?.jsonPrimitive?.content else null
             accepted[value] = "${reply.status} ${if (reply.ok) "accepted, read back as $readBack" else reply.reason()}"
         }
-        println("M8-04 apply-to measured on rabbitmq:4-management: $accepted")
+        println("M8-04 apply-to measured on ${BrokerImages.CURRENT_4X}: $accepted")
         val refused = values.filter { !accepted.getValue(it).contains("accepted") }
         assertTrue(refused.isEmpty(), "the broker refused apply-to values the parser accepts: $refused; all results: $accepted. Report them in the task Status block and correct the spec list.")
         for (value in values) assertTrue(accepted.getValue(value).endsWith("read back as $value"), "$value: ${accepted[value]}")

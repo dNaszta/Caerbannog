@@ -183,7 +183,7 @@ class RealBrokerM9GateTest {
         try {
             // ---- Given: a real 4.x broker with the MQTT plugin and a quorum queue "orders" that already exists (test code, not the app),
             // plus a bystander of every kind the gate could damage: the "nothing was deleted" check compares with it.
-            assertTrue(api.get("/api/overview").obj["rabbitmq_version"]!!.jsonPrimitive.content.startsWith("4."), "rabbitmq:4-management must be a 4.x broker")
+            assertTrue(api.get("/api/overview").obj["rabbitmq_version"]!!.jsonPrimitive.content.startsWith("4."), "${BrokerImages.CURRENT_4X} must be a 4.x broker")
             assertEquals(201, api.declareQueue("orders", """{"x-queue-type":"quorum"}""").status, "orders is created before the plan")
             assertEquals(201, api.declareQueue("bystander", """{"x-queue-type":"quorum"}""").status, "the bystander queue")
             assertEquals(201, api.put("/api/exchanges/%2F/bystander-x", """{"type":"direct","durable":true}""").status, "the bystander exchange")

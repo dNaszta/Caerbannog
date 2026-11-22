@@ -36,8 +36,28 @@ Behaviours worth knowing:
   the ceiling and use `task dev:reset` afterwards.
 - A wrong `--ca` file shows up as `StreamException: null`; the tool then prints a hint that the file may not be the
   CA that signed the broker certificate.
-- The image tag `rabbitmq:4-management` is **floating on purpose**: the dev broker should follow the current 4.x
-  release, so a breaking change shows up here early. It is not pinned by digest.
+## Image versions
+
+The RabbitMQ images are pinned to explicit patch tags (M2-19), so a new release cannot turn `main` red without a commit.
+The pins live in three places that must agree: `BrokerImages` in
+`data-rabbit/src/test/kotlin/dev/caerbannog/datarabbit/RabbitContainers.kt` (all live tests and the spike ladder),
+`dev/broker/docker-compose.yml` (4.x) and `dev/broker-3x/docker-compose.yml` (3.x). `BrokerImagePinTest` fails when a
+literal or a floating tag appears anywhere else. A tag can be re-pushed by the registry; digests are not used.
+
+Early warning: the non-blocking CI job "Live broker tests on the floating 4.x image" runs the regression half on
+`rabbitmq:4-management` weekly and on demand. A red mark there blocks nobody; it means the next bump needs work.
+
+To move to a newer release, deliberately:
+
+1. Pick the new tag and check it exists: `docker manifest inspect docker.io/library/rabbitmq:<tag>` (or Docker Hub).
+2. Change `BrokerImages`, the two compose files and the live-test-images line in the Risks of `docs/spec.md`.
+3. Run `./gradlew :data-rabbit:brokerTest` and `./gradlew :data-rabbit:brokerSpikeTest` on a quiet machine, with the dev broker up for the first.
+4. Fix what is red as its own commit per cause, with the broker's own words in the commit body.
+5. Record newly measured facts in `docs/spec.md`.
+6. Finish with one commit "Move the live tests to RabbitMQ x.y.z".
+
+To try a version without a commit, edit the constant locally (there is no `BROKER_IMAGE` variable). To try the floating
+tag once: `./gradlew :data-rabbit:brokerTest -PbrokerImage=rabbitmq:4-management` (regression half only).
 
 The definitions in `dev/broker/definitions/` (`001-base.json`, `002-super-streams.json`) are **re-applied at every
 boot**, in file name order; anything deleted by hand comes back, data is only cleared by `dev:reset`.

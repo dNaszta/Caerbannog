@@ -29,7 +29,7 @@ import java.util.UUID
 /**
  * M9-14c step 0 (rows S-14c-1 to S-14c-6 of `docs/tasks/M9-14c-stream-arguments.md`): what the broker really does with the stream settings
  * `x-max-age`, `x-max-length-bytes`, `x-stream-max-segment-size-bytes` and `x-queue-leader-locator`, MEASURED on a throwaway
- * `rabbitmq:4-management` (plugins `rabbitmq_stream`, `rabbitmq_stream_management`). Results and exact versions: `docs/tasks/M9-14c-spike-results.md`;
+ * the current 4.x image (`BrokerImages.CURRENT_4X`) (plugins `rabbitmq_stream`, `rabbitmq_stream_management`). Results and exact versions: `docs/tasks/M9-14c-spike-results.md`;
  * raw answers in `fixtures/m9-14c/` (written when `RECORD_M9_14C_FIXTURES` is set); facts in `build/m9-14c-facts.txt`.
  *
  * The client route is the stream client 1.12.0 creator on the stream protocol (the call `RabbitMqStreamManager` makes), used directly here: route T is

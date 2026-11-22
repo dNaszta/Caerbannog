@@ -28,14 +28,14 @@ import java.util.concurrent.TimeUnit
  * (M8SpikeAmqpSupport.kt) unchanged.
  */
 internal object M9SpikeDl {
-    const val IMAGE = "rabbitmq:4-management"
+    val IMAGE: String = BrokerImages.CURRENT_4X
 
     fun newBroker(): RabbitMQContainer =
         brokerWithPlugins(IMAGE, "rabbitmq_stream", "rabbitmq_stream_management").also { it.addExposedPort(5552) }
 
     fun assertFourX(api: MgmtApi) {
         val version = api.get("/api/overview").obj["rabbitmq_version"]!!.jsonPrimitive.content
-        assertTrue(version.startsWith("4."), "rabbitmq:4-management answered version $version; the M9-00b facts are measured on 4.x")
+        assertTrue(version.startsWith("4."), "${BrokerImages.CURRENT_4X} answered version $version; the M9-00b facts are measured on 4.x")
         println("M9SPIKE version=$version erlang=${api.get("/api/overview").obj["erlang_version"]}")
     }
 

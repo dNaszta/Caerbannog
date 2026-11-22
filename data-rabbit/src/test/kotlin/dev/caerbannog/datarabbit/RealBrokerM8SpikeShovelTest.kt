@@ -24,8 +24,8 @@ class RealBrokerM8SpikeShovelTest {
 
     companion object {
         private val network: Network = Network.newNetwork()
-        private val old: RabbitMQContainer = broker("rabbitmq:3.13-management").withNetwork(network).withNetworkAliases("old")
-        private val new: RabbitMQContainer = brokerWithPlugins("rabbitmq:4.4.1-management", "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
+        private val old: RabbitMQContainer = broker(BrokerImages.LEGACY_3X).withNetwork(network).withNetworkAliases("old")
+        private val new: RabbitMQContainer = brokerWithPlugins(BrokerImages.CURRENT_4X, "rabbitmq_shovel", "rabbitmq_shovel_management").withNetwork(network).withNetworkAliases("new")
         private lateinit var o: MgmtApi
         private lateinit var n: MgmtApi
 

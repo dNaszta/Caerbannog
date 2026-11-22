@@ -64,7 +64,7 @@ class RealBrokerM9SpikeNamesTest {
     private fun enc(name: String) = MigrationRequests.encode(name)
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9c.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9c.assertFourX(api)
 
     @Test
     fun `S-H what the broker answers to a declare of each name`() {

@@ -132,6 +132,9 @@ tasks.register<Test>("brokerTest") {
     description = "Regression half of the live suite: gates and product RealBroker* classes (tag expression broker & !spike). " +
         "Uses rootless Podman socket when present, or Docker."
     configureLiveBroker()
+    // M2-19: the floating-image CI job passes -PbrokerImage=...; BrokerImages.CURRENT_4X reads it. Only this half takes it:
+    // the spike half keeps its pinned ladder.
+    (project.findProperty("brokerImage") as String?)?.takeIf { it.isNotBlank() }?.let { systemProperty("caerbannog.brokerImage", it) }
     useJUnitPlatform {
         includeTags("broker")
         excludeTags("spike")

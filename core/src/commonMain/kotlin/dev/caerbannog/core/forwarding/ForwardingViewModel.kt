@@ -94,7 +94,13 @@ class ForwardingViewModel(
         job = scope.launch {
             when (val result = service.start(built, typed)) {
                 StartResult.Started -> { show(queue, ForwardingState.Started()); poll(queue, watched) }
-                StartResult.NotConfirmed, is StartResult.Blocked -> prepareNow()
+                StartResult.NotConfirmed -> prepareNow()
+                is StartResult.Blocked -> {
+                    // Fresh facts (and the Remove button of a ShovelExists block) come from a new dry run, but a refused
+                    // start must never end on Confirm: the plan the service returned is what the user has to see.
+                    prepareNow()
+                    if (mutable.value !is ForwardingScreenState.Blocked) mutable.value = blockedFrom(result.plan)
+                }
                 is StartResult.Refused -> mutable.value = ForwardingScreenState.Problem(queue, result.reason)
                 is StartResult.ProbeFailed -> mutable.value = ForwardingScreenState.Problem(queue, ForwardingTexts.probeFailed(result.outcome))
                 is StartResult.Failed -> mutable.value = ForwardingScreenState.Problem(queue, result.reason)
@@ -184,6 +190,9 @@ class ForwardingViewModel(
             is Prepared.ProbeFailed -> ForwardingScreenState.Problem(queue, ForwardingTexts.probeFailed(prepared.outcome))
         }
     }
+
+    private fun blockedFrom(plan: ForwardingPlan): ForwardingScreenState.Blocked =
+        ForwardingScreenState.Blocked(picked?.name.orEmpty(), destinationProfile?.name.orEmpty(), plan.blocks, plan.warnings, facts, remove = null)
 
     private fun confirmState(): ForwardingScreenState.Confirm? {
         val current = form ?: return null

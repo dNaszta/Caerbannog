@@ -60,7 +60,7 @@ class RealBrokerM9SpikeStreamDeadLetterTest {
     }
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9SpikeDl.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9SpikeDl.assertFourX(api)
 
     // ---- S-C7: a stream as the dead-letter target ----
 

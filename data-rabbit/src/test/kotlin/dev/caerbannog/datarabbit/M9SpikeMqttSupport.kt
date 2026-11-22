@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit
  * docs/tasks/M9-00a-spike-results.md. Throwaway Testcontainers brokers with the default guest user only.
  */
 
-internal const val M9_IMAGE = "rabbitmq:4-management"
+internal val M9_IMAGE: String = BrokerImages.CURRENT_4X
 
 /** A 4.x broker with the stream, stream management and MQTT plugins, plain ports 5552 (stream) and 1883 (MQTT) published. */
 internal fun m9SpikeBroker(config: String? = null): RabbitMQContainer =

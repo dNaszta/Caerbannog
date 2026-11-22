@@ -41,7 +41,7 @@ class RealBrokerM8SpikeClusterTest {
         private const val COOKIE = "caerbannog-spike-cookie"
         private val network: Network = Network.newNetwork()
 
-        private fun node(host: String): RabbitMQContainer = broker("rabbitmq:3.13-management")
+        private fun node(host: String): RabbitMQContainer = broker(BrokerImages.LEGACY_3X)
             .withNetwork(network).withNetworkAliases(host).withEnv("RABBITMQ_ERLANG_COOKIE", COOKIE)
             .withCreateContainerCmdModifier { it.withHostName(host) }
 

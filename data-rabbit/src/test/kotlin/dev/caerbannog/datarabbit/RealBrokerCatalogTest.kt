@@ -68,7 +68,7 @@ class RealBrokerCatalogTest {
         private val users = mapOf("m203-mon" to "pw-mon", "m203-mgmt" to "pw-mgmt", "m203-plain" to "pw-plain")
 
         private fun newContainer(vararg plugins: String): RabbitMQContainer =
-            brokerWithPlugins("rabbitmq:4-management", *plugins)
+            brokerWithPlugins(BrokerImages.CURRENT_4X, *plugins)
                 .withRabbitMQConfig(MountableFile.forClasspathResource("tls/rabbitmq.conf"))
                 .withCopyFileToContainer(MountableFile.forClasspathResource("tls/ca.pem"), "/etc/rabbitmq/tls/ca.pem")
                 .withCopyFileToContainer(MountableFile.forClasspathResource("tls/server.pem"), "/etc/rabbitmq/tls/server.pem")

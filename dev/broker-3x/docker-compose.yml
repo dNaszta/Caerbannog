@@ -7,7 +7,7 @@
 name: caerbannog-dev-3x
 services:
   rabbitmq:
-    image: docker.io/library/rabbitmq:3.13-management
+    image: docker.io/library/rabbitmq:3.13.7-management
     container_name: caerbannog-dev-rabbitmq-3x
     ports:
       - "5673:5672"

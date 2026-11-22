@@ -76,7 +76,7 @@ class RealBrokerM9PolicyStepTest {
     }
 
     @Test
-    fun `The floating tag 4-management is a 4_x broker`() = M9c.assertFourX(api)
+    fun `The 4_x image is a 4_x broker`() = M9c.assertFourX(api)
 
     /** A stream created without retention, then a policy `{max-age: 7D, max-length-bytes: 1000000}` that has taken effect on it. */
     private fun streamWithPolicy(): String {
