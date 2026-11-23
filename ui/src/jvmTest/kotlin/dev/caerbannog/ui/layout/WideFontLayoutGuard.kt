@@ -209,8 +209,8 @@ internal object WideFontScenarios {
 
     /**
      * 7. M2-21b: the Migrations page behind a drawer stand-in ([WithDrawerStandIn]), Openable file, at [width] and font [scale]: the four buttons of the detail panel are intact.
-     * [drawer] = false shows the screen alone (the whole window, as the older tests do). NOTE: 1000 wide WITH the drawer (screen 696 dp, detail 284 px side by side) makes
-     * `waitForIdle` never return while scrolling to `migrations:validateBtn` (measured 2026-11-23: no failure, a hang), so that case is not in the guard; finding for the architect.
+     * [drawer] = false shows the screen alone (the whole window, as the older tests do).
+     * (The old double-drawer stand-in made 1000 wide hang in `waitForIdle`; it is a pass-through now, see DrawerStandIn.kt.)
      */
     fun detailBehindDrawer(pinned: Boolean, width: Int, scale: Float, drawer: Boolean = true): Run = Run().also { run ->
         val tags = listOf("migrations:editStepsBtn", "migrations:editFileBtn", "migrations:validateBtn", "migrations:applySingleBtn")

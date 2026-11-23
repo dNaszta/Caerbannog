@@ -16,12 +16,22 @@ import dev.caerbannog.ui.PinnedFontTheme
 import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.planner.node
 import org.junit.jupiter.api.Timeout
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.positionInRoot
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
  * M2-21b (owner decision A): below a measured content width the Migrations page stacks, file list on top (capped height, scrolls inside), detail below at full width.
- * The screen sits behind a drawer stand-in of 304 dp, as in the app, with the pinned font. The screen draws the 280 dp drawer itself (see DrawerStandIn.kt).
+ * The screen draws its own 280 dp drawer (see DrawerStandIn.kt, a no-op wrapper), with the pinned font.
  */
 @OptIn(ExperimentalTestApi::class)
 @Timeout(60)
@@ -82,5 +92,33 @@ class MigrationsStackedLayoutUiTest {
         show()
         node("migrationCard:0030").performScrollTo().assertIsDisplayed()
         assertTrue(node("migrations:editFileBtn").fetchSemanticsNode().boundsInRoot.width > 0f, "the detail panel is still there")
+    }
+
+    /** Screen width = window minus the 280 dp drawer: window 951 gives 671 dp (stacked), 952 gives 672 dp (side by side), the threshold of the brief. */
+    @Test
+    fun `at window 951 the page is stacked and at 952 it is side by side`() {
+        runDesktopComposeUiTest(951, 800) {
+            show()
+            assertTrue(bounds("migrationDetail:header").top >= bounds("migrationCard:0001").bottom - 0.5f, "stacked expected at window 951 (screen 671 dp)")
+        }
+        runDesktopComposeUiTest(952, 800) {
+            show()
+            assertTrue(bounds("migrationCard:0001").right <= bounds("migrationDetail:header").left + 0.5f, "side by side expected at window 952 (screen 672 dp)")
+        }
+    }
+
+    /** The brief promises the list keeps its scroll across the switch; the scroll state is hoisted above it. */
+    @Test
+    fun `the list keeps its scroll offset when the window widens past 672 dp and narrows again`() = runDesktopComposeUiTest(800, 800) {
+        var width by mutableStateOf(800.dp)
+        setContent { PinnedFontTheme { Box(Modifier.width(width).height(800.dp)) { MigrationsScreen(state, {}, {}, {}, {}, {}, { _, _ -> }, {}, {}) } } }
+        waitForIdle()
+        node("migrationCard:0030").performScrollTo()
+        val before = node("migrationCard:0030").fetchSemanticsNode().positionInRoot.y
+        assertTrue(before < 600f, "the last card must be scrolled into the list before the switch: card 0030 y $before")
+        width = 952.dp; waitForIdle()
+        width = 800.dp; waitForIdle()
+        val after = node("migrationCard:0030").fetchSemanticsNode().positionInRoot.y
+        assertTrue(abs(after - before) < 1f, "the list scroll was lost by crossing 672 dp: card 0030 at y $before before, $after after")
     }
 }

@@ -19,6 +19,9 @@ internal val MIGRATION_PAGE_PADDING: Dp = 24.dp
 /** The smallest detail panel (with its own padding) that still keeps every button at its label width when the buttons wrap. */
 internal val MIGRATION_DETAIL_MIN_WIDTH: Dp = 260.dp
 
+/** The refusal text of a plan that is not offered keeps at least this width to read; its buttons wrap below it. */
+internal val PLAN_NOT_OFFERED_MIN_TEXT_WIDTH: Dp = 200.dp
+
 /** 672 dp = list 340 + gap 24 + page padding 2 x 24 + the smallest detail panel 260. Under it the page stacks. */
 internal val MIGRATIONS_STACK_BELOW: Dp = MIGRATION_LIST_WIDTH + MIGRATION_PAGE_GAP + MIGRATION_PAGE_PADDING * 2 + MIGRATION_DETAIL_MIN_WIDTH
 

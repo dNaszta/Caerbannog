@@ -18,10 +18,12 @@ import kotlin.test.fail
 
 /**
  * M2-21b step 1, the "hang": 1000 x 800, drawer stand-in, pinned font, performScrollTo on Validate never returned. Reproduced bounded (this class, before the fix):
- * the worker sat in waitForIdle for 60 s with the render loop sending frames, the root layout ran once, no measure loop. Cause: the stand-in put 304 dp
- * of blank column in front of a screen that already draws its own 280 dp drawer, so the page was 416 dp wide, the buttons were 0 x 0 px (bounds Rect(0,0,0,0))
+ * the worker sat in waitForIdle for 60 s with the render loop sending frames, the root layout ran once, no measure loop. Cause: the stand-in put a blank
+ * column (about 300 dp) in front of a screen that already draws its own 280 dp drawer, so the page was about 416 dp wide, the buttons were 0 x 0 px (bounds Rect(0,0,0,0))
  * and performScrollTo on a zero-size node never settles. Class: test artefact (a wrong stand-in), not a product layout loop; the screen alone at 1000 scrolls to
  * Validate at once. The scenario runs on a worker thread and the test fails after 60 s with a dump of the threads, so a hang is red and never a bare waitForIdle.
+ * Jupiter @Timeout only interrupts the test thread, and a thread stuck in waitForIdle does not react to that; the bounded worker thread here (and its join with a limit)
+ * is the real protection, the @Timeout annotations on the other UI test classes are a second line only.
  */
 @OptIn(ExperimentalTestApi::class)
 class MigrationsHangReproUiTest {

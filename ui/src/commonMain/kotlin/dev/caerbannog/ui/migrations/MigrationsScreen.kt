@@ -1,27 +1,27 @@
 package dev.caerbannog.ui.migrations
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,21 +51,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import dev.caerbannog.core.help.HowToTexts
-import dev.caerbannog.ui.components.HelpTip
-import dev.caerbannog.ui.components.HowToLink
-import dev.caerbannog.ui.components.TopLineWithHowTo
-import dev.caerbannog.ui.components.rememberCopyToClipboard
-import dev.caerbannog.ui.migrate3x.Advice
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.help.HowToTexts
 import dev.caerbannog.core.migrations.ActionDryRun
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationEntry
 import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
-import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
 import dev.caerbannog.core.mqtt.CorrelationIdSource
@@ -75,19 +70,24 @@ import dev.caerbannog.core.planner.MqttRoutes
 import dev.caerbannog.core.planner.MqttTestMessage
 import dev.caerbannog.core.planner.MqttTestMessageTexts
 import dev.caerbannog.core.planner.MqttTopicSample
-import dev.caerbannog.core.planner.TestMessageOffer
-import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.core.planner.PlannerTexts
+import dev.caerbannog.core.planner.TestMessageOffer
+import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
+import dev.caerbannog.ui.components.HelpTip
+import dev.caerbannog.ui.components.HowToLink
+import dev.caerbannog.ui.components.TopLineWithHowTo
+import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+import dev.caerbannog.ui.migrate3x.Advice
 
 /** Compact buttons: five of them and the connection chip share one line at 1280 px. */
 private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
@@ -194,6 +194,8 @@ fun MigrationsScreen(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val stacked = migrationsLayoutFor(maxWidth) == MigrationsLayout.Stacked
             val pageScroll = rememberScrollState()
+            // Hoisted above the layout switch so the list keeps its scroll position when the window crosses 672 dp (the two layouts call fileList from different places).
+            val listScroll = rememberScrollState()
             val listMaxHeight = stackedListMaxHeight(maxHeight)
             Column(
                 modifier = Modifier
@@ -301,7 +303,7 @@ fun MigrationsScreen(
                 // The same list and detail in both layouts; only the modifiers differ (height rules below a scroll, weights in a Row).
                 val fileList: @Composable (Modifier) -> Unit = { listModifier ->
                     Column(
-                        modifier = listModifier.verticalScroll(rememberScrollState()),
+                        modifier = listModifier.verticalScroll(listScroll),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         draftCard()
@@ -744,7 +746,7 @@ private fun PlanNotOffered(refusal: PlanOpeningDecision.NotOffered, plannerEntry
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(modifier = Modifier.weight(1f).widthIn(min = 200.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f).widthIn(min = PLAN_NOT_OFFERED_MIN_TEXT_WIDTH), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(refusal.reason, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("migrations:planNotOffered"))
             refusal.detail?.let {
                 Text(

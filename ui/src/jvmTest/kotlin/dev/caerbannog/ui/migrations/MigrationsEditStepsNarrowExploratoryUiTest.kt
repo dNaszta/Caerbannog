@@ -18,6 +18,8 @@ import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.ui.layout.WithDrawerStandIn
 import dev.caerbannog.ui.layout.assertIntact
 import dev.caerbannog.ui.planner.node
+import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -26,6 +28,7 @@ import kotlin.test.assertTrue
  * Apply (zero size); with Edit steps (Openable) it loses Validate too and Edit steps is squeezed to 8 px of height. At 1280 wide, scale 1.5 all four fit (MigrationsEditStepsUiTest).
  * M9-12 step 4 (test developer): narrow windows at font scale 1.5 for the action row, and the long names of a refusal. The detail panel scrolls as a whole, so each node is scrolled to first. */
 @OptIn(ExperimentalTestApi::class)
+@Timeout(60)
 class MigrationsEditStepsNarrowExploratoryUiTest {
     private val file = MigrationFile("0002", "d", listOf(MigrationAction.DeclareQueue("orders")), "{}", "abc")
     private fun state(decision: PlanOpeningDecision) = MigrationsScreenState(
@@ -58,5 +61,25 @@ class MigrationsEditStepsNarrowExploratoryUiTest {
         assertIntact(listOf("migrations:copyIntoPlanBtn", "migrations:editFileBtn"), 800, 800, scroll = true)
         val text = node("migrations:planNotOffered").fetchSemanticsNode().boundsInRoot
         assertTrue(text.left >= 0f && text.right <= 800f && text.width >= 200f, "the refusal text is $text wide at 800, it must be inside the window and at least 200 px wide to read")
+    }
+
+    /** Side by side (window 1000, screen 720 dp) with a refusal at font scale 1.5: the two buttons stay intact next to the wrapped text (pinned font). */
+    @Disabled("FINDING M2-21b: red, measured 2026-11-23 on the Mac. 'Copy into a new plan' wraps to 2 lines (276 x 76 px) side by side at 1000 wide, font scale 1.5: the detail panel is about 308 px and the button already fills it. Needs an architect decision (shorter label or stack under a larger width at big font scales).")
+    @Test
+    fun `at 1000 wide and font scale 1_5 a refusal keeps its buttons intact side by side`() = runDesktopComposeUiTest(1000, 800) {
+        setContent {
+            dev.caerbannog.ui.PinnedFontTheme {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) {
+                    MigrationsScreen(
+                        state(PlanOpeningDecision.NotOffered("0002 is applied on uat-eu, so it is not edited", "Copy its steps into a new plan instead.", true)),
+                        {}, {}, {}, {}, {}, { _, _ -> }, {}, {},
+                    )
+                }
+            }
+        }
+        waitForIdle()
+        val tags = listOf("migrations:copyIntoPlanBtn", "migrations:editFileBtn")
+        tags.forEach { node(it).performScrollTo().assertIsDisplayed() }
+        assertIntact(tags, 1000, 800, scroll = true)
     }
 }
