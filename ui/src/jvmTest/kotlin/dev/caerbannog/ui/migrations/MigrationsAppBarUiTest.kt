@@ -5,6 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.planner.PlannerEntry
+import dev.caerbannog.ui.layout.assertIntact
 import dev.caerbannog.ui.planner.node
 import dev.caerbannog.ui.streams.connected
 import dev.caerbannog.ui.streams.noControlEvents
@@ -41,6 +42,8 @@ class MigrationsAppBarUiTest {
             show(entry)
             val tops = tops()
             assertTrue(tops.all { kotlin.math.abs(it - tops.first()) < 8f }, "the app bar wrapped for ${entry.label}: $tops")
+            assertTrue(node("connectionChip").fetchSemanticsNode().boundsInRoot.right <= 1280f - 24f, "the chip ends past the 24 px page padding for ${entry.label}")
+            assertIntact(tags.drop(1).dropLast(1), 1280, 800)
         }
     }
 

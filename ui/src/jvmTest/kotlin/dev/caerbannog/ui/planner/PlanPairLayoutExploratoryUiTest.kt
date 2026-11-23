@@ -2,6 +2,8 @@ package dev.caerbannog.ui.planner
 
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.planner.KnownTopology
@@ -25,6 +27,7 @@ class PlanPairLayoutExploratoryUiTest {
     @Test
     fun `the stacked and the side by side layouts keep every step reachable and the card on the page, for 1 3 7 12 and 30 steps`() {
         var chrome = 0f
+        // chrome only turns a wanted content width into a window width; it is not a promise.
         runDesktopComposeUiTest(1280, 800) { val r = UiRig(); showPlanner(r); chrome = 1280f - node("planner:reviewCard").fetchSemanticsNode().size.width; r.close() }
         val problems = mutableListOf<String>()
         for (content in listOf(1024f - chrome, 1280f - chrome, 1399f, 1400f)) {
@@ -36,7 +39,17 @@ class PlanPairLayoutExploratoryUiTest {
                     val list = rect("planner:stepList"); val card = rect("planner:reviewCard")
                     val where = "window $w x 800, $n steps"
                     val stacked = card[1] >= list[3] - 1f
-                    if (stacked && card[3] > 800f + 1f) problems += "$where: stacked card ends at ${card[3]}, below the window"
+                    // Promise (docs/spec.md, layout promise 3, M2-21): a stacked card is inside the window, or the page scrolls to it (planner:pageScrollbar, by design:
+                    // the StackedPage KDoc) and after performScrollTo it ends inside the window. Side by side has no page scroll, so there it stays strict (below).
+                    if (stacked && card[3] > 800f + 1f) {
+                        if (onAllNodesWithTag("planner:pageScrollbar", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+                            problems += "$where: stacked card ends at ${card[3]}, below the window, and the page has no scrollbar"
+                        } else {
+                            node("planner:reviewCard").performScrollTo(); waitForIdle()
+                            val scrolled = rect("planner:reviewCard")
+                            if (scrolled[1] < 0f || scrolled[3] > 801f) problems += "$where: stacked card cannot be scrolled into the window: top ${scrolled[1]} bottom ${scrolled[3]}"
+                        }
+                    }
                     if (stacked && card[3] - card[1] < 150f) problems += "$where: stacked card is only ${card[3] - card[1]} px high"
                     if (!stacked && card[3] > 800f + 1f) problems += "$where: side by side card ends at ${card[3]}"
                     if (list[3] > card[1] + 1f && stacked.not() && list[2] > card[0] + 1f) problems += "$where: list and card overlap"

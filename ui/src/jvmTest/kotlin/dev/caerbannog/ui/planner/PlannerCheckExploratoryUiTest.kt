@@ -3,6 +3,7 @@ package dev.caerbannog.ui.planner
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.migrations.BrokerFinding
 import dev.caerbannog.core.migrations.MigrationAction
@@ -45,7 +46,18 @@ class PlannerCheckExploratoryUiTest {
         val scrollbar = onAllNodesWithTag("planner:graphScrollbar", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         assertTrue(cut.isEmpty() || scrollbar, "nodes $cut are cut off by the graph box $box and there is no scrollbar")
         val card = node("planner:reviewCard").fetchSemanticsNode()
-        assertTrue(card.positionInRoot.y + card.size.height <= 800f + 1f, "the review card is cut off by the window: ${card.positionInRoot} ${card.size}")
+        // Promise (docs/spec.md, layout promise 3, M2-21): the review card is inside the window, or the stacked page scrolls to it (it draws planner:pageScrollbar, by design:
+        // see the StackedPage KDoc) and after performScrollTo it ends inside the window. Only the 1 px rounding tolerance; no font tolerance.
+        if (card.positionInRoot.y + card.size.height > 800f + 1f) {
+            assertTrue(
+                onAllNodesWithTag("planner:pageScrollbar", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+                "the review card is cut off by the window and the page has no scrollbar: ${card.positionInRoot} ${card.size}",
+            )
+            node("planner:reviewCard").performScrollTo(); waitForIdle()
+            val scrolled = node("planner:reviewCard").fetchSemanticsNode()
+            val top = scrolled.positionInRoot.y; val bottom = top + scrolled.size.height
+            assertTrue(top >= 0f && bottom <= 801f, "the review card is cut off by the window and the page cannot scroll to it: top $top bottom $bottom")
+        }
         r.close()
     }
 

@@ -15,6 +15,7 @@ import dev.caerbannog.core.migrations.MigrationParser
 import dev.caerbannog.core.planner.PlannerMode
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.ui.appframe.AppDestination
+import dev.caerbannog.ui.layout.assertIntact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,6 +32,9 @@ class PlannerEditFileNarrowExploratoryUiTest {
         r.queue("invoices")
         waitForIdle()
         listOf("planner:saveBtn", "planner:discardBtn", "planner:editPill", "planner:unsavedPill").forEach { node(it).assertIsDisplayed() }
+        // isDisplayed passes a squeezed button; assertIntact is the promise (M2-21): one label line, not narrower than the label, inside the window, no overlap.
+        assertIntact(listOf("planner:saveBtn", "planner:discardBtn"), 900, 800)
+        assertIntact(listOf("planner:editPill", "planner:unsavedPill"), 900, 800, minWidthPx = 0f)
         r.close()
     }
 }
