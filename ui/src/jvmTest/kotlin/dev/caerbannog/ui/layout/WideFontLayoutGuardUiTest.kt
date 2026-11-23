@@ -1,6 +1,7 @@
 package dev.caerbannog.ui.layout
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -11,6 +12,7 @@ import kotlin.test.assertEquals
  * the guard asserts the promise (the control is reachable) and passes today. Names of the originals are given on every test.
  */
 @OptIn(ExperimentalTestApi::class)
+@Timeout(60)
 class WideFontLayoutGuardUiTest {
     private fun check(run: Run) {
         run.facts.forEach { println("M2-21 MEASURE $it") }
@@ -34,4 +36,17 @@ class WideFontLayoutGuardUiTest {
 
     /** Original: MigrationsEditStepsNarrowExploratoryUiTest "at 1000 wide and font scale 1_5 the four buttons are on screen" (finding F2). */
     @Test fun `at 1000 wide and font scale 1_5 the four buttons of the Migrations action row are intact with a wide font`() = check(WideFontScenarios.narrowActionRow(pinned = true))
+
+    /** M2-21b test 7: the Migrations detail panel behind the drawer at 800 and 1000 wide, font scale 1 and 1.5 (brief M2-21b). Red at 800 until the page stacks. */
+    @Test fun `at 800 wide and font scale 1 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 800, scale = 1f))
+    @Test fun `at 800 wide and font scale 1_5 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 800, scale = 1.5f))
+    @Test fun `at 1000 wide and font scale 1 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 1000, scale = 1f))
+    @Test fun `at 1000 wide and font scale 1_5 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 1000, scale = 1.5f))
+
+    /** M2-21b test 7b: the machine's own font at 800 (the other half of the brief: machine font and pinned DejaVu). */
+    @Test fun `at 800 wide and font scale 1_5 the Migrations detail panel buttons are intact behind the drawer with the machine font`() =
+        WideFontScenarios.detailBehindDrawer(pinned = false, width = 800, scale = 1.5f).let { run ->
+            run.facts.forEach { println("M2-21b MEASURE $it") }
+            assertEquals(emptyList(), run.problems, "with the machine's own font")
+        }
 }

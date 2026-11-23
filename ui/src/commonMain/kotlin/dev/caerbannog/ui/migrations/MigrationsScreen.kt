@@ -1,24 +1,29 @@
 package dev.caerbannog.ui.migrations
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -39,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -46,21 +52,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import dev.caerbannog.core.help.HowToTexts
-import dev.caerbannog.ui.components.HelpTip
-import dev.caerbannog.ui.components.HowToLink
-import dev.caerbannog.ui.components.TopLineWithHowTo
-import dev.caerbannog.ui.components.rememberCopyToClipboard
-import dev.caerbannog.ui.migrate3x.Advice
 import dev.caerbannog.core.connections.ConnectionControlEvents
 import dev.caerbannog.core.connections.ConnectionControlState
+import dev.caerbannog.core.help.HowToTexts
 import dev.caerbannog.core.migrations.ActionDryRun
+import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationEntry
 import dev.caerbannog.core.migrations.MigrationFile
 import dev.caerbannog.core.migrations.MigrationFolderState
 import dev.caerbannog.core.migrations.MigrationStatus
 import dev.caerbannog.core.migrations.MigrationsScreenState
-import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationsWording
 import dev.caerbannog.core.migrations.redactedRaw
 import dev.caerbannog.core.mqtt.CorrelationIdSource
@@ -70,19 +71,24 @@ import dev.caerbannog.core.planner.MqttRoutes
 import dev.caerbannog.core.planner.MqttTestMessage
 import dev.caerbannog.core.planner.MqttTestMessageTexts
 import dev.caerbannog.core.planner.MqttTopicSample
-import dev.caerbannog.core.planner.TestMessageOffer
-import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.core.planner.PlannerEntry
 import dev.caerbannog.core.planner.PlannerQuestion
 import dev.caerbannog.core.planner.PlannerTexts
+import dev.caerbannog.core.planner.TestMessageOffer
+import dev.caerbannog.core.planner.TestMessageOpening
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.AppFrameLayout
 import dev.caerbannog.ui.appframe.ConnectionControl
+import dev.caerbannog.ui.components.HelpTip
+import dev.caerbannog.ui.components.HowToLink
+import dev.caerbannog.ui.components.TopLineWithHowTo
+import dev.caerbannog.ui.components.rememberCopyToClipboard
 import dev.caerbannog.ui.connections.AppIcon
 import dev.caerbannog.ui.connections.ConnectionIcon
 import dev.caerbannog.ui.connections.IconSize
 import dev.caerbannog.ui.connections.SmallIconSize
+import dev.caerbannog.ui.migrate3x.Advice
 
 /** Compact buttons: five of them and the connection chip share one line at 1280 px. */
 private val BAR_BUTTON_PADDING = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
@@ -185,187 +191,203 @@ fun MigrationsScreen(
         },
         chip = if (control != null && controlEvents != null) ({ ConnectionControl(control, controlEvents) }) else null,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 8.dp), // 8 dp: the guidance line needs the height at 1024x768
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // Subheader Info
-            // The info line takes the full width (one line); the advice and the "How to" link share the next line, so the added guidance costs little height.
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.testTag("migrations:title"),
-                ) {
-                    ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TopLineWithHowTo(link = { HowToLink(HowToTexts.APPLY_MIGRATIONS) }) {
-                    Advice(MigrationsWording.ADVICE_TOP, "migrations-advice-top", Modifier.weight(1f))
-                }
-            }
-
-            plannerNotice?.let { PlannerNoticeBanner(it, onDismissPlannerNotice) }
-
-            FolderRow(state, onShowFolder, onChangeFolder)
-
-            // State banners: where the files and the history are, what applying is doing and how it ended.
-            state.unavailableReason?.let { UnavailableBanner(it) }
-            FolderAndHistoryBanners(state, onRetry, onChangeFolder, onShowFolder, onStartWithEmptyHistory)
-            state.applyProgress?.let { ApplyingBanner(it) }
-            state.applyOutcome?.let {
-                OutcomeBanner(it, onDismissOutcome)
-                MigrationsWording.applyAdvice(it)?.let { advice -> Advice(advice, "migrations-advice-outcome") }
-            }
-
-            // Error Banner
-            val errorMessage = state.errorMessage
-            if (errorMessage != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(12.dp)
-                        .semantics(mergeDescendants = true) {}
-                        .testTag("migrations:errorBanner"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ConnectionIcon(AppIcon.Error, tint = MaterialTheme.colorScheme.onErrorContainer, size = IconSize)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onDismissError) {
-                        Text("Dismiss", color = MaterialTheme.colorScheme.onErrorContainer)
-                    }
-                }
-            }
-
-            // Warning Banner (e.g. modified migration on disk)
-            val warningMessage = state.warningMessage
-            if (warningMessage != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp)
-                        .testTag("migrations:warningBanner"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ConnectionIcon(AppIcon.Warning, tint = MaterialTheme.colorScheme.onSecondaryContainer, size = IconSize)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = warningMessage,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            // M9-14: what the last export could not carry (null when it lost nothing).
-            state.exportNote?.let { Advice(it, "migrations-export-note") }
-
-            // Main Content Area: Left file list + Right detail
-            val selectedFile = state.selectedFile
-            val draftCard: @Composable () -> Unit = {
-                DraftCard(
-                    entry = plannerEntry,
-                    onContinue = onOpenPlanner,
-                    onDismiss = { askDismissDraft = true },
-                )
-            }
-            if (state.folder is MigrationFolderState.ChooseFolder) {
-                draftCard()
-                ChooseFolderPanel(onChooseFolder)
-            } else Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+        // The page measures the width its content is given (window minus the drawer of the frame) and stacks under 672 dp (M2-21b).
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val stacked = migrationsLayoutFor(maxWidth, LocalDensity.current.fontScale) == MigrationsLayout.Stacked
+            val pageScroll = rememberScrollState()
+            // Hoisted above the layout switch so the list keeps its scroll position when the window crosses 672 dp (the two layouts call fileList from different places).
+            val listScroll = rememberScrollState()
+            val listMaxHeight = stackedListMaxHeight(maxHeight)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Only a stacked page scrolls as a whole (CLAUDE.md pitfall: no weight or fillMaxHeight below a scroll); side by side the list and the detail scroll on their own.
+                    .then(if (stacked) Modifier.verticalScroll(pageScroll) else Modifier)
+                    .padding(horizontal = 24.dp, vertical = 8.dp), // 8 dp: the guidance line needs the height at 1024x768
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Left Column: Migration files list
-                Column(
-                    modifier = Modifier
-                        .width(340.dp)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    draftCard()
-                    Text(
-                        text = "Migration files",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
-
-                    if (state.entries.isEmpty() && state.invalidFiles.isEmpty()) {
+                // Subheader Info
+                // The info line takes the full width (one line); the advice and the "How to" link share the next line, so the added guidance costs little height.
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.testTag("migrations:title"),
+                    ) {
+                        ConnectionIcon(AppIcon.Info, size = SmallIconSize, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = "No migration files found.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Applied versions are tracked on this machine, per connection profile. Every action must be safe to run twice.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(8.dp),
                         )
                     }
-
-                    for (entry in state.entries) {
-                        MigrationFileCard(
-                            entry = entry,
-                            isSelected = entry.file.version == state.selectedVersion,
-                            onClick = { onSelectVersion(entry.file.version) },
-                        )
+                    TopLineWithHowTo(link = { HowToLink(HowToTexts.APPLY_MIGRATIONS) }) {
+                        Advice(MigrationsWording.ADVICE_TOP, "migrations-advice-top", Modifier.weight(1f))
                     }
-
-                    for (invalid in state.invalidFiles) InvalidFileRow(invalid)
                 }
 
-                // Right Column: Selected file detail & dry run
-                if (selectedFile != null) {
-                    MigrationDetailPanel(
-                        file = selectedFile,
-                        state = state,
-                        onEdit = { showEditDialog = true },
-                        plannerEntry = plannerEntry,
-                        onEditSteps = { onEditSteps(selectedFile.version) },
-                        onCopyIntoNewPlan = {
-                            // A draft with steps is never replaced without the question; one with only a description is not worth asking about.
-                            if ((plannerEntry as? PlannerEntry.ContinuePlan)?.stepCount?.let { it > 0 } == true) copyAsk = selectedFile.version
-                            else onCopyIntoNewPlan(selectedFile.version)
-                        },
-                        onValidateAgain = onValidateAgain,
-                        onApply = { onApplySingle(selectedFile.version) },
-                        onTestMessage = { route ->
-                            // A route without wildcards needs no sample value: the Publish MQTT dialog opens at once.
-                            if (MqttTopicSample.slots(route.filter).isEmpty()) {
-                                onSendTestMessage(testMessageOpening(route, selectedFile, emptyList(), correlationIds))
-                            } else {
-                                sampleFor = route
-                            }
-                        },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        contentAlignment = Alignment.Center,
+                plannerNotice?.let { PlannerNoticeBanner(it, onDismissPlannerNotice) }
+
+                FolderRow(state, onShowFolder, onChangeFolder)
+
+                // State banners: where the files and the history are, what applying is doing and how it ended.
+                state.unavailableReason?.let { UnavailableBanner(it) }
+                FolderAndHistoryBanners(state, onRetry, onChangeFolder, onShowFolder, onStartWithEmptyHistory)
+                state.applyProgress?.let { ApplyingBanner(it) }
+                state.applyOutcome?.let {
+                    OutcomeBanner(it, onDismissOutcome)
+                    MigrationsWording.applyAdvice(it)?.let { advice -> Advice(advice, "migrations-advice-outcome") }
+                }
+
+                // Error Banner
+                val errorMessage = state.errorMessage
+                if (errorMessage != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(12.dp)
+                            .semantics(mergeDescendants = true) {}
+                            .testTag("migrations:errorBanner"),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        ConnectionIcon(AppIcon.Error, tint = MaterialTheme.colorScheme.onErrorContainer, size = IconSize)
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Select a migration file to inspect details.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = errorMessage,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = onDismissError) {
+                            Text("Dismiss", color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                }
+
+                // Warning Banner (e.g. modified migration on disk)
+                val warningMessage = state.warningMessage
+                if (warningMessage != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(12.dp)
+                            .testTag("migrations:warningBanner"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ConnectionIcon(AppIcon.Warning, tint = MaterialTheme.colorScheme.onSecondaryContainer, size = IconSize)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = warningMessage,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
                         )
                     }
+                }
+
+                // M9-14: what the last export could not carry (null when it lost nothing).
+                state.exportNote?.let { Advice(it, "migrations-export-note") }
+
+                // Main Content Area: Left file list + Right detail
+                val selectedFile = state.selectedFile
+                val draftCard: @Composable () -> Unit = {
+                    DraftCard(
+                        entry = plannerEntry,
+                        onContinue = onOpenPlanner,
+                        onDismiss = { askDismissDraft = true },
+                    )
+                }
+                // The same list and detail in both layouts; only the modifiers differ (height rules below a scroll, weights in a Row).
+                val fileList: @Composable (Modifier) -> Unit = { listModifier ->
+                    Column(
+                        modifier = listModifier.verticalScroll(listScroll),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        draftCard()
+                        Text(
+                            text = "Migration files",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+
+                        if (state.entries.isEmpty() && state.invalidFiles.isEmpty()) {
+                            Text(
+                                text = "No migration files found.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(8.dp),
+                            )
+                        }
+
+                        for (entry in state.entries) {
+                            MigrationFileCard(
+                                entry = entry,
+                                isSelected = entry.file.version == state.selectedVersion,
+                                onClick = { onSelectVersion(entry.file.version) },
+                            )
+                        }
+
+                        for (invalid in state.invalidFiles) InvalidFileRow(invalid)
+                    }
+                }
+                val detail: @Composable (Modifier, Boolean) -> Unit = { detailModifier, stackedPanel ->
+                    if (selectedFile != null) {
+                        MigrationDetailPanel(
+                            file = selectedFile,
+                            state = state,
+                            onEdit = { showEditDialog = true },
+                            plannerEntry = plannerEntry,
+                            onEditSteps = { onEditSteps(selectedFile.version) },
+                            onCopyIntoNewPlan = {
+                                // A draft with steps is never replaced without the question; one with only a description is not worth asking about.
+                                if ((plannerEntry as? PlannerEntry.ContinuePlan)?.stepCount?.let { it > 0 } == true) copyAsk = selectedFile.version
+                                else onCopyIntoNewPlan(selectedFile.version)
+                            },
+                            onValidateAgain = onValidateAgain,
+                            onApply = { onApplySingle(selectedFile.version) },
+                            onTestMessage = { route ->
+                                // A route without wildcards needs no sample value: the Publish MQTT dialog opens at once.
+                                if (MqttTopicSample.slots(route.filter).isEmpty()) {
+                                    onSendTestMessage(testMessageOpening(route, selectedFile, emptyList(), correlationIds))
+                                } else {
+                                    sampleFor = route
+                                }
+                            },
+                            modifier = detailModifier,
+                            stacked = stackedPanel,
+                        )
+                    } else {
+                        Box(
+                            modifier = detailModifier,
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "Select a migration file to inspect details.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (state.folder is MigrationFolderState.ChooseFolder) {
+                    draftCard()
+                    ChooseFolderPanel(onChooseFolder)
+                } else if (stacked) {
+                    fileList(Modifier.fillMaxWidth().heightIn(max = listMaxHeight).testTag("migrations:fileList"))
+                    detail(Modifier.fillMaxWidth().heightIn(min = STACKED_DETAIL_MIN_HEIGHT), true)
+                } else Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(MIGRATION_PAGE_GAP),
+                ) {
+                    fileList(Modifier.width(MIGRATION_LIST_WIDTH).fillMaxHeight())
+                    detail(Modifier.weight(1f).fillMaxHeight(), false)
                 }
             }
+            if (stacked) VerticalScrollbar(rememberScrollbarAdapter(pageScroll), Modifier.align(Alignment.CenterEnd).fillMaxHeight().testTag("migrations:pageScrollbar"))
         }
     }
 
@@ -529,6 +551,8 @@ private fun MigrationDetailPanel(
     onApply: () -> Unit,
     onTestMessage: (MqttRoute) -> Unit,
     modifier: Modifier = Modifier,
+    /** Stacked page (M2-21b): the page scrolls, so the panel takes its natural height and neither scrolls itself nor fills or weights its height. */
+    stacked: Boolean = false,
 ) {
     val copyToClipboard = rememberCopyToClipboard()
 
@@ -536,13 +560,12 @@ private fun MigrationDetailPanel(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(16.dp),
+            .padding(16.dp)
+            .testTag("migrationDetail:panel"),
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+            modifier = if (stacked) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Header
@@ -652,7 +675,8 @@ private fun MigrationDetailPanel(
             val refusal = state.planOpening as? PlanOpeningDecision.NotOffered
             if (refusal != null && !holdsHash) PlanNotOffered(refusal, plannerEntry, onCopyIntoNewPlan)
 
-            Spacer(modifier = Modifier.weight(1f))
+            // A weight needs a bounded height; the stacked panel has its natural height.
+            if (!stacked) Spacer(modifier = Modifier.weight(1f))
 
             // Action row. A FlowRow, not a Row: at font scale 1.5 the four buttons need more than the detail panel is wide, and a Row squeezed the last ones to
             // zero width (M2-21 D2). Every button keeps its natural width; the weighted spacer pushes Validate and Apply to the right, or starts their line when it wraps.
@@ -712,14 +736,18 @@ private fun MigrationDetailPanel(
  * The fixed text that stands in place of "Edit steps" (M9-12), with its second line and, for a file applied elsewhere, "Copy into a new plan". The
  * button stays visible but disabled while the draft file cannot be read (a copy would write over it), with the reason under it.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PlanNotOffered(refusal: PlanOpeningDecision.NotOffered, plannerEntry: PlannerEntry, onCopy: () -> Unit) {
-    Row(
+    // A FlowRow: at font scale 1.5 the copy button is about 300 px wide and a Row left the reason 140 px; the button now drops under the text instead
+    // (M2-21b), and the text keeps at least 200 dp to read.
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        itemVerticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f).widthIn(min = PLAN_NOT_OFFERED_MIN_TEXT_WIDTH), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(refusal.reason, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("migrations:planNotOffered"))
             refusal.detail?.let {
                 Text(
