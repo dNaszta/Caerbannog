@@ -1,10 +1,19 @@
 package dev.caerbannog.ui.layout
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.migrations.ActionDryRun
 import dev.caerbannog.core.migrations.MigrationAction
 import dev.caerbannog.core.migrations.MigrationDryRun
@@ -16,15 +25,6 @@ import dev.caerbannog.ui.PinnedFontTheme
 import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.planner.node
 import org.junit.jupiter.api.Timeout
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.layout.positionInRoot
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue

@@ -18,7 +18,6 @@ import dev.caerbannog.core.planner.PlanOpeningDecision
 import dev.caerbannog.ui.layout.WithDrawerStandIn
 import dev.caerbannog.ui.layout.assertIntact
 import dev.caerbannog.ui.planner.node
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -63,10 +62,7 @@ class MigrationsEditStepsNarrowExploratoryUiTest {
         assertTrue(text.left >= 0f && text.right <= 800f && text.width >= 200f, "the refusal text is $text wide at 800, it must be inside the window and at least 200 px wide to read")
     }
 
-    /** Side by side (window 1000, screen 720 dp) with a refusal at font scale 1.5: the two buttons stay intact next to the wrapped text (pinned font). */
-    @Disabled("FINDING M2-21b: red, measured 2026-11-23 on the Mac. 'Copy into a new plan' wraps to 2 lines (276 x 76 px) side by side at 1000 wide, font scale 1.5: the detail panel is about 308 px and the button already fills it. Needs an architect decision (shorter label or stack under a larger width at big font scales).")
-    @Test
-    fun `at 1000 wide and font scale 1_5 a refusal keeps its buttons intact side by side`() = runDesktopComposeUiTest(1000, 800) {
+    private fun androidx.compose.ui.test.DesktopComposeUiTest.refusalKeepsButtonsIntact(width: Int) {
         setContent {
             dev.caerbannog.ui.PinnedFontTheme {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) {
@@ -80,6 +76,18 @@ class MigrationsEditStepsNarrowExploratoryUiTest {
         waitForIdle()
         val tags = listOf("migrations:copyIntoPlanBtn", "migrations:editFileBtn")
         tags.forEach { node(it).performScrollTo().assertIsDisplayed() }
-        assertIntact(tags, 1000, 800, scroll = true)
+        assertIntact(tags, width, 800, scroll = true)
     }
+
+    /** Window 1000 at font scale 1.5: the page is 720 dp, under the 752 dp threshold of that scale, so it stacks and the refusal buttons have the full width (pinned font). */
+    @Test
+    fun `at 1000 wide and font scale 1_5 a refusal keeps its buttons intact stacked`() = runDesktopComposeUiTest(1000, 800) { refusalKeepsButtonsIntact(1000) }
+
+    /** Window 1100 at font scale 1.5: the page is 820 dp, side by side, detail 408 dp (pinned font). */
+    @Test
+    fun `at 1100 wide and font scale 1_5 a refusal keeps its buttons intact side by side`() = runDesktopComposeUiTest(1100, 800) { refusalKeepsButtonsIntact(1100) }
+
+    /** Window 1032 at font scale 1.5: the page is 752 dp, the first width that is side by side, so the detail is at its smallest (340 dp) and the copy button has its tightest fit (pinned font). */
+    @Test
+    fun `at 1032 wide and font scale 1_5 a refusal keeps its buttons intact side by side at the threshold`() = runDesktopComposeUiTest(1032, 800) { refusalKeepsButtonsIntact(1032) }
 }

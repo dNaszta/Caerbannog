@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -192,7 +193,7 @@ fun MigrationsScreen(
     ) {
         // The page measures the width its content is given (window minus the drawer of the frame) and stacks under 672 dp (M2-21b).
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val stacked = migrationsLayoutFor(maxWidth) == MigrationsLayout.Stacked
+            val stacked = migrationsLayoutFor(maxWidth, LocalDensity.current.fontScale) == MigrationsLayout.Stacked
             val pageScroll = rememberScrollState()
             // Hoisted above the layout switch so the list keeps its scroll position when the window crosses 672 dp (the two layouts call fileList from different places).
             val listScroll = rememberScrollState()
