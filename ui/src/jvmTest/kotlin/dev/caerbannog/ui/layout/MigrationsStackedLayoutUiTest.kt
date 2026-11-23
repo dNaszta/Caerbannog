@@ -15,14 +15,16 @@ import dev.caerbannog.core.migrations.MigrationsScreenState
 import dev.caerbannog.ui.PinnedFontTheme
 import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.planner.node
+import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
  * M2-21b (owner decision A): below a measured content width the Migrations page stacks, file list on top (capped height, scrolls inside), detail below at full width.
- * The screen sits behind a drawer stand-in of 304 dp, as in the app, with the pinned font. Thresholds that the brief leaves open are marked "ASSUMED" and settled with the architect.
+ * The screen sits behind a drawer stand-in of 304 dp, as in the app, with the pinned font. The screen draws the 280 dp drawer itself (see DrawerStandIn.kt).
  */
 @OptIn(ExperimentalTestApi::class)
+@Timeout(60)
 class MigrationsStackedLayoutUiTest {
     private fun file(v: String) = MigrationFile(v, "d", listOf(MigrationAction.DeclareQueue("q$v")), "{}", "abc$v")
     private val files = (1..30).map { file("%04d".format(it)) }
@@ -47,13 +49,10 @@ class MigrationsStackedLayoutUiTest {
         assertTrue(card.top < 400f && detail.top < 400f, "both start at the top of the page at 1280: card $card, detail $detail")
     }
 
-    /**
-     * The screen alone at 1000 (as MigrationsEditStepsUiTest shows it). Behind the drawer the screen gets 696 dp, which is under the brief's 760 threshold, so "1000 is unchanged"
-     * and "start at 760" disagree for a real window (architect to settle); behind the drawer the side by side detail is 284 px and a scroll to Validate hangs the test clock.
-     */
+    /** The 1000 window: the screen gets 720 dp (1000 minus the 280 dp drawer of the app frame), over the 672 dp threshold, so side by side (architect decision 1). */
     @Test
     fun `at 1000 wide the file list is left of the detail panel as before`() = runDesktopComposeUiTest(1000, 800) {
-        show(drawer = false)
+        show()
         val card = bounds("migrationCard:0001"); val detail = bounds("migrationDetail:header")
         assertTrue(card.right <= detail.left + 0.5f, "side by side expected at 1000 (brief: unchanged): list card $card must end left of the detail header $detail")
     }
@@ -61,8 +60,10 @@ class MigrationsStackedLayoutUiTest {
     @Test
     fun `at 800 wide the page stacks with the detail panel under the list and as wide as the content`() = runDesktopComposeUiTest(800, 800) {
         show()
-        val card = bounds("migrationCard:0001"); val detail = bounds("migrationDetail:header")
-        assertTrue(detail.top >= card.bottom - 0.5f, "stacked expected at 800: the detail header $detail must start below the list card $card")
+        val card = bounds("migrationCard:0001"); val header = bounds("migrationDetail:header")
+        assertTrue(header.top >= card.bottom - 0.5f, "stacked expected at 800: the detail header $header must start below the list card $card")
+        // The header is a text of its own width, so the width is read from the panel (tag added in M2-21b), not from the header.
+        val detail = bounds("migrationDetail:panel")
         val content = 800f - DRAWER_WIDTH_DP
         assertTrue(detail.width >= content - 2 * 24f - 1f - 40f, "the detail panel is ${detail.width} px wide at 800, about the content width ($content minus the page padding) was expected")
     }
