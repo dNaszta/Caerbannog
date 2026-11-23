@@ -78,3 +78,17 @@ Facts: the screen is given window minus the 304 dp drawer; the page has 24 dp pa
 - **Test changes outside my brief (flagged):** `DrawerStandIn.kt` as above; `MigrationsStackedLayoutUiTest` read the detail width from the header text (a text of its own width), now from `migrationDetail:panel`; `@Timeout(60)` on the new classes; 1000 guard names lose "without a drawer"; new `MigrationsLayoutTest` (671, 672, 496, 696, 976 and the list cap).
 - **Connections screen:** not touched (architect: stacks under 844 dp).
 
+
+## Architect review (2026-11-23)
+
+**Correction of facts (architect error, found by the senior developer, verified in `ui/.../appframe/AppFrame.kt:377`):** the app frame draws its own drawer of 280 dp, not 304 (304 = 280 + 24 dp page padding, the x of the first card). Every figure above that says "304", "696", "976" or "496" is superseded by this table. The detail panel side by side is content - 412 dp.
+
+| Window | Page content (window - 280) | Layout | Detail panel |
+| --- | --- | --- | --- |
+| 800 | 520 | stacked (under 672) | 520 - 48 = 472 wide, natural height |
+| 951 | 671 | stacked | |
+| 952 | 672 | side by side | 260 |
+| 1000 | 720 | side by side | 308 |
+| 1280 | 1000 | side by side | 588 |
+
+The threshold constant 672 stands; it now means "window 952 dp and wider is side by side". The fallback in decision 1 (raise to 720) is not needed and is void. The "hang" in the test developer's open point 2 was a test artefact (the stand-in doubled the drawer, leaving a 416 dp page with zero-size buttons); decision 3 is closed with class "test artefact", the bounded repro stays as a regression on the screen alone. `DrawerStandIn` is a pass-through; the tests keep their names.
