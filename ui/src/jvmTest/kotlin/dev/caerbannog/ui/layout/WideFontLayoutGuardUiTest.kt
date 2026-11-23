@@ -34,4 +34,17 @@ class WideFontLayoutGuardUiTest {
 
     /** Original: MigrationsEditStepsNarrowExploratoryUiTest "at 1000 wide and font scale 1_5 the four buttons are on screen" (finding F2). */
     @Test fun `at 1000 wide and font scale 1_5 the four buttons of the Migrations action row are intact with a wide font`() = check(WideFontScenarios.narrowActionRow(pinned = true))
+
+    /** M2-21b test 7: the Migrations detail panel behind the drawer at 800 and 1000 wide, font scale 1 and 1.5 (brief M2-21b). Red at 800 until the page stacks. */
+    @Test fun `at 800 wide and font scale 1 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 800, scale = 1f))
+    @Test fun `at 800 wide and font scale 1_5 the Migrations detail panel buttons are intact behind the drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 800, scale = 1.5f))
+    @Test fun `at 1000 wide and font scale 1 the Migrations detail panel buttons are intact without a drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 1000, scale = 1f, drawer = false))
+    @Test fun `at 1000 wide and font scale 1_5 the Migrations detail panel buttons are intact without a drawer with a wide font`() = check(WideFontScenarios.detailBehindDrawer(pinned = true, width = 1000, scale = 1.5f, drawer = false))
+
+    /** M2-21b test 7b: the machine's own font at 800 (the other half of the brief: machine font and pinned DejaVu). */
+    @Test fun `at 800 wide and font scale 1_5 the Migrations detail panel buttons are intact behind the drawer with the machine font`() =
+        WideFontScenarios.detailBehindDrawer(pinned = false, width = 800, scale = 1.5f).let { run ->
+            run.facts.forEach { println("M2-21b MEASURE $it") }
+            assertEquals(emptyList(), run.problems, "with the machine's own font")
+        }
 }
