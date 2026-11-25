@@ -12,7 +12,7 @@ Spec "Access view (M10)", goal 2 and risk "the match preview is a prediction". T
 In:
 1. **`AccessMatcher` in `core`** (pure function, no `java.*` beyond what Kotlin common offers; if Erlang's regular-expression dialect needs more than `Regex` can do, the brief stops and the architect decides, see Open points). Input: the permission rows and topic rows of a user, an `AccessQuestion(action, vhost, name, routingKey?)`. Output: `WouldMatch(kind, pattern)`, `NoMatch(kind, pattern)`, `UnreadablePattern(kind)`, `PermissionsNotReadable`. The action to permission mapping (publish to exchange needs write on the exchange; read from queue needs read; bind needs write on the queue and read on the exchange; the default exchange name; stream publish and consume) comes only from the measured table of S-I, in a data table in the code with the spike row id as comment, not from memory.
 2. **The case table of S-I as a fixture** (`core-testing`, at least 30 rows) used by the unit test of the matcher and by the live gate test.
-3. **UI**: the form and the verdict on the Permissions tab; the sentence "prediction, the broker decides" (wording AQ5) always next to the verdict; the source of the patterns ("read from the broker") shown; no request is sent when the user asks (the permissions are already loaded; the preview never publishes, reads or declares anything).
+3. **UI**: the form and the verdict on the Permissions tab; the sentence "Prediction from the patterns above; the broker decides. Check sends nothing to the broker." (wording approved by the owner, AQ5, 2026-11-25) always next to the verdict; the source of the patterns ("read from the broker") shown; no request is sent when the user asks (the permissions are already loaded; the preview never publishes, reads or declares anything).
 4. **Live test** `RealBrokerAccessMatchTest` (`broker`, in `brokerTest`): for each row of the case table, a throwaway user with the row's pattern, the matcher's answer against the broker's answer to the real operation; any disagreement fails the test and names the row.
 Out: any attempt on the broker from the app (probing is a non-goal), token users (`M10-05`).
 
@@ -24,7 +24,7 @@ Out: any attempt on the broker from the app (probing is a non-goal), token users
 `core/access` for the matcher and the case table; `ui/access` for the form. Pure functions, sealed result types, no boolean flags that switch behaviour. If a pattern can hang the matcher (catastrophic backtracking), bound the work (input length and a step or time budget with a clear result `UnreadablePattern`-like `TooComplex`).
 
 ## UX
-Preview form and verdict of `Access.dc.html`; verdict wording AQ5.
+Preview form and verdict of `Access.dc.html`; verdict wording approved by the owner (AQ5): "Would match.", "Would not match.", "Pattern could not be read.", "Permissions not readable.", "Would match (topic permission)." with the pattern sentences as drawn.
 
 ## MCP
 `caerbannog_check_access` in `M10-08` uses the same matcher; nothing sent beyond the permission read.
