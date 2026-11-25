@@ -1,0 +1,11 @@
+{
+    "request": "GET https://:15671/api/whoami as t-admin (basic, token as password)",
+    "status": 200,
+    "body": {
+        "name": "t-admin",
+        "tags": [
+            "administrator"
+        ],
+        "is_internal_user": false
+    }
+}

@@ -1,0 +1,86 @@
+{
+    "request": "GET /api/channels/{name} of a publishing channel on B (rates_mode detailed)",
+    "status": 200,
+    "body": {
+        "garbage_collection": {
+            "fullsweep_after": 65535,
+            "max_heap_size": 0,
+            "min_bin_vheap_size": 1727361,
+            "min_heap_size": 233,
+            "minor_gcs": 2
+        },
+        "name": "192.168.65.1:26660 -> 172.17.0.4:5672 (2)",
+        "node": "rabbit@d47682b2e31f",
+        "reductions": 2753,
+        "state": "running",
+        "user": "unknown",
+        "confirm": true,
+        "number": 2,
+        "vhost": "/",
+        "prefetch_count": 0,
+        "user_who_performed_action": "unknown",
+        "idle_since": "2026-11-25T09:14:14.569+00:00",
+        "messages_unacknowledged": 0,
+        "consumer_count": 0,
+        "acks_uncommitted": 0,
+        "cached_segments": 0,
+        "messages_uncommitted": 0,
+        "messages_unconfirmed": 0,
+        "pending_raft_commands": 0,
+        "transactional": false,
+        "connection_details": {
+            "name": "192.168.65.1:26660 -> 172.17.0.4:5672",
+            "peer_host": "192.168.65.1",
+            "peer_port": 26660
+        },
+        "message_stats": {
+            "confirm": 1,
+            "confirm_details": {
+                "rate": 0.0
+            },
+            "drop_unroutable": 0,
+            "drop_unroutable_details": {
+                "rate": 0.0
+            },
+            "publish": 1,
+            "publish_details": {
+                "rate": 0.0
+            },
+            "return_unroutable": 0,
+            "return_unroutable_details": {
+                "rate": 0.0
+            }
+        },
+        "consumer_details": [],
+        "deliveries": [],
+        "publishes": [
+            {
+                "exchange": {
+                    "name": "x.tadmin",
+                    "vhost": "/"
+                },
+                "stats": {
+                    "confirm": 1,
+                    "confirm_details": {
+                        "rate": 0.0
+                    },
+                    "drop_unroutable": 0,
+                    "drop_unroutable_details": {
+                        "rate": 0.0
+                    },
+                    "publish": 1,
+                    "publish_details": {
+                        "rate": 0.0
+                    },
+                    "return_unroutable": 0,
+                    "return_unroutable_details": {
+                        "rate": 0.0
+                    }
+                }
+            }
+        ],
+        "reductions_details": {
+            "rate": 0.0
+        }
+    }
+}

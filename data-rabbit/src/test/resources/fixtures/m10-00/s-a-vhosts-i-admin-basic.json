@@ -1,0 +1,54 @@
+{
+    "request": "GET /api/vhosts as i-admin (basic)",
+    "status": 200,
+    "body": [
+        {
+            "name": "/",
+            "description": "Default virtual host",
+            "metadata": {
+                "description": "Default virtual host",
+                "tags": [],
+                "default_queue_type": "classic"
+            },
+            "tags": [],
+            "default_queue_type": "classic",
+            "protected_from_deletion": false,
+            "tracing": false,
+            "cluster_state": {
+                "rabbit@978a34e8b9df": "running"
+            }
+        },
+        {
+            "name": "/orders",
+            "description": "",
+            "metadata": {
+                "description": "",
+                "tags": [],
+                "default_queue_type": "classic"
+            },
+            "tags": [],
+            "default_queue_type": "classic",
+            "protected_from_deletion": false,
+            "tracing": false,
+            "cluster_state": {
+                "rabbit@978a34e8b9df": "running"
+            }
+        },
+        {
+            "name": "/other",
+            "description": "",
+            "metadata": {
+                "description": "",
+                "tags": [],
+                "default_queue_type": "classic"
+            },
+            "tags": [],
+            "default_queue_type": "classic",
+            "protected_from_deletion": false,
+            "tracing": false,
+            "cluster_state": {
+                "rabbit@978a34e8b9df": "running"
+            }
+        }
+    ]
+}

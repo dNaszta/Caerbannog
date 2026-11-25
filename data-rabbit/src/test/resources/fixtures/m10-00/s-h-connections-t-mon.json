@@ -1,0 +1,956 @@
+{
+    "request": "GET /api/connections as t-mon on A",
+    "status": 200,
+    "body": [
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-locator-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040365,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 8
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:16959 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 16959,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 9,
+            "recv_oct": 495,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 11411,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 9,
+            "send_oct": 680,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "i-admin",
+            "user_provided_name": "rabbitmq-stream-locator-0",
+            "user_who_performed_action": "i-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-locator-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040794,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 11
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:18182 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 18182,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 9,
+            "recv_oct": 1110,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 18159,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 9,
+            "send_oct": 680,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "t-admin",
+            "user_provided_name": "rabbitmq-stream-locator-0",
+            "user_who_performed_action": "t-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-consumer-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040403,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 6
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:23127 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 23127,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 8,
+            "recv_oct": 422,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 9732,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 8,
+            "send_oct": 703,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "i-admin",
+            "user_provided_name": "rabbitmq-stream-consumer-0",
+            "user_who_performed_action": "i-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 0,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-t-mon",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598045670,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 11
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:27085 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 27085,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 10,
+            "recv_oct": 1049,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 14829,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 3,
+            "send_oct": 589,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "t-mon",
+            "user_provided_name": "spike-amqp-t-mon",
+            "user_who_performed_action": "t-mon",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-producer-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040384,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 5
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:43374 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 43374,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 8,
+            "recv_oct": 444,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 7827,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 8,
+            "send_oct": 583,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "i-admin",
+            "user_provided_name": "rabbitmq-stream-producer-0",
+            "user_who_performed_action": "i-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-tadmin",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598040762,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 20
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:45051 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 45051,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 19,
+            "recv_oct": 1364,
+            "recv_oct_details": {
+                "rate": 48.8
+            },
+            "reductions": 20219,
+            "reductions_details": {
+                "rate": 934.6
+            },
+            "send_cnt": 12,
+            "send_oct": 817,
+            "send_oct_details": {
+                "rate": 45.6
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "t-admin",
+            "user_provided_name": "spike-amqp-tadmin",
+            "user_who_performed_action": "t-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "none",
+            "channel_max": 0,
+            "client_properties": {
+                "client_id": "mqtt-iadmin"
+            },
+            "connected_at": 1795598040735,
+            "frame_max": 0,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 5
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:47229 -> 172.17.0.3:1883",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 47229,
+            "port": 1883,
+            "protocol": "MQTT 5-0",
+            "recv_cnt": 2,
+            "recv_oct": 76,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 8971,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 2,
+            "send_oct": 28,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "i-admin",
+            "user_who_performed_action": "i-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 0,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-i-mon",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598045663,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 9
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:51633 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 51633,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 6,
+            "recv_oct": 502,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 10450,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 3,
+            "send_oct": 589,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "i-mon",
+            "user_provided_name": "spike-amqp-i-mon",
+            "user_who_performed_action": "i-mon",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-consumer-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040839,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 8
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:55575 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 55575,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 8,
+            "recv_oct": 1037,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 15127,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 8,
+            "send_oct": 703,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "t-admin",
+            "user_provided_name": "rabbitmq-stream-consumer-0",
+            "user_who_performed_action": "t-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 0,
+            "channels": 0,
+            "client_properties": {
+                "connection_name": "rabbitmq-stream-producer-0",
+                "copyright": "Copyright (c) 2020-2025 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL 2.0. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ Stream",
+                "version": "1.12.0"
+            },
+            "connected_at": 1795598040825,
+            "frame_max": 1048576,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 7
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:61231 -> 172.17.0.3:5552",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 61231,
+            "port": 5552,
+            "protocol": "stream",
+            "recv_cnt": 8,
+            "recv_oct": 1059,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 13262,
+            "reductions_details": {
+                "rate": 0.0
+            },
+            "send_cnt": 8,
+            "send_oct": 583,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "user": "t-admin",
+            "user_provided_name": "rabbitmq-stream-producer-0",
+            "user_who_performed_action": "t-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-iadmin",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598040293,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 14
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:64192 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 64192,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 14,
+            "recv_oct": 749,
+            "recv_oct_details": {
+                "rate": 0.0
+            },
+            "reductions": 16013,
+            "reductions_details": {
+                "rate": 171.0
+            },
+            "send_cnt": 12,
+            "send_oct": 817,
+            "send_oct_details": {
+                "rate": 0.0
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "i-admin",
+            "user_provided_name": "spike-amqp-iadmin",
+            "user_who_performed_action": "i-admin",
+            "vhost": "/"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-imgmt",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598041178,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 15
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:25935 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 25935,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 15,
+            "recv_oct": 746,
+            "recv_oct_details": {
+                "rate": 47.4
+            },
+            "reductions": 15277,
+            "reductions_details": {
+                "rate": 946.6
+            },
+            "send_cnt": 12,
+            "send_oct": 813,
+            "send_oct_details": {
+                "rate": 44.8
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "i-mgmt",
+            "user_provided_name": "spike-amqp-imgmt",
+            "user_who_performed_action": "i-mgmt",
+            "vhost": "/orders"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-inone",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598041224,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 16
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:49707 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 49707,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 14,
+            "recv_oct": 746,
+            "recv_oct_details": {
+                "rate": 47.4
+            },
+            "reductions": 15182,
+            "reductions_details": {
+                "rate": 942.4
+            },
+            "send_cnt": 12,
+            "send_oct": 813,
+            "send_oct_details": {
+                "rate": 44.8
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "i-none",
+            "user_provided_name": "spike-amqp-inone",
+            "user_who_performed_action": "i-none",
+            "vhost": "/orders"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-tnone",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598041250,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 18
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:56600 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 56600,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 19,
+            "recv_oct": 1353,
+            "recv_oct_details": {
+                "rate": 47.4
+            },
+            "reductions": 20026,
+            "reductions_details": {
+                "rate": 945.6
+            },
+            "send_cnt": 12,
+            "send_oct": 813,
+            "send_oct_details": {
+                "rate": 44.8
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "t-none",
+            "user_provided_name": "spike-amqp-tnone",
+            "user_who_performed_action": "t-none",
+            "vhost": "/orders"
+        },
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-tmgmt",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598041202,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 18
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:59018 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 59018,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 19,
+            "recv_oct": 1388,
+            "recv_oct_details": {
+                "rate": 47.4
+            },
+            "reductions": 20222,
+            "reductions_details": {
+                "rate": 941.4
+            },
+            "send_cnt": 12,
+            "send_oct": 813,
+            "send_oct_details": {
+                "rate": 44.8
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "t-mgmt",
+            "user_provided_name": "spike-amqp-tmgmt",
+            "user_who_performed_action": "t-mgmt",
+            "vhost": "/orders"
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/whoami as t-none (bearer)",
+    "status": 401,
+    "body": {
+        "error": "not_authorised",
+        "reason": "Not management user"
+    }
+}

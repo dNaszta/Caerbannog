@@ -1,0 +1,32 @@
+{
+    "request": "GET /api/connections?page=1&page_size=500&columns=name,user,vhost,protocol (first 3 items kept)",
+    "status": 200,
+    "body": {
+        "total_count": 600,
+        "item_count": 500,
+        "filtered_count": 600,
+        "page": 1,
+        "page_size": 500,
+        "page_count": 2,
+        "items": [
+            {
+                "name": "192.168.65.1:16012 -> 172.17.0.3:5672",
+                "protocol": "AMQP 0-9-1",
+                "user": "guest",
+                "vhost": "/"
+            },
+            {
+                "name": "192.168.65.1:16024 -> 172.17.0.3:5672",
+                "protocol": "AMQP 0-9-1",
+                "user": "guest",
+                "vhost": "/"
+            },
+            {
+                "name": "192.168.65.1:16158 -> 172.17.0.3:5672",
+                "protocol": "AMQP 0-9-1",
+                "user": "guest",
+                "vhost": "/"
+            }
+        ]
+    }
+}

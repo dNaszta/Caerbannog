@@ -1,0 +1,138 @@
+permission	pattern	name	operation	outcome
+write	ex	ex	basic.publish to exchange	allowed
+write	ex	ex.orders	basic.publish to exchange	allowed
+write	ex	my-ex	basic.publish to exchange	allowed
+write	ex	EX	basic.publish to exchange	refused
+write	^ex$	ex	basic.publish to exchange	allowed
+write	^ex$	ex.orders	basic.publish to exchange	refused
+write	^ex$	my-ex	basic.publish to exchange	refused
+write	^ex$	EX	basic.publish to exchange	refused
+write	ex.*	ex	basic.publish to exchange	allowed
+write	ex.*	ex.orders	basic.publish to exchange	allowed
+write	ex.*	my-ex	basic.publish to exchange	allowed
+write	ex.*	EX	basic.publish to exchange	refused
+write	.*ex	ex	basic.publish to exchange	allowed
+write	.*ex	ex.orders	basic.publish to exchange	allowed
+write	.*ex	my-ex	basic.publish to exchange	allowed
+write	.*ex	EX	basic.publish to exchange	refused
+write	^$	ex	basic.publish to exchange	refused
+write	^$	ex.orders	basic.publish to exchange	refused
+write	^$	my-ex	basic.publish to exchange	refused
+write	^$	EX	basic.publish to exchange	refused
+write		ex	basic.publish to exchange	refused
+write		ex.orders	basic.publish to exchange	refused
+write		my-ex	basic.publish to exchange	refused
+write		EX	basic.publish to exchange	refused
+write	.*	ex	basic.publish to exchange	allowed
+write	.*	ex.orders	basic.publish to exchange	allowed
+write	.*	my-ex	basic.publish to exchange	allowed
+write	.*	EX	basic.publish to exchange	allowed
+write	(?i)ex	ex	basic.publish to exchange	allowed
+write	(?i)ex	ex.orders	basic.publish to exchange	allowed
+write	(?i)ex	my-ex	basic.publish to exchange	allowed
+write	(?i)ex	EX	basic.publish to exchange	allowed
+write	EX	ex	basic.publish to exchange	refused
+write	EX	ex.orders	basic.publish to exchange	refused
+write	EX	my-ex	basic.publish to exchange	refused
+write	EX	EX	basic.publish to exchange	allowed
+write	ex\.orders	ex	basic.publish to exchange	refused
+write	ex\.orders	ex.orders	basic.publish to exchange	allowed
+write	ex\.orders	my-ex	basic.publish to exchange	refused
+write	ex\.orders	EX	basic.publish to exchange	refused
+write	^ex\.	ex	basic.publish to exchange	refused
+write	^ex\.	ex.orders	basic.publish to exchange	allowed
+write	^ex\.	my-ex	basic.publish to exchange	refused
+write	^ex\.	EX	basic.publish to exchange	refused
+read	queue	queue	basic.get on queue	allowed
+read	queue	queue.a	basic.get on queue	allowed
+read	queue	my-queue	basic.get on queue	allowed
+read	queue	Queue.a	basic.get on queue	refused
+read	^queue$	queue	basic.get on queue	allowed
+read	^queue$	queue.a	basic.get on queue	refused
+read	^queue$	my-queue	basic.get on queue	refused
+read	^queue$	Queue.a	basic.get on queue	refused
+read	queue.*	queue	basic.get on queue	allowed
+read	queue.*	queue.a	basic.get on queue	allowed
+read	queue.*	my-queue	basic.get on queue	allowed
+read	queue.*	Queue.a	basic.get on queue	refused
+read	^$	queue	basic.get on queue	refused
+read	^$	queue.a	basic.get on queue	refused
+read	^$	my-queue	basic.get on queue	refused
+read	^$	Queue.a	basic.get on queue	refused
+read		queue	basic.get on queue	refused
+read		queue.a	basic.get on queue	refused
+read		my-queue	basic.get on queue	refused
+read		Queue.a	basic.get on queue	refused
+read	.*	queue	basic.get on queue	allowed
+read	.*	queue.a	basic.get on queue	allowed
+read	.*	my-queue	basic.get on queue	allowed
+read	.*	Queue.a	basic.get on queue	allowed
+read	queue	queue	basic.consume on queue	allowed
+read	^$	queue	basic.consume on queue	refused
+configure	new	new	queue.declare	allowed
+configure	new	new.x	queue.declare	allowed
+configure	new.*	new	queue.declare	allowed
+configure	new.*	new.x	queue.declare	allowed
+configure	^new$	new	queue.declare	allowed
+configure	^new$	new.x	queue.declare	refused
+configure	^$	new	queue.declare	refused
+configure	^$	new.x	queue.declare	refused
+configure		new	queue.declare	refused
+configure		new.x	queue.declare	refused
+configure	new	new	exchange.declare	allowed
+write	^$	(default exchange, routing key queue)	basic.publish to ""	refused
+write		(default exchange, routing key queue)	basic.publish to ""	refused
+write	amq\.default	(default exchange, routing key queue)	basic.publish to ""	allowed
+write	^amq\.default$	(default exchange, routing key queue)	basic.publish to ""	allowed
+write	.*	(default exchange, routing key queue)	basic.publish to ""	allowed
+write	queue	(default exchange, routing key queue)	basic.publish to ""	refused
+write	^queue$	(default exchange, routing key queue)	basic.publish to ""	refused
+write+read	write=[.*] read=[.*]	bind queue to ex	queue.bind	allowed
+write+read	write=[queue] read=[ex]	bind queue to ex	queue.bind	allowed
+write+read	write=[] read=[.*]	bind queue to ex	queue.bind	refused
+write+read	write=[.*] read=[]	bind queue to ex	queue.bind	refused
+write+read	write=[queue] read=[]	bind queue to ex	queue.bind	refused
+write+read	write=[^$] read=[^ex$]	bind queue to ex	queue.bind	refused
+topic write	^a\..*	amq.topic rk=a.b	basic.publish	allowed
+topic write	^a\..*	amq.topic rk=a.b.c	basic.publish	allowed
+topic write	^a\..*	amq.topic rk=b.c	basic.publish	refused
+topic write	^a\..*	amq.topic rk=xa.b	basic.publish	refused
+topic write	a	amq.topic rk=a.b	basic.publish	allowed
+topic write	a	amq.topic rk=a.b.c	basic.publish	allowed
+topic write	a	amq.topic rk=b.c	basic.publish	refused
+topic write	a	amq.topic rk=xa.b	basic.publish	allowed
+topic write	a.*	amq.topic rk=a.b	basic.publish	allowed
+topic write	a.*	amq.topic rk=a.b.c	basic.publish	allowed
+topic write	a.*	amq.topic rk=b.c	basic.publish	refused
+topic write	a.*	amq.topic rk=xa.b	basic.publish	allowed
+topic write	^a\.b$	amq.topic rk=a.b	basic.publish	allowed
+topic write	^a\.b$	amq.topic rk=a.b.c	basic.publish	refused
+topic write	^a\.b$	amq.topic rk=b.c	basic.publish	refused
+topic write	^a\.b$	amq.topic rk=xa.b	basic.publish	refused
+topic write		amq.topic rk=a.b	basic.publish	refused
+topic write		amq.topic rk=a.b.c	basic.publish	refused
+topic write		amq.topic rk=b.c	basic.publish	refused
+topic write		amq.topic rk=xa.b	basic.publish	refused
+topic write	.*	amq.topic rk=a.b	basic.publish	allowed
+topic write	.*	amq.topic rk=a.b.c	basic.publish	allowed
+topic write	.*	amq.topic rk=b.c	basic.publish	allowed
+topic write	.*	amq.topic rk=xa.b	basic.publish	allowed
+topic write	(no topic permission)	amq.topic rk=b.c	basic.publish	allowed
+topic write (MQTT)	^a\..*	mqtt topic a/b	publish qos1	allowed
+topic write (MQTT)	^a\..*	mqtt topic a/b/c	publish qos1	allowed
+topic write (MQTT)	^a\..*	mqtt topic b/c	publish qos1	refused
+topic write (MQTT)	^a\..*	mqtt topic a.b	publish qos1	allowed
+write	.*	st.perm	stream declare publisher	allowed
+read	.*	st.perm	stream subscribe	allowed
+write	.*	st.perm	stream declare publisher	allowed
+read		st.perm	stream subscribe	refused
+write		st.perm	stream declare publisher	refused
+read	.*	st.perm	stream subscribe	allowed
+write	^st\.perm$	st.perm	stream declare publisher	allowed
+read	^st\.perm$	st.perm	stream subscribe	allowed
+write	st	st.perm	stream declare publisher	allowed
+read	st	st.perm	stream subscribe	allowed
+write	st.*	st.perm	stream declare publisher	allowed
+read	st.*	st.perm	stream subscribe	allowed
+configure		st.new	stream create	refused
+configure	st\.new	st.new	stream create	allowed

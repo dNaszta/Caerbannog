@@ -1,0 +1,27 @@
+{
+    "request": "GET /api/users/i-admin/permissions as i-admin",
+    "status": 200,
+    "body": [
+        {
+            "user": "i-admin",
+            "vhost": "/",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        },
+        {
+            "user": "i-admin",
+            "vhost": "/orders",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        },
+        {
+            "user": "i-admin",
+            "vhost": "/other",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/whoami as i-admin (basic)",
+    "status": 200,
+    "body": {
+        "name": "i-admin",
+        "tags": [
+            "administrator"
+        ],
+        "is_internal_user": true
+    }
+}

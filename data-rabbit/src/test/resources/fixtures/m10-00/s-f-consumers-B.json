@@ -1,0 +1,236 @@
+{
+    "request": "GET /api/consumers on B (rates_mode detailed) as guest",
+    "status": 200,
+    "body": [
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:20543 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:20543 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 20543,
+                "user": "unknown"
+            },
+            "consumer_tag": "consumer-t-mon",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.shared",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:22063 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:22063 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 22063,
+                "user": "i-none"
+            },
+            "consumer_tag": "consumer-inone",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.inone",
+                "vhost": "/orders"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:26660 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:26660 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 26660,
+                "user": "unknown"
+            },
+            "consumer_tag": "consumer-tadmin",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.tadmin",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:37249 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:37249 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 37249,
+                "user": "unknown"
+            },
+            "consumer_tag": "consumer-tmgmt",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.tmgmt",
+                "vhost": "/orders"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:38301 -> 172.17.0.4:5552",
+                "name": "",
+                "node": "rabbit@d47682b2e31f",
+                "number": 0,
+                "peer_host": "192.168.65.1",
+                "peer_port": 38301,
+                "user": "unknown"
+            },
+            "consumer_tag": "stream.subid-0",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "st.tadmin",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:39663 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:39663 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 39663,
+                "user": "i-mgmt"
+            },
+            "consumer_tag": "consumer-imgmt",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.imgmt",
+                "vhost": "/orders"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:50428 -> 172.17.0.4:5552",
+                "name": "",
+                "node": "rabbit@d47682b2e31f",
+                "number": 0,
+                "peer_host": "192.168.65.1",
+                "peer_port": 50428,
+                "user": "i-admin"
+            },
+            "consumer_tag": "stream.subid-0",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "st.iadmin",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:51773 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:51773 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 51773,
+                "user": "i-admin"
+            },
+            "consumer_tag": "consumer-iadmin",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.iadmin",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:56192 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:56192 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 56192,
+                "user": "unknown"
+            },
+            "consumer_tag": "consumer-tnone",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.tnone",
+                "vhost": "/orders"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:60594 -> 172.17.0.4:5672",
+                "name": "192.168.65.1:60594 -> 172.17.0.4:5672 (1)",
+                "node": "rabbit@d47682b2e31f",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 60594,
+                "user": "i-mon"
+            },
+            "consumer_tag": "consumer-i-mon",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.shared",
+                "vhost": "/"
+            }
+        }
+    ]
+}

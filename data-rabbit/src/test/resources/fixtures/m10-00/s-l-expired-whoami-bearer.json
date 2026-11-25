@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/whoami with an expired token (bearer)",
+    "status": 401,
+    "body": {
+        "error": "not_authorized",
+        "reason": "Not_Authorized"
+    }
+}

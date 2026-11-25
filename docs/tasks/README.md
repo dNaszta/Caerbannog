@@ -16,7 +16,7 @@ Updated 2026-11-19 after the merges of `M9-13` (`cc4b1b40`) and `M2-10` (`b1f1a9
 
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
-| M10 | `M10-00` spike: what whoami, vhosts, permissions, connections, channels, consumers and stream endpoints return for token users (OAuth 2 backend, static key, minted tokens; S-A to S-P) | M | briefed (ready; owner answers AQ4, AQ11 help, do not block) |
+| M10 | `M10-00` spike: what whoami, vhosts, permissions, connections, channels, consumers and stream endpoints return for token users (OAuth 2 backend, static key, minted tokens; S-A to S-P) | M | spike DONE 2026-11-25, ready for review (S-A to S-P measured except S-K, skipped: AQ11 open; results `M10-00-spike-results.md`) |
 | M10 | `M10-01` Access mockup `docs/ux/Access.dc.html` and owner review | S | briefed (AQ1, AQ2, AQ5; parallel with `M10-00`) |
 | M10 | `M10-02` `SecretGuard`, access gateway, Who am I tab (earliest working slice) | M | `M10-00` (S-A, S-D, S-N, S-O), `M10-01` for the screen |
 | M10 | `M10-03` Permissions tab (patterns and topic permissions, administrator only) | M | `M10-02`, `M10-00` (S-B) |

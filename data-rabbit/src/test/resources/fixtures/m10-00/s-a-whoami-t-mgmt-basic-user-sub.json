@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/whoami as t-mgmt (basic user=sub)",
+    "status": 200,
+    "body": {
+        "name": "t-mgmt",
+        "tags": [
+            "management"
+        ],
+        "is_internal_user": false
+    }
+}

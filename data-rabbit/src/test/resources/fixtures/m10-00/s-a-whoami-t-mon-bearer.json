@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/whoami as t-mon (bearer)",
+    "status": 200,
+    "body": {
+        "name": "t-mon",
+        "tags": [
+            "monitoring"
+        ],
+        "is_internal_user": false
+    }
+}

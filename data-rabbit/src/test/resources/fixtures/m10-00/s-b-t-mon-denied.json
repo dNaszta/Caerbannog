@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/permissions/%2F/t-admin as t-mon",
+    "status": 401,
+    "body": {
+        "error": "not_authorised",
+        "reason": "Not administrator user"
+    }
+}

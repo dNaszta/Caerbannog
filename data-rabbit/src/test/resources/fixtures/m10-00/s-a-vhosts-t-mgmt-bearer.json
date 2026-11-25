@@ -1,0 +1,22 @@
+{
+    "request": "GET /api/vhosts as t-mgmt (bearer)",
+    "status": 200,
+    "body": [
+        {
+            "name": "/orders",
+            "description": "",
+            "metadata": {
+                "description": "",
+                "tags": [],
+                "default_queue_type": "classic"
+            },
+            "tags": [],
+            "default_queue_type": "classic",
+            "protected_from_deletion": false,
+            "tracing": false,
+            "cluster_state": {
+                "rabbit@978a34e8b9df": "running"
+            }
+        }
+    ]
+}

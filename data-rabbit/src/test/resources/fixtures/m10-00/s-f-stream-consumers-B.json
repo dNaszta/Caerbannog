@@ -1,0 +1,48 @@
+{
+    "request": "GET /api/stream/consumers on B (rates_mode detailed)",
+    "status": 200,
+    "body": [
+        {
+            "connection_details": {
+                "name": "192.168.65.1:38301 -> 172.17.0.4:5552",
+                "node": "rabbit@d47682b2e31f",
+                "peer_host": "192.168.65.1",
+                "peer_port": 38301,
+                "user": "unknown"
+            },
+            "active": true,
+            "activity_status": "up",
+            "consumed": 1,
+            "credits": 10,
+            "offset": 0,
+            "offset_lag": 0,
+            "properties": {},
+            "queue": {
+                "name": "st.tadmin",
+                "vhost": "/"
+            },
+            "subscription_id": 0
+        },
+        {
+            "connection_details": {
+                "name": "192.168.65.1:50428 -> 172.17.0.4:5552",
+                "node": "rabbit@d47682b2e31f",
+                "peer_host": "192.168.65.1",
+                "peer_port": 50428,
+                "user": "i-admin"
+            },
+            "active": true,
+            "activity_status": "up",
+            "consumed": 1,
+            "credits": 10,
+            "offset": 0,
+            "offset_lag": 0,
+            "properties": {},
+            "queue": {
+                "name": "st.iadmin",
+                "vhost": "/"
+            },
+            "subscription_id": 0
+        }
+    ]
+}

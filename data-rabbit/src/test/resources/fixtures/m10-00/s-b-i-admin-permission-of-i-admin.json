@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/permissions/%2F/i-admin as i-admin",
+    "status": 200,
+    "body": {
+        "user": "i-admin",
+        "vhost": "/",
+        "configure": ".*",
+        "write": ".*",
+        "read": ".*"
+    }
+}

@@ -1,0 +1,148 @@
+{
+    "request": "GET /api/overview as t-admin (bearer) on D",
+    "status": 200,
+    "body": {
+        "crypto_lib_version": "OpenSSL 3.5.9 29 Sep 2026",
+        "product_name": "RabbitMQ",
+        "product_version": "4.4.1",
+        "rabbitmq_version": "4.4.1",
+        "management_version": "4.4.1",
+        "erlang_version": "29.1.2",
+        "erlang_full_version": "Erlang/OTP 29 [erts-17.1.1] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [jit]",
+        "cluster_name": "rabbit@a6670dc6b277",
+        "rates_mode": "basic",
+        "sample_retention_policies": {
+            "global": [
+                600,
+                3600,
+                28800,
+                86400
+            ],
+            "basic": [
+                600,
+                3600
+            ],
+            "detailed": [
+                600
+            ]
+        },
+        "exchange_types": [
+            {
+                "name": "direct",
+                "description": "AMQP direct exchange, as per the AMQP specification",
+                "enabled": true
+            },
+            {
+                "name": "fanout",
+                "description": "AMQP fanout exchange, as per the AMQP specification",
+                "enabled": true
+            },
+            {
+                "name": "headers",
+                "description": "AMQP headers exchange, as per the AMQP specification",
+                "enabled": true
+            },
+            {
+                "name": "topic",
+                "description": "AMQP topic exchange, as per the AMQP specification",
+                "enabled": true
+            },
+            {
+                "name": "x-local-random",
+                "description": "Picks one random local binding (queue) to route via (to).",
+                "enabled": true
+            },
+            {
+                "name": "x-modulus-hash",
+                "description": "Modulus Hashing Exchange",
+                "enabled": true
+            }
+        ],
+        "cluster_tags": {},
+        "node_tags": {},
+        "disable_stats": false,
+        "default_queue_type": "classic",
+        "is_op_policy_updating_enabled": true,
+        "enable_queue_totals": false,
+        "definitions": {
+            "require_definition_json_extension": false
+        },
+        "require_definition_json_extension": false,
+        "message_stats": {},
+        "churn_rates": {},
+        "queue_totals": {},
+        "object_totals": {
+            "channels": 0,
+            "consumers": 0,
+            "exchanges": 8,
+            "queues": 0,
+            "connections": 0
+        },
+        "statistics_db_event_queue": 0,
+        "node": "rabbit@a6670dc6b277",
+        "listeners": [
+            {
+                "node": "rabbit@a6670dc6b277",
+                "protocol": "amqp",
+                "ip_address": "::",
+                "port": 5672,
+                "socket_opts": {
+                    "backlog": 128,
+                    "nodelay": true,
+                    "linger": [
+                        true,
+                        0
+                    ],
+                    "exit_on_close": false
+                },
+                "tls": false
+            },
+            {
+                "node": "rabbit@a6670dc6b277",
+                "protocol": "clustering",
+                "ip_address": "::",
+                "port": 25672,
+                "socket_opts": [],
+                "tls": false
+            },
+            {
+                "node": "rabbit@a6670dc6b277",
+                "protocol": "http",
+                "ip_address": "::",
+                "port": 15672,
+                "socket_opts": {
+                    "cowboy_opts": {
+                        "sendfile": false
+                    },
+                    "port": 15672
+                },
+                "tls": false
+            },
+            {
+                "node": "rabbit@a6670dc6b277",
+                "protocol": "mqtt",
+                "ip_address": "::",
+                "port": 1883,
+                "socket_opts": {
+                    "backlog": 128,
+                    "nodelay": true,
+                    "send_timeout": 15000,
+                    "send_timeout_close": true
+                },
+                "tls": false
+            },
+            {
+                "node": "rabbit@a6670dc6b277",
+                "protocol": "stream",
+                "ip_address": "::",
+                "port": 5552,
+                "socket_opts": {
+                    "backlog": 128,
+                    "nodelay": true
+                },
+                "tls": false
+            }
+        ],
+        "contexts": []
+    }
+}

@@ -1,0 +1,69 @@
+{
+    "request": "GET /api/exchanges/%2F/x.tadmin on B (rates_mode detailed)",
+    "status": 200,
+    "body": {
+        "arguments": {},
+        "auto_delete": true,
+        "durable": false,
+        "incoming": [
+            {
+                "channel_details": {
+                    "connection_name": "192.168.65.1:26660 -> 172.17.0.4:5672",
+                    "name": "192.168.65.1:26660 -> 172.17.0.4:5672 (2)",
+                    "node": "rabbit@d47682b2e31f",
+                    "number": 2,
+                    "peer_host": "192.168.65.1",
+                    "peer_port": 26660,
+                    "user": "unknown"
+                },
+                "stats": {
+                    "confirm": 1,
+                    "confirm_details": {
+                        "rate": 0.0
+                    },
+                    "drop_unroutable": 0,
+                    "drop_unroutable_details": {
+                        "rate": 0.0
+                    },
+                    "publish": 1,
+                    "publish_details": {
+                        "rate": 0.0
+                    },
+                    "return_unroutable": 0,
+                    "return_unroutable_details": {
+                        "rate": 0.0
+                    }
+                }
+            }
+        ],
+        "internal": false,
+        "message_stats": {
+            "publish_in": 1,
+            "publish_in_details": {
+                "rate": 0.0
+            },
+            "publish_out": 1,
+            "publish_out_details": {
+                "rate": 0.0
+            }
+        },
+        "name": "x.tadmin",
+        "outgoing": [
+            {
+                "queue": {
+                    "name": "q.tadmin",
+                    "vhost": "/"
+                },
+                "stats": {
+                    "publish": 1,
+                    "publish_details": {
+                        "rate": 0.0
+                    }
+                }
+            }
+        ],
+        "type": "fanout",
+        "user_who_performed_action": "unknown",
+        "vhost": "/"
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/vhosts as t-multi (basic user=sub)",
+    "status": 401,
+    "body": {
+        "error": "not_authorised",
+        "reason": "Not management user"
+    }
+}

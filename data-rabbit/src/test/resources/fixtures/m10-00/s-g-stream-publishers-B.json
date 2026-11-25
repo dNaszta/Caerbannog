@@ -1,0 +1,42 @@
+{
+    "request": "GET /api/stream/publishers on B (rates_mode detailed)",
+    "status": 200,
+    "body": [
+        {
+            "connection_details": {
+                "name": "192.168.65.1:19981 -> 172.17.0.4:5552",
+                "node": "rabbit@d47682b2e31f",
+                "peer_host": "192.168.65.1",
+                "peer_port": 19981,
+                "user": "unknown"
+            },
+            "confirmed": 1,
+            "errored": 0,
+            "published": 1,
+            "publisher_id": 0,
+            "queue": {
+                "name": "st.tadmin",
+                "vhost": "/"
+            },
+            "reference": ""
+        },
+        {
+            "connection_details": {
+                "name": "192.168.65.1:28375 -> 172.17.0.4:5552",
+                "node": "rabbit@d47682b2e31f",
+                "peer_host": "192.168.65.1",
+                "peer_port": 28375,
+                "user": "i-admin"
+            },
+            "confirmed": 1,
+            "errored": 0,
+            "published": 1,
+            "publisher_id": 0,
+            "queue": {
+                "name": "st.iadmin",
+                "vhost": "/"
+            },
+            "reference": ""
+        }
+    ]
+}
