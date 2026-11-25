@@ -34,6 +34,10 @@ tests/bdd/
     19_topology_planner.feature
     20_topology_planner_check.feature
     21_topology_planner_recipes.feature
+    22_access_who_am_i_and_permissions.feature
+    23_access_sign_in_method.feature
+    24_access_clients.feature
+    25_access_mcp.feature
 ```
 
 ## Tags
@@ -66,6 +70,7 @@ tests/bdd/
 | `@m9-14` | M9-14 the export keeps arguments and policies (7 `@fake-broker` scenarios in `10`, step 2 written 2026-11-16, red until built: typed queue, exchange and binding arguments, policies and operator policies, super stream, queues that belong to a connection left out, what the export left out, unreadable policies; the `@broker @gate-M5` scenario "Exported topology can be applied to an empty broker" was widened and is bound by name to `RealBrokerM5MigrationTest` and `RealBrokerM9ExportSpikeTest` "E7") |
 | `@m9-14b` | M9-14b export polish (6 new `@fake-broker` scenarios in `10`, written 2026-11-16; glue `M914bExportSteps` and unit tests `TopologyExportNoteTest`, `MigrationsViewModelExportTest`, `ManagementExportReadsTest` written in step 2, red until built; they also carry `@m9-14`): the note names only the settings present, one entry per super stream, ten entries at most, the "setting cannot be written" failure sentence, the completeness check applies only to what is written. |
 | `@m9-07c`, `@m9-14c` | M9-07c (the owner's broker sentence in the response-stream note: 1 `@fake-broker` scenario in `21`, bound in step 2 on 2026-11-17 with the existing step `the form says`, verified green in step 4 (2026-11-17); it replaced "The wizard says what a response stream is", deleted) and M9-14c (`declareStream` carries retention and the leader locator: 10 scenarios in `10`, 1 of them `@broker`, an outline in `20`, 1 in `21` tagged `@m9-12`; written 2026-11-17, owner decision O16). They also carry `@needs-M9-07c` / `@needs-M9-14c` and NO `@fake-broker`, so no runner selects them before their steps exist. |
+| `@M10`, `@access-view`, `@oauth`, `@clients`, `@gate-M10` | M10 Access view (PLANNED 2026-11-25, nothing built, `docs/spec.md` "Access view (M10)"): `22` who am I and permissions with the match preview, `23` sign-in method (OAuth 2 and Keycloak awareness), `24` producers and consumers by user, `25` the read-only MCP tools. `@access-view` is used instead of `@access` because `@access` already marks the M8 access migration scenarios. Tags per task: `@m10-02` to `@m10-09` (one per brief in `docs/tasks/`). `@needs-spike` scenarios wait for `M10-00`; `@needs-decision` ones for the owner's questions AQ1 to AQ11 in the spec. The gate scenarios (`@gate-M10 @broker`) run in `RealBrokerM10GateTest`, not in the Cucumber suites |
 | `@negative` | Checks a refusal, an error or a safety rule |
 | `@security`, `@safety` | Protects a security or data-flow rule from the spec (TLS on by default and never a silent fallback, never reading queue messages, browsing never changes offsets) |
 | `@needs-spike` | Depends on something the M1 spike must confirm (API fields, keychain, search by name for streams) |
@@ -116,6 +121,10 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 19 topology planner | Topology planner (M9): how a plan relates to a migration, step kinds, naming, the draft, review graph, guardrails | M9 (planned) |
 | 20 topology planner check | Topology planner (M9): check against the broker | M9 (planned) |
 | 21 topology planner recipes | Topology planner (M9): streams and the response stream, policies, dead-lettering for a queue, MQTT routes, facts to verify first | M9 (planned) |
+| 22 access who am I and permissions | Access view (M10): goals 1 and 2, redaction rules, match preview | M10 (planned) |
+| 23 access sign-in method | Access view (M10): goal 3, the honesty rule, facts to verify first | M10 (planned) |
+| 24 access clients | Access view (M10): goal 4, redaction rules | M10 (planned) |
+| 25 access MCP | Access view (M10): MCP evaluation | M10 (planned) |
 
 Unit-level coverage with no Gherkin scenario (behaviour users see stays in `02`):
 
