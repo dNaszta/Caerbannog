@@ -17,7 +17,7 @@ Updated 2026-11-19 after the merges of `M9-13` (`cc4b1b40`) and `M2-10` (`b1f1a9
 | Milestone | Task | Size | Waits on |
 | --- | --- | --- | --- |
 | M10 | `M10-00` spike: what whoami, vhosts, permissions, connections, channels, consumers and stream endpoints return for token users (OAuth 2 backend, static key, minted tokens; S-A to S-P) | M | briefed (ready; owner answers AQ4, AQ11 help, do not block) |
-| M10 | `M10-01` Access mockup `docs/ux/Access.dc.html` and owner review | S | mockup drafted 2026-11-25 (branch `M10-01-access-mockup`), awaiting owner review, NOT reviewed; chip "Token expired" decided by the owner, Main change is `M10-10` |
+| M10 | `M10-01` Access mockup `docs/ux/Access.dc.html` and owner review | S | mockup drafted 2026-11-25 (branch `M10-01-access-mockup`), awaiting owner review, NOT reviewed (round 3 done, pending architect check); chip "Token expired" decided by the owner, Main change is `M10-10` |
 | M10 | `M10-02` `SecretGuard`, access gateway, Who am I tab (earliest working slice) | M | `M10-00` (S-A, S-D, S-N, S-O), `M10-01` for the screen |
 | M10 | `M10-03` Permissions tab (patterns and topic permissions, administrator only) | M | `M10-02`, `M10-00` (S-B) |
 | M10 | `M10-04` match preview and `AccessMatcher`, differential live test | M | `M10-03`, `M10-00` (S-I) |
