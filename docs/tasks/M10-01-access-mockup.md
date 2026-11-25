@@ -32,11 +32,18 @@ AQ1, AQ2, AQ5, AQ8 (what client properties may be shown).
 ## Definition of done
 Mockup committed, reviewed by the owner, spec "Screens and UX" row for Access updated if the review changes it.
 
+
 ## Status
-Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`; awaiting owner review (NOT reviewed). Owner decisions applied: AQ1, AQ4, AQ7, AQ9, AQ10. Working assumptions, not decisions: AQ2, AQ3, AQ5 (wording), AQ6, AQ8.
+Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`, round 2 done (architect: Changes required, small); awaiting owner review (NOT reviewed).
 
-Placeholders (full list at the top of `docs/ux/Access.dc.html`): P1 preview verdict wording, label and prediction note (AQ5); P2 the honesty sentence; P3 the other Sign-in texts; P4 refused / token-expired text; P5 redaction line and "hidden"; P6 indirect publisher wording and "publishers could not be told"; P7 drawer icon and generic empty, error, locked and loading texts; P8 3.x text, locked reasons, declaration label.
+Decided (owner): AQ1, AQ2, AQ3, AQ4, AQ6, AQ7, AQ8, AQ9, AQ10 (AQ2, AQ3, AQ6, AQ8 recorded in the spec by commit d2df4d2e). Still a placeholder: AQ5, the owner's words for the preview verdicts and the prediction note.
 
-Questions raised: Q1 Sign-in line on Who am I (needs OAuth detection on the first tab); Q2 user chooser list only, no free typing; Q3 keep "Configure" in the preview; Q4 should the connection chip also say "token expired"; Q5 a "Stop reading" button for paged connections; Q6 where the screen goes when the connection becomes 3.x; Q7 reuse of the settling wording; Q8 the "token" pill on token users; Q9 font scale 1.5 is only approximated in the mockup.
+Placeholders (full list at the top of `docs/ux/Access.dc.html`): P1 preview verdicts, label, Check button and prediction note (AQ5); P2 the honesty sentence; P3 the other Sign-in texts; P4 refused / token-expired text; P5 redaction line and "hidden"; P6 indirect publisher wording and "publishers could not be told"; P7 drawer icon and generic empty, error, locked and loading texts; P8 the 3.x notice ("needs a 4.x broker"), locked reasons, declaration label.
 
-Not checked: opened only in headless Chrome (top of the page seen as a screenshot, the rest not looked at by eye); not opened in the design canvas (`support.js` is not in the repo); `canvas.json` not changed.
+Round 2 changes: Active column on the queue consumers table; 3.x drawn as item absent plus the return to Connections with a one-line notice when the connection becomes 3.x (scenario 22 is the architect's to align); Would not match and topic verdict frames now agree with their form fields; the stale Permissions frame draws the preview disabled; expanded connection details row (product, version, platform, connection_name only); narrow 800 dp frames for Who am I and Permissions; token-expired frame titled as replacing the data on all four tabs; user chooser frame with filter box; Sign-in line removed from Who am I; "token" pill removed.
+
+Architect decisions applied: Q1 Who am I is whoami plus virtual hosts only; Q2 user chooser with a filter box, no paging; Q3 Configure stays in the preview; Q5 no "Stop reading"; Q7 M2-06 settling wording reused; Q8 no token pill (S-D unmeasured); Q9 font scale 1.5 is approximated in the mockup, a known limit.
+
+Open question for the owner: Q4, should the connection chip also say "token expired"? Recommendation: not in M10, the banner on every tab is enough. Main is not changed.
+
+Not checked: opened only in headless Chrome, the top of the page seen as a screenshot and the later frames (including the new ones) not looked at by eye; not opened in the design canvas (`support.js` is not in the repo); `canvas.json` has no Access board and none was added.
