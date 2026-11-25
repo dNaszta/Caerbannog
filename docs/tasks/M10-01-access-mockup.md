@@ -31,3 +31,21 @@ AQ5 (verdict wording) only; AQ1, AQ2, AQ3, AQ6, AQ8 are decided (spec "Access vi
 
 ## Definition of done
 Mockup committed, reviewed by the owner, spec "Screens and UX" row for Access updated if the review changes it.
+
+
+## Status
+Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`, round 2 and round 3 done (round 3 pending the architect's check); awaiting owner review (NOT reviewed).
+
+Decided (owner): AQ1, AQ2, AQ3, AQ4, AQ6, AQ7, AQ8, AQ9, AQ10 (AQ2, AQ3, AQ6, AQ8 recorded in the spec by commit d2df4d2e). Still a placeholder: AQ5, the owner's words for the preview verdicts and the prediction note.
+
+Placeholders (full list at the top of `docs/ux/Access.dc.html`): P1 preview verdicts, label, Check button and prediction note (AQ5); P2 the honesty sentence; P3 the other Sign-in texts; P4 refused / token-expired text; P5 redaction line and "hidden"; P6 indirect publisher wording and "publishers could not be told"; P7 drawer icon and generic empty, error, locked and loading texts; P8 the 3.x notice ("needs a 4.x broker"), locked reasons, declaration label.
+
+Round 2 changes: Active column on the queue consumers table; 3.x drawn as item absent plus the return to Connections with a one-line notice when the connection becomes 3.x (scenario 22 is aligned, branch M10-spec-aq-alignment); Would not match and topic verdict frames now agree with their form fields; the stale Permissions frame draws the preview disabled; expanded connection details row (product, version, platform, connection_name only); narrow 800 dp frames for Who am I and Permissions; token-expired frame titled as replacing the data on all four tabs; user chooser frame with filter box; Sign-in line removed from Who am I; "token" pill removed.
+
+Architect decisions applied: Q1 Who am I is whoami plus virtual hosts only; Q2 user chooser with a filter box, no paging; Q3 Configure stays in the preview; Q5 no "Stop reading"; Q7 M2-06 settling wording reused; Q8 no token pill (S-D unmeasured); Q9 font scale 1.5 is approximated in the mockup, a known limit.
+
+Q4 decided (owner, 2026-11-25): the connection chip says "Token expired" when the token is refused. Drawn in `Access.dc.html` (red chip and popup row, marked "decided (owner)") in the refused frames on Who am I and Sign-in and in a new "stale after a refusal" frame. `Main.dc.html` is not edited here; the chip and popup are drawn only as a preview of the Main change, which the architect briefs separately as M10-10. Open for M10-10 (owner, architect): should a lost connection also change the chip? Spec D2 says Failed "Connection lost"; the ordinary connection-lost frames keep the Connected chip, as Topology and Streams draw it today.
+
+Not checked: opened only in headless Chrome, the top of the page seen as a screenshot and the later frames (including the new ones) not looked at by eye; not opened in the design canvas (`support.js` is not in the repo); `canvas.json` has no Access board and none was added.
+
+Round 3 changes: narrow Permissions frame no longer stretches (stacked fields do not flex), with a "table scrolls sideways" hint and visible scrollbar styling; the expired popup no longer covers the banner; the 3.x frames show the 3.x profile (legacy-3x) in the chip and the notice is one line ("The Access view needs a 4.x broker."); the Q4 heading is retitled; chevrons in the by-user table are centred with the name. Looked at in headless Chrome after the change: narrow Permissions, token expired (chip and popup), 3.x switched, Clients by user. Not looked at: the other frames, the font scale 1.5 frame, the new scroll bar on a real (non-overlay) scrollbar system.
