@@ -98,6 +98,23 @@ class SecretGuardTest {
     }
 
     @Test
+    fun `a held secret of 6 characters hides only a value equal to it, case-sensitive`() {
+        val short = "Ab3-xZ"
+        assertEquals(SecretGuard.HIDDEN, hiddenText(short, short).text)
+        assertEquals("ab3-xz", hiddenText("ab3-xz", short).text, "case-sensitive")
+        assertEquals("svc-Ab3-xZ-1", hiddenText("svc-Ab3-xZ-1", short).text, "inside longer text only the shape scan applies")
+        assertEquals("Ab3-xZ ", hiddenText("Ab3-xZ ", short).text, "equal means equal, not trimmed")
+    }
+
+    @Test
+    fun `a held secret of 7 characters hides a value that contains it`() {
+        val seven = "Ab3-xZq"
+        assertEquals(SecretGuard.HIDDEN, hiddenText(seven, seven).text)
+        assertEquals(SecretGuard.HIDDEN, hiddenText("conn-Ab3-xZq-1", seven).text)
+        assertEquals("conn-ab3-xzq-1", hiddenText("conn-ab3-xzq-1", seven).text, "case-sensitive")
+    }
+
+    @Test
     fun `without a held password, or with an empty one, nothing is hidden by the held scan`() {
         assertEquals("orders", hiddenText("orders", null).text)
         assertEquals("orders", hiddenText("orders", "").text, "an empty secret must not match every value")

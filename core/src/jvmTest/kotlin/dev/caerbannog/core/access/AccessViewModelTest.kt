@@ -207,10 +207,13 @@ class AccessViewModelTest {
         val s = AccessHarness(this)
         s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
         s.open()
-        assertEquals(AccessScreen.Failed("HTTP 500"), s.state.screen)
-        assertEquals("HTTP 500", s.state.message)
+        assertEquals(AccessScreen.Failed("HTTP 500"), s.state.screen, "the mapped reason is the 'Broker text'")
+        assertEquals(AccessTexts.USER_ERROR, s.state.message)
+        assertEquals("The user could not be read.", AccessTexts.USER_ERROR)
         assertEquals(AccessTexts.RETRY, s.state.action)
         assertNull(s.state.user)
+        assertEquals(emptyList(), s.state.tags)
+        assertEquals(emptyList(), s.state.vhosts, "no virtual host list is shown")
         assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value)
     }
 
@@ -223,6 +226,64 @@ class AccessViewModelTest {
         assertEquals(AccessTexts.RETRY, s.state.action)
         assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value, "the broker answered; D2 is for an unreachable broker")
         assertFalse(s.state.toString().contains("S3cret-PW-4711"), "no password anywhere in the state")
+    }
+
+    // ---------------------------------------------------------------- mid-session refusals (architect decision 8)
+
+    @Test
+    fun `whoami ok then virtual hosts say no management tag locks the whole screen and drops the user`() = runTest {
+        val s = AccessHarness(this)
+        s.access.vhostsFailure = AccessResult.NoManagementTag
+        s.open()
+        assertIs<AccessScreen.Locked>(s.state.screen)
+        assertEquals(AccessTexts.LOCKED_TITLE, s.state.message)
+        assertNull(s.state.user, "the earlier user may be stale: it must go")
+        assertEquals(emptyList(), s.state.tags)
+        assertEquals(emptyList(), s.state.vhosts)
+    }
+
+    @Test
+    fun `a tag removed while the data is shown locks the screen on the next read and drops what was shown`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        assertEquals("svc-orders", s.state.user)
+        s.access.hasManagementTag = false
+        s.pass(5)
+        assertIs<AccessScreen.Locked>(s.state.screen)
+        assertNull(s.state.user)
+        assertEquals(emptyList(), s.state.vhosts)
+        assertFalse(s.state.stale)
+    }
+
+    @Test
+    fun `whoami ok then virtual hosts are refused keeps the last data stale with the refusal banner and Retry`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.vhostsFailure = AccessResult.NotAuthorised
+        s.pass(5)
+        assertIs<AccessScreen.Loaded>(s.state.screen)
+        assertEquals("svc-orders", s.state.user, "the last data stays")
+        assertEquals(listOf("/orders", "/", "/billing"), s.state.vhosts.map { it.name })
+        assertTrue(s.state.stale, "dimmed and marked stale")
+        assertEquals(AccessTexts.SIGN_IN_REFUSED, s.state.refusalBanner)
+        assertEquals(AccessTexts.RETRY, s.state.action)
+        assertNull(s.state.connectionBanner, "the broker answered: this is not a lost connection")
+        assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value)
+    }
+
+    // ---------------------------------------------------------------- RabbitMQ 3.x answered by the gateway (NotOffered)
+
+    @Test
+    fun `a gateway that answers NotOffered makes the view leave with the one-line notice and never shows a failure`() = runTest {
+        val s = AccessHarness(this)
+        s.access.notOffered = true
+        s.open()
+        s.pass(60)
+        assertEquals(AccessTexts.NEEDS_4X, s.state.leaveNotice)
+        assertFalse(s.state.offered)
+        assertFalse(s.state.screen is AccessScreen.Failed, "NotOffered is not a failure: ${s.state.screen}")
+        assertFalse(s.state.message.orEmpty().contains("4.x"), "the notice appears only as leaveNotice")
+        assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value, "not a lost connection")
     }
 
     // ---------------------------------------------------------------- D2: lost connection

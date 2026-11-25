@@ -1,7 +1,6 @@
 package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.access.AccessResult
-import dev.caerbannog.core.access.AccessTexts
 import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.WhoAmI
 import dev.caerbannog.core.connections.ConnectionProfile
@@ -195,7 +194,7 @@ class ManagementAccessGatewayTest {
         for (version in listOf("3.13.7", "3.12.0", "3.8.35-rc.1")) {
             val seen = Seen()
             val results = withGateway(engine(seen) { fixture("s-a-whoami-i-admin-basic") }, version = version) { listOf(it.whoAmI(), it.virtualHosts()) }
-            results.forEach { r -> assertEquals(AccessResult.Unexpected(AccessTexts.NEEDS_4X), r, "version $version") }
+            results.forEach { r -> assertEquals(AccessResult.NotOffered, r, "version $version") }
             assertEquals(emptyList<String>(), seen.urls.toList(), "a request reached the 3.x broker (version $version)")
         }
     }

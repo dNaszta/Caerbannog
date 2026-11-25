@@ -20,6 +20,7 @@ object AccessTexts {
     const val TOKEN_USER_NOTE: String = "as the broker reports it"
     const val CONNECTION_LOST_DETAIL: String = "The data below is the last that was read."
     const val NOT_ENCRYPTED_DETAIL: String = "The password and all messages travel in clear text."
+    const val USER_ERROR: String = "The user could not be read."
     const val SIGN_IN_REFUSED: String = "The broker refused the sign-in."
     const val RETRY: String = "Retry"
 
@@ -79,6 +80,8 @@ data class AccessState(
     val stale: Boolean = false,
     /** D2: `ConnectionFailureReason.CONNECTION_LOST` while the link is lost with data on screen; else null. */
     val connectionBanner: String? = null,
+    /** [AccessTexts.SIGN_IN_REFUSED] while the broker refused a refresh and the last data stays, dimmed and stale (mid-session NotAuthorised); else null. */
+    val refusalBanner: String? = null,
     /** `ConnectionNotes.NOT_ENCRYPTED` while the held profile has TLS off; else null. */
     val notEncrypted: String? = null,
     /** False while the held connection is a RabbitMQ 3.x one (AQ6): the drawer has no Access item. True when nothing is held. */

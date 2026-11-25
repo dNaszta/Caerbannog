@@ -30,6 +30,9 @@ class FakeAccessGateway : AccessGateway {
     /** The broker answers a plain 401 (wrong or expired credentials) on every call. */
     @Volatile var refusesSignIn: Boolean = false
 
+    /** The connection is a known 3.x broker as the real gateway sees it: every call is [AccessResult.NotOffered] and nothing is sent. */
+    @Volatile var notOffered: Boolean = false
+
     /** The broker does not answer at all: every call is [AccessResult.Unreachable]. */
     @Volatile var unreachable: Boolean = false
 
@@ -62,6 +65,7 @@ class FakeAccessGateway : AccessGateway {
     }
 
     private fun common(): AccessResult<Nothing>? = when {
+        notOffered -> AccessResult.NotOffered
         unreachable -> AccessResult.Unreachable
         !hasManagementTag -> AccessResult.NoManagementTag
         refusesSignIn -> AccessResult.NotAuthorised

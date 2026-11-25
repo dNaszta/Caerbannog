@@ -17,7 +17,7 @@ interface AccessGateway {
 data class WhoAmI(val name: String, val tags: List<String>, val isInternalUser: Boolean)
 
 /**
- * Typed result of one Access call. [Unexpected] carries a reason only, never a body, never a secret; the reason is mapped (`SecretGuard.brokerErrorText`)
+ * Typed result of one Access call (six types). [Unexpected] carries a reason only, never a body, never a secret; the reason is mapped (`SecretGuard.brokerErrorText`)
  * or a status text such as "HTTP 500".
  */
 sealed interface AccessResult<out T> {
@@ -33,11 +33,14 @@ sealed interface AccessResult<out T> {
     data object Unreachable : AccessResult<Nothing>
 
     data class Unexpected(val reason: String) : AccessResult<Nothing>
+
+    /** A known RabbitMQ 3.x broker (AQ6): nothing was sent. The view model leaves Access with the one-line notice; it never shows this as a failure. */
+    data object NotOffered : AccessResult<Nothing>
 }
 
-/** The gateway of a connection that is not a held 4.x one (and the default of a source built without one): answers [AccessResult.Unexpected], sends nothing. */
+/** The gateway of a connection that is not a held 4.x one (and the default of a source built without one): answers [AccessResult.NotOffered], sends nothing. */
 object UnavailableAccessGateway : AccessGateway {
-    override suspend fun whoAmI(): AccessResult<WhoAmI> = AccessResult.Unexpected(AccessTexts.NEEDS_4X)
+    override suspend fun whoAmI(): AccessResult<WhoAmI> = AccessResult.NotOffered
 
-    override suspend fun virtualHosts(): AccessResult<List<String>> = AccessResult.Unexpected(AccessTexts.NEEDS_4X)
+    override suspend fun virtualHosts(): AccessResult<List<String>> = AccessResult.NotOffered
 }
