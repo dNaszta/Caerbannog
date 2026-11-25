@@ -44,6 +44,6 @@ Round 2 changes: Active column on the queue consumers table; 3.x drawn as item a
 
 Architect decisions applied: Q1 Who am I is whoami plus virtual hosts only; Q2 user chooser with a filter box, no paging; Q3 Configure stays in the preview; Q5 no "Stop reading"; Q7 M2-06 settling wording reused; Q8 no token pill (S-D unmeasured); Q9 font scale 1.5 is approximated in the mockup, a known limit.
 
-Open question for the owner: Q4, should the connection chip also say "token expired"? Recommendation: not in M10, the banner on every tab is enough. Main is not changed.
+Q4 decided (owner, 2026-11-25): the connection chip says "Token expired" when the token is refused. Drawn in `Access.dc.html` (red chip and popup row, marked "decided (owner)") in the refused frames on Who am I and Sign-in and in a new "stale after a refusal" frame. `Main.dc.html` is not edited here; the architect writes the separate brief M10-10 for it.
 
 Not checked: opened only in headless Chrome, the top of the page seen as a screenshot and the later frames (including the new ones) not looked at by eye; not opened in the design canvas (`support.js` is not in the repo); `canvas.json` has no Access board and none was added.
