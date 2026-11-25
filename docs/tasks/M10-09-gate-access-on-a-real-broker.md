@@ -26,7 +26,7 @@ None.
 None here; `M10-08` tests carry the MCP side with fakes.
 
 ## Open points
-S-K (Keycloak) is not part of the gate.
+S-K (Keycloak) is not part of the gate. Reuse from M10-00: the test helpers (`AccessSpikeSupport`, `AccessSpikeClients`: token minting with a static key, broker configs A to D, the leak scan) and the 137-row case table `fixtures/m10-00/s-i-pattern-rows.tsv` for "the preview agrees with the broker". Facts to pin in the gate: scope `%2F` notation for `/orders`; user derivation (`sub`, then `client_id`); `is_internal_user`; `columns` keeps client properties out; no token in any response. Broker settings needed for the publisher case: `management.rates_mode = detailed`. Image pin 4.4.1 (`BrokerImages.CURRENT_4X`).
 
 ## Definition of done
 Gate green, timeout check against the `brokerTest` limit in the root `build.gradle.kts` and the CI step (`docs/tasks/M2-18`), milestone status updated by the architect, README rows closed.

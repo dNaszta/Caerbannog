@@ -26,7 +26,7 @@ Updated 2026-11-19 after the merges of `M9-13` (`cc4b1b40`) and `M2-10` (`b1f1a9
 | M10 | `M10-07` Clients tab: stream publishers and consumers, MQTT clients by user | S | `M10-06` |
 | M10 | `M10-08` three read-only MCP tools (`caerbannog_get_access_summary`, `caerbannog_check_access`, `caerbannog_list_clients`) | M | each tool after its slice; AQ9 |
 | M10 | `M10-09` gate `RealBrokerM10GateTest` (`@gate-M10`) | M | `M10-02` to `M10-08` |
-| M10 | `M10-10` connection chip says "Token expired" (new connection state, Main mockup, scenarios in `13`; waits for the spike signal S-D/S-J; owner decision Q4 2026-11-25) | M | `M10-00`, `M10-02`, `M10-01` |
+| M10 | `M10-10` connection chip says "Token expired" (new connection state, Main mockup, scenarios in `13`; spike S-L done: certain only for a live connection closed with code 320, a fresh connect is a generic 401 (fallback wording is the owner's); owner decision Q4 2026-11-25) | M | `M10-00`, `M10-02`, `M10-01` |
 | M9 | `M9-13` gate on a real broker (`RealBrokerM9GateTest`): done (merged, `cc4b1b40`, 2026-11-19); accepted at step 5 | M | none |
 | M9 | `M9-08d` retention column, detail and MCP show the byte limit too (Retention `7D, 1 MB`, additive `maxLengthBytes`; five `@m9-08d` scenarios held with `@needs-M9-08d`) | S | nothing (briefed, ready; owner chose b on 2026-11-17) |
 | M9 | `M9-08c` wizard Cancel and Next reachable at 1280 x 420, font scale 1.5 (measure the base first) | S | nothing (briefed) |

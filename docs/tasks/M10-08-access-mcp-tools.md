@@ -27,7 +27,7 @@ None (headless).
 This task. Tool names, inputs and outputs: `docs/spec.md` "Access view (M10)", "MCP evaluation".
 
 ## Open points
-The default `limit`. (AQ9 is decided.)
+The default `limit`. (AQ9 is decided.) Changed by M10-00: `caerbannog_get_access_summary` reports the sign-in as `{tokenUser: true|false, oauth2PluginLoaded: true|false|unknown, note}` and never "oauth2 backend in use"; for a token user `permissions` is `{readable: false, reason: "token user: permissions come from the token"}`. `caerbannog_list_clients` returns queue publishers only as `{exchange, user}` when the broker has detailed rates and says `publishersAvailable: false` otherwise; it carries `sharedNameWarning` for users such as `unknown`. Every free-text field (including `user_provided_name`) passes `SecretGuard`. Facts: `docs/tasks/M10-00-spike-results.md`, spec "Measured facts of M10-00".
 
 ## Definition of done
 Tests first and passing; `docs/spec.md` MCP section and README updated if names change.

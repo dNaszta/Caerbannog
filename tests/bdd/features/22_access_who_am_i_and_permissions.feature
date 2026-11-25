@@ -7,8 +7,8 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
 
   The view is read-only (spec "Access view (M10)", non-goals): nothing here changes a user, tag,
   permission or virtual host; changes go through the Topology planner and migrations.
-  Management API field names for whoami, vhosts, permissions and topic permissions are measured by
-  the spike M10-00 (S-A, S-B); scenarios tagged @needs-spike depend on it. Wording of every
+  Management API field names for whoami, vhosts, permissions and topic permissions were measured by
+  the spike M10-00 (S-A, S-B, 2026-11-25; spec "Measured facts of M10-00"); no @needs-spike scenario is left here. Wording of every
   visible text is an owner decision (spec "Access view (M10)", questions); scenarios assert meaning,
   not exact sentences, unless a sentence is quoted.
 
@@ -169,20 +169,39 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I ask whether "svc-orders" can publish to the exchange "<name>" on "/orders"
     Then the answer is "<answer>"
 
-    # rows are placeholders until the spike M10-00 (S-I) measures anchoring and the empty pattern
+    # measured by the spike M10-00 (S-I, 137 rows in fixtures/m10-00/s-i-pattern-rows.tsv):
+    # a pattern is an unanchored, case-sensitive regular-expression search; the empty pattern allows nothing
     Examples:
       | pattern | name      | answer      |
       | ex      | ex.orders | would match |
-      | ex      | my-ex     | no match    |
+      | ex      | my-ex     | would match |
       | ^ex$    | ex.orders | no match    |
+      | ^ex$    | ex        | would match |
+      | ex      | EX        | no match    |
+      | (?i)ex  | EX        | would match |
+      | ^$      | ex.orders | no match    |
       |         | ex.orders | no match    |
-      | .*      |           | would match |
+      | .*      | ex.orders | would match |
 
-  @needs-spike @fake-broker @m10-04
+  # measured (S-I): the default exchange is checked as "amq.default", never as the target queue
+  @fake-broker @m10-04
   Scenario: The default exchange is asked about by the name the broker uses for it
     Given "svc-orders" has on "/orders" write "^amq\\.default$"
     When I ask whether "svc-orders" can publish to the default exchange on "/orders"
-    Then the answer follows what the spike M10-00 measured for the default exchange
+    Then the answer is "would match" and names the write pattern "^amq\\.default$"
+    And the answer does not use the name of the target queue
+
+  @fake-broker @m10-04
+  Scenario: A pattern that fits the queue name does not allow the default exchange
+    Given "svc-orders" has on "/orders" write "^queue$"
+    When I ask whether "svc-orders" can publish to the default exchange on "/orders"
+    Then the answer is "no match"
+
+  @fake-broker @m10-04
+  Scenario: Binding a queue needs write on the queue and read on the exchange
+    Given "svc-orders" has on "/orders" write "^queue\\..*" and read "^ex\\..*"
+    When I ask whether "svc-orders" can bind the queue "queue.orders" to the exchange "ex.orders" on "/orders"
+    Then the answer is "would match" and names the write pattern and the read pattern
 
   @fake-broker @m10-04
   Scenario: A topic permission is checked against the routing key

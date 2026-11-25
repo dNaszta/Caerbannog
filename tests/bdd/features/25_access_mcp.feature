@@ -65,11 +65,11 @@ Feature: Model Context Protocol tools for the Access view
     Then the result is grouped by user with counts
     And the result holds at most the documented number of rows and says how many were left out
 
-  @needs-spike @m10-08
+  @m10-08
   Scenario: The client list for one queue or stream shows publishers and consumers
     When the client calls "caerbannog_list_clients" for "prod-eu" with the queue "orders"
     Then the result lists the consumers with connection, channel and user
-    And the publishers are listed as far as the broker tells
+    And the publishers are listed as far as the broker tells: stream publishers with the user, queue publishers only as the exchange they publish to and only on a broker with detailed rates
 
   @security @m10-08
   Scenario Outline: No tool output contains a token, a password or a secret-looking value

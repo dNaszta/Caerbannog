@@ -259,24 +259,33 @@ Feature: Connect and disconnect
     And the app bar shows "prod-eu" with the state "Connected"
 
   # ---------------------------------------------------------------- M10-10 token expired (owner decision Q4, 2026-11-25)
-  # Wording "Token expired" is the owner's. How an expired token is told from another refusal is
-  # measured by the spike M10-00 (S-D, S-J).
+  # Wording "Token expired" is the owner's. Measured (spike M10-00, S-L): the broker closes a LIVE
+  # connection when its token expires (CONNECTION_FORCED, credential expired, code 320), which is certain.
+  # A NEW connect with an expired token gets the same 401 Not_Authorized as a wrong password, so the
+  # chip cannot say "Token expired" there; the fallback wording is the owner's (product question).
 
-  @M10 @needs-spike @fake-broker @m10-10
-  Scenario: A refused token shows Token expired on the chip and the popup
-    Given the connection "prod-eu" holds a token as its password
-    When the broker refuses the sign-in of "prod-eu" as an expired token
+  @M10 @fake-broker @m10-10
+  Scenario: An established connection closed because its token expired shows Token expired
+    Given the connection "prod-eu" holds a token as its password and is connected
+    When the broker closes the connection with "credential expired"
     Then the chip and the popup row say "Token expired"
 
-  @M10 @needs-spike @fake-broker @m10-10
-  Scenario: A refused token is told from a refused password
+  @M10 @needs-decision @fake-broker @m10-10
+  Scenario: A new connect with a refused token cannot be told from a refused password
+    Given the connection "prod-eu" holds a token as its password
+    When the broker answers the connect with 401 Not_Authorized
+    Then the chip and the popup show the fallback wording for a refused sign-in
+    And the chip and the popup do not say "Token expired"
+
+  @M10 @fake-broker @m10-10
+  Scenario: A refused password does not say Token expired
     Given the connection "uat-eu" holds a password and the broker refuses it
     Then the chip and the popup do not say "Token expired"
 
   @M10 @fake-broker @m10-10
   Scenario: A connection with Token expired keeps the last data as stale and offers Retry
     Given the connection "prod-eu" showed data
-    When the broker refuses the sign-in of "prod-eu" as an expired token
+    When the broker closes the connection with "credential expired"
     Then the last data stays on screen marked as stale
     And Retry is offered and no automatic reconnect happens
 

@@ -8,51 +8,66 @@ Feature: Access view, part 3: how the broker signs users in (OAuth 2 and Keycloa
   It does not show the Keycloak client, its roles or its mappers, and the view never claims it does.
   The app never calls the identity provider. A JWT, a client secret and the held password never
   appear on screen, in logs, in error text, in copied text or in MCP output.
-  What RabbitMQ exposes for a token user is measured by the spike M10-00 (S-B, S-C, S-J);
-  scenarios tagged @needs-spike are written for the likely outcome and are checked against the result.
+  What RabbitMQ exposes for a token user was measured by the spike M10-00 (S-A to S-C, S-J, 2026-11-25):
+  outcome B, no resolved permissions; the backend cannot be detected, a token user can.
 
   Background:
     Given the connection "prod-eu" is the held connection
 
+  # Spike M10-00 (S-C, S-A): the OAuth 2 backend itself cannot be detected from the management API.
+  # A token user is recognised by whoami "is_internal_user" = false; the plugin being loaded is visible
+  # to an administrator or monitoring user in /api/nodes. Wording is the owner's.
+
   @smoke @fake-broker @m10-05
-  Scenario: A broker with the OAuth 2 backend says so
-    Given the broker reports that the OAuth 2 backend is in use
+  Scenario: A token user is told that the connection signs in with a token
+    Given whoami reports the connection user as not an internal user
     When I open the Sign-in tab of the Access view
-    Then I see that this broker signs users in with tokens from an identity provider
+    Then I see that this connection signs in with a token from an identity provider
 
   @fake-broker @m10-05
   Scenario: The view says what it can and cannot show
-    Given the broker reports that the OAuth 2 backend is in use
+    Given whoami reports the connection user as not an internal user
     When I open the Sign-in tab of the Access view
     Then I see that the view shows what RabbitMQ resolved for the user
     And I see that the identity provider's own setup, such as clients, roles and mappers, is not shown here
 
   @fake-broker @m10-05
-  Scenario: A broker without the OAuth 2 backend does not claim the opposite
-    Given the broker reports no OAuth 2 backend
+  Scenario: An internal user on a broker with the OAuth 2 plugin loaded is told what the view cannot tell
+    Given whoami reports the connection user as an internal user
+    And the node list shows the OAuth 2 plugin as loaded
+    When I open the Sign-in tab of the Access view
+    Then I see that the OAuth 2 plugin is loaded
+    And I see that this view cannot tell whether the broker uses it
+    And I do not see the statement that tokens are in use
+
+  @fake-broker @m10-05
+  Scenario: An internal user on a broker without the OAuth 2 plugin does not claim the opposite
+    Given whoami reports the connection user as an internal user
+    And the node list does not show the OAuth 2 plugin
     When I open the Sign-in tab of the Access view
     Then I do not see the statement that tokens are in use
     And I do not see a statement that the broker uses only its own users
 
   @negative @fake-broker @m10-05
-  Scenario: The sign-in method cannot be read for this user
-    Given the connection user may not read the broker's plugin list
+  Scenario: The plugin list cannot be read for this user
+    Given the connection user may not read the node list
     When I open the Sign-in tab of the Access view
-    Then I see that the sign-in method could not be determined
+    Then I see that it could not be told whether the OAuth 2 plugin is loaded
     And I see no guess
+    And a token user is still told that the connection signs in with a token
 
-  @needs-spike @fake-broker @m10-05
-  Scenario: For a token user, what RabbitMQ resolved is shown and labelled
-    Given the broker reports that the OAuth 2 backend is in use
-    And RabbitMQ resolved for the connection user the tag "monitoring" and read access on "/orders" for "^queue\\..*"
+  @fake-broker @m10-05
+  Scenario: For a token user, what RabbitMQ gives is shown and labelled
+    Given whoami reports the token user "jdoe" with the tag "monitoring"
+    And the broker lists for this user the virtual hosts "/orders" only
     When I open the Sign-in tab of the Access view
-    Then I see the tag and the read access
+    Then I see the user, the tag and the virtual hosts
     And they are labelled as resolved by RabbitMQ from the token
 
-  @needs-spike @fake-broker @m10-05
-  Scenario: When RabbitMQ does not expose the resolved permissions, the view says so
-    Given the broker reports that the OAuth 2 backend is in use
-    And no management API call returns resolved permissions for a token user
+  @fake-broker @m10-05
+  Scenario: The view says that the permissions of a token user cannot be listed
+    Given whoami reports the connection user as not an internal user
+    And the broker answers 404 for the permissions of that user
     When I open the Sign-in tab of the Access view
     Then I see that the permissions come from the token and are not stored on the broker
     And I see that this view cannot list them
@@ -72,12 +87,21 @@ Feature: Access view, part 3: how the broker signs users in (OAuth 2 and Keycloa
     When I open the Sign-in tab of the Access view
     Then the only requests made went to the profile's own broker
 
-  @needs-spike @negative @fake-broker @m10-05
+  # Measured (S-L): a fresh connect with an expired, badly signed or unknown token gets the same
+  # 401 Not_Authorized as a wrong password, so "expired" is never certain here. The words are the owner's.
+  @negative @fake-broker @m10-05
   Scenario: A token the broker refuses is reported without echoing it
-    Given the held password is a JWT that the broker refuses
+    Given the held password is a JWT that the broker refuses at connect
     When I open the Access view
-    Then I see that the sign-in was refused and that the token may have expired
+    Then I see that the sign-in was refused and that the token may be expired or wrong
     And the message does not contain the token
+
+  @negative @fake-broker @m10-05
+  Scenario: A live connection closed because its token expired says so
+    Given the Access view showed data for a token user
+    When the broker closes the connection with "credential expired"
+    Then I see that the token expired
+    And the last data stays on screen marked as stale
 
   # Owner decision AQ3 (2026-11-25): no local token decoding in v1 (revisit after spike S-B).
   @security @fake-broker @m10-05
