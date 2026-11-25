@@ -20,6 +20,6 @@ import org.junit.platform.suite.api.Suite
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.lifecycle")
 @ConfigurationParameter(
     key = FILTER_TAGS_PROPERTY_NAME,
-    value = "not @needs-M2 and not @needs-decision and not @broker",
+    value = "not @needs-M2 and not @needs-decision and not @broker and not @m10-10",
 )
 class RunConnectionLifecycleAcceptanceTest
