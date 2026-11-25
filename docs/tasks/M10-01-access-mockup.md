@@ -31,3 +31,12 @@ AQ1, AQ2, AQ5, AQ8 (what client properties may be shown).
 
 ## Definition of done
 Mockup committed, reviewed by the owner, spec "Screens and UX" row for Access updated if the review changes it.
+
+## Status
+Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`; awaiting owner review (NOT reviewed). Owner decisions applied: AQ1, AQ4, AQ7, AQ9, AQ10. Working assumptions, not decisions: AQ2, AQ3, AQ5 (wording), AQ6, AQ8.
+
+Placeholders (full list at the top of `docs/ux/Access.dc.html`): P1 preview verdict wording, label and prediction note (AQ5); P2 the honesty sentence; P3 the other Sign-in texts; P4 refused / token-expired text; P5 redaction line and "hidden"; P6 indirect publisher wording and "publishers could not be told"; P7 drawer icon and generic empty, error, locked and loading texts; P8 3.x text, locked reasons, declaration label.
+
+Questions raised: Q1 Sign-in line on Who am I (needs OAuth detection on the first tab); Q2 user chooser list only, no free typing; Q3 keep "Configure" in the preview; Q4 should the connection chip also say "token expired"; Q5 a "Stop reading" button for paged connections; Q6 where the screen goes when the connection becomes 3.x; Q7 reuse of the settling wording; Q8 the "token" pill on token users; Q9 font scale 1.5 is only approximated in the mockup.
+
+Not checked: opened only in headless Chrome (top of the page seen as a screenshot, the rest not looked at by eye); not opened in the design canvas (`support.js` is not in the repo); `canvas.json` not changed.
