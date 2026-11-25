@@ -9,8 +9,8 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
   permission or virtual host; changes go through the Topology planner and migrations.
   Management API field names for whoami, vhosts, permissions and topic permissions were measured by
   the spike M10-00 (S-A, S-B, 2026-11-25; spec "Measured facts of M10-00"); no @needs-spike scenario is left here. Wording of every
-  visible text is an owner decision (spec "Access view (M10)", questions); scenarios assert meaning,
-  not exact sentences, unless a sentence is quoted.
+  visible text is approved by the owner (2026-11-25, as drawn in docs/ux/Access.dc.html); scenarios assert meaning,
+  not exact sentences, unless a sentence is quoted (the 3.x notice and the preview note are quoted).
 
   Background:
     Given the connection "prod-eu" is the held connection
@@ -84,7 +84,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Given the Access view is open on the connection "prod-eu"
     When the held connection becomes the RabbitMQ 3.x connection "legacy-3x"
     Then I am on the Connections screen
-    And I see a one-line notice that the Access view needs a 4.x broker
+    And I see the one-line notice "The Access view needs a 4.x broker."
     And no request was sent to the 3.x broker by the Access view
 
   # ---------------------------------------------------------------- M10-03 Permissions table
@@ -223,7 +223,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
   Scenario: The preview sends nothing to the broker
     When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
     Then no message was published and no queue was read
-    And the answer is labelled as a prediction and says the broker decides
+    And the answer is labelled as a prediction and says "Prediction from the patterns above; the broker decides. Check sends nothing to the broker."
 
   @fake-broker @m10-04
   Scenario: The preview says where the permission came from

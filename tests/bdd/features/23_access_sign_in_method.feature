@@ -16,13 +16,15 @@ Feature: Access view, part 3: how the broker signs users in (OAuth 2 and Keycloa
 
   # Spike M10-00 (S-C, S-A): the OAuth 2 backend itself cannot be detected from the management API.
   # A token user is recognised by whoami "is_internal_user" = false; the plugin being loaded is visible
-  # to an administrator or monitoring user in /api/nodes. Wording is the owner's.
+  # to an administrator or monitoring user in /api/nodes. Wording is approved by the owner (2026-11-25, as
+  # drawn in docs/ux/Access.dc.html); exact strings are asserted only for the short, stable ones (token statement,
+  # refusal, expiry); the long explanatory sentences stay meaning-only on purpose, because they are likely to be edited.
 
   @smoke @fake-broker @m10-05
   Scenario: A token user is told that the connection signs in with a token
     Given whoami reports the connection user as not an internal user
     When I open the Sign-in tab of the Access view
-    Then I see that this connection signs in with a token from an identity provider
+    Then I see "This connection signs in with a token from an identity provider."
 
   @fake-broker @m10-05
   Scenario: The view says what it can and cannot show
@@ -88,19 +90,20 @@ Feature: Access view, part 3: how the broker signs users in (OAuth 2 and Keycloa
     Then the only requests made went to the profile's own broker
 
   # Measured (S-L): a fresh connect with an expired, badly signed or unknown token gets the same
-  # 401 Not_Authorized as a wrong password, so "expired" is never certain here. The words are the owner's.
+  # 401 Not_Authorized as a wrong password, so "expired" is never certain here. The words are approved by the owner.
   @negative @fake-broker @m10-05
   Scenario: A token the broker refuses is reported without echoing it
     Given the held password is a JWT that the broker refuses at connect
     When I open the Access view
-    Then I see that the sign-in was refused and that the token may be expired or wrong
+    Then I see "Sign-in refused." and "The token may have expired or be wrong."
     And the message does not contain the token
 
   @negative @fake-broker @m10-05
   Scenario: A live connection closed because its token expired says so
     Given the Access view showed data for a token user
     When the broker closes the connection with "credential expired"
-    Then I see that the token expired
+    Then I see "The broker closed the connection because the token expired."
+    And the chip says "Token expired"
     And the last data stays on screen marked as stale
 
   # Owner decision AQ3 (2026-11-25): no local token decoding in v1 (revisit after spike S-B).

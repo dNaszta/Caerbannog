@@ -1,6 +1,6 @@
 # M10-01: Access view mockup
 
-Milestone: M10    Depends on: owner answers AQ1, AQ2, AQ6, AQ8 (all decided 2026-11-25); AQ5 wording stays placeholder    Size: S
+Milestone: M10    Depends on: owner answers AQ1, AQ2, AQ6, AQ8 (all decided 2026-11-25); AQ5 and all wording approved by the owner 2026-11-25 ("in wording use recommended")    Size: S
 
 ## Goal
 `docs/ux/Access.dc.html` exists in the Material 3 style of the other mockups, shows the four tabs with every state, and the owner has reviewed it.
@@ -10,11 +10,11 @@ Screens come from `docs/ux/`. No UI step of M10 starts without a reviewed mockup
 
 ## Scope
 In: the mockup for Who am I, Permissions (table, topic permissions, match preview form and verdict), Sign-in (OAuth 2 detected, not detected, could not be told, token user with and without resolved permissions), Clients (users with counts, a queue or stream with consumers and publishers, filter, notice for a `management` user, "settling" row). States per tab: loading, empty, error, locked with the reason, stale after a lost connection, "Not encrypted" banner. The honesty sentence for part 3 ("what RabbitMQ resolved, not the identity provider's setup") placed where it cannot be missed. The redaction state ("hidden" with a count). No control that changes anything (no edit, delete, close connection, no queue message action). Narrow window and font scale 1.5 states (the layout promises of the spec, M2-21).
-Out: any code; wording the owner has not given (use clearly marked placeholder text and list the placeholders).
+Out: any code. Wording: the owner approved the recommended wording as drawn (2026-11-25); the mockup marks every text with a "decided" pill (groups P1 to P13).
 
 ## Acceptance
 - The file opens like the other `.dc.html` mockups; every state above is reachable.
-- A list of placeholders and of questions the mockup raised is at the top of the file or in the brief's Status.
+- A list of the approved wording groups (P1 to P13) and of the questions the mockup raised is at the top of the file or in the brief's Status.
 - Owner review recorded in the Status line of this brief and in `docs/tasks/README.md`.
 
 ## Design notes
@@ -27,16 +27,16 @@ It is the UX task.
 None (design).
 
 ## Open points
-AQ5 (verdict wording) only; AQ1, AQ2, AQ3, AQ6, AQ8 are decided (spec "Access view (M10)"). The mockup must no longer label them as assumptions after the review fixes.
+None on wording: AQ1 to AQ10 and all wording are decided (spec "Access view (M10)"). Still open: the owner's review of the mockup as a whole (not yet stated).
 
 ## Definition of done
 Mockup committed, reviewed by the owner, spec "Screens and UX" row for Access updated if the review changes it.
 
 
 ## Status
-Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`, round 2 and round 3 done (round 3 pending the architect's check); awaiting owner review (NOT reviewed).
+Mockup drafted 2026-11-25 on branch `M10-01-access-mockup`, round 2 and round 3 done (round 3 pending the architect's check); awaiting the owner's review of the mockup as a whole (NOT reviewed). Wording approved by the owner on 2026-11-25 ("in wording use recommended"): every "placeholder" pill became "decided" (branch `M10-wording-decided`); no text was changed.
 
-Decided (owner): AQ1, AQ2, AQ3, AQ4, AQ6, AQ7, AQ8, AQ9, AQ10 (AQ2, AQ3, AQ6, AQ8 recorded in the spec by commit d2df4d2e). Still a placeholder: AQ5, the owner's words for the preview verdicts and the prediction note.
+Decided (owner): AQ1, AQ2, AQ3, AQ4, AQ6, AQ7, AQ8, AQ9, AQ10 (AQ2, AQ3, AQ6, AQ8 recorded in the spec by commit d2df4d2e). Wording approved 2026-11-25 (was a placeholder: AQ5, the owner's words for the preview verdicts and the prediction note.
 
 Placeholders (full list at the top of `docs/ux/Access.dc.html`): P1 preview verdicts, label, Check button and prediction note (AQ5); P2 the honesty sentence; P3 the other Sign-in texts; P4 refused / token-expired text; P5 redaction line and "hidden"; P6 indirect publisher wording and "publishers could not be told"; P7 drawer icon and generic empty, error, locked and loading texts; P8 the 3.x notice ("needs a 4.x broker"), locked reasons, declaration label.
 
