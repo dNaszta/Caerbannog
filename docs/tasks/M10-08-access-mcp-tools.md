@@ -6,7 +6,7 @@ Milestone: M10    Depends on: M10-02 (summary), M10-04 (check), M10-06 and M10-0
 `:mcp-server` offers `caerbannog_get_access_summary`, `caerbannog_check_access` and `caerbannog_list_clients`, read only, through the same gateway, matcher and `SecretGuard` as the screen, and no tool that changes access, closes a connection, reads a queue message or touches a Shovel.
 
 ## Why
-Spec "Access view (M10)", "MCP evaluation" (decision of 2026-11-25, owner confirmation of AQ9 pending), "Model Context Protocol (MCP) server & architectural rule". Safety: no secret leakage, no changes.
+Spec "Access view (M10)", "MCP evaluation" (decision of 2026-11-25, owner confirmed AQ9 on 2026-11-25), "Model Context Protocol (MCP) server & architectural rule". Safety: no secret leakage, no changes.
 
 ## Scope
 In: the three tools with the schemas of the spec table; bounds (`limit` default 200 rows, maximum 500, `omittedRows` says how many were left out; a documented cap on summary size); every output through `SecretGuard` with `hiddenValues`; `check_access` rejects an action outside `publish`, `read`, `configure` with the list of allowed actions; the profile's TLS setting as saved, "not encrypted" reported for a plain profile, no fallback; a tool that lacks rights returns `{readable: false, reason}` and tries nothing else; broker error bodies are never passed through; the MCP initialize version stays as decided by the owner (not part of this task).
@@ -27,7 +27,7 @@ None (headless).
 This task. Tool names, inputs and outputs: `docs/spec.md` "Access view (M10)", "MCP evaluation".
 
 ## Open points
-AQ9; the default `limit`.
+The default `limit`. (AQ9 is decided.)
 
 ## Definition of done
 Tests first and passing; `docs/spec.md` MCP section and README updated if names change.

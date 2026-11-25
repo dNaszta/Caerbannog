@@ -32,7 +32,7 @@ Clients tab of `Access.dc.html`.
 `caerbannog_list_clients` in `M10-08`, same rows, same guard, bounded.
 
 ## Open points
-AQ8 (client properties), AQ9 (visibility of other users), AQ10 (publisher wording). S-G decides what "producers of a queue" can honestly mean.
+AQ8, AQ9 and AQ10 are decided (four allow-listed properties; other users visible; indirect publisher wording). No "token" pill and no Stop button (review of the mockup, Q8 and Q5). S-G decides what "producers of a queue" can honestly mean.
 
 ## Definition of done
 Tests first and passing; a test that the log of a run with hostile values holds none of them; README and tags updated.

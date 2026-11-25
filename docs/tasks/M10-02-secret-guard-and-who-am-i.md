@@ -30,7 +30,7 @@ Out: permissions, sign-in tab, clients, MCP.
 Exposed later in `M10-08` (`caerbannog_get_access_summary`). This task makes the guard shareable with `:mcp-server` (it lives in `core`).
 
 ## Open points
-AQ1 (place and name), AQ6 (3.x). Which `/api/vhosts` fields exist for a non-admin is S-A. Until the spike, field names are not asserted.
+AQ1 and AQ6 are decided: a drawer item "Access", absent on a 3.x connection, with a return to Connections and a one-line notice if the connection becomes 3.x while Access is open (scenarios 22, `@m10-02`). Who am I has no Sign-in line (review of the mockup, Q1). Which `/api/vhosts` fields exist for a non-admin is S-A. Until the spike, field names are not asserted.
 
 ## Definition of done
 Tests written first and passing, no unrelated changes, README rows and scenario tags updated, `task test` green (report what was not run).

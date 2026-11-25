@@ -70,12 +70,22 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then I still see the connection user and the tags
     And I see that the virtual host list could not be read
 
-  @negative @needs-decision @fake-broker @m10-02
-  Scenario: The view is not offered for a RabbitMQ 3.x connection
-    Given the connection "legacy-3x" is a RabbitMQ 3.x broker
-    When I open the Access view
-    Then I see that the view needs a 4.x broker
+  # Owner decision AQ6 (2026-11-25): not offered on a 3.x connection. The drawer has no Access item;
+  # if the held connection becomes 3.x while Access is open, the app returns to Connections with a
+  # one-line notice. "Needs a 4.x broker" appears only in that notice.
+  @negative @fake-broker @m10-02
+  Scenario: The Access item is not offered for a RabbitMQ 3.x connection
+    Given the connection "legacy-3x" is a RabbitMQ 3.x broker and is the held connection
+    Then the drawer has no Access item
     And no request was sent to the 3.x broker
+
+  @negative @fake-broker @m10-02
+  Scenario: A connection that becomes 3.x while Access is open returns to Connections with a notice
+    Given the Access view is open on the connection "prod-eu"
+    When the held connection becomes the RabbitMQ 3.x connection "legacy-3x"
+    Then I am on the Connections screen
+    And I see a one-line notice that the Access view needs a 4.x broker
+    And no request was sent to the 3.x broker by the Access view
 
   # ---------------------------------------------------------------- M10-03 Permissions table
 
@@ -196,7 +206,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then no message was published and no queue was read
     And the answer is labelled as a prediction and says the broker decides
 
-  @needs-decision @fake-broker @m10-04
+  @fake-broker @m10-04
   Scenario: The preview says where the permission came from
     Given the permissions were read from the broker
     When I ask whether "svc-orders" can read from the queue "queue.orders" on "/orders"
