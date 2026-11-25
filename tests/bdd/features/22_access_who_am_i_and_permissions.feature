@@ -7,8 +7,8 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
 
   The view is read-only (spec "Access view (M10)", non-goals): nothing here changes a user, tag,
   permission or virtual host; changes go through the Topology planner and migrations.
-  Management API field names for whoami, vhosts, permissions and topic permissions are measured by
-  the spike M10-00 (S-A, S-B); scenarios tagged @needs-spike depend on it. Wording of every
+  Management API field names for whoami, vhosts, permissions and topic permissions were measured by
+  the spike M10-00 (S-A, S-B, 2026-11-25; spec "Measured facts of M10-00"); no @needs-spike scenario is left here. Wording of every
   visible text is an owner decision (spec "Access view (M10)", questions); scenarios assert meaning,
   not exact sentences, unless a sentence is quoted.
 
@@ -70,12 +70,22 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then I still see the connection user and the tags
     And I see that the virtual host list could not be read
 
-  @negative @needs-decision @fake-broker @m10-02
-  Scenario: The view is not offered for a RabbitMQ 3.x connection
-    Given the connection "legacy-3x" is a RabbitMQ 3.x broker
-    When I open the Access view
-    Then I see that the view needs a 4.x broker
+  # Owner decision AQ6 (2026-11-25): not offered on a 3.x connection. The drawer has no Access item;
+  # if the held connection becomes 3.x while Access is open, the app returns to Connections with a
+  # one-line notice. "Needs a 4.x broker" appears only in that notice.
+  @negative @fake-broker @m10-02
+  Scenario: The Access item is not offered for a RabbitMQ 3.x connection
+    Given the connection "legacy-3x" is a RabbitMQ 3.x broker and is the held connection
+    Then the drawer has no Access item
     And no request was sent to the 3.x broker
+
+  @negative @fake-broker @m10-02
+  Scenario: A connection that becomes 3.x while Access is open returns to Connections with a notice
+    Given the Access view is open on the connection "prod-eu"
+    When the held connection becomes the RabbitMQ 3.x connection "legacy-3x"
+    Then I am on the Connections screen
+    And I see a one-line notice that the Access view needs a 4.x broker
+    And no request was sent to the 3.x broker by the Access view
 
   # ---------------------------------------------------------------- M10-03 Permissions table
 
@@ -159,20 +169,39 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I ask whether "svc-orders" can publish to the exchange "<name>" on "/orders"
     Then the answer is "<answer>"
 
-    # rows are placeholders until the spike M10-00 (S-I) measures anchoring and the empty pattern
+    # measured by the spike M10-00 (S-I, 137 rows in fixtures/m10-00/s-i-pattern-rows.tsv):
+    # a pattern is an unanchored, case-sensitive regular-expression search; the empty pattern allows nothing
     Examples:
       | pattern | name      | answer      |
       | ex      | ex.orders | would match |
-      | ex      | my-ex     | no match    |
+      | ex      | my-ex     | would match |
       | ^ex$    | ex.orders | no match    |
+      | ^ex$    | ex        | would match |
+      | ex      | EX        | no match    |
+      | (?i)ex  | EX        | would match |
+      | ^$      | ex.orders | no match    |
       |         | ex.orders | no match    |
-      | .*      |           | would match |
+      | .*      | ex.orders | would match |
 
-  @needs-spike @fake-broker @m10-04
+  # measured (S-I): the default exchange is checked as "amq.default", never as the target queue
+  @fake-broker @m10-04
   Scenario: The default exchange is asked about by the name the broker uses for it
     Given "svc-orders" has on "/orders" write "^amq\\.default$"
     When I ask whether "svc-orders" can publish to the default exchange on "/orders"
-    Then the answer follows what the spike M10-00 measured for the default exchange
+    Then the answer is "would match" and names the write pattern "^amq\\.default$"
+    And the answer does not use the name of the target queue
+
+  @fake-broker @m10-04
+  Scenario: A pattern that fits the queue name does not allow the default exchange
+    Given "svc-orders" has on "/orders" write "^queue$"
+    When I ask whether "svc-orders" can publish to the default exchange on "/orders"
+    Then the answer is "no match"
+
+  @fake-broker @m10-04
+  Scenario: Binding a queue needs write on the queue and read on the exchange
+    Given "svc-orders" has on "/orders" write "^queue\\..*" and read "^ex\\..*"
+    When I ask whether "svc-orders" can bind the queue "queue.orders" to the exchange "ex.orders" on "/orders"
+    Then the answer is "would match" and names the write pattern and the read pattern
 
   @fake-broker @m10-04
   Scenario: A topic permission is checked against the routing key
@@ -196,7 +225,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then no message was published and no queue was read
     And the answer is labelled as a prediction and says the broker decides
 
-  @needs-decision @fake-broker @m10-04
+  @fake-broker @m10-04
   Scenario: The preview says where the permission came from
     Given the permissions were read from the broker
     When I ask whether "svc-orders" can read from the queue "queue.orders" on "/orders"

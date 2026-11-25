@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/users/t-narrow/permissions as t-admin",
+    "status": 404,
+    "body": {
+        "error": "not_found",
+        "reason": "Not Found"
+    }
+}

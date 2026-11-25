@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/whoami as t-admin (bearer)",
+    "status": 200,
+    "body": {
+        "name": "t-admin",
+        "tags": [
+            "administrator"
+        ],
+        "is_internal_user": false
+    }
+}

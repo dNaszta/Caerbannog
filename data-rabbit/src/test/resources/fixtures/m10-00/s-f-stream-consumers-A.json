@@ -1,0 +1,48 @@
+{
+    "request": "GET /api/stream/consumers on A",
+    "status": 200,
+    "body": [
+        {
+            "connection_details": {
+                "name": "192.168.65.1:23127 -> 172.17.0.3:5552",
+                "node": "rabbit@978a34e8b9df",
+                "peer_host": "192.168.65.1",
+                "peer_port": 23127,
+                "user": "i-admin"
+            },
+            "active": true,
+            "activity_status": "up",
+            "consumed": 1,
+            "credits": 10,
+            "offset": 0,
+            "offset_lag": 0,
+            "properties": {},
+            "queue": {
+                "name": "st.iadmin",
+                "vhost": "/"
+            },
+            "subscription_id": 0
+        },
+        {
+            "connection_details": {
+                "name": "192.168.65.1:55575 -> 172.17.0.3:5552",
+                "node": "rabbit@978a34e8b9df",
+                "peer_host": "192.168.65.1",
+                "peer_port": 55575,
+                "user": "t-admin"
+            },
+            "active": true,
+            "activity_status": "up",
+            "consumed": 1,
+            "credits": 10,
+            "offset": 0,
+            "offset_lag": 0,
+            "properties": {},
+            "queue": {
+                "name": "st.tadmin",
+                "vhost": "/"
+            },
+            "subscription_id": 0
+        }
+    ]
+}

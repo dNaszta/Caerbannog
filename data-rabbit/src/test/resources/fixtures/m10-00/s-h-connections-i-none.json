@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/connections as i-none on A",
+    "status": 401,
+    "body": {
+        "error": "not_authorised",
+        "reason": "Not management user"
+    }
+}

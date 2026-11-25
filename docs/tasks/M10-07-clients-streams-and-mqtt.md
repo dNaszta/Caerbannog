@@ -26,7 +26,7 @@ Clients tab, stream and MQTT rows of `Access.dc.html`.
 Covered by `caerbannog_list_clients` (`M10-08`, `stream` input).
 
 ## Open points
-Whether the token user shows as the claim-derived name in `connection_details.user` (S-F).
+Measured by M10-00 (S-D, S-F): yes, a token user shows as the broker's claim-derived name in `connection_details.user`, on stream publishers and consumers, in `/api/stream/connections` and (stream consumers also) in `/api/consumers`. MQTT connections show the same user with `auth_mechanism: none`, no `type`, and no connection name. Facts: `docs/tasks/M10-00-spike-results.md`, spec "Measured facts of M10-00".
 
 ## Definition of done
 Tests first and passing; README updated.

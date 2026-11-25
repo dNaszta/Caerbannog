@@ -1,0 +1,74 @@
+{
+    "request": "GET /api/connections as i-mgmt on A",
+    "status": 200,
+    "body": [
+        {
+            "auth_mechanism": "PLAIN",
+            "channel_max": 256,
+            "channels": 2,
+            "client_properties": {
+                "capabilities": {
+                    "authentication_failure_close": true,
+                    "basic.nack": true,
+                    "connection.blocked": true,
+                    "consumer_cancel_notify": true,
+                    "exchange_exchange_bindings": true,
+                    "publisher_confirms": true
+                },
+                "connection_name": "spike-amqp-imgmt",
+                "copyright": "Copyright (c) 2007-2024 Broadcom Inc. and/or its subsidiaries.",
+                "information": "Licensed under the MPL. See https://www.rabbitmq.com/",
+                "platform": "Java",
+                "product": "RabbitMQ",
+                "version": "5.37.0"
+            },
+            "connected_at": 1795598041178,
+            "frame_max": 131072,
+            "garbage_collection": {
+                "fullsweep_after": 65535,
+                "max_heap_size": 0,
+                "min_bin_vheap_size": 46422,
+                "min_heap_size": 233,
+                "minor_gcs": 15
+            },
+            "host": "172.17.0.3",
+            "name": "192.168.65.1:25935 -> 172.17.0.3:5672",
+            "node": "rabbit@978a34e8b9df",
+            "peer_cert_issuer": null,
+            "peer_cert_serial_number": null,
+            "peer_cert_subject": null,
+            "peer_cert_validity": null,
+            "peer_host": "192.168.65.1",
+            "peer_port": 25935,
+            "port": 5672,
+            "protocol": "AMQP 0-9-1",
+            "recv_cnt": 15,
+            "recv_oct": 746,
+            "recv_oct_details": {
+                "rate": 47.4
+            },
+            "reductions": 15277,
+            "reductions_details": {
+                "rate": 946.6
+            },
+            "send_cnt": 12,
+            "send_oct": 813,
+            "send_oct_details": {
+                "rate": 44.8
+            },
+            "send_pend": 0,
+            "ssl": false,
+            "ssl_cipher": null,
+            "ssl_hash": null,
+            "ssl_key_exchange": null,
+            "ssl_protocol": null,
+            "state": "running",
+            "timeout": 60,
+            "type": "network",
+            "user": "i-mgmt",
+            "user_provided_name": "spike-amqp-imgmt",
+            "user_who_performed_action": "i-mgmt",
+            "vhost": "/orders"
+        }
+    ]
+}

@@ -1,0 +1,20 @@
+{
+    "request": "GET /api/consumers?columns=consumer_tag,queue",
+    "status": 200,
+    "body": [
+        {
+            "consumer_tag": "consumer-sodemo",
+            "queue": {
+                "name": "q.sodemo",
+                "vhost": "/"
+            }
+        },
+        {
+            "consumer_tag": "stream.subid-0",
+            "queue": {
+                "name": "st.sodemo",
+                "vhost": "/"
+            }
+        }
+    ]
+}

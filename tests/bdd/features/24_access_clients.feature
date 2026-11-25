@@ -9,7 +9,7 @@ Feature: Access view, part 4: who produces and consumes, by user
   Connection and channel records carry client-supplied properties, so every value is allow-listed
   and scanned before it is shown, copied or returned by MCP (spec "Access view (M10)", "Redaction").
   Field names and what a classic queue's publishers look like are measured by the spike M10-00
-  (S-D to S-H); scenarios tagged @needs-spike wait for it.
+  (S-D to S-H, measured 2026-11-25; spec "Measured facts of M10-00"); no @needs-spike scenario is left here.
 
   Background:
     Given the connection "prod-eu" is the held connection
@@ -32,20 +32,45 @@ Feature: Access view, part 4: who produces and consumes, by user
     Then I see the consumer "c1" with its channel, its connection and the user "svc-orders"
     And I see whether each consumer is active
 
-  @needs-spike @fake-broker @m10-06
+  # Measured (S-G): a queue has no publisher field; "user U publishes to exchange X" exists only when
+  # the broker runs with management.rates_mode = detailed; stream publishers always carry the user.
+  @fake-broker @m10-06
   Scenario: The publishers of a queue are shown through the exchange they publish to
-    Given a channel of the user "svc-orders" publishes to the exchange "orders-in"
+    Given the broker runs with detailed rates
+    And a channel of the user "svc-orders" publishes to the exchange "orders-in"
     And "orders-in" is bound to the queue "orders"
     When I choose the queue "orders" on the Clients tab
     Then I see the user "svc-orders" as publishing to "orders-in", which routes to "orders"
     And I do not see it presented as a direct publisher of the queue
 
-  @needs-spike @fake-broker @m10-06
+  @fake-broker @m10-06
   Scenario: When the broker does not tell who publishes, the view says so
-    Given the broker reports no publisher information for the exchange "orders-in"
+    Given the broker runs with the default rates mode and lists no publisher for the exchange "orders-in"
     When I choose the queue "orders" on the Clients tab
     Then I see that the publishers could not be told from the broker's data
     And no publisher is guessed from names
+
+  @fake-broker @m10-06
+  Scenario: Users that share a name are warned about
+    Given the broker reports the user "unknown" for 4 connections of different people
+    When I open the Clients tab of the Access view
+    Then I see the user "unknown" with 4 connections
+    And I see a notice that the broker's user name may be shared by several people
+    And I do not see a name made up from anything else
+
+  @security @fake-broker @m10-06
+  Scenario: The user-provided connection name is scanned like the connection name
+    Given a connection whose "user_provided_name" is a JWT and whose "connection_name" is the same text
+    When I open the Clients tab of the Access view
+    Then the connection is shown with the name replaced by "hidden"
+    And the JWT appears nowhere on the screen, in the copied text or in the log
+
+  @fake-broker @m10-06
+  Scenario: The consumers of the whole broker are not paged by the broker
+    Given the broker has 600 consumers
+    When I open the Clients tab of the Access view
+    Then the consumers are read in one call and bounded on arrival
+    And the screen says when the list was cut
 
   @fake-broker @m10-06
   Scenario: A user with the management tag sees only their own connections and is told so

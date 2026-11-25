@@ -27,7 +27,7 @@ Permissions tab of `Access.dc.html`: table per virtual host, topic permission ta
 Exposed in `M10-08` through `caerbannog_get_access_summary` with `includePermissions`; administrator only, "not readable" otherwise.
 
 ## Open points
-AQ2 (what a non-administrator sees), AQ7 (any user or only the connection user). S-B decides whether a token user can be shown at all.
+AQ2 and AQ7 are decided (non-administrator sees "only an administrator can read this" plus the declaration; an administrator may choose any user). Measured by M10-00 (S-B, outcome B confirmed): a token user is absent from `/api/users`, `/api/permissions` and `/api/topic-permissions`; the per-user permission endpoints answer 404 for a token user, also for a token administrator. So the user chooser lists internal users only, and for a token connection user the tab says the permissions come from the token and are not stored on the broker (scenario "The view says that the permissions of a token user cannot be listed", `23`). A `monitoring` or `management` token gets 401 on every permission endpoint (the locked state with the declaration). Facts: `docs/tasks/M10-00-spike-results.md`, spec "Measured facts of M10-00".
 
 ## Definition of done
 Tests first and passing; no write call exists in the new code (a test asserts the gateway interface has no non-GET method); README and tags updated.

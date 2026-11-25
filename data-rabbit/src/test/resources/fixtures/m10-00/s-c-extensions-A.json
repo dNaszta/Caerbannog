@@ -1,0 +1,23 @@
+{
+    "request": "GET /api/extensions as i-admin",
+    "status": 200,
+    "body": [
+        {
+            "javascript": "dispatcher.js"
+        },
+        [],
+        [],
+        [],
+        [],
+        [],
+        {
+            "javascript": [
+                "stream_management-ejs.js",
+                "stream.js"
+            ]
+        },
+        [],
+        [],
+        []
+    ]
+}

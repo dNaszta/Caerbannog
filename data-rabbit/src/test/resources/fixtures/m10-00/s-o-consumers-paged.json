@@ -1,0 +1,52 @@
+{
+    "request": "GET /api/consumers?page=1&page_size=2",
+    "status": 200,
+    "body": [
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:16624 -> 172.17.0.3:5552",
+                "name": "",
+                "node": "rabbit@978a34e8b9df",
+                "number": 0,
+                "peer_host": "192.168.65.1",
+                "peer_port": 16624,
+                "user": "t-admin"
+            },
+            "consumer_tag": "stream.subid-0",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "st.sodemo",
+                "vhost": "/"
+            }
+        },
+        {
+            "arguments": {},
+            "ack_required": false,
+            "active": true,
+            "activity_status": "up",
+            "channel_details": {
+                "connection_name": "192.168.65.1:31364 -> 172.17.0.3:5672",
+                "name": "192.168.65.1:31364 -> 172.17.0.3:5672 (1)",
+                "node": "rabbit@978a34e8b9df",
+                "number": 1,
+                "peer_host": "192.168.65.1",
+                "peer_port": 31364,
+                "user": "t-admin"
+            },
+            "consumer_tag": "consumer-sodemo",
+            "consumer_timeout": 1800000,
+            "exclusive": false,
+            "prefetch_count": 0,
+            "queue": {
+                "name": "q.sodemo",
+                "vhost": "/"
+            }
+        }
+    ]
+}

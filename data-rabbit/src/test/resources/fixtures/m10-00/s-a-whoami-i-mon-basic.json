@@ -1,0 +1,11 @@
+{
+    "request": "GET /api/whoami as i-mon (basic)",
+    "status": 200,
+    "body": {
+        "name": "i-mon",
+        "tags": [
+            "monitoring"
+        ],
+        "is_internal_user": true
+    }
+}

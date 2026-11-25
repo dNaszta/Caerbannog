@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/auth anonymous on A (no management.oauth_enabled)",
+    "status": 404,
+    "body": {
+        "error": "not_found",
+        "reason": "Not Found"
+    }
+}

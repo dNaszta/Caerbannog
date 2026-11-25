@@ -1,6 +1,6 @@
 # M10-01: Access view mockup
 
-Milestone: M10    Depends on: owner answers AQ1, AQ2, AQ5 (may be asked with the first draft)    Size: S
+Milestone: M10    Depends on: owner answers AQ1, AQ2, AQ6, AQ8 (all decided 2026-11-25); AQ5 wording stays placeholder    Size: S
 
 ## Goal
 `docs/ux/Access.dc.html` exists in the Material 3 style of the other mockups, shows the four tabs with every state, and the owner has reviewed it.
@@ -27,7 +27,7 @@ It is the UX task.
 None (design).
 
 ## Open points
-AQ1, AQ2, AQ5, AQ8 (what client properties may be shown).
+AQ5 (verdict wording) only; AQ1, AQ2, AQ3, AQ6, AQ8 are decided (spec "Access view (M10)"). The mockup must no longer label them as assumptions after the review fixes.
 
 ## Definition of done
 Mockup committed, reviewed by the owner, spec "Screens and UX" row for Access updated if the review changes it.
