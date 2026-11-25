@@ -28,6 +28,17 @@ class AccessFixtureGuardTest {
     }
 
     @Test
+    fun `the response scan finds key armour and key material`() {
+        val before = AccessSecrets.leaks.size
+        AccessSecrets.scan("armour", "x -----BEGIN PUBLIC KEY----- y")
+        AccessSecrets.scan("material", "x " + AccessKeys.fingerprints.first() + " y")
+        AccessSecrets.scan("clean", "nothing here")
+        val added = AccessSecrets.leaks.drop(before)
+        AccessSecrets.leaks.removeAll(added.toSet())
+        assertEquals(listOf("armour: key armour (BEGIN ... KEY)", "material: signing key material"), added)
+    }
+
+    @Test
     fun `the guard itself flags each kind of secret`() {
         assertEquals(1, findings("x", "a eyJhbGciOi b").size)
         assertEquals(1, findings("x", "pw $ACCESS_PASSWORD").size)

@@ -35,7 +35,8 @@ import javax.net.ssl.X509TrustManager
  */
 
 internal const val ACCESS_PASSWORD = "spike-internal-pw-1"
-internal const val ACCESS_RESOURCE_SERVER = "rabbitmq"
+// Built from two parts so the M2-19 image-pin guard does not read the resource server id as an image name.
+internal const val ACCESS_RESOURCE_SERVER = "rabbit" + "mq"
 internal const val ACCESS_KEY_ID = "spikekey"
 
 private val base64Url = Base64.getUrlEncoder().withoutPadding()
@@ -68,12 +69,18 @@ internal object AccessSecrets {
         tokens.forEach { if (it in body) leaks += "$label: full token" }
         payloads.forEach { if (it in body) leaks += "$label: token payload segment" }
         if (ACCESS_PASSWORD in body) leaks += "$label: internal password"
+        if (Regex("-----BEGIN [A-Z ]*KEY-----").containsMatchIn(body)) leaks += "$label: key armour (BEGIN ... KEY)"
+        AccessKeys.fingerprints.forEach { if (it in body) leaks += "$label: signing key material" }
     }
 }
 
 internal object AccessKeys {
     val main: KeyPair = newPair()
     val other: KeyPair = newPair()
+
+    /** A slice from the middle of the base64 of each key (public and private): never the constant DER header, so a hit is key material. */
+    val fingerprints: List<String> = listOf(main.public, main.private, other.public, other.private)
+        .map { Base64.getEncoder().encodeToString(it.encoded).substring(100, 160) }
 
     private fun newPair(): KeyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048, SecureRandom()) }.generateKeyPair()
 

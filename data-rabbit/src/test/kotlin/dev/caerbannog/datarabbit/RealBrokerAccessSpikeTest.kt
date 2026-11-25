@@ -807,6 +807,7 @@ class RealBrokerAccessSpikeTest {
                 AccessFacts.note("S-O", "page_size=$size: status=${page.status} items=${page.obj?.get("items")?.jsonArray?.size} reported page_size=${page.obj?.field("page_size")} page_count=${page.obj?.field("page_count")} body=${page.body.length} bytes in $ms ms")
             }
             assertEquals(400, a.http.get("/api/connections?page=1&page_size=1000", admin).status, "page_size above 500 is refused")
+            assertEquals(400, a.http.get("/api/connections?page=1&page_size=501", admin).status, "page_size 501 is refused")
             assertEquals(500, a.http.get("/api/connections?page=1&page_size=500", admin).obj?.get("items")?.jsonArray?.size, "a page of 500 of 600")
             val start = System.nanoTime()
             val slim =a.http.get("/api/connections?page=1&page_size=500&columns=name,user,vhost,protocol", admin)
