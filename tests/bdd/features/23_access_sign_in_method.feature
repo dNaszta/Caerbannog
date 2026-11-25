@@ -79,11 +79,12 @@ Feature: Access view, part 3: how the broker signs users in (OAuth 2 and Keycloa
     Then I see that the sign-in was refused and that the token may have expired
     And the message does not contain the token
 
-  @needs-decision @fake-broker @m10-05
-  Scenario: Scopes read locally from the user's own token are labelled as not confirmed
+  # Owner decision AQ3 (2026-11-25): no local token decoding in v1 (revisit after spike S-B).
+  @security @fake-broker @m10-05
+  Scenario: Scopes in the user's own token are not read or shown
     Given the held password is a JWT with the scopes "rabbitmq.read:orders/queue.*"
     When I open the Sign-in tab of the Access view
-    Then I see the scopes labelled as read from my token and not confirmed by the broker
+    Then no scope read from the token is shown
     And the token itself is not shown
 
   @gate-M10 @broker @oauth @m10-09

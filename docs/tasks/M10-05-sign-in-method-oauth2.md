@@ -1,6 +1,6 @@
 # M10-05: Sign-in method tab (OAuth 2 and Keycloak awareness)
 
-Milestone: M10    Depends on: M10-02, M10-00 (S-B, S-C, S-D, S-J, S-L), owner answers AQ3, AQ4    Size: M
+Milestone: M10    Depends on: M10-02, M10-00 (S-B, S-C, S-D, S-J, S-L), owner answers AQ3 (no) and AQ4 (decided)    Size: M
 
 ## Goal
 The Sign-in tab says whether the broker uses the OAuth 2 backend (yes, no, could not be told), says plainly that the view shows what RabbitMQ resolved and not the identity provider's setup, shows what RabbitMQ resolved for a token user where the management API exposes it, and where it does not says that the permissions come from the token and cannot be listed here.
@@ -15,7 +15,7 @@ In:
 3. **Token states**: a refused token (expired, bad signature, missing audience) maps to a reason from S-L and S-M and never echoes the body or the token; "the token may have expired" is the first-class hint.
 4. The fixed honesty text, always shown when `InUse`.
 5. Security: the token (the profile's password) and any part of it appear nowhere (screen, copy, log, error); the app makes no request to the issuer (a test counts the hosts requested).
-6. **Only if AQ3 is yes:** local reading of the `scope` claim of the user's own token in memory, shown labelled "from my token, not confirmed by the broker", never the token or other claims, never stored. Without a yes this item is not built and the `@needs-decision` scenario stays unrun.
+6. **Not built (AQ3 answered no, 2026-11-25; revisit after S-B):** local reading of the `scope` claim of the user's own token in memory, shown labelled "from my token, not confirmed by the broker", never the token or other claims, never stored. The scenario "Scopes in the user's own token are not read or shown" asserts the negative.
 Out: Keycloak calls, token refresh, any change.
 
 ## Acceptance
@@ -32,7 +32,7 @@ Sign-in tab of `Access.dc.html`: detected, not detected, could not be told, toke
 The sign-in method is part of `caerbannog_get_access_summary` (`M10-08`): `{method, note}` with the same honesty note. No scopes in MCP in any case.
 
 ## Open points
-AQ3, AQ4; the outcome of S-B. The wording is the owner's.
+AQ3 and AQ4 are decided; the outcome of S-B is open. The wording is the owner's.
 
 ## Definition of done
 Tests first and passing; a live check of detection and "no token in any value read" in the gate (`M10-09`); README, scenarios and spec updated to the outcome.

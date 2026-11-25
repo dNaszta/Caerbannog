@@ -27,7 +27,7 @@ Permissions tab of `Access.dc.html`: table per virtual host, topic permission ta
 Exposed in `M10-08` through `caerbannog_get_access_summary` with `includePermissions`; administrator only, "not readable" otherwise.
 
 ## Open points
-AQ2 (what a non-administrator sees), AQ7 (any user or only the connection user). S-B decides whether a token user can be shown at all.
+AQ2 and AQ7 are decided (non-administrator sees "only an administrator can read this" plus the declaration; an administrator may choose any user). S-B decides whether a token user can be shown at all.
 
 ## Definition of done
 Tests first and passing; no write call exists in the new code (a test asserts the gateway interface has no non-GET method); README and tags updated.
