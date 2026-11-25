@@ -84,6 +84,8 @@ class StreamSource(
     val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
+    /** M10-02 (compile-only stub by the test developer): the read-only access gateway of the same held connection, guarded like [shovels]; a connection that is not a held 4.x one refuses. */
+    val access: dev.caerbannog.core.access.AccessGateway = dev.caerbannog.core.access.UnavailableAccessGateway,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).

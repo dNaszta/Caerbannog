@@ -70,6 +70,71 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then I still see the connection user and the tags
     And I see that the virtual host list could not be read
 
+  @fake-broker @m10-02
+  Scenario: Who am I shows loading rows while the first read runs
+    Given the broker has not answered yet
+    When I open the Access view
+    Then I see the loading text and loading rows, not a blank page
+    And I see the note that this screen only reads
+    When the broker answers
+    Then I see the connection user "svc-orders"
+
+  @fake-broker @m10-02
+  Scenario: A broker that lists no virtual host for this user says so
+    Given the broker lists no virtual host for this user
+    When I open the Access view
+    Then I see that the broker lists no virtual host for this user
+    And I still see the connection user and the tags
+
+  @fake-broker @m10-02
+  Scenario: A token user is shown as the broker reports it
+    Given the connection user is the token user "jdoe" with the tag "monitoring"
+    When I open the Access view
+    Then I see the connection user "jdoe"
+    And I see that the name is as the broker reports it
+    And I see the tag "monitoring"
+
+  @security @fake-broker @m10-02
+  Scenario: A refused sign-in is reported without echoing anything
+    Given the broker refuses the sign-in
+    When I open the Access view
+    Then I see that the broker refused the sign-in
+    And no password and no token text is shown
+    And the connection is not reported as lost
+
+  # Decision D3: a screen refreshes only while it is shown, with the app-wide interval.
+  @fake-broker @m10-02
+  Scenario: The Access view reads only while it is shown
+    Given the Access view is not open
+    When 60 seconds pass
+    Then no request was sent to any broker
+    When I open the Access view
+    Then the broker was asked for the user and for the virtual hosts
+    When I leave the Access view
+    And the number of requests is noted
+    And 60 seconds pass
+    Then no further request was sent
+
+  # Decision D2: the screen never reconnects by itself.
+  @fake-broker @m10-02
+  Scenario: A lost connection is not reconnected by itself, Retry connects again
+    Given the Access view showed the virtual hosts
+    When the connection to the broker is lost
+    And 10 minutes pass
+    Then the app did not connect again by itself
+    When the broker is back and I choose Retry
+    Then the connection is held again
+    And I see the connection user "svc-orders"
+    And the data is no longer marked as stale
+
+  @fake-broker @m10-02
+  Scenario: Switching the connection clears the data of the previous one
+    Given the Access view showed the virtual hosts
+    And the connection "prod-plain" has the connection user "svc-billing" with the tag "management"
+    When I choose the connection "prod-plain"
+    Then I do not see the connection user "svc-orders"
+    And I see the connection user "svc-billing"
+
   # Owner decision AQ6 (2026-11-25): not offered on a 3.x connection. The drawer has no Access item;
   # if the held connection becomes 3.x while Access is open, the app returns to Connections with a
   # one-line notice. "Needs a 4.x broker" appears only in that notice.
