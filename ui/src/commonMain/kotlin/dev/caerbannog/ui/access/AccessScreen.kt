@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.access.AccessScreen as Screen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
+import dev.caerbannog.core.access.PermissionsState
 import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.VhostRowView
 import dev.caerbannog.core.access.VhostsStatus
@@ -73,7 +74,10 @@ fun AccessScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
+    permissions: PermissionsState = PermissionsState(),
+    permissionsEvents: PermissionsEvents = NoPermissionsEvents,
 ) {
+    // M10-03 COMPILE-ONLY STUB (test developer): `permissions` and `permissionsEvents` are not used yet; see PermissionsTabUiTest for the tags the tab must have.
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
         currentEvents.setShown(true)
