@@ -84,17 +84,13 @@ fun AccessScreen(
     permissionsEvents: PermissionsEvents = NoPermissionsEvents,
 ) {
     val currentEvents by rememberUpdatedState(events)
-    DisposableEffect(Unit) {
-        currentEvents.setShown(true)
-        onDispose { currentEvents.setShown(false) }
-    }
-    var tab by remember { mutableStateOf(AccessTab.WhoAmI) }
-    // The Permissions tab reads only while it is selected (D3): leaving the tab or the screen reports not shown.
     val currentPermissionsEvents by rememberUpdatedState(permissionsEvents)
-    val onPermissions = tab == AccessTab.Permissions
-    DisposableEffect(onPermissions) {
-        if (onPermissions) currentPermissionsEvents.setShown(true)
-        onDispose { if (onPermissions) currentPermissionsEvents.setShown(false) }
+    var tab by remember { mutableStateOf(AccessTab.WhoAmI) }
+    // Each view model reads only while its own tab is selected (D3): switching tabs or leaving the screen reports not shown to the tab that was open.
+    DisposableEffect(tab) {
+        val shown = if (tab == AccessTab.Permissions) currentPermissionsEvents::setShown else currentEvents::setShown
+        shown(true)
+        onDispose { shown(false) }
     }
     AppFrame(
         title = AppDestination.Access.name,
