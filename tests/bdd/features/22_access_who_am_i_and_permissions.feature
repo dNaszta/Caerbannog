@@ -63,6 +63,20 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then the last data stays on screen marked as stale
     And I see the "Connection lost" banner
 
+  # M10-02b (architect review of M10-02, finding 1): stale data says why (D2).
+  @fake-broker @m10-02b
+  Scenario: An unreadable user while data is shown keeps the data and says so
+    Given the Access view showed the virtual hosts
+    When the broker answers the user with an error
+    And 5 seconds pass
+    Then the last data stays on screen marked as stale
+    And I see that the user could not be read, with the broker's reason, and a Retry
+    And the connection is not reported as lost
+    When the broker answers the user again and I choose Retry
+    Then I see the connection user "svc-orders"
+    And the data is no longer marked as stale
+    And I no longer see that the user could not be read
+
   @fake-broker @m10-02
   Scenario: The virtual host list cannot be read
     Given the broker answers the virtual host list with an error

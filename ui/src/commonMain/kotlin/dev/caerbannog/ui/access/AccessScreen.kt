@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.access.AccessScreen as Screen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
+import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.VhostRowView
 import dev.caerbannog.core.access.VhostsStatus
 import dev.caerbannog.core.connections.ConnectionControlEvents
@@ -95,7 +96,7 @@ private fun RowScope.AccessActions(state: AccessState, updatedAtMillis: Long?, n
         Text(age, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("updatedAge"))
     }
     // Refresh is useful only while data is on screen and no banner offers its own Retry; a double press is harmless (D3).
-    val canRefresh = state.screen is Screen.Loaded && state.connectionBanner == null && state.refusalBanner == null
+    val canRefresh = state.screen is Screen.Loaded && state.connectionBanner == null && state.refusalBanner == null && state.readErrorBanner == null
     IconButton(
         onClick = events::refreshNow,
         enabled = canRefresh,
@@ -138,6 +139,7 @@ private fun TabbedBody(state: AccessState, events: AccessEvents) {
     ) {
         state.connectionBanner?.let { LostConnectionBanner("$it. ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessConnectionBanner") }
         state.refusalBanner?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessRefusalBanner") }
+        state.readErrorBanner?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessReadErrorBanner") }
         state.notEncrypted?.let { NotEncryptedBanner(it) }
         TabRow()
         state.readOnlyNote?.let { ReadOnlyNote(it) }
@@ -218,7 +220,7 @@ private fun WhoAmIContent(state: AccessState, events: AccessEvents) {
             Text(state.vhostsMessage ?: AccessTexts.VHOSTS_ERROR, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("accessVhostsError"))
             state.vhostsReason?.let { Text(AccessTexts.brokerText(it), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("accessVhostsReason")) }
             // The banners carry their own Retry; a list error alone has this one.
-            if (state.connectionBanner == null && state.refusalBanner == null) {
+            if (state.connectionBanner == null && state.refusalBanner == null && state.readErrorBanner == null) {
                 state.action?.let { TextButton(onClick = events::retry, modifier = Modifier.testTag("accessVhostsRetry")) { Text(it) } }
             }
         }
@@ -239,10 +241,12 @@ private fun VhostTable(rows: List<VhostRowView>) {
             Text(NOTE_COLUMN, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
         }
         HorizontalDivider()
-        rows.forEach { row ->
-            Row(Modifier.padding(vertical = 8.dp).testTag("accessVhostRow:${row.name}")) {
+        rows.forEachIndexed { index, row ->
+            // Names hidden by the guard all read the same, so they are told apart by position (M10-02b).
+            val key = if (row.name == SecretGuard.HIDDEN) "${row.name}:$index" else row.name
+            Row(Modifier.padding(vertical = 8.dp).testTag("accessVhostRow:$key")) {
                 Text(row.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text(row.note.orEmpty(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).testTag("accessVhostNote:${row.name}"))
+                Text(row.note.orEmpty(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).testTag("accessVhostNote:$key"))
             }
             HorizontalDivider()
         }

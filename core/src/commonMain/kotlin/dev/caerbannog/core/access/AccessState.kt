@@ -85,6 +85,11 @@ data class AccessState(
     val connectionBanner: String? = null,
     /** [AccessTexts.SIGN_IN_REFUSED] while the broker refused a refresh and the last data stays, dimmed and stale (mid-session NotAuthorised); else null. */
     val refusalBanner: String? = null,
+    /**
+     * Set only while data is shown and the last read answered `Unexpected`: [AccessTexts.USER_ERROR] and [AccessTexts.brokerText] of the mapped reason
+     * (the screen appends [AccessTexts.CONNECTION_LOST_DETAIL]); never together with the connection or refusal banner; else null.
+     */
+    val readErrorBanner: String? = null,
     /** `ConnectionNotes.NOT_ENCRYPTED` while the held profile has TLS off; else null. */
     val notEncrypted: String? = null,
     /** False while the held connection is a RabbitMQ 3.x one (AQ6): the drawer has no Access item. True when nothing is held. */

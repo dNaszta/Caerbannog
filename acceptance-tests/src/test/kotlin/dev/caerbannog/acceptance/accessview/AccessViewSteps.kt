@@ -361,6 +361,35 @@ class AccessViewSteps {
         current.vhostsFailure = AccessResult.Unexpected("HTTP 500")
     }
 
+    // --- M10-02b: unreadable user while data is shown ---
+
+    @When("the broker answers the user with an error")
+    fun theBrokerAnswersTheUserWithAnError() {
+        current.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+    }
+
+    @Then("I see that the user could not be read, with the broker's reason, and a Retry")
+    fun iSeeTheUserCouldNotBeRead() {
+        val banner = state.readErrorBanner
+        assertTrue(
+            banner != null && AccessTexts.USER_ERROR in banner && AccessTexts.brokerText("HTTP 500") in banner,
+            "expected the read-error banner with the broker's reason, state was: readErrorBanner=$banner",
+        )
+        assertEquals(AccessTexts.RETRY, state.action)
+    }
+
+    @When("the broker answers the user again and I choose Retry")
+    fun theBrokerAnswersTheUserAgainAndIChooseRetry() {
+        current.whoamiFailure = null
+        vm.retry()
+        settle()
+    }
+
+    @Then("I no longer see that the user could not be read")
+    fun iNoLongerSeeTheReadError() {
+        assertNull(state.readErrorBanner)
+    }
+
     @Then("I still see the connection user and the tags")
     fun iStillSeeTheUserAndTags() {
         assertEquals(current.user, state.user)

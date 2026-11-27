@@ -55,6 +55,7 @@ class AccessViewModel(
     private var stale = false
     private var connectionBanner: String? = null
     private var refusalBanner: String? = null
+    private var readErrorBanner: String? = null
     private var gatewayRefused = false
     private var leaveNotice: String? = null
 
@@ -153,6 +154,7 @@ class AccessViewModel(
             if (who != null) {
                 stale = true
                 connectionBanner = newLink.reason
+                readErrorBanner = null
             }
         } else {
             clearData()
@@ -174,6 +176,7 @@ class AccessViewModel(
         stale = false
         connectionBanner = null
         refusalBanner = null
+        readErrorBanner = null
         gatewayRefused = false
     }
 
@@ -222,6 +225,7 @@ class AccessViewModel(
         stale = false
         refusalBanner = null
         connectionBanner = null
+        readErrorBanner = null
     }
 
     /**
@@ -260,6 +264,7 @@ class AccessViewModel(
         if (who != null) {
             stale = true
             refusalBanner = AccessTexts.SIGN_IN_REFUSED
+            readErrorBanner = null
         } else {
             failure = Failure(AccessTexts.SIGN_IN_REFUSED, AccessTexts.SIGN_IN_REFUSED)
         }
@@ -267,7 +272,13 @@ class AccessViewModel(
     }
 
     private fun unreadable(reason: String) {
-        if (who != null) stale = true else failure = Failure(reason, AccessTexts.USER_ERROR)
+        if (who == null) {
+            failure = Failure(reason, AccessTexts.USER_ERROR)
+        } else {
+            stale = true
+            // Precedence: refusal, then lost connection, then read error; a read that was answered cannot coexist with the other two.
+            if (refusalBanner == null && connectionBanner == null) readErrorBanner = "${AccessTexts.USER_ERROR} ${AccessTexts.brokerText(reason)}."
+        }
         render()
     }
 
@@ -329,6 +340,7 @@ class AccessViewModel(
             stale = loaded && stale,
             connectionBanner = if (loaded) connectionBanner else null,
             refusalBanner = if (loaded) refusalBanner else null,
+            readErrorBanner = if (loaded) readErrorBanner else null,
             notEncrypted = if (link is LinkState.Disconnected) null else notEncrypted(),
             offered = offered(),
             leaveNotice = leaveNotice,
@@ -337,7 +349,7 @@ class AccessViewModel(
 
     private fun needsRetry(screen: AccessScreen, link: LinkState): Boolean =
         link is LinkState.Failed || screen is AccessScreen.Failed ||
-            (screen is AccessScreen.Loaded && (vhostsStatus == VhostsStatus.Unreadable || stale || refusalBanner != null))
+            (screen is AccessScreen.Loaded && (vhostsStatus == VhostsStatus.Unreadable || stale || refusalBanner != null || readErrorBanner != null))
 
     private fun notEncrypted(): String? = if (context.value?.profile?.tls == false) ConnectionNotes.NOT_ENCRYPTED else null
 }

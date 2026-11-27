@@ -18,5 +18,5 @@ import org.junit.platform.suite.api.Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("22_access_who_am_i_and_permissions.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "dev.caerbannog.acceptance.accessview")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@m10-02 and @fake-broker and not @broker")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "(@m10-02 or @m10-02b) and @fake-broker and not @broker")
 class RunAccessViewAcceptanceTest
