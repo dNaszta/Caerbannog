@@ -2,7 +2,11 @@ package dev.caerbannog.datarabbit
 
 import dev.caerbannog.core.access.AccessGateway
 import dev.caerbannog.core.access.AccessResult
+import dev.caerbannog.core.access.PatternCell
+import dev.caerbannog.core.access.PatternReading
+import dev.caerbannog.core.access.PermissionRow
 import dev.caerbannog.core.access.SecretGuard
+import dev.caerbannog.core.access.TopicPermissionRow
 import dev.caerbannog.core.access.UserNames
 import dev.caerbannog.core.access.UserPermissions
 import dev.caerbannog.core.access.WhoAmI
@@ -30,17 +34,39 @@ internal class ManagementAccessGateway(
 
     override suspend fun virtualHosts(): AccessResult<List<String>> = read(requests.vhosts(), ::parseVirtualHosts)
 
-    // M10-03 COMPILE-ONLY STUB (test developer): the behaviour is the senior developer's. See ManagementAccessGatewayPermissionsTest.
-    override suspend fun users(): AccessResult<UserNames> = AccessResult.Unreachable
+    override suspend fun users(): AccessResult<UserNames> = read(requests.users(), ::parseUsers)
 
-    override suspend fun permissionsOf(user: String): AccessResult<UserPermissions> = AccessResult.Unreachable
+    /** Two GETs; a result only when both parse, so the tab never draws half a table. The first answer that is not a table decides the result (404: a token user). */
+    override suspend fun permissionsOf(user: String): AccessResult<UserPermissions> {
+        val permissions = read(requests.userPermissions(user), ::parsePermissionRows, notFoundIsResult = true)
+        val rows = when (permissions) {
+            is AccessResult.Loaded -> permissions.value
+            else -> return permissions.withoutValue()
+        }
+        val topics = read(requests.userTopicPermissions(user), ::parseTopicRows, notFoundIsResult = true)
+        return when (topics) {
+            is AccessResult.Loaded -> AccessResult.Loaded(UserPermissions(user, rows, topics.value))
+            else -> topics.withoutValue()
+        }
+    }
 
-    private suspend fun <T> read(url: String, parse: (JsonElement, String?) -> T?): AccessResult<T> {
+    private fun <T> AccessResult<T>.withoutValue(): AccessResult<Nothing> = when (this) {
+        is AccessResult.Loaded -> error("a loaded result has a value")
+        AccessResult.NoManagementTag -> AccessResult.NoManagementTag
+        AccessResult.NotAuthorised -> AccessResult.NotAuthorised
+        AccessResult.Unreachable -> AccessResult.Unreachable
+        is AccessResult.Unexpected -> AccessResult.Unexpected(reason)
+        AccessResult.NotFound -> AccessResult.NotFound
+        AccessResult.NotOffered -> AccessResult.NotOffered
+    }
+
+    private suspend fun <T> read(url: String, parse: (JsonElement, String?) -> T?, notFoundIsResult: Boolean = false): AccessResult<T> {
         if (isMigrationSourceOnly(brokerVersion)) return AccessResult.NotOffered
         return when (val reply = http.get(url)) {
             ManagementReply.Unreachable, ManagementReply.CertificateRejected, ManagementReply.NoTlsAnswer -> AccessResult.Unreachable
             is ManagementReply.Response -> when (reply.status) {
                 200 -> parseBody(reply.body, parse)
+                404 -> if (notFoundIsResult) AccessResult.NotFound else AccessResult.Unexpected("HTTP 404")
                 401 -> if (ManagementErrors.isNotManagementUser(reply.body)) AccessResult.NoManagementTag else AccessResult.NotAuthorised
                 403 -> AccessResult.NotAuthorised
                 else -> AccessResult.Unexpected("HTTP ${reply.status}")
@@ -67,6 +93,45 @@ internal class ManagementAccessGateway(
     private fun parseVirtualHosts(root: JsonElement, secret: String?): List<String>? {
         val names = (root as? JsonArray)?.map { text((it as? JsonObject)?.get("name")) ?: return null } ?: return null
         return SecretGuard.redactAll(names, secret).values
+    }
+
+    // Names only: every other field of a user (password_hash, tags, limits) is dropped here and never enters a model.
+    private fun parseUsers(root: JsonElement, secret: String?): UserNames? {
+        val names = (root as? JsonArray)?.map { text((it as? JsonObject)?.get("name")) ?: return null } ?: return null
+        return UserNames(SecretGuard.redactAll(names, secret).values)
+    }
+
+    private fun parsePermissionRows(root: JsonElement, secret: String?): List<PermissionRow>? =
+        (root as? JsonArray)?.map { element ->
+            val obj = element as? JsonObject ?: return null
+            PermissionRow(
+                vhost = SecretGuard.redact(text(obj["vhost"]) ?: return null, secret).text,
+                configure = cell(obj["configure"], secret) ?: return null,
+                write = cell(obj["write"], secret) ?: return null,
+                read = cell(obj["read"], secret) ?: return null,
+            )
+        }
+
+    private fun parseTopicRows(root: JsonElement, secret: String?): List<TopicPermissionRow>? =
+        (root as? JsonArray)?.map { element ->
+            val obj = element as? JsonObject ?: return null
+            TopicPermissionRow(
+                vhost = SecretGuard.redact(text(obj["vhost"]) ?: return null, secret).text,
+                exchange = SecretGuard.redact(text(obj["exchange"]) ?: return null, secret).text,
+                write = cell(obj["write"], secret) ?: return null,
+                read = cell(obj["read"], secret) ?: return null,
+            )
+        }
+
+    // The raw text stays; the empty string is "no permission", everything else (`^$` included) is a pattern. A hidden pattern is never a regular expression.
+    private fun cell(element: JsonElement?, secret: String?): PatternCell? {
+        val raw = text(element) ?: return null
+        val guarded = SecretGuard.redact(raw, secret)
+        return when {
+            guarded.hidden -> PatternCell(guarded.text, PatternReading.HasPattern(guarded.text), hidden = true)
+            raw.isEmpty() -> PatternCell("", PatternReading.NoPermission)
+            else -> PatternCell(raw, PatternReading.HasPattern(raw))
+        }
     }
 
     private fun text(element: JsonElement?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content
