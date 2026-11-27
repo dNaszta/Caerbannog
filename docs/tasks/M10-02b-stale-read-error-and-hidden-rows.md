@@ -2,6 +2,16 @@
 
 Milestone: M10    Depends on: M10-02    Size: S
 
+## Status
+Step 1 brief done. Step 2 tests done (commit 672e07bb, red for the right reasons, compile-only stub `AccessState.readErrorBanner: String? = null`). Step 3 (senior developer) is next. Review round 0.
+
+## Rulings (architect, 2026-11-27, after step 2)
+1. Field `AccessState.readErrorBanner` holds `"${AccessTexts.USER_ERROR} ${brokerText(reason)}."` (same shape as the refusal banner). `AccessScreen` appends `AccessTexts.CONNECTION_LOST_DETAIL` when drawing. The full sentence in Scope 1 is the drawn text, not the field.
+2. `accessVhostRow:hidden:<n>` and its note tag: `<n>` is the 0-based index of the row in the shown vhost list (not 1-based, not counting only hidden rows).
+3. While `readErrorBanner` shows, the vhost list error must not draw its own Retry (`accessVhostsRetry`): the banner's Retry is the only one. The list error text may stay.
+4. `readErrorBanner` is never set together with the lost-connection or refusal banner. Precedence: refusal, then lost connection, then read error; `succeeded()`, `clearData()`, `lock()` and a lost connection or refusal clear it.
+5. The proposed frame in `docs/ux/Access.dc.html` is the architect's job (docs only, no code, not blocking step 3); the developer does not touch `docs/ux/`.
+
 ## Goal
 When the Who am I data is on screen and a later `whoami` answers `Unexpected` (for example HTTP 500), the screen says so with a banner and a Retry button, the same way as the lost-connection and refusal cases; and two virtual host names that were both hidden by the guard can be told apart by the code that tests them.
 
