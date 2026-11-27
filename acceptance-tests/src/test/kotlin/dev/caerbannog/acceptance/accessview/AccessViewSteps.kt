@@ -2,13 +2,22 @@ package dev.caerbannog.acceptance.accessview
 
 import dev.caerbannog.acceptance.connections.FakeSecretStore
 import dev.caerbannog.acceptance.permissions.FakePermissionChecker
+import dev.caerbannog.core.access.AccessAction
+import dev.caerbannog.core.access.AccessAnswer
 import dev.caerbannog.core.access.AccessContext
 import dev.caerbannog.core.access.AccessGateway
+import dev.caerbannog.core.access.AccessMatcher
+import dev.caerbannog.core.access.AccessQuestion
 import dev.caerbannog.core.access.AccessResult
 import dev.caerbannog.core.access.AccessScreen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
 import dev.caerbannog.core.access.AccessViewModel
+import dev.caerbannog.core.access.MatchAction
+import dev.caerbannog.core.access.MatchPreviewTexts
+import dev.caerbannog.core.access.MatchPreviewViewModel
+import dev.caerbannog.core.access.MatchVerdictView
+import dev.caerbannog.core.access.PatternKind
 import dev.caerbannog.core.access.PatternReading
 import dev.caerbannog.core.access.PermissionsScreen
 import dev.caerbannog.core.access.PermissionsState
@@ -92,6 +101,14 @@ class AccessViewSteps {
     private val setTopics = mutableMapOf<Triple<String, String, String>, Pair<String, String>>()
     private var chosen: String? = null
 
+    // M10-04 part B: the form (lazy: a scenario of another slice never touches it) and what the last "I ask whether" produced.
+    private val preview: MatchPreviewViewModel by lazy {
+        MatchPreviewViewModel(permissions.matchInput, test.backgroundScope, heldSecret = { held?.let { accessOf(it).heldSecret } })
+    }
+    private var matcherAnswer: AccessAnswer? = null
+    private var requestsAtCheck = -1
+    private var hiddenText: String? = null
+
     private val state: AccessState get() = vm.state.value
     private val pstate: PermissionsState get() = permissions.state.value
 
@@ -117,6 +134,9 @@ class AccessViewSteps {
         setPatterns.clear()
         setTopics.clear()
         chosen = null
+        matcherAnswer = null
+        requestsAtCheck = -1
+        hiddenText = null
         permissions = PermissionsViewModel(
             active = active,
             settings = settings,
@@ -609,10 +629,15 @@ class AccessViewSteps {
     }
 
     @Given("{string} has on {string} configure {string}, write {string} and read {string}")
-    fun userHasOnConfigureWriteRead(user: String, vhost: String, configure: String, write: String, read: String) = setPermission(user, vhost, configure, write, read)
+    fun userHasOnConfigureWriteRead(user: String, vhost: String, configure: String, write: String, read: String) =
+        setPermission(user, vhost, StepText.pattern(configure), StepText.pattern(write), StepText.pattern(read))
 
     @Given("{string} has the topic permission on {string} for the exchange {string} with write {string} and read {string}")
     fun userHasTopicPermission(user: String, vhost: String, exchange: String, write: String, read: String) {
+        setTopic(user, vhost, exchange, StepText.pattern(write), StepText.pattern(read))
+    }
+
+    private fun setTopic(user: String, vhost: String, exchange: String, write: String, read: String) {
         current.setTopicPermissions(user, vhost, exchange, write, read)
         setTopics[Triple(user, vhost, exchange)] = write to read
     }
@@ -865,4 +890,242 @@ class AccessViewSteps {
         assertTrue(current.requests.toList().none { "hash" in it.lowercase() || "password" in it.lowercase() }, "requests: ${current.requests}")
         assertFalse("hash" in pstate.toString().lowercase())
     }
+
+    // ====================================================================================================================
+    // M10-04 part B Match preview (`@m10-04`): the real `PermissionsViewModel`, `MatchPreviewViewModel` and `AccessMatcher` over the fake broker.
+    // Thinner than the wording, stated plainly: "the answer ..." reads `MatchPreviewState.verdict` (what the form is told to draw), not pixels; the Compose half is
+    // `MatchPreviewUiTest`. Binding is not offered by the form (PD-1): its steps ask `AccessMatcher` directly with the permissions the tab handed over
+    // (`PermissionsViewModel.matchInput`) and read the hits. The gate scenario (`@broker`) is `RealBrokerAccessMatchTest` and has no step here. Every pattern in a
+    // step text goes through `StepText.pattern` (doubled backslashes), never its own replace.
+    // ====================================================================================================================
+
+    @Given("{string} has on {string} write {string}")
+    fun userHasOnWrite(user: String, vhost: String, write: String) = setPermission(user, vhost, ".*", StepText.pattern(write), ".*")
+
+    @Given("{string} has on {string} read {string}")
+    fun userHasOnRead(user: String, vhost: String, read: String) = setPermission(user, vhost, ".*", ".*", StepText.pattern(read))
+
+    @Given("{string} has on {string} configure {string}")
+    fun userHasOnConfigure(user: String, vhost: String, configure: String) = setPermission(user, vhost, StepText.pattern(configure), ".*", ".*")
+
+    @Given("{string} has on {string} write {string} and read {string}")
+    fun userHasOnWriteAndRead(user: String, vhost: String, write: String, read: String) =
+        setPermission(user, vhost, ".*", StepText.pattern(write), StepText.pattern(read))
+
+    // The guard replaces a secret-looking pattern by the word "hidden" (measured in M10-03); the fake applies the same guard.
+    @Given("{string} has on {string} a write pattern that the guard hid")
+    fun userHasAHiddenWritePattern(user: String, vhost: String) {
+        hiddenText = "hunter2"
+        setPermission(user, vhost, ".*", "password=$hiddenText", ".*")
+    }
+
+    @Given("{string} has the topic permission on {string} for the exchange {string} with write {string}")
+    fun userHasTopicWrite(user: String, vhost: String, exchange: String, write: String) = setTopic(user, vhost, exchange, StepText.pattern(write), ".*")
+
+    // A token user is not an internal user; as the connection user with the administrator tag it lands on its own name, which the broker answers with 404.
+    @Given("{string} is a token user")
+    fun userIsATokenUser(user: String) {
+        current.user = user
+        current.tags = listOf("administrator")
+        becomesTokenUser()
+    }
+
+    @Given("the connection password is {string}")
+    fun theConnectionPasswordIs(secret: String) {
+        current.heldSecret = secret
+    }
+
+    // The only source of patterns in the app is the gateway read; a declaration is drawn in the locked frame only, never as a preview source.
+    @Given("the permissions were read from the broker")
+    fun thePermissionsWereReadFromTheBroker() {
+        assertNull(context.value?.profile?.declaredPermissions, "premise: no declaration stands in for the broker's patterns")
+    }
+
+    @When("the broker now returns for {string} on {string} the write pattern {string}")
+    fun theBrokerNowReturns(user: String, vhost: String, write: String) = setPermission(user, vhost, ".*", StepText.pattern(write), ".*")
+
+    @When("I read the permissions again")
+    fun iReadThePermissionsAgain() {
+        permissions.refreshNow()
+        settle()
+    }
+
+    private fun ask(action: MatchAction, user: String, name: String, vhost: String, key: String?) {
+        iChooseTheUser(user)
+        matcherAnswer = null
+        preview.chooseAction(action)
+        preview.chooseVhost(vhost)
+        preview.setName(name)
+        if (key != null) preview.setRoutingKey(key)
+        settle()
+        requestsAtCheck = current.requests.size
+        preview.check()
+        settle()
+    }
+
+    @When("I ask(ed) whether {string} can publish to the exchange {string} on {string}")
+    fun iAskPublish(user: String, exchange: String, vhost: String) = ask(MatchAction.Publish, user, exchange, vhost, null)
+
+    @When("I ask(ed) whether {string} can publish to the exchange {string} on {string} with the routing key {string}")
+    fun iAskPublishWithKey(user: String, exchange: String, vhost: String, key: String) = ask(MatchAction.Publish, user, exchange, vhost, key)
+
+    @When("I ask(ed) whether {string} can publish to the exchange {string} on {string} without a routing key")
+    fun iAskPublishWithoutKey(user: String, exchange: String, vhost: String) = ask(MatchAction.Publish, user, exchange, vhost, "")
+
+    @When("I ask(ed) whether {string} can publish to the default exchange on {string}")
+    fun iAskPublishDefault(user: String, vhost: String) = ask(MatchAction.Publish, user, "", vhost, null)
+
+    @When("I ask(ed) whether {string} can read from the queue {string} on {string}")
+    fun iAskRead(user: String, queue: String, vhost: String) = ask(MatchAction.Read, user, queue, vhost, null)
+
+    @When("I ask(ed) whether {string} can configure the queue {string} on {string}")
+    fun iAskConfigure(user: String, queue: String, vhost: String) = ask(MatchAction.Configure, user, queue, vhost, null)
+
+    private fun askBind(user: String, queue: String, exchange: String, vhost: String, key: String?) {
+        iChooseTheUser(user)
+        requestsAtCheck = current.requests.size
+        matcherAnswer = AccessMatcher().check(permissions.matchInput.value.source, AccessQuestion(AccessAction.BindQueue(exchange), vhost, queue, key))
+    }
+
+    @When("I ask whether {string} can bind the queue {string} to the exchange {string} on {string}")
+    fun iAskBind(user: String, queue: String, exchange: String, vhost: String) = askBind(user, queue, exchange, vhost, null)
+
+    @When("I ask whether {string} can bind the queue {string} to the exchange {string} on {string} with the routing key {string}")
+    fun iAskBindWithKey(user: String, queue: String, exchange: String, vhost: String, key: String) = askBind(user, queue, exchange, vhost, key)
+
+    @When("I choose the action {string} in the preview form")
+    fun iChooseTheAction(action: String) {
+        preview.chooseAction(MatchAction.valueOf(action.replaceFirstChar { it.uppercase() }))
+        settle()
+    }
+
+    private val verdict: MatchVerdictView get() = checkNotNull(preview.state.value.verdict) { "no answer is shown; form is ${preview.state.value}" }
+
+    /** What the last question answered, in the words of the scenarios. */
+    private fun answered(): String = matcherAnswer?.let {
+        when (it) {
+            is AccessAnswer.WouldMatch -> "would match"
+            is AccessAnswer.NoMatch -> "no match"
+            is AccessAnswer.UnreadablePattern -> "pattern could not be read"
+            is AccessAnswer.PermissionsNotReadable -> "permissions not readable"
+        }
+    } ?: when (verdict.title) {
+        MatchPreviewTexts.TITLE_MATCH, MatchPreviewTexts.TITLE_MATCH_TOPIC -> "would match"
+        MatchPreviewTexts.TITLE_NO_MATCH -> "no match"
+        MatchPreviewTexts.TITLE_UNREADABLE -> "pattern could not be read"
+        MatchPreviewTexts.TITLE_NOT_READABLE -> "permissions not readable"
+        else -> "unknown verdict \"${verdict.title}\""
+    }
+
+    @Then("the answer is {string}")
+    fun theAnswerIs(expected: String) = assertEquals(expected, answered(), "the answer; verdict ${preview.state.value.verdict}, matcher ${matcherAnswer}")
+
+    @Then("the answer is {string} and names the {word} pattern {string}")
+    fun theAnswerNamesThePattern(expected: String, kind: String, pattern: String) {
+        theAnswerIs(expected)
+        val named = StepText.pattern(pattern)
+        assertTrue("The $kind pattern $named " in verdict.sentence, "the sentence must name the $kind pattern $named: ${verdict.sentence}")
+    }
+
+    @Then("the answer is {string} and names the topic permission")
+    fun theAnswerNamesTheTopicPermission(expected: String) {
+        theAnswerIs(expected)
+        assertTrue(verdict.sentence.startsWith("The topic "), "the sentence must name the topic permission: ${verdict.sentence}")
+        assertTrue("amq.topic" in verdict.sentence, "the sentence must name the exchange of the topic permission: ${verdict.sentence}")
+        if (expected == "would match") assertEquals(MatchPreviewTexts.TITLE_MATCH_TOPIC, verdict.title)
+    }
+
+    private fun hitKinds(): List<PatternKind> = when (val a = checkNotNull(matcherAnswer) { "no bind question was asked" }) {
+        is AccessAnswer.WouldMatch -> a.hits.map { it.kind }
+        is AccessAnswer.NoMatch -> listOf(a.deciding.kind)
+        else -> emptyList()
+    }
+
+    @Then("the answer is {string} and names the write pattern and the read pattern")
+    fun theAnswerNamesWriteAndRead(expected: String) {
+        theAnswerIs(expected)
+        assertEquals(listOf(PatternKind.Write, PatternKind.Read), hitKinds())
+    }
+
+    @Then("the answer is {string} and names the topic read pattern")
+    fun theAnswerNamesTheTopicRead(expected: String) {
+        theAnswerIs(expected)
+        assertEquals(listOf(PatternKind.TopicRead), hitKinds(), "the third check decides and must be named")
+    }
+
+    @Then("the answer is {string} and names the write pattern, the read pattern and the topic read pattern")
+    fun theAnswerNamesAllThree(expected: String) {
+        theAnswerIs(expected)
+        assertEquals(listOf(PatternKind.Write, PatternKind.Read, PatternKind.TopicRead), hitKinds())
+    }
+
+    @Then("the answer does not use the name of the target queue")
+    fun theAnswerDoesNotUseTheQueue() {
+        assertTrue(MatchPreviewTexts.DEFAULT_EXCHANGE in verdict.sentence, "the sentence must name the default exchange by its broker name: ${verdict.sentence}")
+        assertFalse("queue" in verdict.sentence, "the sentence names a queue: ${verdict.sentence}")
+    }
+
+    @Then("the exchange box shows {string}")
+    fun theExchangeBoxShows(text: String) = assertEquals(text, preview.state.value.name)
+
+    @Then("the name box is labelled {string}")
+    fun theNameBoxIsLabelled(label: String) = assertEquals(label, preview.state.value.nameLabel)
+
+    @Then("the routing key box is shown")
+    fun theRoutingKeyBoxIsShown() = assertTrue(preview.state.value.showRoutingKey, "form ${preview.state.value}")
+
+    @Then("the routing key box is not shown")
+    fun theRoutingKeyBoxIsNotShown() = assertFalse(preview.state.value.showRoutingKey, "form ${preview.state.value}")
+
+    @Then("the app does not fail")
+    fun theAppDoesNotFail() {
+        assertNotNull(preview.state.value.verdict, "Check must end in a verdict, not in silence")
+    }
+
+    @Then("no message was published and no queue was read")
+    fun noMessageWasPublishedAndNoQueueWasRead() {
+        val gatewayMethods = AccessGateway::class.java.methods.map { it.name }.toSet()
+        assertEquals(setOf("whoAmI", "virtualHosts", "users", "permissionsOf"), gatewayMethods, "the gateway has reads of the Access view only")
+        assertEquals(requestsAtCheck, current.requests.size, "Check sent a request: ${current.requests.toList().drop(requestsAtCheck)}")
+    }
+
+    @Then("no request was sent to the broker")
+    fun noRequestWasSentToTheBroker() {
+        assertTrue(requestsAtCheck >= 0, "no question was asked")
+        assertEquals(requestsAtCheck, current.requests.size, "Check sent a request: ${current.requests.toList().drop(requestsAtCheck)}")
+    }
+
+    @Then("the answer is labelled as a prediction and says {string}")
+    fun theAnswerIsLabelledAsAPrediction(note: String) {
+        assertEquals(MatchPreviewTexts.NOTE, note, "the scenario quotes the approved note")
+        assertEquals(note, verdict.note)
+    }
+
+    @Then("the answer says {string} has no permission on {string}")
+    fun theAnswerSaysNoPermissionOn(user: String, vhost: String) = assertEquals("$user has no permission on $vhost.", verdict.sentence)
+
+    @Then("the answer says the patterns were read from the broker")
+    fun theAnswerSaysWhereItCameFrom() = assertEquals(MatchPreviewTexts.SOURCE_BROKER, verdict.source)
+
+    @Then("the answer does not show the hidden pattern")
+    fun theAnswerDoesNotShowTheHiddenPattern() {
+        val text = checkNotNull(hiddenText) { "the scenario did not set a hidden pattern" }
+        assertFalse(text in verdict.toString(), "the hidden pattern's text is in the verdict: $verdict")
+        assertTrue(SecretGuard.HIDDEN in verdict.sentence, "the verdict shows the hidden marker: ${verdict.sentence}")
+    }
+
+    @Then("the answer does not contain {string}")
+    fun theAnswerDoesNotContain(text: String) = assertFalse(text in verdict.toString(), "the verdict echoes \"$text\": $verdict")
+
+    @When("I change the name to {string}")
+    fun iChangeTheNameTo(name: String) {
+        preview.setName(name)
+        settle()
+    }
+
+    @Then("Check is disabled")
+    fun checkIsDisabled() = assertFalse(preview.state.value.checkEnabled, "Check is enabled on a frame that cannot be checked: ${preview.state.value}")
+
+    @Then("no answer is shown")
+    fun noAnswerIsShown() = assertNull(preview.state.value.verdict, "a stale answer is still shown")
 }

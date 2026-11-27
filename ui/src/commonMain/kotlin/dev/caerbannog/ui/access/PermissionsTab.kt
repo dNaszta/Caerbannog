@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.access.DeclarationView
+import dev.caerbannog.core.access.MatchPreviewState
 import dev.caerbannog.core.access.PatternCell
 import dev.caerbannog.core.access.PatternReading
 import dev.caerbannog.core.access.PermissionRow
@@ -69,7 +70,14 @@ internal val PermissionsScreen.hasData: Boolean
  * accessTopicRow:<vhost>:<exchange>, accessTopicCell:<vhost>:<exchange>:<kind>, plus the banner tags of the Who am I tab.
  */
 @Composable
-internal fun PermissionsPage(state: PermissionsState, events: PermissionsEvents, tab: AccessTab, onTab: (AccessTab) -> Unit) {
+internal fun PermissionsPage(
+    state: PermissionsState,
+    events: PermissionsEvents,
+    tab: AccessTab,
+    onTab: (AccessTab) -> Unit,
+    matchPreview: MatchPreviewState,
+    matchPreviewEvents: MatchPreviewEvents,
+) {
     Column(
         Modifier.fillMaxSize().testTag("accessScreen").verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -77,13 +85,13 @@ internal fun PermissionsPage(state: PermissionsState, events: PermissionsEvents,
         AccessBanners(state.connectionBanner, state.refusalBanner, state.readErrorBanner, state.notEncrypted, state.action, events::retry)
         TabRow(tab, onTab)
         Column(Modifier.testTag("accessContent").alpha(if (state.stale) 0.6f else 1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(Modifier.testTag("accessPermissions"), verticalArrangement = Arrangement.spacedBy(16.dp)) { PermissionsBody(state, events) }
+            Column(Modifier.testTag("accessPermissions"), verticalArrangement = Arrangement.spacedBy(16.dp)) { PermissionsBody(state, events, matchPreview, matchPreviewEvents) }
         }
     }
 }
 
 @Composable
-private fun PermissionsBody(state: PermissionsState, events: PermissionsEvents) {
+private fun PermissionsBody(state: PermissionsState, events: PermissionsEvents, matchPreview: MatchPreviewState, matchPreviewEvents: MatchPreviewEvents) {
     if (state.canChooseUser) UserChooser(state, events)
     when (state.screen) {
         PermissionsScreen.NotConnected, PermissionsScreen.Connecting -> MessageText(state.message)
@@ -94,15 +102,23 @@ private fun PermissionsBody(state: PermissionsState, events: PermissionsEvents) 
         PermissionsScreen.Locked -> {
             Notice(AppIcon.Lock, state)
             state.declaration?.let { Declaration(it) }
+            MatchPreviewForm(matchPreview, matchPreviewEvents)
         }
-        PermissionsScreen.TokenUser, PermissionsScreen.Empty -> Notice(AppIcon.Info, state)
+        PermissionsScreen.TokenUser -> {
+            Notice(AppIcon.Info, state)
+            MatchPreviewForm(matchPreview, matchPreviewEvents)
+        }
+        PermissionsScreen.Empty -> Notice(AppIcon.Info, state)
         is PermissionsScreen.Failed -> {
             Notice(AppIcon.Error, state)
             state.action?.let { label ->
                 Button(onClick = events::retry, modifier = Modifier.testTag("accessPermissionsRetry").semantics { text = AnnotatedString(label) }) { Text(label) }
             }
         }
-        PermissionsScreen.Loaded -> Tables(state, events)
+        PermissionsScreen.Loaded -> {
+            Tables(state, events)
+            MatchPreviewForm(matchPreview, matchPreviewEvents)
+        }
     }
 }
 

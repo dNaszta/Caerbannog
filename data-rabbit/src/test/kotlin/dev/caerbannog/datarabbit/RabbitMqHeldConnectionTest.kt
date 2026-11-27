@@ -70,6 +70,7 @@ class RabbitMqHeldConnectionTest {
             manager = StubStreamManager,
             resources = resources.toList(),
             log = { lines += it },
+            secret = { secret },
         )
 
     @Test
@@ -78,6 +79,14 @@ class RabbitMqHeldConnectionTest {
         val b = Counting()
         holder(a, b).close()
         assertEquals(listOf(1, 1), listOf(a.closes, b.closes))
+    }
+
+    @Test
+    fun `the held secret is the connection password while open and null once closed (M10-04)`() {
+        val held = holder(Counting())
+        assertEquals(secret, held.heldSecret())
+        held.close()
+        assertEquals(null, held.heldSecret(), "a closed holder gives no secret")
     }
 
     @Test

@@ -75,6 +75,12 @@ interface HeldConnection : AutoCloseable {
     /** M5-08a R1: why [migrationExecutor] is null, a fixed text for the screen (3.x: "migration source only"; unknown version: "could not be read"); null when there is an executor. */
     val migrationUnavailableReason: String? get() = null
 
+    /**
+     * M10-04: the connection's password, read per call and never stored by the caller, for the redaction guard only (a typed name that holds it is not echoed).
+     * Null for a holder that has none or one that is closed. Never log it, show it or put it in a state.
+     */
+    fun heldSecret(): String? = null
+
     /** M8-02a: the raw `rabbitmq_version` text read once when the connection opened; null when unknown. Not a secret. */
     val brokerVersion: String? get() = null
 

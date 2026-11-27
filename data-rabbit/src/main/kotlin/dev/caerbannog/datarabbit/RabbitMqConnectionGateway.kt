@@ -78,6 +78,7 @@ class RabbitMqConnectionGateway(
                 shovels = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelGateway else ManagementShovelGateway(http, requests, profiles, secretStore),
                 shovelStatus = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelStatusReader else ManagementShovelStatusReader(http, requests),
                 access = ManagementAccessGateway(http, requests, access.version) { password },
+                secret = { password },
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),

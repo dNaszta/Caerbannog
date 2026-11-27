@@ -669,7 +669,7 @@ class PermissionsViewModelTest {
     fun `the gateway has reads only and the view model has no method that changes anything`() = runTest {
         val gatewayMethods = AccessGateway::class.java.methods.map { it.name }.toSet()
         assertEquals(setOf("whoAmI", "virtualHosts", "users", "permissionsOf"), gatewayMethods, "a new gateway method needs a decision")
-        val allowed = setOf("getState", "getUpdatedAtMillis", "setShown", "refreshNow", "retry", "chooseUser", "setUserFilter", "setVhostFilter", "close")
+        val allowed = setOf("getState", "getUpdatedAtMillis", "getMatchInput" /* M10-04: the one read-only accessor */, "setShown", "refreshNow", "retry", "chooseUser", "setUserFilter", "setVhostFilter", "close")
         val own = PermissionsViewModel::class.java.methods.filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) && it.declaringClass == PermissionsViewModel::class.java }.map { it.name }
         assertTrue(own.all { it in allowed }, "unexpected public methods on the Permissions view model: ${own.filter { it !in allowed }}")
     }

@@ -82,6 +82,12 @@ class PermissionsViewModel(
     private val _updatedAt = MutableStateFlow<Long?>(null)
     override val updatedAtMillis: StateFlow<Long?> = _updatedAt.asStateFlow()
 
+    // A StateFlow drops an equal value, so a refresh that reads the same patterns does not reach the match preview (it would clear a verdict that still holds).
+    private val _matchInput = MutableStateFlow(MatchInput(null, PermissionsSource.NotAvailable(PermissionsUnavailable.NotLoaded), emptyList(), link))
+
+    /** What the match preview form checks against, read-only (M10-04 part B). See [MatchInput]. */
+    val matchInput: StateFlow<MatchInput> = _matchInput.asStateFlow()
+
     private val following: Job
     private val followingContext: Job
 
@@ -359,6 +365,7 @@ class PermissionsViewModel(
             (withData || screen is PermissionsScreen.Failed || screen is PermissionsScreen.Loading)
         val visible = offered.filter { userFilter.isBlank() || it.name.contains(userFilter.trim(), ignoreCase = true) }
         _updatedAt.value = banners.lastSuccessMillis
+        _matchInput.value = matchInputNow()
         _state.value = PermissionsState(
             screen = screen,
             message = when (screen) {
@@ -397,6 +404,18 @@ class PermissionsViewModel(
         )
     }
 
+    // Available also while stale (the last read stays on screen). Locked and token users have no patterns: the form shows the profile's host, display only.
+    private fun matchInputNow(): MatchInput {
+        val read = result
+        val profileHost = context.value?.profile?.virtualHost?.let(::listOf).orEmpty()
+        return when {
+            locked -> MatchInput(null, PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), profileHost, link)
+            read is Result.Token -> MatchInput(chosen, PermissionsSource.NotAvailable(PermissionsUnavailable.TokenUser), profileHost, link)
+            read is Result.Rows -> MatchInput(chosen, PermissionsSource.Available(read.permissions), hostsOf(read.permissions), link)
+            else -> MatchInput(null, PermissionsSource.NotAvailable(PermissionsUnavailable.NotLoaded), emptyList(), link)
+        }
+    }
+
     private fun needsRetry(screen: PermissionsScreen, withData: Boolean): Boolean =
         link is LinkState.Failed || screen is PermissionsScreen.Failed || (withData && (banners.stale || banners.any))
 
@@ -421,12 +440,17 @@ class PermissionsViewModel(
 
     // One row per host: the broker's rows (never dropped) plus the listed hosts that have none ("no permission" everywhere). A hidden host name cannot be
     // told apart from the broker's own hidden row, so a listed hidden host adds nothing.
-    private fun tableRows(read: UserPermissions): List<PermissionRow> {
+    private fun tableRows(read: UserPermissions): List<PermissionRow> = allRows(read).filter(::matchesVhost)
+
+    private fun allRows(read: UserPermissions): List<PermissionRow> {
         val none = PatternCell("", PatternReading.NoPermission)
         val have = read.rows.map { it.vhost }.toSet()
         val empty = vhostNames.filter { it != SecretGuard.HIDDEN && it !in have }.distinct().map { PermissionRow(it, none, none, none) }
-        return (read.rows + empty).sortedWith(compareBy(BY_NAME) { it.vhost }).filter(::matchesVhost)
+        return (read.rows + empty).sortedWith(compareBy(BY_NAME) { it.vhost })
     }
+
+    // The hosts the form offers: the table's hosts, never narrowed by the filter, a hidden host name left out (it cannot be asked about).
+    private fun hostsOf(read: UserPermissions): List<String> = allRows(read).map { it.vhost }.filter { it != SecretGuard.HIDDEN }
 
     private fun topicTableRows(read: UserPermissions): List<TopicPermissionRow> =
         read.topicRows.sortedWith(compareBy(BY_NAME) { it.vhost }).filter { matchesVhost(it.vhost) }
