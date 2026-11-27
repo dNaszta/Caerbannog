@@ -9,6 +9,12 @@ import dev.caerbannog.core.access.AccessScreen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
 import dev.caerbannog.core.access.AccessViewModel
+import dev.caerbannog.core.access.PatternReading
+import dev.caerbannog.core.access.PermissionsScreen
+import dev.caerbannog.core.access.PermissionsState
+import dev.caerbannog.core.access.PermissionsTexts
+import dev.caerbannog.core.access.PermissionsViewModel
+import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.VhostsStatus
 import dev.caerbannog.core.access.fakes.FakeAccessGateway
 import dev.caerbannog.core.connections.ActiveConnection
@@ -16,6 +22,7 @@ import dev.caerbannog.core.connections.ConnectionFailureReason
 import dev.caerbannog.core.connections.ConnectionNotes
 import dev.caerbannog.core.connections.ConnectionProfile
 import dev.caerbannog.core.connections.ConnectionSession
+import dev.caerbannog.core.connections.DeclaredPermissions
 import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.fakes.FakeAppSettings
 import dev.caerbannog.core.connections.fakes.FakeConnectionGateway
@@ -61,6 +68,7 @@ class AccessViewSteps {
     private companion object {
         const val PASSWORD = "S3cret-PW-4711"
         const val HOME_VHOST = "/orders"
+        const val TOKEN_NAME = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
         val PROFILE_NAMES = listOf("prod-eu", "prod-plain", "legacy-3x")
     }
 
@@ -69,6 +77,7 @@ class AccessViewSteps {
     private lateinit var settings: FakeAppSettings
     private lateinit var test: TestScope
     private lateinit var vm: AccessViewModel
+    private lateinit var permissions: PermissionsViewModel
     private lateinit var profiles: Map<String, ConnectionProfile>
     private val context = MutableStateFlow<AccessContext?>(null)
     private var held: String? = null
@@ -77,7 +86,14 @@ class AccessViewSteps {
     private var reconnectCalls = 0
     private val permissionsRecorded = mutableListOf<String>()
 
+    // M10-03: what the Given steps set on the fake broker, to compare with what the tab shows ("exactly as the broker returned them").
+    private class Triple3(val configure: String, val write: String, val read: String)
+    private val setPatterns = mutableMapOf<Pair<String, String>, Triple3>()
+    private val setTopics = mutableMapOf<Triple<String, String, String>, Pair<String, String>>()
+    private var chosen: String? = null
+
     private val state: AccessState get() = vm.state.value
+    private val pstate: PermissionsState get() = permissions.state.value
 
     @Before
     fun reset() {
@@ -98,6 +114,20 @@ class AccessViewSteps {
         requestsNoted = -1
         reconnectCalls = 0
         permissionsRecorded.clear()
+        setPatterns.clear()
+        setTopics.clear()
+        chosen = null
+        permissions = PermissionsViewModel(
+            active = active,
+            settings = settings,
+            scope = test.backgroundScope,
+            clock = RefreshClock { test.testScheduler.currentTime },
+            reconnect = { name ->
+                active.connect(profiles.getValue(name))
+                publishContext(name)
+            },
+            context = context,
+        )
         vm = AccessViewModel(
             active = active,
             settings = settings,
@@ -115,6 +145,7 @@ class AccessViewSteps {
     @After
     fun closeEverything() {
         vm.close()
+        permissions.close()
         active.close()
     }
 
@@ -156,6 +187,7 @@ class AccessViewSteps {
         current.user = user
         current.tags = listOf(tag)
         current.internalUser = true
+        current.addUser(user) // an internal user is listed by GET /api/users (M10-03)
     }
 
     @Given("the broker has the virtual hosts {string}, {string} and {string}")
@@ -165,7 +197,8 @@ class AccessViewSteps {
 
     @Given("the user {string} has permissions on {string} only")
     fun theUserHasPermissionsOnOnly(user: String, vhost: String) {
-        permissionsRecorded += "$user:$vhost" // M10-03 data; nothing of the Who am I tab reads it
+        permissionsRecorded += "$user:$vhost"
+        setPermission(user, vhost, ".*", ".*", ".*") // M10-03: the Permissions tab reads it; nothing of the Who am I tab does
     }
 
     // --- opening and reading the view ---
@@ -244,7 +277,7 @@ class AccessViewSteps {
 
     private fun assertOnlyReads() {
         val gatewayMethods = AccessGateway::class.java.methods.map { it.name }.toSet()
-        assertEquals(setOf("whoAmI", "virtualHosts"), gatewayMethods, "the access gateway has reads only; a new method needs a decision")
+        assertEquals(setOf("whoAmI", "virtualHosts", "users", "permissionsOf"), gatewayMethods, "the access gateway has reads only; a new method needs a decision")
         val allowed = setOf("getState", "getUpdatedAtMillis", "setShown", "refreshNow", "retry", "noticeShown", "close")
         val own = AccessViewModel::class.java.methods.filter { !Modifier.isStatic(it.modifiers) && it.declaringClass == AccessViewModel::class.java }.map { it.name }
         assertTrue(own.all { it in allowed }, "unexpected public methods on the Access view model: ${own.filter { it !in allowed }}")
@@ -561,5 +594,275 @@ class AccessViewSteps {
     fun iChooseTheConnection(name: String) {
         connect(name)
         settle()
+    }
+
+    // ====================================================================================================================
+    // M10-03 Permissions tab (`@m10-03`). The app side is the real `PermissionsViewModel` over the real `ActiveConnection`; only the broker is fake.
+    // Thinner than the wording, stated plainly: "I see ..." reads `PermissionsState` (what the screen is told to draw), not pixels; the Compose half is
+    // `PermissionsTabUiTest`. "every request ... was a GET" is structural here (the gateway interface has four reads and no write; the recorded names are those
+    // reads); the real HTTP method of each call is pinned by `ManagementAccessGatewayPermissionsTest` in data-rabbit.
+    // ====================================================================================================================
+
+    private fun setPermission(user: String, vhost: String, configure: String, write: String, read: String) {
+        current.setPermissions(user, vhost, configure, write, read)
+        setPatterns[user to vhost] = Triple3(configure, write, read)
+    }
+
+    @Given("{string} has on {string} configure {string}, write {string} and read {string}")
+    fun userHasOnConfigureWriteRead(user: String, vhost: String, configure: String, write: String, read: String) = setPermission(user, vhost, configure, write, read)
+
+    @Given("{string} has the topic permission on {string} for the exchange {string} with write {string} and read {string}")
+    fun userHasTopicPermission(user: String, vhost: String, exchange: String, write: String, read: String) {
+        current.setTopicPermissions(user, vhost, exchange, write, read)
+        setTopics[Triple(user, vhost, exchange)] = write to read
+    }
+
+    @Given("the broker has the users {string} and {string}")
+    fun theBrokerHasTheUsers(a: String, b: String) {
+        current.addUser(a)
+        current.addUser(b)
+    }
+
+    @Given("the broker has the user {string} with no permission on any virtual host")
+    fun theBrokerHasAnIdleUser(user: String) = current.addUser(user)
+
+    @Given("the broker has the user {string} with permissions on {string}")
+    fun theBrokerHasAUserWithPermissionsOn(user: String, vhost: String) = setPermission(user, vhost, "^queue\\..*", "^ex\\..*", ".*")
+
+    @Given("the broker has a user whose name is a token")
+    fun theBrokerHasAUserNamedLikeAToken() = current.addUser(TOKEN_NAME)
+
+    @Given("the profile {string} declares configure {string} and write {string}")
+    fun theProfileDeclares(name: String, configure: String, write: String) {
+        profiles = profiles + (name to profiles.getValue(name).copy(declaredPermissions = DeclaredPermissions(configure == "yes", write == "yes")))
+        publishContext(name)
+    }
+
+    @Given("the broker could not be asked for permissions")
+    fun theBrokerCouldNotBeAsked() {
+        // The only way the broker is not asked is the lock (ruling 1): the connection user is not an administrator. Nothing else is set.
+        if ("administrator" in current.tags) current.tags = listOf("monitoring")
+    }
+
+    @Given("whoami reports the connection user as not an internal user")
+    fun whoamiReportsATokenUser() = becomesTokenUser()
+
+    // A token user is not an internal user: the broker does not list it (measured, S-B). The Background gave the connection user "svc-orders" a row, which a
+    // token user cannot have, so the fake forgets it as an internal user.
+    private fun becomesTokenUser() {
+        current.internalUser = false
+        current.internalUsers = current.internalUsers - current.user
+    }
+
+    @Given("whoami reports the connection user as not an internal user with the tag {string}")
+    fun whoamiReportsATokenUserWithTag(tag: String) {
+        becomesTokenUser()
+        current.tags = listOf(tag)
+    }
+
+    @Given("the broker answers 404 for the permissions of that user")
+    fun theBrokerAnswers404() {
+        // A token user is not an internal user, so the honest fake already answers 404 (measured, S-B). Nothing to set; the step pins the premise.
+        assertFalse(current.user in current.internalUsers, "the token user must not be an internal user of the broker")
+        current.addUser("svc-billing") // the broker has internal users besides the token user (the chooser offers them)
+    }
+
+    @Given("I have chosen the user {string} on the Permissions tab")
+    fun iHaveChosenTheUser(user: String) = iChooseTheUser(user)
+
+    @When("I open the Permissions tab")
+    fun iOpenThePermissionsTab() {
+        permissions.setShown(true)
+        settle()
+    }
+
+    @When("I choose the user {string} on the Permissions tab")
+    fun iChooseTheUser(user: String) {
+        iOpenThePermissionsTab()
+        permissions.chooseUser(user)
+        settle()
+        chosen = user
+    }
+
+    @When("the next read of the permissions answers HTTP 500")
+    fun theNextReadAnswers500() {
+        current.permissionsFailure = AccessResult.Unexpected("HTTP 500")
+        permissions.refreshNow()
+        settle()
+    }
+
+    private fun expectedFor(vhost: String): Triple3 =
+        checkNotNull(setPatterns[checkNotNull(chosen) { "no user was chosen" } to vhost]) { "the scenario set no patterns for $chosen on $vhost" }
+
+    @Then("I see for {string} the three patterns exactly as the broker returned them")
+    fun iSeeTheThreePatterns(vhost: String) {
+        val expected = expectedFor(vhost)
+        val row = pstate.rows.singleOrNull { it.vhost == vhost }
+        assertNotNull(row, "no row for $vhost; screen is ${pstate.screen}, rows ${pstate.rows.map { it.vhost }}")
+        assertEquals(expected.configure, row!!.configure.text)
+        assertEquals(expected.write, row.write.text)
+        assertEquals(expected.read, row.read.text)
+    }
+
+    @Then("the patterns are labelled as read from the broker")
+    fun thePatternsAreLabelled() {
+        assertEquals(PermissionsTexts.READ_FROM_BROKER, pstate.readLabel)
+        assertNull(pstate.declaration)
+    }
+
+    @Then("the {string} permission on {string} reads as {string}")
+    fun thePermissionReadsAs(kind: String, vhost: String, reading: String) {
+        val row = pstate.rows.single { it.vhost == vhost }
+        val cell = when (kind) { "configure" -> row.configure; "write" -> row.write; "read" -> row.read; else -> error("unknown kind $kind") }
+        when (reading) {
+            "no permission" -> assertEquals(PatternReading.NoPermission, cell.reading, "$kind on $vhost")
+            "has a pattern" -> assertTrue(cell.reading is PatternReading.HasPattern, "$kind on $vhost reads ${cell.reading}")
+            else -> error("unknown reading $reading")
+        }
+    }
+
+    @Then("I see the exchange {string} with its write pattern and read pattern for {string}")
+    fun iSeeTheTopicRow(exchange: String, vhost: String) {
+        val expected = checkNotNull(setTopics[Triple(checkNotNull(chosen), vhost, exchange)]) { "the scenario set no topic permission" }
+        val row = pstate.topicRows.singleOrNull { it.vhost == vhost && it.exchange == exchange }
+        assertNotNull(row, "topic rows: ${pstate.topicRows}")
+        assertEquals(expected.first, row!!.write.text)
+        assertEquals(expected.second, row.read.text)
+    }
+
+    @Then("I see that only an administrator can read permissions")
+    fun iSeeOnlyAnAdministratorCanRead() {
+        assertTrue(pstate.screen is PermissionsScreen.Locked, "screen is ${pstate.screen}")
+        assertEquals(PermissionsTexts.LOCKED_TITLE, pstate.message)
+    }
+
+    @Then("no permission pattern is shown")
+    fun noPermissionPatternIsShown() {
+        assertEquals(emptyList<Any>(), pstate.rows)
+        assertEquals(emptyList<Any>(), pstate.topicRows)
+    }
+
+    @Then("nothing is guessed from other calls")
+    fun nothingIsGuessed() {
+        val asked = current.requests.toList().filter { it == "users" || it.startsWith("permissions:") }
+        assertEquals(emptyList<String>(), asked, "a user or permission request was sent without the administrator tag")
+    }
+
+    @Then("I see the declaration labelled as declared by me and not confirmed by the broker")
+    fun iSeeTheDeclaration() {
+        val declaration = pstate.declaration
+        assertNotNull(declaration, "screen ${pstate.screen}")
+        assertEquals(PermissionsTexts.DECLARED_LABEL, declaration!!.label)
+        assertEquals("no", declaration.configure)
+        assertEquals("yes", declaration.write)
+        assertEquals(PermissionsTexts.DECLARED_NOT_DECLARED, declaration.read)
+    }
+
+    @Then("it does not use the wording or style of a broker-read result")
+    fun itDoesNotUseTheBrokerWording() {
+        assertNull(pstate.readLabel, "a declaration must not carry the broker-read label")
+        assertTrue(PermissionsTexts.READ_FROM_BROKER !in (pstate.declaration?.label.orEmpty()))
+        assertEquals(emptyList<Any>(), pstate.rows, "the declaration is not a pattern table")
+    }
+
+    @Then("I can choose either user")
+    fun iCanChooseEither() {
+        assertTrue(pstate.canChooseUser)
+        val names = pstate.users.map { it.name }
+        assertTrue("svc-orders" in names && "svc-billing" in names, "chooser offers $names")
+        assertTrue(pstate.users.none { it.hidden })
+    }
+
+    @Then("the list of users shows no password and no password hash")
+    fun theListShowsNoSecret() {
+        val shown = pstate.users.toString().lowercase()
+        for (word in listOf("password", "hash")) assertFalse(word in shown, "'$word' in the chooser: $shown")
+    }
+
+    @Then("{string} is shown with no permission for {string}")
+    fun vhostShownWithNoPermission(vhost: String, user: String) {
+        assertEquals(user, pstate.chosenUser)
+        val row = pstate.rows.singleOrNull { it.vhost == vhost }
+        assertNotNull(row, "rows: ${pstate.rows.map { it.vhost }}")
+        for (cell in listOf(row!!.configure, row.write, row.read)) assertEquals(PatternReading.NoPermission, cell.reading)
+    }
+
+    @Then("I see that {string} has no permissions on any virtual host")
+    fun iSeeNoPermissionsOnAnyVhost(user: String) {
+        assertTrue(pstate.screen is PermissionsScreen.Empty, "screen is ${pstate.screen}")
+        assertEquals(PermissionsTexts.empty(user), pstate.message)
+    }
+
+    @Then("I do not see an error")
+    fun iDoNotSeeAnError() {
+        assertFalse(pstate.screen is PermissionsScreen.Failed, "screen is ${pstate.screen}")
+        assertNull(pstate.action, "an error offers Retry")
+        assertNull(pstate.readErrorBanner)
+        assertNull(pstate.refusalBanner)
+        assertNull(pstate.connectionBanner)
+    }
+
+    @Then("I see that the permissions of this user come from the token and are not stored on the broker")
+    fun iSeeTheTokenText() {
+        assertTrue(pstate.screen is PermissionsScreen.TokenUser, "screen is ${pstate.screen}")
+        assertEquals(PermissionsTexts.tokenDetail(current.user), pstate.detail)
+    }
+
+    @Then("the chosen user is the connection user")
+    fun theChosenUserIsTheConnectionUser() = assertEquals(current.user, pstate.chosenUser)
+
+    @Then("the list of users offers the connection user besides the internal users")
+    fun theListOffersTheConnectionUser() {
+        val names = pstate.users.map { it.name }
+        assertTrue(current.user in names, "chooser offers $names")
+        assertTrue(names.any { it != current.user }, "the internal users are offered too: $names")
+    }
+
+    @Then("the list of users shows that name as hidden and I cannot choose it")
+    fun theHiddenNameCannotBeChosen() {
+        val hidden = pstate.users.filter { it.hidden }
+        assertEquals(1, hidden.size, "options: ${pstate.users}")
+        assertEquals(SecretGuard.HIDDEN, hidden.single().name)
+        val before = pstate.chosenUser
+        val asked = current.requests.toList().count { it.startsWith("permissions:") }
+        permissions.chooseUser(hidden.single().key)
+        settle()
+        assertEquals(before, pstate.chosenUser, "a hidden option was chosen")
+        assertEquals(asked, current.requests.toList().count { it.startsWith("permissions:") }, "a request was sent for a hidden name")
+    }
+
+    @Then("the token text appears nowhere on the screen")
+    fun theTokenTextAppearsNowhere() {
+        assertFalse(pstate.toString().contains("eyJ") || pstate.toString().contains(TOKEN_NAME), "the token text is on the state")
+    }
+
+    @Then("the last patterns stay on screen, marked as stale")
+    fun theLastPatternsStay() {
+        assertTrue(pstate.screen is PermissionsScreen.Loaded, "screen is ${pstate.screen}")
+        assertTrue(pstate.stale, "stale")
+        assertTrue(pstate.rows.any { it.configure.reading is PatternReading.HasPattern }, "the last patterns must stay")
+    }
+
+    @Then("I see that the permissions could not be read with a Retry button")
+    fun iSeeThePermissionsCouldNotBeRead() {
+        val banner = pstate.readErrorBanner
+        assertTrue(banner != null && PermissionsTexts.ERROR in banner && AccessTexts.brokerText("HTTP 500") in banner, "banner was $banner")
+        assertEquals(AccessTexts.RETRY, pstate.action)
+    }
+
+    @Then("every request sent to the broker was a GET")
+    fun everyRequestWasAGet() {
+        val gatewayMethods = AccessGateway::class.java.methods.map { it.name }.toSet()
+        assertEquals(setOf("whoAmI", "virtualHosts", "users", "permissionsOf"), gatewayMethods, "the gateway has reads only")
+        val allowed = Regex("whoami|vhosts|users|permissions:.+")
+        val sent = current.requests.toList()
+        assertTrue(sent.any { it.startsWith("permissions:") }, "the scenario must have read permissions: $sent")
+        assertTrue(sent.all { allowed.matches(it) }, "requests: $sent")
+    }
+
+    @Then("no request carried a password hash")
+    fun noRequestCarriedAHash() {
+        assertTrue(current.requests.toList().none { "hash" in it.lowercase() || "password" in it.lowercase() }, "requests: ${current.requests}")
+        assertFalse("hash" in pstate.toString().lowercase())
     }
 }
