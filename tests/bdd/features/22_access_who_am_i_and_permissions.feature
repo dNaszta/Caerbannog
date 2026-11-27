@@ -244,6 +244,16 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     And I do not see an error
 
   @fake-broker @m10-03
+  Scenario: A token administrator lands on its own name with the token note
+    Given whoami reports the connection user as not an internal user with the tag "administrator"
+    And the broker answers 404 for the permissions of that user
+    When I open the Permissions tab
+    Then the chosen user is the connection user
+    And I see that the permissions of this user come from the token and are not stored on the broker
+    And the list of users offers the connection user besides the internal users
+    And I do not see an error
+
+  @fake-broker @m10-03
   Scenario: A token administrator may choose an internal user
     # PD-1 decided (owner, 2026-11-27, option a): the broker lets a token administrator read internal users' permissions (spike S-B).
     Given whoami reports the connection user as not an internal user with the tag "administrator"
