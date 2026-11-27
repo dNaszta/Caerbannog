@@ -2,7 +2,6 @@ package dev.caerbannog.core.access
 
 import dev.caerbannog.core.connections.ActiveConnection
 import dev.caerbannog.core.connections.ConnectionFailureReason
-import dev.caerbannog.core.connections.ConnectionNotes
 import dev.caerbannog.core.connections.LinkState
 import dev.caerbannog.core.connections.StreamSource
 import dev.caerbannog.core.connections.isMigrationSourceOnly
@@ -51,11 +50,7 @@ class AccessViewModel(
     private var vhostsReason: String? = null
     private var locked = false
     private var failure: Failure? = null
-    private var lastSuccessMillis: Long? = null
-    private var stale = false
-    private var connectionBanner: String? = null
-    private var refusalBanner: String? = null
-    private var readErrorBanner: String? = null
+    private val banners = AccessBanners()
     private var gatewayRefused = false
     private var leaveNotice: String? = null
 
@@ -151,11 +146,7 @@ class AccessViewModel(
         loop.cancel()
         if (newLink is LinkState.Failed && newLink.reason == ConnectionFailureReason.CONNECTION_LOST) {
             // D2: the data of the last read stays, marked stale, with the banner.
-            if (who != null) {
-                stale = true
-                connectionBanner = newLink.reason
-                readErrorBanner = null
-            }
+            banners.connectionLost(newLink.reason, hasData = who != null)
         } else {
             clearData()
             home = newSource?.vhost
@@ -172,11 +163,7 @@ class AccessViewModel(
         vhostsReason = null
         locked = false
         failure = null
-        lastSuccessMillis = null
-        stale = false
-        connectionBanner = null
-        refusalBanner = null
-        readErrorBanner = null
+        banners.clear()
         gatewayRefused = false
     }
 
@@ -220,37 +207,16 @@ class AccessViewModel(
         render()
     }
 
-    private fun succeeded() {
-        lastSuccessMillis = clock.nowMillis()
-        stale = false
-        refusalBanner = null
-        connectionBanner = null
-        readErrorBanner = null
-    }
+    private fun succeeded() = banners.succeeded(clock.nowMillis())
 
-    /**
-     * One call. Null: drop the result (superseded or closed), the connection was reported lost (D2), or the gateway answered [AccessResult.NotOffered]
-     * (the app leaves Access; this is not a failure and shows no error).
-     */
-    private suspend fun <T> ask(src: StreamSource, call: suspend () -> AccessResult<T>): AccessResult<T>? {
-        val result = call()
-        if (!loop.alive(src)) return null
-        return when (result) {
-            AccessResult.Unreachable -> {
-                active.connectionLost(src)
-                null
-            }
-            AccessResult.NotOffered -> {
-                loop.cancel()
-                clearData()
-                gatewayRefused = true
-                if (shown) leaveNotice = AccessTexts.NEEDS_4X
-                render()
-                null
-            }
-            else -> result
-        }
-    }
+    private suspend fun <T> ask(src: StreamSource, call: suspend () -> AccessResult<T>): AccessResult<T>? =
+        askAccess(loop, active, src, onNotOffered = {
+            loop.cancel()
+            clearData()
+            gatewayRefused = true
+            if (shown) leaveNotice = AccessTexts.NEEDS_4X
+            render()
+        }, call)
 
     // No management tag, on either call: the whole screen is the lock, and what was shown may be stale, so it goes.
     private fun lock() {
@@ -261,23 +227,13 @@ class AccessViewModel(
 
     // NotAuthorised: with data the last data stays, dimmed, with the refusal banner; without, the screen has nothing to show.
     private fun refused() {
-        if (who != null) {
-            stale = true
-            refusalBanner = AccessTexts.SIGN_IN_REFUSED
-            readErrorBanner = null
-        } else {
-            failure = Failure(AccessTexts.SIGN_IN_REFUSED, AccessTexts.SIGN_IN_REFUSED)
-        }
+        if (!banners.refused(hasData = who != null)) failure = Failure(AccessTexts.SIGN_IN_REFUSED, AccessTexts.SIGN_IN_REFUSED)
         render()
     }
 
     private fun unreadable(reason: String) {
-        if (who == null) {
+        if (!banners.unreadable(hasData = who != null, banner = "${AccessTexts.USER_ERROR} ${AccessTexts.brokerText(reason)}.")) {
             failure = Failure(reason, AccessTexts.USER_ERROR)
-        } else {
-            stale = true
-            // Precedence: refusal, then lost connection, then read error; a read that was answered cannot coexist with the other two.
-            if (refusalBanner == null && connectionBanner == null) readErrorBanner = "${AccessTexts.USER_ERROR} ${AccessTexts.brokerText(reason)}."
         }
         render()
     }
@@ -308,7 +264,7 @@ class AccessViewModel(
         val loaded = screen is AccessScreen.Loaded
         val link = link
         val user = if (loaded) who else null
-        _updatedAt.value = lastSuccessMillis
+        _updatedAt.value = banners.lastSuccessMillis
         _state.value = AccessState(
             screen = screen,
             message = when (screen) {
@@ -337,10 +293,10 @@ class AccessViewModel(
             },
             vhostsReason = if (loaded && vhostsStatus == VhostsStatus.Unreadable) vhostsReason else null,
             action = if (needsRetry(screen, link)) AccessTexts.RETRY else null,
-            stale = loaded && stale,
-            connectionBanner = if (loaded) connectionBanner else null,
-            refusalBanner = if (loaded) refusalBanner else null,
-            readErrorBanner = if (loaded) readErrorBanner else null,
+            stale = loaded && banners.stale,
+            connectionBanner = if (loaded) banners.connection else null,
+            refusalBanner = if (loaded) banners.refusal else null,
+            readErrorBanner = if (loaded) banners.readError else null,
             notEncrypted = if (link is LinkState.Disconnected) null else notEncrypted(),
             offered = offered(),
             leaveNotice = leaveNotice,
@@ -349,7 +305,7 @@ class AccessViewModel(
 
     private fun needsRetry(screen: AccessScreen, link: LinkState): Boolean =
         link is LinkState.Failed || screen is AccessScreen.Failed ||
-            (screen is AccessScreen.Loaded && (vhostsStatus == VhostsStatus.Unreadable || stale || refusalBanner != null || readErrorBanner != null))
+            (screen is AccessScreen.Loaded && (vhostsStatus == VhostsStatus.Unreadable || banners.stale || banners.refusal != null || banners.readError != null))
 
-    private fun notEncrypted(): String? = if (context.value?.profile?.tls == false) ConnectionNotes.NOT_ENCRYPTED else null
+    private fun notEncrypted(): String? = notEncryptedNote(context.value)
 }
