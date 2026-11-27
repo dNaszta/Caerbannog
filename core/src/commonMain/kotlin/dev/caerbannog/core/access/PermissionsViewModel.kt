@@ -82,6 +82,9 @@ class PermissionsViewModel(
     private val _updatedAt = MutableStateFlow<Long?>(null)
     override val updatedAtMillis: StateFlow<Long?> = _updatedAt.asStateFlow()
 
+    /** M10-04 part B contract (STUB, step 3 builds it): what the match preview form checks against, read-only. See [MatchInput]. */
+    val matchInput: StateFlow<MatchInput> get() = throw NotImplementedError("M10-04 part B: PermissionsViewModel.matchInput")
+
     private val following: Job
     private val followingContext: Job
 
