@@ -126,8 +126,8 @@ private fun Notice(icon: AppIcon, state: PermissionsState) {
 @Composable
 private fun Declaration(declaration: DeclarationView) {
     val spoken = listOf(
-        PermissionsTexts.DECLARED_HEADING, declaration.label, "$CONFIGURE_COLUMN ${declaration.configure}", "$WRITE_COLUMN ${declaration.write}",
-        "$READ_COLUMN ${declaration.read}", declaration.note,
+        PermissionsTexts.DECLARED_HEADING, declaration.label, "${PermissionsTexts.CONFIGURE_COLUMN} ${declaration.configure}", "${PermissionsTexts.WRITE_COLUMN} ${declaration.write}",
+        "${PermissionsTexts.READ_COLUMN} ${declaration.read}", declaration.note,
     ).joinToString(". ")
     Column(
         Modifier.fillMaxWidth().border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(12.dp)).padding(16.dp)
@@ -138,9 +138,9 @@ private fun Declaration(declaration: DeclarationView) {
             Text(PermissionsTexts.DECLARED_HEADING, style = MaterialTheme.typography.titleSmall)
             Pill(declaration.label, AppIcon.Edit, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, null)
         }
-        KeyValue(CONFIGURE_COLUMN, declaration.configure)
-        KeyValue(WRITE_COLUMN, declaration.write)
-        KeyValue(READ_COLUMN, declaration.read)
+        KeyValue(PermissionsTexts.CONFIGURE_COLUMN, declaration.configure)
+        KeyValue(PermissionsTexts.WRITE_COLUMN, declaration.write)
+        KeyValue(PermissionsTexts.READ_COLUMN, declaration.read)
         Text(declaration.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -174,13 +174,13 @@ private fun UserChooser(state: PermissionsState, events: PermissionsEvents) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ConnectionIcon(AppIcon.Person, SmallIconSize)
-            Text(USER_LABEL, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(PermissionsTexts.USER_LABEL, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(state.chosenUser.orEmpty(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.testTag("accessUserCurrent"))
             ConnectionIcon(AppIcon.ArrowDropDown, SmallIconSize)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SearchField(state.userFilter, USER_FILTER_HINT, "accessUserFilter", events::setUserFilter, minWidth = 240.dp, maxWidth = 320.dp)
+                SearchField(state.userFilter, PermissionsTexts.USER_FILTER_HINT, "accessUserFilter", events::setUserFilter, minWidth = 240.dp, maxWidth = 320.dp)
                 state.userCountText?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessUserCount")) }
             }
             state.users.forEach { option -> UserItem(option) { events.chooseUser(option.key); open = false } }
@@ -201,7 +201,7 @@ private fun UserItem(option: UserOption, onChoose: () -> Unit) {
 
 @Composable
 private fun Tables(state: PermissionsState, events: PermissionsEvents) {
-    SearchField(state.vhostFilter, VHOST_FILTER_HINT, "accessVhostFilter", events::setVhostFilter)
+    SearchField(state.vhostFilter, PermissionsTexts.VHOST_FILTER_HINT, "accessVhostFilter", events::setVhostFilter)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         state.heading?.let { Text(it, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("accessPermissionsHeading")) }
         state.readLabel?.let { Pill(it, AppIcon.Dns, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer, "accessPermissionsReadLabel") }
@@ -212,13 +212,13 @@ private fun Tables(state: PermissionsState, events: PermissionsEvents) {
             if (state.topicRows.isNotEmpty()) TopicTable(state.topicRows)
         }
     }
-    Text(PATTERN_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(PermissionsTexts.PATTERN_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
 private fun PatternTable(rows: List<PermissionRow>) {
     Column(Modifier.fillMaxWidth().testTag("accessPermissionsTable")) {
-        HeaderRow(VHOST_COLUMN, CONFIGURE_COLUMN, WRITE_COLUMN, READ_COLUMN)
+        HeaderRow(PermissionsTexts.VHOST_COLUMN, PermissionsTexts.CONFIGURE_COLUMN, PermissionsTexts.WRITE_COLUMN, PermissionsTexts.READ_COLUMN)
         rows.forEachIndexed { index, row ->
             val key = vhostKey(row.vhost, index)
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("accessPermissionRow:$key"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -235,8 +235,8 @@ private fun PatternTable(rows: List<PermissionRow>) {
 @Composable
 private fun TopicTable(rows: List<TopicPermissionRow>) {
     Column(Modifier.fillMaxWidth().testTag("accessTopicTable")) {
-        Text(TOPIC_HEADING, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
-        HeaderRow(VHOST_COLUMN, EXCHANGE_COLUMN, WRITE_COLUMN, READ_COLUMN)
+        Text(PermissionsTexts.TOPIC_HEADING, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
+        HeaderRow(PermissionsTexts.VHOST_COLUMN, PermissionsTexts.EXCHANGE_COLUMN, PermissionsTexts.WRITE_COLUMN, PermissionsTexts.READ_COLUMN)
         rows.forEachIndexed { index, row ->
             val key = "${vhostKey(row.vhost, index)}:${row.exchange}"
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("accessTopicRow:$key"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -273,16 +273,3 @@ private fun RowScope.PatternText(cell: PatternCell, tag: String) {
         modifier = Modifier.weight(1f).testTag(tag),
     )
 }
-
-// Column and heading words drawn in docs/ux/Access.dc.html; they label fixed fields and carry no state.
-private const val USER_LABEL = "User"
-private const val USER_FILTER_HINT = "Filter by user"
-private const val VHOST_FILTER_HINT = "Filter by virtual host"
-private const val VHOST_COLUMN = "Virtual host"
-private const val CONFIGURE_COLUMN = "Configure"
-private const val WRITE_COLUMN = "Write"
-private const val READ_COLUMN = "Read"
-private const val EXCHANGE_COLUMN = "Exchange"
-private const val TOPIC_HEADING = "Topic permissions"
-private const val PATTERN_NOTE =
-    "A pattern is a regular expression the broker applies to the name. An empty pattern means no permission and is shown as such. Cells are copyable as displayed."

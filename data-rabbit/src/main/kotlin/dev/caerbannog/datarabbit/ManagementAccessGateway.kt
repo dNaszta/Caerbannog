@@ -38,20 +38,16 @@ internal class ManagementAccessGateway(
 
     /** Two GETs; a result only when both parse, so the tab never draws half a table. The first answer that is not a table decides the result (404: a token user). */
     override suspend fun permissionsOf(user: String): AccessResult<UserPermissions> {
-        val permissions = read(requests.userPermissions(user), ::parsePermissionRows, notFoundIsResult = true)
-        val rows = when (permissions) {
-            is AccessResult.Loaded -> permissions.value
-            else -> return permissions.withoutValue()
-        }
-        val topics = read(requests.userTopicPermissions(user), ::parseTopicRows, notFoundIsResult = true)
-        return when (topics) {
-            is AccessResult.Loaded -> AccessResult.Loaded(UserPermissions(user, rows, topics.value))
-            else -> topics.withoutValue()
+        return read(requests.userPermissions(user), ::parsePermissionRows, notFoundIsResult = true).andThen { rows ->
+            read(requests.userTopicPermissions(user), ::parseTopicRows, notFoundIsResult = true).andThen { topics ->
+                AccessResult.Loaded(UserPermissions(user, rows, topics))
+            }
         }
     }
 
-    private fun <T> AccessResult<T>.withoutValue(): AccessResult<Nothing> = when (this) {
-        is AccessResult.Loaded -> error("a loaded result has a value")
+    /** Continues with the value of a loaded result and passes every other answer on unchanged: a `when` over the sealed type, so no branch can throw. */
+    private suspend fun <T, R> AccessResult<T>.andThen(next: suspend (T) -> AccessResult<R>): AccessResult<R> = when (this) {
+        is AccessResult.Loaded -> next(value)
         AccessResult.NoManagementTag -> AccessResult.NoManagementTag
         AccessResult.NotAuthorised -> AccessResult.NotAuthorised
         AccessResult.Unreachable -> AccessResult.Unreachable

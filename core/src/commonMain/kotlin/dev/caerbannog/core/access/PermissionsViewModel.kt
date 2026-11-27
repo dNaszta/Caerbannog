@@ -280,7 +280,7 @@ class PermissionsViewModel(
     private suspend fun readChosen(src: StreamSource) {
         val user = chosen
         if (user == null) {
-            failure = Failure(NO_USER, PermissionsTexts.ERROR)
+            failure = Failure(PermissionsTexts.NO_USER, PermissionsTexts.NO_USER)
             return render()
         }
         val answer = ask(src) { src.access.permissionsOf(user) } ?: return
@@ -437,7 +437,6 @@ class PermissionsViewModel(
 
     private companion object {
         const val ADMINISTRATOR = "administrator"
-        const val NO_USER = "The broker lists no user to choose."
         val BY_NAME: Comparator<String> = compareBy<String, String>(String.CASE_INSENSITIVE_ORDER) { it }.thenBy { it }
     }
 }
