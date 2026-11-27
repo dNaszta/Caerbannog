@@ -17,7 +17,11 @@ sealed interface AccessAction {
     /** Configure (declare) a queue, exchange or stream: the configure pattern on [AccessQuestion.name]. */
     data object Configure : AccessAction
 
-    /** `queue.bind`: write on the queue ([AccessQuestion.name]) AND read on [exchange] (measured S-I). Matcher level only (PD-1). */
+    /**
+     * `queue.bind`: write on the queue ([AccessQuestion.name]) AND read on [exchange] (measured S-I), AND, when the user has a topic permission row for [exchange],
+     * the topic READ pattern on the routing key (measured by M10-04: bind key a.b allowed and b.c refused under topic read `^a\..*`). Hits in that order.
+     * Matcher level only (PD-1). Consuming from a queue does NOT check the topic read pattern (measured: `basic.consume` under topic read `^$` is allowed).
+     */
     data class BindQueue(val exchange: String) : AccessAction
 
     /** Stream publisher: the write pattern on the stream name (same patterns, S-I). Matcher level only. */

@@ -311,6 +311,9 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
       | ^$      | ex.orders | no match    |
       |         | ex.orders | no match    |
       | .*      | ex.orders | would match |
+      | ^[[:alpha:]]+$ | ex | would match |
+      | ^\\d+$ | ex      | no match    |
+      | (?<n>ex)       | ex.orders | would match |
 
   # measured (S-I): the default exchange is checked as "amq.default", never as the target queue
   @fake-broker @m10-04
@@ -378,21 +381,31 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then the answer is "pattern could not be read"
     And the answer does not show the hidden pattern
 
-  # the engine rejects what it does not read, and constructs the live rows show to differ from the broker are reported too; the rest is not guessed
+  # the engine (RE2/J) rejects what it does not read; measured by RealBrokerAccessMatchTest on 4.4.1 (rows NEW-013 to NEW-021, NEW-034, NEW-051): lookaround, backreference,
+  # possessive quantifier, the (?x) flag and \Z are rejected. Accepted and agreeing with the broker (so NOT here): [[:alpha:]], \d, named groups, \p{L}, \x41, (a+)+$
   @negative @fake-broker @m10-04
   Scenario Outline: A construct the matcher cannot be sure of is reported as unreadable
     Given "svc-orders" has on "/orders" write "<pattern>"
     When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
     Then the answer is "pattern could not be read"
 
-    # which rows are rejected depends on the chosen engine (OQ-1) and on KnownDivergences, decided by the live rows of M10-04 (RealBrokerAccessMatchTest); these are examples to be settled in step 2
     Examples:
       | pattern        |
-      | [[:alpha:]]+   |
       | (?=ex)ex       |
-      | (?<n>ex)       |
-      | \\p{L}+        |
-      | (a+)+$         |
+      | ex(?!x)        |
+      | (?<=x)ex       |
+      | (e)x.*\\1      |
+      | ex.*++         |
+      | (?x) ex        |
+      | ex\\Z          |
+
+  # measured (NEW-052 and the rows beside it): Erlang re reads bytes, RE2/J characters; "é" is two bytes, so "^.$" differs. A construct that counts or classes characters
+  # with a name that has a non-ASCII character is on KnownDivergences, and so is "$" with a name that ends in a line feed (NEW-047)
+  @negative @fake-broker @m10-04
+  Scenario: A name that the engine would read differently from the broker is reported as unreadable
+    Given "svc-orders" has on "/orders" write "^.$"
+    When I ask whether "svc-orders" can publish to the exchange "é" on "/orders"
+    Then the answer is "pattern could not be read"
 
   @fake-broker @m10-04
   Scenario Outline: The preview of a user whose patterns cannot be read says so
@@ -420,8 +433,8 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I choose the user "svc-billing" on the Permissions tab
     Then no answer is shown
 
-  # needs the live row first (M10-04 part A): the matcher is believed to read an absent routing key as the empty key
-  @needs-spike @fake-broker @m10-04
+  # measured (NEW rows of M10-04 part A): an empty routing key against "^a\\..*" is refused by the broker, and ".*" allows it
+  @fake-broker @m10-04
   Scenario: Asking about an exchange with a topic permission but no routing key uses an empty key
     Given "svc-orders" has on "/orders" write ".*"
     And "svc-orders" has the topic permission on "/orders" for the exchange "amq.topic" with write "^sensors\\..*"
