@@ -326,6 +326,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I ask whether "svc-orders" can publish to the default exchange on "/orders"
     Then the answer is "no match"
 
+  # matcher level only (owner, PD-1, 2026-11-27): the form offers publish, read and configure; bind and the stream forms are asked of the matcher directly
   @fake-broker @m10-04
   Scenario: Binding a queue needs write on the queue and read on the exchange
     Given "svc-orders" has on "/orders" write "^queue\\..*" and read "^ex\\..*"
@@ -353,6 +354,79 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
     Then no message was published and no queue was read
     And the answer is labelled as a prediction and says "Prediction from the patterns above; the broker decides. Check sends nothing to the broker."
+
+  @fake-broker @m10-04
+  Scenario: Configuring is checked against the configure pattern
+    Given "svc-orders" has on "/orders" configure "^queue\\..*"
+    When I ask whether "svc-orders" can configure the queue "queue.orders" on "/orders"
+    Then the answer is "would match" and names the configure pattern "^queue\\..*"
+    When I ask whether "svc-orders" can configure the queue "other" on "/orders"
+    Then the answer is "no match" and names the configure pattern "^queue\\..*"
+
+  @fake-broker @m10-04
+  Scenario: A virtual host without a permission does not match
+    Given "svc-orders" has on "/orders" write ".*"
+    When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/billing"
+    Then the answer is "no match"
+    And the answer says "svc-orders" has no permission on "/billing"
+
+  # measured (M10-03): the guard replaces a secret-looking pattern by the word "hidden", which is itself a valid regular expression
+  @security @fake-broker @m10-04
+  Scenario: A hidden pattern is never applied
+    Given "svc-orders" has on "/orders" a write pattern that the guard hid
+    When I ask whether "svc-orders" can publish to the exchange "hidden-exchange" on "/orders"
+    Then the answer is "pattern could not be read"
+    And the answer does not show the hidden pattern
+
+  # the engine rejects what it does not read, and constructs the live rows show to differ from the broker are reported too; the rest is not guessed
+  @negative @fake-broker @m10-04
+  Scenario Outline: A construct the matcher cannot be sure of is reported as unreadable
+    Given "svc-orders" has on "/orders" write "<pattern>"
+    When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
+    Then the answer is "pattern could not be read"
+
+    # which rows are rejected depends on the chosen engine (OQ-1) and on KnownDivergences, decided by the live rows of M10-04 (RealBrokerAccessMatchTest); these are examples to be settled in step 2
+    Examples:
+      | pattern        |
+      | [[:alpha:]]+   |
+      | (?=ex)ex       |
+      | (?<n>ex)       |
+      | \\p{L}+        |
+      | (a+)+$         |
+
+  @fake-broker @m10-04
+  Scenario Outline: The preview of a user whose patterns cannot be read says so
+    Given <situation>
+    When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
+    Then the answer is "permissions not readable"
+    And no request was sent to the broker
+
+    Examples:
+      | situation                                                      |
+      | the connection user is "ops-reader" with the tag "monitoring"  |
+      | "svc-orders" is a token user                                   |
+
+  @security @fake-broker @m10-04
+  Scenario: A typed name that is a secret is not echoed
+    Given the connection password is "s3cret-token-value"
+    And "svc-orders" has on "/orders" write ".*"
+    When I ask whether "svc-orders" can publish to the exchange "s3cret-token-value" on "/orders"
+    Then the answer does not contain "s3cret-token-value"
+
+  @fake-broker @m10-04
+  Scenario: The verdict is cleared when the shown permissions change
+    Given "svc-orders" has on "/orders" write ".*"
+    And I asked whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
+    When I choose the user "svc-billing" on the Permissions tab
+    Then no answer is shown
+
+  # needs the live row first (M10-04 part A): the matcher is believed to read an absent routing key as the empty key
+  @needs-spike @fake-broker @m10-04
+  Scenario: Asking about an exchange with a topic permission but no routing key uses an empty key
+    Given "svc-orders" has on "/orders" write ".*"
+    And "svc-orders" has the topic permission on "/orders" for the exchange "amq.topic" with write "^sensors\\..*"
+    When I ask whether "svc-orders" can publish to the exchange "amq.topic" on "/orders" without a routing key
+    Then the answer is "no match" and names the topic permission
 
   @fake-broker @m10-04
   Scenario: The preview says where the permission came from
