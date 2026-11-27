@@ -132,12 +132,17 @@ class MatchPreviewUiTest {
         permissions: PermissionsState = loaded,
         events: Events = Events(),
         width: Int = 1280,
+        fontScale: Float = 1f,
     ): Events {
         setContent {
-            AccessScreen(
-                who, null, 10_000L, WhoEvents(), control, noop,
-                permissions = permissions, permissionsEvents = PermEvents(), matchPreview = match, matchPreviewEvents = events,
-            )
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale),
+            ) {
+                AccessScreen(
+                    who, null, 10_000L, WhoEvents(), control, noop,
+                    permissions = permissions, permissionsEvents = PermEvents(), matchPreview = match, matchPreviewEvents = events,
+                )
+            }
         }
         onNodeWithTag("accessTabPermissions").performClick()
         return events
@@ -357,4 +362,13 @@ class MatchPreviewUiTest {
             onNodeWithTag(tag, useUnmergedTree = true).assertExists()
         }
     }
+
+    @Test
+    fun `at font scale 1_5 in a narrow window the form and the verdict are still all there (layout-fs15)`() =
+        runDesktopComposeUiTest(480, 900) {
+            show(form.copy(verdict = match), fontScale = 1.5f)
+            for (tag in listOf("accessMatchCheck", "accessMatchName", "accessMatchRoutingKey", "accessMatchVhost", "accessMatchVerdictSentence", "accessMatchNote")) {
+                onNodeWithTag(tag, useUnmergedTree = true).assertExists()
+            }
+        }
 }

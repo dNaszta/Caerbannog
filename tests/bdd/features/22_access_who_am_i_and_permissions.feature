@@ -424,14 +424,22 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
       | (?x) ex        |
       | ex\\Z          |
 
-  # measured (NEW-052 and the rows beside it): Erlang re reads bytes, RE2/J characters; "é" is two bytes, so "^.$" differs. A construct that counts or classes characters
-  # with a name that has a non-ASCII character is on KnownDivergences, and so is "$" with a name that ends in a line feed (NEW-047)
+  # measured (NEW-065, KnownDivergences): with a non-ASCII name RE2/J folds Latin-1 letters under (?i) (byte C3 to E3) and the broker does not, so the answer would differ.
+  # The other divergence, "$" with a name that ends in a line feed (NEW-047), cannot be typed in a Gherkin step. "." and "[" no longer differ: the byte adapter reads bytes as Erlang does
   @negative @fake-broker @m10-04
   Scenario: A name that the engine would read differently from the broker is reported as unreadable
     Given the connection user is "ops-admin" with the tag "administrator"
+    And "svc-orders" has on "/orders" write "(?i)Á"
+    When I ask whether "svc-orders" can publish to the exchange "あ" on "/orders"
+    Then the answer is "pattern could not be read"
+
+  # measured (NEW-052, architect ruling 1 after step 3 part A): Erlang re counts bytes, so "é" (two bytes) is not one "."; the matcher reads it the same way and says so
+  @fake-broker @m10-04
+  Scenario: A non-ASCII name is counted in bytes as the broker counts it
+    Given the connection user is "ops-admin" with the tag "administrator"
     And "svc-orders" has on "/orders" write "^.$"
     When I ask whether "svc-orders" can publish to the exchange "é" on "/orders"
-    Then the answer is "pattern could not be read"
+    Then the answer is "no match"
 
   @fake-broker @m10-04
   Scenario Outline: The preview of a user whose patterns cannot be read says so

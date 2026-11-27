@@ -359,6 +359,43 @@ class MatchPreviewViewModelTest {
         assertTrue("ex.orders" in w.verdict.sentence)
     }
 
+    // ---------------------------------------------------------------- step 4 probes (test developer)
+
+    @Test
+    fun `a hidden topic pattern is never shown as text and a secret routing key is not echoed`() = runTest {
+        val w = World(this, permissions(write = cell(".*"), topic = listOf(topicRow("amq.topic", write = cell("token=abc123", hidden = true)))))
+        w.ask("amq.topic", "Bearer abcdefgh")
+        assertEquals("Pattern could not be read.", w.verdict.title)
+        assertFalse("abc123" in w.verdict.toString() || "abcdefgh" in w.verdict.toString(), w.verdict.toString())
+    }
+
+    @Test
+    fun `a name over the broker limit is reported as unreadable, not guessed`() = runTest {
+        val w = World(this, permissions(write = cell(".*")))
+        w.ask("x".repeat(300))
+        assertEquals("Pattern could not be read.", w.verdict.title)
+    }
+
+    @Test
+    fun `when a locked tab turns readable again the derived verdict goes and no stale one stays`() = runTest {
+        val w = World(this)
+        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), vhosts = listOf("/orders"))
+        w.settle()
+        assertNotNull(w.state.verdict)
+        w.give(permissions(write = cell(".*")))
+        w.input.value = w.input.value.copy(vhosts = listOf("/billing", "/orders"))
+        w.settle()
+        assertNull(w.state.verdict)
+        assertTrue(w.state.checkEnabled)
+    }
+
+    @Test
+    fun `an unreadable pattern with a secret name shows the pattern and not the name`() = runTest {
+        val w = World(this, permissions(write = cell("([unclosed")), secret = "s3cret-token-value")
+        w.ask("s3cret-token-value")
+        assertFalse("s3cret-token-value" in w.verdict.toString(), w.verdict.toString())
+    }
+
     // ---------------------------------------------------------------- the verdict is cleared (D2)
 
     @Test
