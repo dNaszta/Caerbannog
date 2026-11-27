@@ -234,18 +234,6 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then I see that "svc-idle" has no permissions on any virtual host
     And I do not see an error
 
-  # @needs-decision (test developer, M10-03 step 2): as written the connection user keeps the Background tag "monitoring". Ruling 1 plus PD-1 say a token user
-  # without the administrator tag gets the LOCKED frame and no request is sent, so this scenario can never show the token text. Proposed fix for the architect:
-  # add "with the tag "administrator"" to the first Given (it then equals "A token administrator lands on its own name ..." plus "no pattern table"), or drop it.
-  @fake-broker @m10-03 @needs-decision
-  Scenario: The Permissions tab says that the broker lists no permissions for a token user
-    Given whoami reports the connection user as not an internal user
-    And the broker answers 404 for the permissions of that user
-    When I open the Permissions tab
-    Then I see that the permissions of this user come from the token and are not stored on the broker
-    And no permission pattern is shown
-    And I do not see an error
-
   @fake-broker @m10-03
   Scenario: A token administrator lands on its own name with the token note
     Given whoami reports the connection user as not an internal user with the tag "administrator"
@@ -254,6 +242,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then the chosen user is the connection user
     And I see that the permissions of this user come from the token and are not stored on the broker
     And the list of users offers the connection user besides the internal users
+    And no permission pattern is shown
     And I do not see an error
 
   @fake-broker @m10-03
