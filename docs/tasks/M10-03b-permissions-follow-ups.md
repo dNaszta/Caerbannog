@@ -30,7 +30,7 @@ Out: tooltip for the empty pattern (dropped, M10-03 ruling 1 of step 5), any new
 None (UI-only follow-up).
 
 ## Open points
-Wording of item 1 awaits the owner (non-blocking; the review report lists the options).
+Wording of item 1 decided by the owner 2026-11-27: option (a), "The broker lists no user to choose." as the message of the Failed frame, with Retry and no "Broker text:" prefix. The owner also confirmed the empty-pattern tooltip is dropped (useless).
 
 ## Definition of done
 Tests first and passing, no unrelated changes, README line updated.
