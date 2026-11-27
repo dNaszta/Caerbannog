@@ -308,7 +308,11 @@ class AccessViewModel(
                 AccessScreen.Loaded -> null
                 is AccessScreen.Failed -> failure?.message ?: screen.reason
             },
-            detail = if (screen is AccessScreen.Locked) AccessTexts.LOCKED_DETAIL else null,
+            detail = when {
+                screen is AccessScreen.Locked -> AccessTexts.LOCKED_DETAIL
+                screen is AccessScreen.Failed && failure != null -> AccessTexts.brokerText(screen.reason).takeIf { screen.reason != failure?.message }
+                else -> null
+            },
             readOnlyNote = if (loaded || screen is AccessScreen.Loading) AccessTexts.READ_ONLY_NOTE else null,
             user = user?.name,
             tags = user?.tags.orEmpty(),

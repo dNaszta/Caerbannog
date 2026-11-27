@@ -432,6 +432,9 @@ enum class AppDestination(val label: String) {
 
     /** M8-06a: the file source and report of the migration from RabbitMQ 3.x; the name is used for tags and selection. */
     MigrateFromThree("Migrate from 3.x"),
+
+    /** M10-02: users, permissions and clients, read only. Absent from the drawer on a 3.x connection (AQ6). */
+    Access("Access"),
 }
 
 /** The feature a drawer item needs; null for Connections, which is always on. */
@@ -441,6 +444,7 @@ fun AppDestination.requiredFeature(): ConnectionFeature? = when (this) {
     AppDestination.Topology -> ConnectionFeature.Topology
     AppDestination.Migrations -> ConnectionFeature.Migrations
     AppDestination.MigrateFromThree -> ConnectionFeature.MigrateFromThreeX
+    AppDestination.Access -> ConnectionFeature.Access
 }
 
 /** What the window tells every frame below it: the features on and the reason for the others (null when all are on). */
@@ -455,6 +459,7 @@ private val navItems: List<Pair<AppDestination, AppIcon>> = listOf(
     AppDestination.Topology to AppIcon.Hub,
     AppDestination.Migrations to AppIcon.AccountTree,
     AppDestination.MigrateFromThree to AppIcon.DriveFileMove,
+    AppDestination.Access to AppIcon.AdminPanelSettings,
 )
 
 @Composable
@@ -485,6 +490,8 @@ private fun AppDrawer(
         var anyDisabled = ConnectionFeature.Search !in features
         navItems.forEach { (destination, icon) ->
             val on = destination.requiredFeature()?.let { it in features } ?: true
+            // AQ6: the Access item is absent, not disabled, on a 3.x connection: no tooltip, no reason text.
+            if (destination == AppDestination.Access && !on) return@forEach
             if (!on) anyDisabled = true
             NavItem(destination, icon, selected = destination.name == activeItem, enabled = on, reason = reason, onClick = { onNavigate(destination) })
         }

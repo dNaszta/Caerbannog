@@ -24,6 +24,9 @@ object AccessTexts {
     const val SIGN_IN_REFUSED: String = "The broker refused the sign-in."
     const val RETRY: String = "Retry"
 
+    /** The mapped reason after a failed read, as the screen shows it ("The user could not be read. Broker text: HTTP 500"). */
+    fun brokerText(reason: String): String = "Broker text: $reason"
+
     /** The one-line notice shown on Connections when the held connection becomes 3.x while Access is open (AQ6). Appears nowhere else. */
     const val NEEDS_4X: String = "The Access view needs a 4.x broker."
 }

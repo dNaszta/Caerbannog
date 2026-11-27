@@ -120,6 +120,7 @@ class AppNavigation(initial: AppDestination = AppDestination.Connections) {
             AppDestination.Topology,
             AppDestination.Migrations,
             AppDestination.MigrateFromThree,
+            AppDestination.Access,
         )
     }
 }

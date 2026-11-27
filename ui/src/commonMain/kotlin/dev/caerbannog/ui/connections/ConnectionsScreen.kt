@@ -33,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -96,6 +98,9 @@ fun ConnectionsScreen(
     controlEvents: ConnectionControlEvents? = null,
     /** The drawer reports the destination the user chose. */
     onNavigate: (dev.caerbannog.ui.appframe.AppDestination) -> Unit = {},
+    /** M10-02: a one-line notice from another screen (the Access view needs a 4.x broker), shown above the content; [onNoticeShown] when it leaves. */
+    notice: String? = null,
+    onNoticeShown: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
@@ -113,29 +118,32 @@ fun ConnectionsScreen(
         },
         chip = if (control != null && controlEvents != null) ({ ConnectionControl(control, controlEvents) }) else null,
     ) {
-        ConnectionsContent(
-            state = state,
-            onSelect = viewModel::selectConnection,
-            connectedName = control?.chip?.takeIf { it.kind == ChipState.Connected }?.text,
-            editPanel = { panelModifier ->
-                EditPanel(
-                    state = state,
-                    onSave = { originalName, input ->
-                        if (originalName == null) {
-                            viewModel.addConnection(input)
-                        } else {
-                            scope.launch { viewModel.saveProfileChanges(originalName, input) }
-                        }
-                    },
-                    onDeleteRequest = viewModel::requestDelete,
-                    // The file is read off the UI thread; the view model drops a result the user has moved away from.
-                    onValidateCaCertificate = { name, path -> viewModel.validateCaCertificateOffThread(name, path, Dispatchers.IO) },
-                    onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
-                    modifier = panelModifier,
-                )
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
+        Column(Modifier.fillMaxSize()) {
+            notice?.let { ConnectionsNotice(it, onNoticeShown) }
+            ConnectionsContent(
+                state = state,
+                onSelect = viewModel::selectConnection,
+                connectedName = control?.chip?.takeIf { it.kind == ChipState.Connected }?.text,
+                editPanel = { panelModifier ->
+                    EditPanel(
+                        state = state,
+                        onSave = { originalName, input ->
+                            if (originalName == null) {
+                                viewModel.addConnection(input)
+                            } else {
+                                scope.launch { viewModel.saveProfileChanges(originalName, input) }
+                            }
+                        },
+                        onDeleteRequest = viewModel::requestDelete,
+                        // The file is read off the UI thread; the view model drops a result the user has moved away from.
+                        onValidateCaCertificate = { name, path -> viewModel.validateCaCertificateOffThread(name, path, Dispatchers.IO) },
+                        onCheckConnection = { name -> scope.launch { viewModel.checkConnectionAndPermissions(name) } },
+                        modifier = panelModifier,
+                    )
+                },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+        }
     }
 
     val pendingDeleteName = state.pendingDeleteName
@@ -640,6 +648,23 @@ private fun MqttPluginSection(
                 tag = "mqttPortField",
                 onChange = onPortChange,
             )
+        }
+    }
+}
+
+/** One line with an info icon (`role="note"` in the mockup); it is "shown" once it leaves the composition, so the view model drops it. */
+@Composable
+private fun ConnectionsNotice(text: String, onShown: () -> Unit) {
+    val currentOnShown by rememberUpdatedState(onShown)
+    DisposableEffect(Unit) { onDispose { currentOnShown() } }
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp).testTag("connectionsNotice"),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ConnectionIcon(AppIcon.Info, SmallIconSize)
+            Text(text, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
