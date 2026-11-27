@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.access.AccessScreen as Screen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
+import dev.caerbannog.core.access.MatchPreviewState
 import dev.caerbannog.core.access.PermissionsState
 import dev.caerbannog.core.access.PermissionsTexts
 import dev.caerbannog.core.access.SecretGuard
@@ -82,6 +83,9 @@ fun AccessScreen(
     onNavigate: (AppDestination) -> Unit = {},
     permissions: PermissionsState = PermissionsState(),
     permissionsEvents: PermissionsEvents = NoPermissionsEvents,
+    // M10-04 part B contract (STUB: accepted and not drawn yet; step 3 draws the form below the topic table, see MatchPreviewUiTest for the tags).
+    @Suppress("UNUSED_PARAMETER") matchPreview: MatchPreviewState = MatchPreviewState(),
+    @Suppress("UNUSED_PARAMETER") matchPreviewEvents: MatchPreviewEvents = NoMatchPreviewEvents,
 ) {
     val currentEvents by rememberUpdatedState(events)
     val currentPermissionsEvents by rememberUpdatedState(permissionsEvents)
