@@ -77,6 +77,8 @@ class FakeConnectionGateway(
         override val threeXReads: dev.caerbannog.core.migrate3x.ThreeXReads? = null,
         /** M9-05: the read-only check of a 4.x connection; null exactly when [migrationExecutor] is null. */
         override val declareCheck: dev.caerbannog.core.migrations.DeclareCheck? = null,
+        /** M10-02: the access gateway of the connection (whoami, virtual hosts). */
+        override val access: dev.caerbannog.core.access.AccessGateway = dev.caerbannog.core.access.UnavailableAccessGateway,
     ) : HeldConnection {
         private val closes = AtomicInteger()
         val closeCalls: Int get() = closes.get()
@@ -120,6 +122,7 @@ class FakeConnectionGateway(
     private val mqttCatalogs = ConcurrentHashMap<String, FakeMqttCatalog>()
     private val mqttPublishers = ConcurrentHashMap<String, FakeMqttMessagePublisher>()
     private val queueInspectors = ConcurrentHashMap<String, FakeQueueMessageInspector>()
+    private val accessGateways = ConcurrentHashMap<String, dev.caerbannog.core.access.fakes.FakeAccessGateway>()
     private val numbers = AtomicInteger()
     private val started = Channel<String>(Channel.UNLIMITED)
     private val opened = Collections.synchronizedList(ArrayList<Held>())
@@ -231,6 +234,10 @@ class FakeConnectionGateway(
     /** The queue message inspector every connection opened for [profileName] holds. */
     fun queueInspectorOf(profileName: String): FakeQueueMessageInspector = queueInspectors.getOrPut(profileName) { FakeQueueMessageInspector() }
 
+    /** M10-02: the access gateway every connection opened for [profileName] exposes; configure it before Connect. A 3.x connection gets it too, so a test sees whether a screen asked (the real gateway refuses and sends nothing). */
+    fun accessOf(profileName: String): dev.caerbannog.core.access.fakes.FakeAccessGateway =
+        accessGateways.getOrPut(profileName) { dev.caerbannog.core.access.fakes.FakeAccessGateway() }
+
     /** The broker answers 401 "Not management user" for the user of [profileName]: Connect still succeeds, visibility is NONE. */
     fun noManagementTag(profileName: String) {
         catalogOf(profileName).visibility = Visibility.NONE
@@ -294,6 +301,8 @@ class FakeConnectionGateway(
             brokerVersion = version,
             threeXReads = if (threeX) threeXReadsOf(name) else null,
             declareCheck = if (threeX || oddVersion || name in unreadable) null else declareChecks[name],
+            // Also on a 3.x connection: the real gateway would refuse, but the fake's request log must show it if a screen asked at all.
+            access = accessOf(name),
         )
         opened += held
         log += "opened:$name#${held.number}"

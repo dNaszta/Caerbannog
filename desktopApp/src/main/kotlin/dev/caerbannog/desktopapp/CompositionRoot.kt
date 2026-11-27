@@ -30,6 +30,8 @@ import dev.caerbannog.core.streams.RefreshClock
 import dev.caerbannog.core.streams.RefreshTarget
 import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
+import dev.caerbannog.core.access.AccessContext
+import dev.caerbannog.core.access.AccessViewModel
 import dev.caerbannog.core.topology.TopologyContext
 import dev.caerbannog.core.topology.TopologyViewModel
 import dev.caerbannog.datarabbit.FilePlanDraftStore
@@ -116,7 +118,12 @@ class AppComposition(
     val navigationFeatures: StateFlow<NavigationFeatures> = MutableStateFlow(NavigationFeatures.ALL),
     /** What the Migrate from 3.x screen may read live (the held 3.x connection), read only; None for a composition without one. */
     val liveSource: LiveSourceProvider = LiveSourceProvider.None,
+    /** The read-only Access screen's state holder (M10-02); its screen is drawn by `AccessScreen`. */
+    val access: AccessViewModel,
 ) {
+    /** The Access screen's events, mapped onto [access]. */
+    val accessEvents: AccessEventsAdapter = AccessEventsAdapter(access)
+
     /** The Topology screen's events, mapped onto [topology] (M2-08c). */
     val topologyEvents: TopologyEventsAdapter = TopologyEventsAdapter(topology)
 
@@ -128,6 +135,7 @@ class AppComposition(
             streamList.close()
             streamClients.close()
             topology.close()
+            access.close()
             control.close()
             streamListScope.cancel()
         } finally {
@@ -190,11 +198,20 @@ fun createAppComposition(
         reconnect = viewModel::connect,
         context = viewModel.state.map(::topologyContext).stateIn(streamListScope, SharingStarted.Eagerly, topologyContext(viewModel.state.value)),
     )
+    val access = AccessViewModel(
+        active = active,
+        settings = appSettings,
+        scope = streamListScope,
+        clock = clock,
+        reconnect = viewModel::connect,
+        context = viewModel.state.map(::accessContext).stateIn(streamListScope, SharingStarted.Eagerly, accessContext(viewModel.state.value)),
+    )
     // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
     // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
     // M2-08c: the Topology screen is its own target; it is the shown screen, whatever stream was open before.
     fun targetOf(screen: AppDestination, stream: String?): RefreshTarget = when {
         screen == AppDestination.Topology -> topology
+        screen == AppDestination.Access -> access
         stream == null -> streamList
         else -> streamClients
     }
@@ -216,7 +233,7 @@ fun createAppComposition(
         }
     }
     return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory),
-        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope))
+        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope), access)
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.
@@ -245,6 +262,12 @@ private fun topologyContext(state: ConnectionsState): TopologyContext? {
     val current = state.currentConnection ?: return null
     val profile = state.profiles.firstOrNull { it.name == current.name } ?: return null
     return TopologyContext(profile, (current.status as? PermissionCheckStatus.Done)?.result)
+}
+
+// The Not encrypted banner of the Access screen needs the connected profile's TLS switch, nothing else.
+private fun accessContext(state: ConnectionsState): AccessContext? {
+    val current = state.currentConnection ?: return null
+    return state.profiles.firstOrNull { it.name == current.name }?.let(::AccessContext)
 }
 
 /** Window close request: close the held connection first, then always exit, even if closing went wrong. */

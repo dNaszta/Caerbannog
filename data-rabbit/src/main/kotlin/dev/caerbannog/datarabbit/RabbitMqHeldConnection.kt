@@ -45,6 +45,8 @@ class RabbitMqHeldConnection(
     /** M8-09: the management shovel gateway of a 4.x connection; the unavailable one for a 3.x source. */
     override val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
     override val shovelStatus: dev.caerbannog.core.forwarding.ShovelStatusReader = dev.caerbannog.core.forwarding.UnavailableShovelStatusReader,
+    /** M10-02: the read-only access gateway; a 3.x connection gets the one that refuses. */
+    override val access: dev.caerbannog.core.access.AccessGateway = dev.caerbannog.core.access.UnavailableAccessGateway,
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
 

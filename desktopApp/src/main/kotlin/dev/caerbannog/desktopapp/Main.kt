@@ -42,6 +42,7 @@ import dev.caerbannog.core.topology.UnavailableQueueMessageInspector
 import dev.caerbannog.ui.appframe.AppDestination
 import dev.caerbannog.ui.appframe.LocalNavigationFeatures
 import dev.caerbannog.ui.appframe.NavigationFeaturesInfo
+import dev.caerbannog.ui.access.AccessScreen
 import dev.caerbannog.ui.connections.ConnectionsScreen
 import dev.caerbannog.ui.migrations.MigrationsScreen
 import dev.caerbannog.ui.mqtt.PublishMqttDialog
@@ -95,7 +96,14 @@ fun main() = application {
                 AppDestination.Migrations ->
                     if (plannerOpen) PlannerWindowContent(composition, control) else MigrationsWindowContent(composition, control)
                 AppDestination.MigrateFromThree -> MigrateFromThreeWindowContent(composition, control)
-                else -> ConnectionsScreen(composition.viewModel, control, composition.control, onNavigate = composition.navigation::open)
+                AppDestination.Access -> AccessWindowContent(composition, control)
+                else -> {
+                    val access by composition.access.state.collectAsState()
+                    ConnectionsScreen(
+                        composition.viewModel, control, composition.control, onNavigate = composition.navigation::open,
+                        notice = access.leaveNotice, onNoticeShown = composition.access::noticeShown,
+                    )
+                }
             }
         }
     }
@@ -318,6 +326,26 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
         onDeleteConfirmationChange = managementVm::setDeleteConfirmation,
         onConfirmDelete = { scope.launch { managementVm.confirmDelete() } },
         onCancelDelete = managementVm::closeDelete,
+    )
+}
+
+/** The Access screen (M10-02) with its own one-second clock. A held connection that becomes 3.x while it is open sends the app back to Connections, with the notice. */
+@Composable
+internal fun AccessWindowContent(composition: AppComposition, control: ConnectionControlState) {
+    val access by composition.access.state.collectAsState()
+    val updatedAt by composition.access.updatedAtMillis.collectAsState()
+    val now = rememberNowMillis()
+    LaunchedEffect(access.leaveNotice) {
+        if (access.leaveNotice != null) composition.navigation.open(AppDestination.Connections)
+    }
+    AccessScreen(
+        state = access,
+        updatedAtMillis = updatedAt,
+        nowMillis = now,
+        events = composition.accessEvents,
+        control = control,
+        controlEvents = composition.control,
+        onNavigate = composition.navigation::open,
     )
 }
 

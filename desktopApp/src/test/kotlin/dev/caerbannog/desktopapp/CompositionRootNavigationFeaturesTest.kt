@@ -103,11 +103,11 @@ class CompositionRootNavigationFeaturesTest {
     }
 
     @Test
-    fun `a 4x connection offers all seven features and no reason`() {
+    fun `a 4x connection offers all eight features and no reason`() {
         val c = compose()
         try {
             connect(c, "new-eu")
-            assertEquals(7, all.size)
+            assertEquals(8, all.size)
             assertEquals(NavigationFeatures(all, null), c.navigationFeatures.value)
         } finally { c.close() }
     }

@@ -93,8 +93,12 @@ private fun claim(result: PermissionCheckResult.DeclaredByUser): String = when {
 }
 
 /** What a connection offers, decided here so Compose only reads it. */
-enum class ConnectionFeature { Streams, Topology, TopologyEdits, Publish, Search, Migrations, MigrateFromThreeX }
+enum class ConnectionFeature { Streams, Topology, TopologyEdits, Publish, Search, Migrations, MigrateFromThreeX,
 
-/** A migration source offers only the live read; every other result, and null (no connection), offers all (a file import needs none). */
+    /** M10-02: the Access view; a 3.x connection (a migration source) does not offer it (AQ6). */
+    Access,
+}
+
+/** A migration source offers only the live read (so no Access item, AQ6); every other result, and null (no connection), offers all (a file import needs none). */
 fun availableFeatures(result: PermissionCheckResult?): Set<ConnectionFeature> =
     if (result is PermissionCheckResult.MigrationSource) setOf(ConnectionFeature.MigrateFromThreeX) else ConnectionFeature.entries.toSet()

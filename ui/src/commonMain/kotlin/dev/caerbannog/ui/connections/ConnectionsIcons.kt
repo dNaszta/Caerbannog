@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
@@ -114,6 +115,7 @@ internal enum class AppIcon(val mockupName: String) {
     Stream("stream"),
     Hub("hub"),
     AccountTree("account_tree"),
+    AdminPanelSettings("admin_panel_settings"),
     ArrowBack("arrow_back"),
     Info("info"),
     ArrowUpward("arrow_upward"),
@@ -178,6 +180,7 @@ private fun AppIcon.vector(): ImageVector = when (this) {
     AppIcon.Stream -> Icons.Outlined.Stream
     AppIcon.Hub -> Icons.Outlined.Hub
     AppIcon.AccountTree -> Icons.Outlined.AccountTree
+    AppIcon.AdminPanelSettings -> Icons.Outlined.AdminPanelSettings
     AppIcon.ArrowBack -> Icons.AutoMirrored.Outlined.ArrowBack
     AppIcon.Info -> Icons.Outlined.Info
     AppIcon.ArrowUpward -> Icons.Outlined.ArrowUpward

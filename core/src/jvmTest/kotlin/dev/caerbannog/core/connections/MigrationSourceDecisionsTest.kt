@@ -81,9 +81,9 @@ class MigrationSourceDecisionsTest {
     }
 
     @Test
-    fun `the feature list names the entries the app already has plus the migration`() {
+    fun `the feature list names the entries the app already has plus the migration and Access (M10-02)`() {
         assertEquals(
-            setOf("Streams", "Topology", "TopologyEdits", "Publish", "Search", "Migrations", "MigrateFromThreeX"),
+            setOf("Streams", "Topology", "TopologyEdits", "Publish", "Search", "Migrations", "MigrateFromThreeX", "Access"),
             ConnectionFeature.entries.map { it.name }.toSet(),
         )
     }

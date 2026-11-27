@@ -183,6 +183,7 @@ class ActiveConnection(
                 isCurrent,
             ),
             shovels = connection.shovels,
+            access = GuardedAccessGateway(connection.access, isCurrent),
             hasMqtt = hasMqtt,
         )
     }

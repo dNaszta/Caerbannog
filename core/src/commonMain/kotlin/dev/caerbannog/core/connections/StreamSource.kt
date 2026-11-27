@@ -84,6 +84,8 @@ class StreamSource(
     val shovels: dev.caerbannog.core.forwarding.ShovelGateway = dev.caerbannog.core.forwarding.UnavailableShovelGateway,
     /** Whether the profile has an MQTT port. The MQTT publisher object always exists; this says whether the user can use it. */
     val hasMqtt: Boolean = false,
+    /** M10-02: the read-only access gateway of the same held connection; one that is not a held 4.x one refuses. */
+    val access: dev.caerbannog.core.access.AccessGateway = dev.caerbannog.core.access.UnavailableAccessGateway,
 )
 
 // Proxy pattern: a source of a closed or superseded connection must never reach it (the connection may be gone).
@@ -204,6 +206,17 @@ internal class GuardedMqttPublisher(
 ) : MqttMessagePublisher {
     override suspend fun publish(request: PublishMqttRequest): PublishOutcome =
         if (isCurrent()) inner.publish(request) else PublishOutcome.Failed("Connection closed")
+}
+
+internal class GuardedAccessGateway(
+    private val inner: dev.caerbannog.core.access.AccessGateway,
+    private val isCurrent: () -> Boolean,
+) : dev.caerbannog.core.access.AccessGateway {
+    override suspend fun whoAmI(): dev.caerbannog.core.access.AccessResult<dev.caerbannog.core.access.WhoAmI> =
+        if (isCurrent()) inner.whoAmI() else dev.caerbannog.core.access.AccessResult.Unreachable
+
+    override suspend fun virtualHosts(): dev.caerbannog.core.access.AccessResult<List<String>> =
+        if (isCurrent()) inner.virtualHosts() else dev.caerbannog.core.access.AccessResult.Unreachable
 }
 
 internal class GuardedQueueMessageInspector(
