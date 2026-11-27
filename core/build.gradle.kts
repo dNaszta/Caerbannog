@@ -20,6 +20,12 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
         }
+        // M10-04 (owner decision 2026-11-27, PD-2 b, OQ-1 option A): RE2/J reads the permission patterns for the match preview, behind
+        // `PatternEngine` (`expect fun defaultPatternEngine()`). jvmMain only: commonMain stays free of the library. BSD-3-Clause, see
+        // THIRD_PARTY_NOTICES.md; its runtime dependency org.jspecify:jspecify:1.0.1 (Apache-2.0, annotations only) comes transitively.
+        jvmMain.dependencies {
+            implementation("com.google.re2j:re2j:1.9")
+        }
         jvmTest.dependencies {
             implementation(project(":core-testing"))
             implementation(kotlin("test"))
