@@ -10,7 +10,7 @@ Review of M10-04 part B (2026-11-27). Today an empty (no permission) pattern giv
 
 ## Scope
 In:
-1. NEEDS OWNER (does not block the merge; ships as is until answered). Proposed sentences, recommendation: approve.
+1. APPROVED by the owner 2026-11-27 ("use recommended sentences"). Sentences:
    - Non-topic empty cell: "svc-orders has no write permission on /orders, so nothing is allowed." (read: "no read permission", configure: "no configure permission").
    - Topic empty cell: "svc-orders has no topic write permission on amq.topic, so nothing is allowed." (read: "topic read").
    Build it in `MatchPreviewTexts.hitSentence` when `hit.pattern.text == PermissionsTexts.NO_PERMISSION` (better: carry a flag or a sealed `DisplayPattern` so a real pattern spelled "no permission" is not mistaken; today the broker could return that text as a pattern, so the check by text is a smell). Update the tests that pin the old text (search "no permission" in `MatchPreviewViewModelTest`) and the `@m10-04` scenarios that name an empty pattern.
@@ -33,7 +33,13 @@ Out: any change to matching, to the matcher, to MCP.
 None (UI-only). The matcher is reused by `M10-08`; its wording is built there from the same `AccessAnswer`.
 
 ## Open points
-Owner: approve or change the two sentences of point 1 (also still open from the R2 ruling: "does not match the routing key", "empty routing key", the not-loaded sentence; recommendation: approve as written).
+CLOSED by the owner 2026-11-27 ("use recommended sentences"): (a) the two empty-pattern sentences of point 1 as proposed; (b) the R2 sentences as written ("The topic write pattern ^sensors\..* of amq.topic does not match the routing key alarms.fire.", read variant, "... does not match the empty routing key.", "... matches the empty routing key.", NotLoaded "The patterns of this user have not been read from the broker, so there is nothing to check against."); (c) R3: editing the form clears the answer.
 
 ## Definition of done
 Tests first and passing, no unrelated changes, mockup, brief Status and `tests/bdd/README.md` updated.
+
+## Status
+- 2026-11-27, step 2 (test developer), points 1 and 4 only; points 2 (by-eye) and 3 (optional holder) are not in this run.
+- Contract for the senior developer: `DisplayPattern(text, noPermission: Boolean = false)` (compile-only stub already in `AccessAnswer.kt`). `AccessMatcher` must set `noPermission = true` for the empty cell (also the no-row hit, your choice, `AccessMatcherTest` pins the empty cell and the empty topic cell) and `MatchPreviewTexts.hitSentence` must build the approved sentences from the flag, never from `text == NO_PERMISSION`. The no-row-on-vhost sentence ("<user> has no permission on <vhost>.") is unchanged. Point 4 (the one-line comment next to `name` in `MatchPreviewViewModel`/`MatchPreviewState`) is yours.
+- Red: `AccessMatcherTest` 3, `MatchPreviewViewModelTest` 3 (core), `@m10-04` 4 runs (empty write, read, configure, empty topic write). Already green by design (guards): the literal "no permission" pattern in `MatchPreviewViewModelTest` (2) and in `AccessMatcherTest`, and the `@m10-04` scenario `A pattern that is spelled "no permission" is shown as a pattern`.
+- Mockup: `docs/ux/Access.dc.html`, frame `perm-verdicts`, new block "Would not match: an empty pattern".
