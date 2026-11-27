@@ -226,6 +226,54 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I choose the user "svc-orders" on the Permissions tab
     Then "/billing" is shown with no permission for "svc-orders"
 
+  @fake-broker @m10-03
+  Scenario: A user with no permission on any virtual host gets the empty message
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And the broker has the user "svc-idle" with no permission on any virtual host
+    When I choose the user "svc-idle" on the Permissions tab
+    Then I see that "svc-idle" has no permissions on any virtual host
+    And I do not see an error
+
+  @fake-broker @m10-03
+  Scenario: The Permissions tab says that the broker lists no permissions for a token user
+    Given whoami reports the connection user as not an internal user
+    And the broker answers 404 for the permissions of that user
+    When I open the Permissions tab
+    Then I see that the permissions of this user come from the token and are not stored on the broker
+    And no permission pattern is shown
+    And I do not see an error
+
+  @needs-decision @fake-broker @m10-03
+  Scenario: A token administrator may choose an internal user
+    # PD-1, recommended option: the broker lets a token administrator read internal users' permissions (spike S-B).
+    Given whoami reports the connection user as not an internal user with the tag "administrator"
+    And the broker has the user "svc-orders" with permissions on "/orders"
+    When I choose the user "svc-orders" on the Permissions tab
+    Then I see for "/orders" the three patterns exactly as the broker returned them
+
+  @security @fake-broker @m10-03
+  Scenario: A user whose name looks like a token cannot be chosen
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And the broker has a user whose name is a token
+    When I open the Permissions tab
+    Then the list of users shows that name as hidden and I cannot choose it
+    And the token text appears nowhere on the screen
+
+  @negative @fake-broker @m10-03
+  Scenario: An unreadable permission list keeps the last data and says so
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And I have chosen the user "svc-orders" on the Permissions tab
+    When the next read of the permissions answers HTTP 500
+    Then the last patterns stay on screen, marked as stale
+    And I see that the permissions could not be read with a Retry button
+
+  @security @safety @fake-broker @m10-03
+  Scenario: The Permissions tab sends only GET requests
+    Given the connection user is "ops-admin" with the tag "administrator"
+    When I choose the user "svc-orders" on the Permissions tab
+    Then every request sent to the broker was a GET
+    And no request carried a password hash
+
   # ---------------------------------------------------------------- M10-04 Match preview
 
   @smoke @fake-broker @m10-04
