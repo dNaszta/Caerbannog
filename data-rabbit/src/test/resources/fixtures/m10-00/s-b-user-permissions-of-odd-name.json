@@ -1,0 +1,13 @@
+{
+    "request": "GET /api/users/m3%20odd%2Fuser/permissions as guest",
+    "status": 200,
+    "body": [
+        {
+            "user": "m3 odd/user",
+            "vhost": "/orders",
+            "configure": "a",
+            "write": "b",
+            "read": "c"
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/users/m3-svc/topic-permissions as t-m3-mon",
+    "status": 401,
+    "body": {
+        "error": "not_authorised",
+        "reason": "Not administrator user"
+    }
+}

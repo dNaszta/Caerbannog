@@ -32,6 +32,7 @@ import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.access.AccessContext
 import dev.caerbannog.core.access.AccessViewModel
+import dev.caerbannog.core.access.PermissionsViewModel
 import dev.caerbannog.core.topology.TopologyContext
 import dev.caerbannog.core.topology.TopologyViewModel
 import dev.caerbannog.datarabbit.FilePlanDraftStore
@@ -120,7 +121,14 @@ class AppComposition(
     val liveSource: LiveSourceProvider = LiveSourceProvider.None,
     /** The read-only Access screen's state holder (M10-02); its screen is drawn by `AccessScreen`. */
     val access: AccessViewModel,
+    /** The Permissions tab's state holder (M10-03), a sibling of [access] on the same screen. */
+    val permissions: PermissionsViewModel,
+    /** What the control refreshes and ages on the Access screen: both tabs. */
+    internal val accessTarget: RefreshTarget,
 ) {
+    /** The Permissions tab's events, mapped onto [permissions]. */
+    val permissionsEvents: PermissionsEventsAdapter = PermissionsEventsAdapter(permissions)
+
     /** The Access screen's events, mapped onto [access]. */
     val accessEvents: AccessEventsAdapter = AccessEventsAdapter(access)
 
@@ -136,6 +144,7 @@ class AppComposition(
             streamClients.close()
             topology.close()
             access.close()
+            permissions.close()
             control.close()
             streamListScope.cancel()
         } finally {
@@ -206,12 +215,24 @@ fun createAppComposition(
         reconnect = viewModel::connect,
         context = viewModel.state.map(::accessContext).stateIn(streamListScope, SharingStarted.Eagerly, accessContext(viewModel.state.value)),
     )
+    val permissions = PermissionsViewModel(
+        active = active,
+        settings = appSettings,
+        scope = streamListScope,
+        clock = clock,
+        reconnect = viewModel::connect,
+        context = viewModel.state.map(::accessContext).stateIn(streamListScope, SharingStarted.Eagerly, accessContext(viewModel.state.value)),
+    )
+    val accessTarget = AccessRefreshTarget(
+        access, permissions,
+        combine(access.updatedAtMillis, permissions.updatedAtMillis) { a, p -> listOfNotNull(a, p).maxOrNull() }.stateIn(streamListScope, SharingStarted.Eagerly, null),
+    )
     // Ruling 8: a stream open means the tab is the screen the control ages and refreshes; Disconnect of the held connection closes it,
     // a switch or a lost connection keeps it (the tab then shows the new broker's answer or its stale rows).
     // M2-08c: the Topology screen is its own target; it is the shown screen, whatever stream was open before.
     fun targetOf(screen: AppDestination, stream: String?): RefreshTarget = when {
         screen == AppDestination.Topology -> topology
-        screen == AppDestination.Access -> access
+        screen == AppDestination.Access -> accessTarget
         stream == null -> streamList
         else -> streamClients
     }
@@ -233,7 +254,7 @@ fun createAppComposition(
         }
     }
     return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory),
-        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope), access)
+        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope), access, permissions, accessTarget)
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.

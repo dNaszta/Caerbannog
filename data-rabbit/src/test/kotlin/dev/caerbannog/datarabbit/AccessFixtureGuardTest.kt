@@ -42,12 +42,15 @@ class AccessFixtureGuardTest {
     fun `the guard itself flags each kind of secret`() {
         assertEquals(1, findings("x", "a eyJhbGciOi b").size)
         assertEquals(1, findings("x", "pw $ACCESS_PASSWORD").size)
+        assertEquals(1, findings("x", """{"name":"u","password_hash":"abc="}""").size)
+        assertEquals(0, findings("x", """{"hashing_algorithm":"rabbit_password_hashing_sha256"}""").size)
         assertEquals(1, findings("x", "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----").size)
     }
 
     private fun findings(name: String, text: String): List<String> = buildList {
         if ("eyJ" in text) add("$name: contains a JWT-shaped text (eyJ)")
         if (ACCESS_PASSWORD in text) add("$name: contains the spike password")
+        if (Regex("\"password_hash\"\\s*:").containsMatchIn(text)) add("$name: contains a password_hash (M10-03: the recorder removes it)")
         if (Regex("-----BEGIN [A-Z ]*KEY-----").containsMatchIn(text)) add("$name: contains a key")
     }
 }

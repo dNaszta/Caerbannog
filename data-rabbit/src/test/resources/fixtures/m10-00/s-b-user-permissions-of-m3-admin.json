@@ -1,0 +1,20 @@
+{
+    "request": "GET /api/users/m3-admin/permissions as guest (an empty write pattern)",
+    "status": 200,
+    "body": [
+        {
+            "user": "m3-admin",
+            "vhost": "/",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        },
+        {
+            "user": "m3-admin",
+            "vhost": "/orders",
+            "configure": ".*",
+            "write": "",
+            "read": ".*"
+        }
+    ]
+}

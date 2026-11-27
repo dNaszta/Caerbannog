@@ -1,0 +1,48 @@
+{
+    "request": "GET /api/users as t-m3-admin (token administrator); password_hash removed before saving",
+    "status": 200,
+    "body": [
+        {
+            "has_password": true,
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "guest",
+            "tags": [
+                "administrator"
+            ]
+        },
+        {
+            "has_password": true,
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "m3 odd/user",
+            "tags": []
+        },
+        {
+            "has_password": true,
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "m3-admin",
+            "tags": [
+                "administrator"
+            ]
+        },
+        {
+            "has_password": true,
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "m3-none",
+            "tags": []
+        },
+        {
+            "has_password": true,
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "m3-svc",
+            "tags": [
+                "management",
+                "policymaker"
+            ]
+        }
+    ]
+}

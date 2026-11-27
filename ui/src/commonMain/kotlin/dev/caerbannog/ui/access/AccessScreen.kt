@@ -1,5 +1,6 @@
 package dev.caerbannog.ui.access
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -23,11 +24,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
@@ -37,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import dev.caerbannog.core.access.AccessScreen as Screen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
+import dev.caerbannog.core.access.PermissionsState
+import dev.caerbannog.core.access.PermissionsTexts
 import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.VhostRowView
 import dev.caerbannog.core.access.VhostsStatus
@@ -56,7 +63,7 @@ import dev.caerbannog.ui.connections.SmallIconSize
 /**
  * The read-only Access screen, Who am I tab (`docs/ux/Access.dc.html`, frames "Who am I: ..."), drawn inside the app frame. It draws the strings of
  * [state] and decides none. [nowMillis] is the clock for "Updated N s ago" and [updatedAtMillis] the time of the last good read. The screen reports
- * [AccessEvents.setShown] on entering and leaving the composition (D3). Only the Who am I tab exists: the other tabs appear as their slices land.
+ * [AccessEvents.setShown] on entering and leaving the composition (D3). The Permissions tab (M10-03) is drawn by `PermissionsPage`; the other tabs appear as their slices land.
  * No control here changes anything: [AccessEvents] has no such method.
  *
  * Stable test tags: accessScreen, accessTabWhoAmI, accessReadOnlyNote, accessMessage, accessLockedDetail, accessFailedDetail, accessRetry,
@@ -73,32 +80,54 @@ fun AccessScreen(
     control: ConnectionControlState,
     controlEvents: ConnectionControlEvents,
     onNavigate: (AppDestination) -> Unit = {},
+    permissions: PermissionsState = PermissionsState(),
+    permissionsEvents: PermissionsEvents = NoPermissionsEvents,
 ) {
     val currentEvents by rememberUpdatedState(events)
     DisposableEffect(Unit) {
         currentEvents.setShown(true)
         onDispose { currentEvents.setShown(false) }
     }
+    var tab by remember { mutableStateOf(AccessTab.WhoAmI) }
+    // The Permissions tab reads only while it is selected (D3): leaving the tab or the screen reports not shown.
+    val currentPermissionsEvents by rememberUpdatedState(permissionsEvents)
+    val onPermissions = tab == AccessTab.Permissions
+    DisposableEffect(onPermissions) {
+        if (onPermissions) currentPermissionsEvents.setShown(true)
+        onDispose { if (onPermissions) currentPermissionsEvents.setShown(false) }
+    }
     AppFrame(
         title = AppDestination.Access.name,
         control = control,
         events = controlEvents,
         onNavigate = onNavigate,
-        actions = { AccessActions(state, updatedAtMillis, nowMillis, events) },
+        actions = { AccessActions(state, updatedAtMillis, nowMillis, events, permissions, permissionsEvents, tab) },
     ) {
-        AccessBody(state, events)
+        AccessBody(state, events, permissions, permissionsEvents, tab) { tab = it }
     }
 }
 
 @Composable
-private fun RowScope.AccessActions(state: AccessState, updatedAtMillis: Long?, nowMillis: Long, events: AccessEvents) {
+private fun RowScope.AccessActions(
+    state: AccessState,
+    updatedAtMillis: Long?,
+    nowMillis: Long,
+    events: AccessEvents,
+    permissions: PermissionsState,
+    permissionsEvents: PermissionsEvents,
+    tab: AccessTab,
+) {
     UpdatedAge.text(nowMillis, updatedAtMillis)?.let { age ->
         Text(age, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("updatedAge"))
     }
     // Refresh is useful only while data is on screen and no banner offers its own Retry; a double press is harmless (D3).
-    val canRefresh = state.screen is Screen.Loaded && state.connectionBanner == null && state.refusalBanner == null && state.readErrorBanner == null
+    val canRefresh = if (tab == AccessTab.Permissions) {
+        permissions.screen.hasData && permissions.connectionBanner == null && permissions.refusalBanner == null && permissions.readErrorBanner == null
+    } else {
+        state.screen is Screen.Loaded && state.connectionBanner == null && state.refusalBanner == null && state.readErrorBanner == null
+    }
     IconButton(
-        onClick = events::refreshNow,
+        onClick = if (tab == AccessTab.Permissions) permissionsEvents::refreshNow else events::refreshNow,
         enabled = canRefresh,
         modifier = Modifier.testTag("refreshIcon").semantics { contentDescription = StreamClientsTexts.REFRESH },
     ) {
@@ -107,17 +136,48 @@ private fun RowScope.AccessActions(state: AccessState, updatedAtMillis: Long?, n
 }
 
 @Composable
-private fun AccessBody(state: AccessState, events: AccessEvents) {
+private fun AccessBody(
+    state: AccessState,
+    events: AccessEvents,
+    permissions: PermissionsState,
+    permissionsEvents: PermissionsEvents,
+    tab: AccessTab,
+    onTab: (AccessTab) -> Unit,
+) {
     when (val screen = state.screen) {
         Screen.NotConnected, Screen.Connecting -> Message(state.message)
-        Screen.Locked -> Message(state.message, AppIcon.Block) {
-            state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessLockedDetail")) }
+        // The tabs stay when the Who am I read is locked or failed: the Permissions tab has its own frames for the same lock (mockup, "Who am I: locked").
+        Screen.Locked -> MessageWithTabs(tab, onTab, permissions, permissionsEvents) {
+            Message(state.message, AppIcon.Block) {
+                state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessLockedDetail")) }
+            }
         }
-        is Screen.Failed -> Message(state.message ?: screen.reason, AppIcon.Error) {
-            state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessFailedDetail")) }
-            state.action?.let { RetryButton(it, events, "accessRetry") }
+        is Screen.Failed -> MessageWithTabs(tab, onTab, permissions, permissionsEvents) {
+            Message(state.message ?: screen.reason, AppIcon.Error) {
+                state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessFailedDetail")) }
+                state.action?.let { RetryButton(it, events, "accessRetry") }
+            }
         }
-        Screen.Loading, Screen.Loaded -> TabbedBody(state, events)
+        Screen.Loading, Screen.Loaded -> TabbedBody(state, events, permissions, permissionsEvents, tab, onTab)
+    }
+}
+
+/** A Who am I message frame that keeps the tab row; the Permissions tab, when selected, draws its own frame instead. */
+@Composable
+private fun MessageWithTabs(
+    tab: AccessTab,
+    onTab: (AccessTab) -> Unit,
+    permissions: PermissionsState,
+    permissionsEvents: PermissionsEvents,
+    whoAmI: @Composable () -> Unit,
+) {
+    if (tab == AccessTab.Permissions) {
+        PermissionsPage(permissions, permissionsEvents, tab, onTab)
+    } else {
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(horizontal = 24.dp).padding(top = 16.dp)) { TabRow(tab, onTab) }
+            whoAmI()
+        }
     }
 }
 
@@ -132,16 +192,21 @@ private fun RetryButton(label: String, events: AccessEvents, tag: String) {
 }
 
 @Composable
-private fun TabbedBody(state: AccessState, events: AccessEvents) {
+private fun TabbedBody(
+    state: AccessState,
+    events: AccessEvents,
+    permissions: PermissionsState,
+    permissionsEvents: PermissionsEvents,
+    tab: AccessTab,
+    onTab: (AccessTab) -> Unit,
+) {
+    if (tab == AccessTab.Permissions) return PermissionsPage(permissions, permissionsEvents, tab, onTab)
     Column(
         Modifier.fillMaxSize().testTag("accessScreen").verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        state.connectionBanner?.let { LostConnectionBanner("$it. ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessConnectionBanner") }
-        state.refusalBanner?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessRefusalBanner") }
-        state.readErrorBanner?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", state.action ?: AccessTexts.RETRY, events::retry, tag = "accessReadErrorBanner") }
-        state.notEncrypted?.let { NotEncryptedBanner(it) }
-        TabRow()
+        AccessBanners(state.connectionBanner, state.refusalBanner, state.readErrorBanner, state.notEncrypted, state.action, events::retry)
+        TabRow(tab, onTab)
         state.readOnlyNote?.let { ReadOnlyNote(it) }
         val dim = if (state.stale) 0.6f else 1f
         Column(Modifier.testTag("accessContent").alpha(dim), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -150,17 +215,35 @@ private fun TabbedBody(state: AccessState, events: AccessEvents) {
     }
 }
 
+/** The banners both tabs share (D2, M10-02b): one place, so the two tabs say the same things in the same words. */
 @Composable
-private fun TabRow() {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            WHO_AM_I_TAB,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.testTag("accessTabWhoAmI").padding(vertical = 8.dp),
-        )
+internal fun AccessBanners(connection: String?, refusal: String?, readError: String?, notEncrypted: String?, action: String?, onRetry: () -> Unit) {
+    connection?.let { LostConnectionBanner("$it. ${AccessTexts.CONNECTION_LOST_DETAIL}", action ?: AccessTexts.RETRY, onRetry, tag = "accessConnectionBanner") }
+    refusal?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", action ?: AccessTexts.RETRY, onRetry, tag = "accessRefusalBanner") }
+    readError?.let { LostConnectionBanner("$it ${AccessTexts.CONNECTION_LOST_DETAIL}", action ?: AccessTexts.RETRY, onRetry, tag = "accessReadErrorBanner") }
+    notEncrypted?.let { NotEncryptedBanner(it) }
+}
+
+internal enum class AccessTab { WhoAmI, Permissions }
+
+@Composable
+internal fun TabRow(tab: AccessTab, onTab: (AccessTab) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        TabLabel(WHO_AM_I_TAB, "accessTabWhoAmI", tab == AccessTab.WhoAmI) { onTab(AccessTab.WhoAmI) }
+        TabLabel(PermissionsTexts.TAB, "accessTabPermissions", tab == AccessTab.Permissions) { onTab(AccessTab.Permissions) }
     }
     HorizontalDivider()
+}
+
+@Composable
+private fun TabLabel(label: String, tag: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.titleSmall,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier.testTag(tag).clickable(role = Role.Tab, onClick = onClick).padding(vertical = 8.dp),
+    )
 }
 
 @Composable

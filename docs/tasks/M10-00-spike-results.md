@@ -32,6 +32,8 @@ Callers `i-admin`, `t-admin`, `i-mon`, `t-mon`, `i-mgmt`, `t-mgmt` against targe
 
 `/api/topic-permissions/{vhost}/{user}` for a token user: 404 (administrator), 401 (others). Verdict: nothing returns what RabbitMQ resolved from the token; a token administrator can read the internal users' permissions but nothing about token users.
 
+S-B follow-up (M10-03 step 2, live capture, 4.4.1): `GET /api/users` rows have `has_password`, `hashing_algorithm`, `limits`, `name`, `tags` (array) and no `password_hash`; topic permission rows are exactly `user, vhost, exchange, write, read`; unknown and token users answer 404 `{"error":"not_found","reason":"Not Found"}`; non-administrators get 401 `{"error":"not_authorised","reason":"Not administrator user"}` on both paths; a token administrator can read `/api/users` (internal users only); a user name with a space and a slash works as one encoded path segment; an empty pattern is `""`. Not measured on 4.0.9 or 3.13.
+
 ## S-C how the OAuth 2 backend is detected: measured
 
 | Endpoint | Callers that may | What it shows |

@@ -98,6 +98,15 @@ internal class ManagementRequests(baseUrl: String, private val transport: Broker
     /** M2-08a (spike S-E): the vhosts the broker lists for this user. Never `/api/vhosts/{name}`, which only an administrator may read. */
     fun vhosts(): String = "$base/api/vhosts"
 
+    /** M10-03: the user names (administrator only). Never `/api/permissions`, which returns every user's rows. */
+    fun users(): String = "$base/api/users"
+
+    /** M10-03: one user's permission rows; the name is one encoded path segment (dots-only names cannot form a `.` or `..` segment). */
+    fun userPermissions(user: String): String = "$base/api/users/${MigrationRequests.encode(user)}/permissions"
+
+    /** M10-03: one user's topic permission rows. */
+    fun userTopicPermissions(user: String): String = "$base/api/users/${MigrationRequests.encode(user)}/topic-permissions"
+
     /** M6-02: every connection of the broker (client connections, including MQTT). */
     fun connections(): String = "$base/api/connections"
 
