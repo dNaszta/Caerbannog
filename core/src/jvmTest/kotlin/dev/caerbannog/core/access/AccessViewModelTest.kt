@@ -271,6 +271,129 @@ class AccessViewModelTest {
         assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value)
     }
 
+    // ---------------------------------------------------------------- M10-02b: an unreadable user while data is shown
+
+    @Test
+    fun `whoami ok then whoami answers HTTP 500 keeps the last data stale with the read-error banner and Retry`() = runTest {
+        val s = AccessHarness(this)
+        s.access.tags = listOf("monitoring", "management")
+        s.open()
+        val vhosts = s.state.vhosts
+        assertNull(s.state.readErrorBanner)
+
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+
+        assertIs<AccessScreen.Loaded>(s.state.screen)
+        assertEquals("svc-orders", s.state.user, "the last user stays")
+        assertEquals(listOf("monitoring", "management"), s.state.tags, "the last tags stay")
+        assertEquals(vhosts, s.state.vhosts, "the last virtual hosts stay")
+        assertTrue(s.state.stale, "dimmed and marked stale")
+        val banner = s.state.readErrorBanner
+        assertTrue(banner != null && AccessTexts.USER_ERROR in banner && AccessTexts.brokerText("HTTP 500") in banner, "read-error banner was: $banner")
+        assertEquals(AccessTexts.RETRY, s.state.action)
+        assertNull(s.state.connectionBanner, "the broker answered: not a lost connection")
+        assertNull(s.state.refusalBanner, "a read error is not a refusal: its own field")
+        assertEquals(LinkState.Connected("prod-eu"), s.h.active.state.value)
+    }
+
+    @Test
+    fun `the next good read clears the read-error banner and the stale mark`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        assertTrue(s.state.readErrorBanner != null, "precondition: the banner shows")
+
+        s.access.whoamiFailure = null
+        s.pass(5)
+
+        assertNull(s.state.readErrorBanner)
+        assertFalse(s.state.stale)
+        assertNull(s.state.action)
+        assertEquals("svc-orders", s.state.user)
+    }
+
+    @Test
+    fun `Retry after a read error reads again and clears the banner`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        assertTrue(s.state.readErrorBanner != null, "precondition: the banner shows")
+        s.access.whoamiFailure = null
+        s.forgetRequests()
+
+        s.vm.retry()
+        s.settle()
+
+        assertEquals(listOf("whoami", "vhosts"), s.requests())
+        assertNull(s.state.readErrorBanner)
+        assertFalse(s.state.stale)
+    }
+
+    @Test
+    fun `the refresh timer keeps ticking after an unreadable user on a shown screen`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        s.forgetRequests()
+
+        s.pass(5)
+        assertEquals(listOf("whoami"), s.requests(), "the next tick asks again, whoami only while it keeps failing")
+        s.pass(5)
+        assertEquals(listOf("whoami", "whoami"), s.requests())
+        assertTrue(s.state.readErrorBanner != null, "still shown while it keeps failing")
+    }
+
+    @Test
+    fun `a read error then a lost connection shows the lost-connection banner and no read-error banner`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        s.access.whoamiFailure = null
+        s.access.unreachable = true
+        s.pass(5)
+        assertEquals(ConnectionFailureReason.CONNECTION_LOST, s.state.connectionBanner)
+        assertNull(s.state.readErrorBanner, "one banner at a time")
+    }
+
+    @Test
+    fun `a read error then no management tag drops the data and the banner`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        s.access.whoamiFailure = null
+        s.access.hasManagementTag = false
+        s.pass(5)
+        assertIs<AccessScreen.Locked>(s.state.screen)
+        assertNull(s.state.readErrorBanner)
+    }
+
+    @Test
+    fun `a read error then a disconnect clears the banner`() = runTest {
+        val s = AccessHarness(this)
+        s.open()
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.pass(5)
+        s.h.active.disconnect()
+        s.settle()
+        assertNull(s.state.readErrorBanner)
+        assertNull(s.state.user)
+    }
+
+    @Test
+    fun `an unreadable user on the very first read is the Failed screen and no read-error banner`() = runTest {
+        val s = AccessHarness(this)
+        s.access.whoamiFailure = AccessResult.Unexpected("HTTP 500")
+        s.open()
+        assertEquals(AccessScreen.Failed("HTTP 500"), s.state.screen)
+        assertNull(s.state.readErrorBanner, "the banner is only for data that is shown")
+    }
+
     // ---------------------------------------------------------------- RabbitMQ 3.x answered by the gateway (NotOffered)
 
     @Test

@@ -9,11 +9,13 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.caerbannog.core.access.AccessScreen as Screen
 import dev.caerbannog.core.access.AccessState
 import dev.caerbannog.core.access.AccessTexts
+import dev.caerbannog.core.access.SecretGuard
 import dev.caerbannog.core.access.VhostRowView
 import dev.caerbannog.core.access.VhostsStatus
 import dev.caerbannog.core.connections.ChipIcon
@@ -193,6 +195,69 @@ class AccessScreenUiTest {
         assertTrue(AccessTexts.SIGN_IN_REFUSED in text("accessRefusalBanner"))
         onNodeWithTag("accessUser").assertExists()
         absent("accessConnectionBanner", "accessVhostsRetry")
+    }
+
+    // ---------------------------------------------------------------- M10-02b
+
+    private val readError = loaded.copy(
+        stale = true,
+        readErrorBanner = "${AccessTexts.USER_ERROR} ${AccessTexts.brokerText("HTTP 500")}.",
+        action = AccessTexts.RETRY,
+    )
+
+    @Test
+    fun `an unreadable user with data shows the read-error banner with the reason and the last-read note, keeps the data and dims it`() = runDesktopComposeUiTest(1280, 800) {
+        show(readError)
+        val said = text("accessReadErrorBanner")
+        assertTrue(AccessTexts.USER_ERROR in said, "banner text was: $said")
+        assertTrue(AccessTexts.brokerText("HTTP 500") in said, "banner text was: $said")
+        assertTrue(AccessTexts.CONNECTION_LOST_DETAIL in said, "banner text was: $said")
+        onNodeWithTag("accessUser").assertExists()
+        onNodeWithTag("accessVhostsTable").assertExists()
+        onNodeWithTag("accessContent").assertExists()
+        absent("accessConnectionBanner", "accessRefusalBanner")
+    }
+
+    @Test
+    fun `the read-error banner has a Retry that sends retry`() = runDesktopComposeUiTest(1280, 800) {
+        val e = show(readError)
+        onNodeWithTag("accessReadErrorBanner").assertExists()
+        // The banner's own Retry button (same shape as the other banners, which tag the banner, not the button); the only Retry on this screen.
+        onNodeWithText(AccessTexts.RETRY).performClick()
+        assertEquals(1, e.retries, "Retry on the read-error banner must call retry once")
+    }
+
+    @Test
+    fun `refresh is disabled while the read-error banner shows`() = runDesktopComposeUiTest(1280, 800) {
+        val e = show(readError)
+        onNodeWithTag("refreshIcon").assertIsNotEnabled()
+        assertEquals(0, e.refreshes)
+    }
+
+    @Test
+    fun `without a read error there is no read-error banner`() = runDesktopComposeUiTest(1280, 800) {
+        show(loaded)
+        absent("accessReadErrorBanner")
+    }
+
+    @Test
+    fun `the vhost list error does not draw a second Retry while the read-error banner shows`() = runDesktopComposeUiTest(1280, 800) {
+        show(readError.copy(vhostsStatus = VhostsStatus.Unreadable, vhosts = emptyList(), vhostsMessage = AccessTexts.VHOSTS_ERROR, vhostsReason = "HTTP 500"))
+        absent("accessVhostsRetry")
+    }
+
+    @Test
+    fun `two hidden virtual host names are both drawn, each with its own row tag and its own note tag`() = runDesktopComposeUiTest(1280, 800) {
+        val hidden = SecretGuard.HIDDEN
+        show(loaded.copy(vhosts = listOf(VhostRowView("orders", null), VhostRowView(hidden, null), VhostRowView(hidden, null))))
+        val rows = onAllNodesWithTag("accessVhostRow:$hidden:0", useUnmergedTree = true).fetchSemanticsNodes().size +
+            onAllNodesWithTag("accessVhostRow:$hidden:1", useUnmergedTree = true).fetchSemanticsNodes().size +
+            onAllNodesWithTag("accessVhostRow:$hidden:2", useUnmergedTree = true).fetchSemanticsNodes().size
+        assertEquals(2, rows, "two hidden rows, each with a distinct tag accessVhostRow:hidden:<n> (n is the position)")
+        onAllNodesWithTag("accessVhostRow:$hidden", useUnmergedTree = true).assertCountEquals(0)
+        onAllNodesWithTag("accessVhostNote:$hidden", useUnmergedTree = true).assertCountEquals(0)
+        onNodeWithTag("accessVhostRow:orders").assertExists()
+        onNodeWithTag("accessVhostNote:orders", useUnmergedTree = true).assertExists()
     }
 
     @Test
