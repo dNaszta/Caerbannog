@@ -334,6 +334,7 @@ private fun StreamsWindowContent(composition: AppComposition, control: Connectio
 internal fun AccessWindowContent(composition: AppComposition, control: ConnectionControlState) {
     val access by composition.access.state.collectAsState()
     val permissions by composition.permissions.state.collectAsState()
+    val matchPreview by composition.matchPreview.state.collectAsState()
     val updatedAt by composition.accessTarget.updatedAtMillis.collectAsState()
     val now = rememberNowMillis()
     LaunchedEffect(access.leaveNotice) {
@@ -349,6 +350,8 @@ internal fun AccessWindowContent(composition: AppComposition, control: Connectio
         onNavigate = composition.navigation::open,
         permissions = permissions,
         permissionsEvents = composition.permissionsEvents,
+        matchPreview = matchPreview,
+        matchPreviewEvents = composition.matchPreviewEvents,
     )
 }
 

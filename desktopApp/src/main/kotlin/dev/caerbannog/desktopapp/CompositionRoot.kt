@@ -32,6 +32,7 @@ import dev.caerbannog.core.streams.StreamClientsViewModel
 import dev.caerbannog.core.streams.StreamListViewModel
 import dev.caerbannog.core.access.AccessContext
 import dev.caerbannog.core.access.AccessViewModel
+import dev.caerbannog.core.access.MatchPreviewViewModel
 import dev.caerbannog.core.access.PermissionsViewModel
 import dev.caerbannog.core.topology.TopologyContext
 import dev.caerbannog.core.topology.TopologyViewModel
@@ -125,7 +126,12 @@ class AppComposition(
     val permissions: PermissionsViewModel,
     /** What the control refreshes and ages on the Access screen: both tabs. */
     internal val accessTarget: RefreshTarget,
+    /** The match preview form's state holder (M10-04), under the Permissions tab's tables; it asks the pure matcher and sends nothing. */
+    val matchPreview: MatchPreviewViewModel,
 ) {
+    /** The match preview form's events, mapped onto [matchPreview]. */
+    val matchPreviewEvents: MatchPreviewEventsAdapter = MatchPreviewEventsAdapter(matchPreview)
+
     /** The Permissions tab's events, mapped onto [permissions]. */
     val permissionsEvents: PermissionsEventsAdapter = PermissionsEventsAdapter(permissions)
 
@@ -223,6 +229,8 @@ fun createAppComposition(
         reconnect = viewModel::connect,
         context = viewModel.state.map(::accessContext).stateIn(streamListScope, SharingStarted.Eagerly, accessContext(viewModel.state.value)),
     )
+    // The password for the redaction guard comes from the holder of the connection that is held now, per call; null when none is held.
+    val matchPreview = MatchPreviewViewModel(permissions.matchInput, streamListScope, heldSecret = active::heldSecret)
     val accessTarget = AccessRefreshTarget(
         access, permissions,
         combine(access.updatedAtMillis, permissions.updatedAtMillis) { a, p -> listOfNotNull(a, p).maxOrNull() }.stateIn(streamListScope, SharingStarted.Eagerly, null),
@@ -254,7 +262,7 @@ fun createAppComposition(
         }
     }
     return AppComposition(viewModel, active, streamList, streamClients, control, navigation, StreamListEventsAdapter(streamList), StreamClientsEventsAdapter(streamClients, navigation), topology, migrationHistory, migrationFolderPorts(appSettings, migrationFolderChooser, migrationHistory),
-        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope), access, permissions, accessTarget)
+        FilePlanDraftStore(planDraftFile, NowProvider { System.currentTimeMillis() }), appSettings, streamListScope, migrateFromThree, navigationFeatures, HeldLiveSourceProvider(active, session, streamListScope), access, permissions, accessTarget, matchPreview)
 }
 
 // The remembered folder lives in settings.json; a settings object of another kind (a test's) only remembers it until the app closes.

@@ -47,8 +47,12 @@ class RabbitMqHeldConnection(
     override val shovelStatus: dev.caerbannog.core.forwarding.ShovelStatusReader = dev.caerbannog.core.forwarding.UnavailableShovelStatusReader,
     /** M10-02: the read-only access gateway; a 3.x connection gets the one that refuses. */
     override val access: dev.caerbannog.core.access.AccessGateway = dev.caerbannog.core.access.UnavailableAccessGateway,
+    /** M10-04: where the redaction guard reads the connection's password from, per call. */
+    private val secret: () -> String? = { null },
 ) : HeldConnection {
     private val closed = AtomicBoolean(false)
+
+    override fun heldSecret(): String? = if (closed.get()) null else secret()
 
     // The one broad catch of the holder: every resource must get its close, whatever the previous one threw.
     @Suppress("TooGenericExceptionCaught")

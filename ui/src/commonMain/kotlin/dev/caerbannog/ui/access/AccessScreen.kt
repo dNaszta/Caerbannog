@@ -83,9 +83,8 @@ fun AccessScreen(
     onNavigate: (AppDestination) -> Unit = {},
     permissions: PermissionsState = PermissionsState(),
     permissionsEvents: PermissionsEvents = NoPermissionsEvents,
-    // M10-04 part B contract (STUB: accepted and not drawn yet; step 3 draws the form below the topic table, see MatchPreviewUiTest for the tags).
-    @Suppress("UNUSED_PARAMETER") matchPreview: MatchPreviewState = MatchPreviewState(),
-    @Suppress("UNUSED_PARAMETER") matchPreviewEvents: MatchPreviewEvents = NoMatchPreviewEvents,
+    matchPreview: MatchPreviewState = MatchPreviewState(),
+    matchPreviewEvents: MatchPreviewEvents = NoMatchPreviewEvents,
 ) {
     val currentEvents by rememberUpdatedState(events)
     val currentPermissionsEvents by rememberUpdatedState(permissionsEvents)
@@ -103,7 +102,7 @@ fun AccessScreen(
         onNavigate = onNavigate,
         actions = { AccessActions(state, updatedAtMillis, nowMillis, events, permissions, permissionsEvents, tab) },
     ) {
-        AccessBody(state, events, permissions, permissionsEvents, tab) { tab = it }
+        AccessBody(state, events, permissions, permissionsEvents, matchPreview, matchPreviewEvents, tab) { tab = it }
     }
 }
 
@@ -141,24 +140,26 @@ private fun AccessBody(
     events: AccessEvents,
     permissions: PermissionsState,
     permissionsEvents: PermissionsEvents,
+    matchPreview: MatchPreviewState,
+    matchPreviewEvents: MatchPreviewEvents,
     tab: AccessTab,
     onTab: (AccessTab) -> Unit,
 ) {
     when (val screen = state.screen) {
         Screen.NotConnected, Screen.Connecting -> Message(state.message)
         // The tabs stay when the Who am I read is locked or failed: the Permissions tab has its own frames for the same lock (mockup, "Who am I: locked").
-        Screen.Locked -> MessageWithTabs(tab, onTab, permissions, permissionsEvents) {
+        Screen.Locked -> MessageWithTabs(tab, onTab, permissions, permissionsEvents, matchPreview, matchPreviewEvents) {
             Message(state.message, AppIcon.Block) {
                 state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessLockedDetail")) }
             }
         }
-        is Screen.Failed -> MessageWithTabs(tab, onTab, permissions, permissionsEvents) {
+        is Screen.Failed -> MessageWithTabs(tab, onTab, permissions, permissionsEvents, matchPreview, matchPreviewEvents) {
             Message(state.message ?: screen.reason, AppIcon.Error) {
                 state.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("accessFailedDetail")) }
                 state.action?.let { RetryButton(it, events, "accessRetry") }
             }
         }
-        Screen.Loading, Screen.Loaded -> TabbedBody(state, events, permissions, permissionsEvents, tab, onTab)
+        Screen.Loading, Screen.Loaded -> TabbedBody(state, events, permissions, permissionsEvents, matchPreview, matchPreviewEvents, tab, onTab)
     }
 }
 
@@ -169,10 +170,12 @@ private fun MessageWithTabs(
     onTab: (AccessTab) -> Unit,
     permissions: PermissionsState,
     permissionsEvents: PermissionsEvents,
+    matchPreview: MatchPreviewState,
+    matchPreviewEvents: MatchPreviewEvents,
     whoAmI: @Composable () -> Unit,
 ) {
     if (tab == AccessTab.Permissions) {
-        PermissionsPage(permissions, permissionsEvents, tab, onTab)
+        PermissionsPage(permissions, permissionsEvents, tab, onTab, matchPreview, matchPreviewEvents)
     } else {
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.padding(horizontal = 24.dp).padding(top = 16.dp)) { TabRow(tab, onTab) }
@@ -197,10 +200,12 @@ private fun TabbedBody(
     events: AccessEvents,
     permissions: PermissionsState,
     permissionsEvents: PermissionsEvents,
+    matchPreview: MatchPreviewState,
+    matchPreviewEvents: MatchPreviewEvents,
     tab: AccessTab,
     onTab: (AccessTab) -> Unit,
 ) {
-    if (tab == AccessTab.Permissions) return PermissionsPage(permissions, permissionsEvents, tab, onTab)
+    if (tab == AccessTab.Permissions) return PermissionsPage(permissions, permissionsEvents, tab, onTab, matchPreview, matchPreviewEvents)
     Column(
         Modifier.fillMaxSize().testTag("accessScreen").verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),

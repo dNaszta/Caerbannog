@@ -55,6 +55,9 @@ class ActiveConnection(
      */
     val sources: StateFlow<StreamSource?> = _source.asStateFlow()
 
+    /** The password of the held connection for the redaction guard (see [HeldConnection.heldSecret]); null when none is held. Read per call, never kept. */
+    fun heldSecret(): String? = held?.heldSecret()
+
     /** [state] if it is about [name], otherwise [LinkState.Disconnected] for that name (profile cards). */
     fun stateOf(name: String): LinkState = _state.value.takeIf { it.name == name } ?: LinkState.Disconnected(name)
 
