@@ -77,6 +77,7 @@ class RabbitMqConnectionGateway(
                 // A 3.x connection is a source only: it never gets a shovel gateway, so it can never be a shovel destination.
                 shovels = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelGateway else ManagementShovelGateway(http, requests, profiles, secretStore),
                 shovelStatus = if (access.version?.let { isMigrationSourceOnly(it) } == true) UnavailableShovelStatusReader else ManagementShovelStatusReader(http, requests),
+                access = ManagementAccessGateway(http, requests, access.version) { password },
                 resources = listOf(environments, http),
                 log = log,
                 mqtt = ManagementMqttCatalog(http, requests),

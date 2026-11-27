@@ -84,7 +84,7 @@ interface HeldConnection : AutoCloseable {
     /** M8-09: the shovel gateway of a held 4.x connection; a connection that is not one refuses every operation (a 3.x broker is never a shovel destination). */
     val shovels: dev.caerbannog.core.forwarding.ShovelGateway get() = dev.caerbannog.core.forwarding.UnavailableShovelGateway
 
-    /** M10-02 (compile-only stub by the test developer): the read-only access gateway (whoami, virtual hosts) of a held 4.x connection; a 3.x connection refuses and sends nothing. */
+    /** M10-02: the read-only access gateway (whoami, virtual hosts) of a held 4.x connection; a 3.x connection refuses and sends nothing. */
     val access: dev.caerbannog.core.access.AccessGateway get() = dev.caerbannog.core.access.UnavailableAccessGateway
 
     /** M8-10: the read-only shovel status of a held 4.x connection (for the MCP server, which never gets [shovels]). */
