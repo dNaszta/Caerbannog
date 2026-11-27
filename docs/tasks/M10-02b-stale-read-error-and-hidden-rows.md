@@ -3,7 +3,7 @@
 Milestone: M10    Depends on: M10-02    Size: S
 
 ## Status
-Step 1 brief done. Step 2 tests done (commit 672e07bb, red for the right reasons, compile-only stub `AccessState.readErrorBanner: String? = null`). Step 3 built (HEAD f6fa4d8a), step 4 test run PASS. Step 5 architect review round 0: Accepted with follow-ups (2026-11-27), see the findings in the review answer; the proposed frame "Who am I: stale (the user cannot be read, D2)" is added to `docs/ux/Access.dc.html` (marked proposed). Ready to merge on the owner's word.
+Step 1 brief done. Step 2 tests done (commit 672e07bb, red for the right reasons, compile-only stub `AccessState.readErrorBanner: String? = null`). Step 3 built (HEAD f6fa4d8a), step 4 test run PASS. Step 5 architect review round 0: Accepted (2026-11-27, minor and idea findings only); the proposed frame "Who am I: stale (the user cannot be read, D2)" is added to `docs/ux/Access.dc.html` (marked proposed). Ready to merge on the owner's word.
 
 ## Rulings (architect, 2026-11-27, after step 2)
 1. Field `AccessState.readErrorBanner` holds `"${AccessTexts.USER_ERROR} ${brokerText(reason)}."` (same shape as the refusal banner). `AccessScreen` appends `AccessTexts.CONNECTION_LOST_DETAIL` when drawing. The full sentence in Scope 1 is the drawn text, not the field.
