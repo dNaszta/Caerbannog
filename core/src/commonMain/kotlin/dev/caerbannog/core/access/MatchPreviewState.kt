@@ -54,10 +54,10 @@ object MatchPreviewTexts {
     ): String = when (answer) {
         is AccessAnswer.WouldMatch -> {
             val hit = answer.hits.lastOrNull { it.kind.isTopic() } ?: answer.hits.firstOrNull()
-            if (hit == null) "No pattern limits $name on $vhost." else hitSentence(hit, "matches", vhost, name, routingKey)
+            if (hit == null) "No pattern limits $name on $vhost." else hitSentence(hit, "matches", user, vhost, name, routingKey)
         }
         is AccessAnswer.NoMatch ->
-            if (answer.noRowForVhost) "$user has no permission on $vhost." else hitSentence(answer.deciding, "does not match", vhost, name, routingKey)
+            if (answer.noRowForVhost) "$user has no permission on $vhost." else hitSentence(answer.deciding, "does not match", user, vhost, name, routingKey)
         is AccessAnswer.UnreadablePattern ->
             "The ${kindWord(answer.kind)} pattern $unreadablePattern is not a pattern this app can apply. No answer is guessed."
         is AccessAnswer.PermissionsNotReadable -> when (answer.reason) {
@@ -83,7 +83,12 @@ object MatchPreviewTexts {
         is AccessAnswer.PermissionsNotReadable -> VerdictIcon.NotReadable
     }
 
-    private fun hitSentence(hit: Hit, verb: String, vhost: String, name: String, routingKey: String?): String {
+    private fun hitSentence(hit: Hit, verb: String, user: String, vhost: String, name: String, routingKey: String?): String {
+        // The flag, not the text: a real pattern spelled "no permission" is still a pattern.
+        if (hit.pattern.noPermission) {
+            return if (hit.kind.isTopic()) "$user has no ${kindWord(hit.kind)} permission on ${hit.exchange.orEmpty()}, so nothing is allowed."
+            else "$user has no ${kindWord(hit.kind)} permission on $vhost, so nothing is allowed."
+        }
         val pattern = "The ${kindWord(hit.kind)} pattern ${hit.pattern.text}"
         return if (hit.kind.isTopic()) {
             val key = if (routingKey.isNullOrEmpty()) "the empty routing key" else "the routing key $routingKey"
