@@ -192,16 +192,36 @@ class MatchPreviewViewModelTest {
         w.ask("amq.topic", "alarms.fire")
         assertEquals(VerdictIcon.NoMatch, w.verdict.icon)
         assertEquals("Would not match.", w.verdict.title)
-        for (part in listOf("topic", "^sensors\\..*", "amq.topic", "alarms.fire")) assertTrue(part in w.verdict.sentence, "the sentence must name '$part': ${w.verdict.sentence}")
+        assertEquals("The topic write pattern ^sensors\\..* of amq.topic does not match the routing key alarms.fire.", w.verdict.sentence)
     }
 
     @Test
-    fun `an empty routing key against a topic pattern is asked as an empty key and the topic pattern decides`() = runTest {
+    fun `an empty routing key against a topic pattern is asked as an empty key and the sentence says the empty routing key`() = runTest {
         val w = World(this, permissions(write = cell(".*"), topic = listOf(topicRow("amq.topic", write = cell("^sensors\\..*")))))
         w.ask("amq.topic")
         assertEquals("Would not match.", w.verdict.title)
-        assertTrue("^sensors\\..*" in w.verdict.sentence, w.verdict.sentence)
-        assertTrue("amq.topic" in w.verdict.sentence, w.verdict.sentence)
+        assertEquals("The topic write pattern ^sensors\\..* of amq.topic does not match the empty routing key.", w.verdict.sentence)
+    }
+
+    @Test
+    fun `an empty routing key that the topic pattern allows matches and says the empty routing key`() = runTest {
+        val w = World(this, permissions(write = cell(".*"), topic = listOf(topicRow("amq.topic", write = cell(".*")))))
+        w.ask("amq.topic")
+        assertEquals("Would match (topic permission).", w.verdict.title)
+        assertEquals("The topic write pattern .* of amq.topic matches the empty routing key.", w.verdict.sentence)
+    }
+
+    @Test
+    fun `the sentence builder names a TopicRead hit with the topic template (bind, matcher level)`() {
+        val hit = Hit(PatternKind.TopicRead, DisplayPattern("^sensors\\..*"), "amq.topic", "alarms.fire")
+        assertEquals(
+            "The topic read pattern ^sensors\\..* of amq.topic does not match the routing key alarms.fire.",
+            MatchPreviewTexts.sentence(AccessAnswer.NoMatch(hit), "svc-orders", "/orders", "queue.orders", "alarms.fire"),
+        )
+        assertEquals(
+            "The topic read pattern ^sensors\\..* of amq.topic matches the routing key sensors.temp.",
+            MatchPreviewTexts.sentence(AccessAnswer.WouldMatch(listOf(hit.copy(checked = "sensors.temp"))), "svc-orders", "/orders", "queue.orders", "sensors.temp"),
+        )
     }
 
     @Test
@@ -259,37 +279,47 @@ class MatchPreviewViewModelTest {
     }
 
     @Test
-    fun `a locked tab gives permissions not readable with the drawn sentence and no source`() = runTest {
+    fun `a locked tab shows permissions not readable at once, with no Check press, the drawn sentence and no source (R1)`() = runTest {
         val w = World(this)
-        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked))
+        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), vhosts = listOf("/orders"))
         w.settle()
-        w.ask("ex.orders")
         assertEquals(VerdictIcon.NotReadable, w.verdict.icon)
         assertEquals("Permissions not readable.", w.verdict.title)
         assertEquals("Only an administrator can read the patterns of a user, so there is nothing to check against.", w.verdict.sentence)
         assertNull(w.verdict.source, "no pattern was applied, so no pattern was read from anywhere")
         assertEquals(MatchPreviewTexts.NOTE, w.verdict.note)
+        assertFalse(w.state.checkEnabled)
+        assertEquals(listOf("/orders"), w.state.vhosts, "the profile's host, display only")
     }
 
     @Test
-    fun `a locked tab has no host list and Check still says permissions not readable, no host is needed for that`() = runTest {
+    fun `on a locked tab Check does nothing and editing the form keeps the derived verdict`() = runTest {
         val w = World(this)
-        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), vhosts = emptyList())
+        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), vhosts = listOf("/orders"))
         w.settle()
-        assertNull(w.state.vhost)
-        w.ask("ex.orders")
-        assertEquals("Permissions not readable.", w.verdict.title)
+        val before = w.state.verdict
+        w.ask("ex.other")
+        assertEquals(before, w.state.verdict)
+        assertFalse(w.state.checkEnabled)
     }
 
     @Test
-    fun `a token user gives permissions not readable with the sentence of the Permissions tab`() = runTest {
-        val w = World(this)
-        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.TokenUser))
+    fun `Check is enabled when permissions are available and when nothing is loaded`() = runTest {
+        assertTrue(World(this).state.checkEnabled)
+        val w = World(this, permissions = null)
         w.settle()
-        w.ask("ex.orders")
+        assertTrue(w.state.checkEnabled, "NotLoaded: the form is not drawn, check() still answers")
+    }
+
+    @Test
+    fun `a token user shows permissions not readable at once with the sentence of the Permissions tab (R1)`() = runTest {
+        val w = World(this)
+        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.TokenUser), vhosts = listOf("/orders"))
+        w.settle()
         assertEquals("Permissions not readable.", w.verdict.title)
         assertEquals(PermissionsTexts.tokenDetail("svc-orders"), w.verdict.sentence)
         assertNull(w.verdict.source)
+        assertFalse(w.state.checkEnabled)
     }
 
     @Test
@@ -298,6 +328,7 @@ class MatchPreviewViewModelTest {
         w.ask("ex.orders")
         assertEquals(VerdictIcon.NotReadable, w.verdict.icon)
         assertEquals("Permissions not readable.", w.verdict.title)
+        assertEquals("The patterns of this user have not been read from the broker, so there is nothing to check against.", w.verdict.sentence)
         assertNull(w.verdict.source)
     }
 
@@ -357,12 +388,15 @@ class MatchPreviewViewModelTest {
     }
 
     @Test
-    fun `the verdict is cleared when the permissions become unavailable`() = runTest {
-        val w = World(this, permissions(write = cell(".*")))
-        w.ask("ex.orders")
-        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked))
-        w.settle()
-        assertNull(w.state.verdict)
+    fun `the verdict becomes permissions not readable when the permissions become unavailable (Locked or TokenUser)`() = runTest {
+        for (reason in listOf(PermissionsUnavailable.Locked, PermissionsUnavailable.TokenUser)) {
+            val w = World(this, permissions(write = cell(".*")))
+            w.ask("ex.orders")
+            assertEquals("Would match.", w.verdict.title)
+            w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(reason), vhosts = listOf("/orders"))
+            w.settle()
+            assertEquals("Permissions not readable.", w.verdict.title, "reason $reason")
+        }
     }
 
     @Test
@@ -391,6 +425,60 @@ class MatchPreviewViewModelTest {
         w.settle()
         assertEquals("/billing", w.state.vhost)
         assertEquals(listOf("/billing"), w.state.vhosts)
+    }
+
+    // ---------------------------------------------------------------- editing the form clears the verdict (R3)
+
+    @Test
+    fun `changing the action clears the verdict and keeps the typed text`() = runTest {
+        val w = World(this, permissions(write = cell(".*"))); w.ask("ex.orders", "k")
+        w.vm.chooseAction(MatchAction.Read); w.settle()
+        assertNull(w.state.verdict)
+        assertEquals("ex.orders", w.state.name)
+        assertEquals("k", w.state.routingKey)
+    }
+
+    @Test
+    fun `changing the virtual host clears the verdict and keeps the typed text`() = runTest {
+        val w = World(this, permissions(write = cell(".*"))); w.ask("ex.orders", "k")
+        w.vm.chooseVhost("/billing"); w.settle()
+        assertNull(w.state.verdict)
+        assertEquals("ex.orders", w.state.name)
+    }
+
+    @Test
+    fun `changing the name clears the verdict and keeps the typed text`() = runTest {
+        val w = World(this, permissions(write = cell(".*"))); w.ask("ex.orders", "k")
+        w.vm.setName("ex.other"); w.settle()
+        assertNull(w.state.verdict)
+        assertEquals("ex.other", w.state.name)
+        assertEquals("k", w.state.routingKey)
+    }
+
+    @Test
+    fun `changing the routing key clears the verdict and keeps the typed text`() = runTest {
+        val w = World(this, permissions(write = cell(".*"))); w.ask("ex.orders", "k")
+        w.vm.setRoutingKey("k2"); w.settle()
+        assertNull(w.state.verdict)
+        assertEquals("k2", w.state.routingKey)
+        assertEquals("ex.orders", w.state.name)
+    }
+
+    @Test
+    fun `the same value typed or chosen again does not clear the verdict`() = runTest {
+        val w = World(this, permissions(write = cell(".*"))); w.ask("ex.orders", "k")
+        w.vm.setName("ex.orders"); w.vm.setRoutingKey("k"); w.vm.chooseVhost("/orders"); w.vm.chooseAction(MatchAction.Publish); w.settle()
+        assertNotNull(w.state.verdict)
+    }
+
+    @Test
+    fun `the amq default echo that Check writes into the box does not clear its own verdict`() = runTest {
+        val w = World(this, permissions(write = cell("^amq\\.default$")))
+        w.ask("")
+        assertEquals("amq.default", w.state.name)
+        assertEquals("Would match.", w.verdict.title)
+        w.settle()
+        assertNotNull(w.state.verdict)
     }
 
     // ---------------------------------------------------------------- Check sends nothing
@@ -445,12 +533,15 @@ class MatchPreviewViewModelTest {
         locked.access.tags = listOf("monitoring")
         locked.open()
         assertEquals(PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), locked.vm.matchInput.value.source)
+        assertEquals(listOf("/orders"), locked.vm.matchInput.value.vhosts, "R1: the profile's virtual host, display only")
 
         val token = PermissionsHarness(this)
         token.access.internalUser = false
         token.access.internalUsers = token.access.internalUsers - token.access.user
         token.open()
         assertEquals(PermissionsSource.NotAvailable(PermissionsUnavailable.TokenUser), token.vm.matchInput.value.source)
+        assertEquals(listOf("/orders"), token.vm.matchInput.value.vhosts, "R1: the profile's virtual host, display only")
+        assertEquals(emptyList(), before.vm.matchInput.value.vhosts, "R1: nothing loaded, no host")
     }
 
     @Test
