@@ -59,7 +59,7 @@ class PermissionsViewModelTest {
 
     @Test
     fun `a user without the administrator tag is locked and no permission request is sent`() = runTest {
-        val s = PermissionsHarness(this)
+        val s = PermissionsHarness(this, declared = DeclaredPermissions(configure = true, write = false))
         s.access.user = "svc-explorer"
         s.access.tags = listOf("monitoring", "management")
         s.open()
@@ -633,10 +633,10 @@ class PermissionsViewModelTest {
     @Test
     fun `no state field ever holds a password, a hash or the tags of a user`() = runTest {
         val s = PermissionsHarness(this)
-        s.access.addUser("svc-hash")
+        s.access.addUser("svc-reports")
         s.openAndChoose("svc-orders")
         val shown = s.state.toString()
         for (word in listOf("password", "hash", "hashing", "rabbit_password")) assertFalse(word in shown.lowercase(), "'$word' on the state: $shown")
-        assertNotNull(s.state.users.firstOrNull { it.name == "svc-hash" })
+        assertNotNull(s.state.users.firstOrNull { it.name == "svc-reports" })
     }
 }
