@@ -24,12 +24,7 @@ data class KnownDivergences(val entries: List<Divergence>) {
         val Measured: KnownDivergences = KnownDivergences(
             listOf(
                 Divergence("$", DivergenceWhen.NameEndsWithLineFeed, "NEW-047 ^ex$ / ex<LF>"),
-                Divergence(".", DivergenceWhen.NameHasNonAscii, "NEW-052 ^.$ / é"),
-                Divergence("[", DivergenceWhen.NameHasNonAscii, "NEW-058 ^[^a]$ / é, NEW-059 ^[é]$ / é"),
-                Divergence("\\W", DivergenceWhen.NameHasNonAscii, "NEW-060 ^\\W$ / é"),
-                Divergence("\\S", DivergenceWhen.NameHasNonAscii, "NEW-061 ^\\S$ / é"),
-                Divergence("\\p{", DivergenceWhen.NameHasNonAscii, "NEW-062 ^\\p{L}$ / é, NEW-063"),
-                Divergence("(?i)", DivergenceWhen.NameHasNonAscii, "NEW-064 (?i)^É$ / é"),
+                Divergence("(?i)", DivergenceWhen.NameHasNonAscii, "NEW-065 (?i)Á / あ (measured: RE2/J folds byte C3 to E3, the broker does not); NEW-064 is conservative, not a measured difference"),
             ),
         )
     }

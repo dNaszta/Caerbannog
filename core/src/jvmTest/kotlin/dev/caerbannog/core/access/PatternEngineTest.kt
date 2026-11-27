@@ -44,4 +44,10 @@ class PatternEngineTest {
         assertFalse(contains("^(a+)+$", "a".repeat(255) + "b"))
         assertTrue((System.nanoTime() - started) / 1_000_000 < 2_000, "a nested quantifier on 255 characters took long: the engine backtracks")
     }
+
+    @Test
+    fun `the engine folds Latin-1 case on UTF-8 bytes where the broker does not (why the (?i) entry is a measured divergence, row NEW-065)`() {
+        val compiled = (engine.compile("(?i)Á") as PatternCompilation.Compiled).pattern
+        assertTrue(compiled.containsMatchIn("あ"), "RE2/J folds byte C3 to E3; the broker said Refused for this row")
+    }
 }

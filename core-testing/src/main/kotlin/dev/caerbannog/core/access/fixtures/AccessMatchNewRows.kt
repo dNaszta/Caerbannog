@@ -37,7 +37,7 @@ internal object AccessMatchNewRows {
     }
 
     private const val DOLLAR = "KnownDivergences: $ with a name that ends in a line feed"
-    private const val NON_ASCII = "KnownDivergences: a construct that counts characters, with a non-ASCII name"
+    private const val CASE_FOLD = "case-insensitive pattern with a non-ASCII name, not measured"
 
     private enum class Cell { Write, Read, Configure, None }
 
@@ -99,12 +99,14 @@ internal object AccessMatchNewRows {
         pub("ex$", "ex\n", Allowed, Unreadable, DOLLAR, "PCRE: $ also matches before a final newline; RE2/J does not")
         pub("\\Aex\\z", "ex", Allowed); pub("\\Aex\\z", "ex\n", Refused)
         pub("\\Aex\\Z", "ex\n", Allowed, Unreadable, "RE2/J has no \\Z")
-        // --- bytes versus characters: Erlang re reads bytes (no UTF mode); é is two bytes, RE2/J reads one character. Measured: every row below where the construct counts or classes characters.
-        pub("^.$", "é", Refused, Unreadable, NON_ASCII, "broker counts 2 bytes, RE2/J 1 character"); pub("^..$", "é", Allowed, Unreadable, NON_ASCII)
+        // --- bytes versus characters: Erlang re reads bytes (no UTF mode); é is two bytes. The engine feeds RE2/J the UTF-8 bytes as Latin-1 characters, so the matcher agrees with the broker on every row below but the case-insensitive one.
+        pub("^.$", "é", Refused, note = "broker counts 2 bytes; the byte adapter does too"); pub("^..$", "é", Allowed)
         pub("^é$", "é", Allowed, note = "a literal non-ASCII pattern agrees: both compare the same bytes"); pub("^é$", "e", Refused)
-        pub("^.{2}$", "é", Allowed, Unreadable, NON_ASCII); pub("^.*$", "é", Allowed, Unreadable, NON_ASCII, "agrees, but the construct . is on KnownDivergences by shape, so the matcher says unreadable (safe direction)")
-        pub("^[^a]$", "é", Refused, Unreadable, NON_ASCII); pub("^[é]$", "é", Refused, Unreadable, NON_ASCII); pub("^\\W$", "é", Refused, Unreadable, NON_ASCII); pub("^\\S$", "é", Refused, Unreadable, NON_ASCII)
-        pub("^\\p{L}$", "é", Refused, Unreadable, NON_ASCII); pub("^\\p{L}+$", "é", Refused, Unreadable, NON_ASCII); pub("(?i)^É$", "é", Refused, Unreadable, NON_ASCII, "RE2/J folds Unicode case, Erlang re (no UTF mode) only ASCII")
+        pub("^.{2}$", "é", Allowed); pub("^.*$", "é", Allowed)
+        pub("^[^a]$", "é", Refused); pub("^[é]$", "é", Refused); pub("^\\W$", "é", Refused); pub("^\\S$", "é", Refused)
+        pub("^\\p{L}$", "é", Refused); pub("^\\p{L}+$", "é", Refused)
+        pub("(?i)^É$", "é", Refused, Unreadable, CASE_FOLD, "conservative: a (?i) pattern with a non-ASCII name is not measured for Latin-1 case pairs")
+        pub("(?i)Á", "あ", Refused, Unreadable, "KnownDivergences: (?i) with a non-ASCII name, measured", "follow-up probe: Á is bytes C3 81, あ is E3 81 82; RE2/J folds the Latin-1 letters C3 and E3, PCRE without UTF mode folds ASCII only")
         pub("^(a+)+$", "aaaa", Allowed, note = "nested quantifier: linear in RE2/J, so no rule and no budget"); pub("^(a+)+$", "aaab", Refused)
         // --- a long name
         pub("^a+$", "a".repeat(255), Allowed); pub("^a{255}$", "a".repeat(255), Allowed); pub("^a{254}$", "a".repeat(255), Refused)
