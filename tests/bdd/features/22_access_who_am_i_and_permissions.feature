@@ -439,6 +439,7 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
     Then the answer is "permissions not readable"
     And no request was sent to the broker
+    And Check is disabled
 
     Examples:
       | situation                                                      |
@@ -469,6 +470,15 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     And I asked whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
     When the broker now returns for "svc-orders" on "/orders" the write pattern "^queue\\..*"
     And I read the permissions again
+    Then no answer is shown
+
+  # architect ruling R3 (2026-11-27): the sentence names the name and the host, so an edit of the question clears it
+  @fake-broker @m10-04
+  Scenario: The answer is cleared when the question is edited
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And "svc-orders" has on "/orders" write ".*"
+    And I asked whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
+    When I change the name to "ex.other"
     Then no answer is shown
 
   @fake-broker @m10-04

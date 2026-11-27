@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -47,6 +49,8 @@ import kotlin.test.assertTrue
  * `accessMatchNameLabel` (Exchange / Queue / Name), `accessMatchName` (text field), `accessMatchRoutingKey` (text field, only when the state says so),
  * `accessMatchCheck` (button, text "Check"), and for a verdict: `accessMatchVerdict` (root), `accessMatchVerdictIcon:<Match|NoMatch|Unreadable|NotReadable>`,
  * `accessMatchVerdictTitle`, `accessMatchVerdictSentence`, `accessMatchSource` (absent when the state has none), `accessMatchNote`.
+ * R1 (architect, 2026-11-27): when `checkEnabled` is false (Locked, TokenUser) the form is drawn dimmed, `accessMatchCheck` is disabled, and a marker `accessMatchDimmed`
+ * exists inside the form root `accessMatch` (absent otherwise; it is how a test sees the dimming, which is not readable from the semantics tree).
  * The form is drawn on the Loaded, Locked and TokenUser frames of the tab and not while loading or not connected. The existing tags of the tab stay.
  */
 @OptIn(ExperimentalTestApi::class)
@@ -296,24 +300,42 @@ class MatchPreviewUiTest {
     // ---------------------------------------------------------------- frames
 
     @Test
-    fun `the form is drawn on the locked frame and the verdict says permissions not readable`() = runDesktopComposeUiTest(1280, 800) {
+    fun `the form is drawn on the locked frame dimmed, Check disabled, with the verdict already shown`() = runDesktopComposeUiTest(1280, 800) {
         show(
-            form.copy(verdict = verdict(VerdictIcon.NotReadable, "Permissions not readable.", MatchPreviewTexts.LOCKED_SENTENCE, source = null)),
+            form.copy(
+                verdict = verdict(VerdictIcon.NotReadable, "Permissions not readable.", MatchPreviewTexts.LOCKED_SENTENCE, source = null),
+                vhosts = listOf("/orders"), checkEnabled = false,
+            ),
             permissions = locked,
         )
         onNodeWithTag("accessMatch").assertExists()
+        onNodeWithTag("accessMatchDimmed", useUnmergedTree = true).assertExists()
+        onNodeWithTag("accessMatchCheck").assertIsNotEnabled()
         assertEquals("Permissions not readable.", text("accessMatchVerdictTitle"))
         assertEquals(PermissionsTexts.LOCKED_TITLE, text("accessPermissionsMessage"))
+        assertEquals("/orders", text("accessMatchVhost"))
     }
 
     @Test
-    fun `the form is drawn on the token user frame`() = runDesktopComposeUiTest(1280, 800) {
+    fun `the form is drawn on the token user frame dimmed, Check disabled, with the verdict already shown`() = runDesktopComposeUiTest(1280, 800) {
         show(
-            form.copy(verdict = verdict(VerdictIcon.NotReadable, "Permissions not readable.", PermissionsTexts.tokenDetail("jdoe"), source = null)),
+            form.copy(
+                verdict = verdict(VerdictIcon.NotReadable, "Permissions not readable.", PermissionsTexts.tokenDetail("jdoe"), source = null),
+                vhosts = listOf("/orders"), checkEnabled = false,
+            ),
             permissions = token,
         )
         onNodeWithTag("accessMatch").assertExists()
+        onNodeWithTag("accessMatchDimmed", useUnmergedTree = true).assertExists()
+        onNodeWithTag("accessMatchCheck").assertIsNotEnabled()
         assertEquals(PermissionsTexts.tokenDetail("jdoe"), text("accessMatchVerdictSentence"))
+    }
+
+    @Test
+    fun `on a loaded frame Check is enabled and the form is not dimmed`() = runDesktopComposeUiTest(1280, 800) {
+        show()
+        onNodeWithTag("accessMatchCheck").assertIsEnabled()
+        absent("accessMatchDimmed")
     }
 
     @Test

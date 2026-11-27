@@ -1117,6 +1117,15 @@ class AccessViewSteps {
     @Then("the answer does not contain {string}")
     fun theAnswerDoesNotContain(text: String) = assertFalse(text in verdict.toString(), "the verdict echoes \"$text\": $verdict")
 
+    @When("I change the name to {string}")
+    fun iChangeTheNameTo(name: String) {
+        preview.setName(name)
+        settle()
+    }
+
+    @Then("Check is disabled")
+    fun checkIsDisabled() = assertFalse(preview.state.value.checkEnabled, "Check is enabled on a frame that cannot be checked: ${preview.state.value}")
+
     @Then("no answer is shown")
     fun noAnswerIsShown() = assertNull(preview.state.value.verdict, "a stale answer is still shown")
 }
