@@ -21,6 +21,21 @@ object PermissionsTexts {
     const val DECLARED_NOT_DECLARED: String = "not declared"
     const val DECLARED_NOTE: String = "You entered this in the connection settings. The broker enforces its own permissions."
 
+    // M10-03b item 3 (test developer, COMPILE-ONLY STUB): the words of PermissionsTab.kt, final values copied from it; the developer moves the UI to these and drops its private consts.
+    // M10-03b item 1: the message of the Failed frame when the offered list has no selectable name (owner 2026-11-27).
+    const val NO_USER: String = "The broker lists no user to choose."
+    const val USER_LABEL: String = "User"
+    const val USER_FILTER_HINT: String = "Filter by user"
+    const val VHOST_FILTER_HINT: String = "Filter by virtual host"
+    const val VHOST_COLUMN: String = "Virtual host"
+    const val CONFIGURE_COLUMN: String = "Configure"
+    const val WRITE_COLUMN: String = "Write"
+    const val READ_COLUMN: String = "Read"
+    const val EXCHANGE_COLUMN: String = "Exchange"
+    const val TOPIC_HEADING: String = "Topic permissions"
+    const val PATTERN_NOTE: String =
+        "A pattern is a regular expression the broker applies to the name. An empty pattern means no permission and is shown as such. Cells are copyable as displayed."
+
     /** "The broker gives the permission patterns only to an administrator, and svc-explorer has no administrator tag. Nothing is guessed from other calls." */
     fun lockedDetail(user: String): String =
         "The broker gives the permission patterns only to an administrator, and $user has no administrator tag. Nothing is guessed from other calls."

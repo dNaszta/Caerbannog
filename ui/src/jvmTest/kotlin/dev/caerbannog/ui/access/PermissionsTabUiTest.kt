@@ -375,4 +375,74 @@ class PermissionsTabUiTest {
         show(loaded.copy(rows = listOf(PermissionRow(vhost, cell(long), cell(long), cell(long))), topicRows = emptyList()))
         assertEquals(long, text("accessCell:$vhost:configure"))
     }
+
+    // ---------------------------------------------------------------- M10-03b item 2: each view model reads only while its own tab is selected (D3)
+
+    @Test
+    fun `selecting the Permissions tab reports Who am I as not shown and Permissions as shown, and the reverse on selecting Who am I`() = runDesktopComposeUiTest(1280, 800) {
+        val perm = Events()
+        val whoEvents = WhoEvents()
+        setContent { AccessScreen(who, null, 10_000L, whoEvents, control, noop, permissions = loaded, permissionsEvents = perm) }
+        waitForIdle()
+        assertEquals(listOf(true), whoEvents.shown, "Who am I is the first tab and reads on entering")
+        assertEquals(emptyList(), perm.shown)
+        onNodeWithTag("accessTabPermissions").performClick()
+        waitForIdle()
+        assertEquals(false, whoEvents.shown.last(), "Who am I must stop polling whoami and vhosts while Permissions is selected: ${whoEvents.shown}")
+        assertEquals(listOf(true), perm.shown)
+        onNodeWithTag("accessTabWhoAmI").performClick()
+        waitForIdle()
+        assertEquals(true, whoEvents.shown.last(), "Who am I reads again when its tab is selected again: ${whoEvents.shown}")
+        assertEquals(listOf(true, false), perm.shown)
+    }
+
+    @Test
+    fun `leaving the screen while Permissions is selected leaves both view models not shown`() = runDesktopComposeUiTest(1280, 800) {
+        val perm = Events()
+        val whoEvents = WhoEvents()
+        val on = androidx.compose.runtime.mutableStateOf(true)
+        setContent { if (on.value) AccessScreen(who, null, 10_000L, whoEvents, control, noop, permissions = loaded, permissionsEvents = perm) }
+        onNodeWithTag("accessTabPermissions").performClick()
+        waitForIdle()
+        on.value = false
+        waitForIdle()
+        assertEquals(false, whoEvents.shown.last(), "${whoEvents.shown}")
+        assertEquals(false, perm.shown.last(), "${perm.shown}")
+        assertTrue(whoEvents.shown.count { it } <= whoEvents.shown.count { !it }, "every shown is matched by a not shown: ${whoEvents.shown}")
+    }
+
+    @Test
+    fun `leaving the screen on the Who am I tab never reports the Permissions tab as shown`() = runDesktopComposeUiTest(1280, 800) {
+        val perm = Events()
+        val on = androidx.compose.runtime.mutableStateOf(true)
+        setContent { if (on.value) AccessScreen(who, null, 10_000L, WhoEvents(), control, noop, permissions = loaded, permissionsEvents = perm) }
+        waitForIdle()
+        on.value = false
+        waitForIdle()
+        assertTrue(true !in perm.shown, "${perm.shown}")
+    }
+
+    // ---------------------------------------------------------------- M10-03b item 3: the words come from PermissionsTexts
+
+    @Test
+    fun `the table headings, filter hints and note are the words of PermissionsTexts`() = runDesktopComposeUiTest(1280, 800) {
+        show(loaded)
+        for (word in listOf(PermissionsTexts.VHOST_COLUMN, PermissionsTexts.CONFIGURE_COLUMN, PermissionsTexts.WRITE_COLUMN, PermissionsTexts.READ_COLUMN, PermissionsTexts.EXCHANGE_COLUMN)) {
+            assertTrue(onAllNodesWithText(word, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(), "column word '$word' is not drawn")
+        }
+        onNodeWithText(PermissionsTexts.PATTERN_NOTE, substring = true, useUnmergedTree = true).assertExists()
+        onNodeWithText(PermissionsTexts.TOPIC_HEADING, useUnmergedTree = true).assertExists()
+        onNodeWithText(PermissionsTexts.VHOST_FILTER_HINT, useUnmergedTree = true).assertExists()
+    }
+
+    // ---------------------------------------------------------------- M10-03b item 1 at screen level
+
+    @Test
+    fun `the no-user frame shows the message, no broker text line and a Retry that sends retry`() = runDesktopComposeUiTest(1280, 800) {
+        val e = show(PermissionsState(screen = PermissionsScreen.Failed(PermissionsTexts.NO_USER), message = PermissionsTexts.NO_USER, detail = null, action = AccessTexts.RETRY))
+        assertEquals(PermissionsTexts.NO_USER, text("accessPermissionsMessage"))
+        absent("accessPermissionsDetail", "accessPermissionsTable")
+        onNodeWithTag("accessPermissionsRetry").performClick()
+        assertEquals(1, e.retries)
+    }
 }

@@ -481,6 +481,50 @@ class PermissionsViewModelTest {
         assertNull(s.state.action)
     }
 
+    // ---------------------------------------------------------------- M10-03b item 1: no selectable user
+
+    @Test
+    fun `an administrator whose user list is empty gets the Failed frame with the no-user message, Retry and no permission request`() = runTest {
+        val s = PermissionsHarness(this)
+        s.access.internalUsers = emptyList()
+        s.open()
+        assertIs<PermissionsScreen.Failed>(s.state.screen)
+        assertEquals(PermissionsTexts.NO_USER, s.state.message, "the owner's wording is the message of the frame")
+        assertEquals("The broker lists no user to choose.", PermissionsTexts.NO_USER)
+        assertNull(s.state.detail, "it is not a broker text: no 'Broker text:' line")
+        assertEquals(AccessTexts.RETRY, s.state.action)
+        assertNull(s.state.chosenUser)
+        assertEquals(emptyList(), s.state.rows)
+        assertEquals(emptyList(), s.requests().filter { it.startsWith("permissions:") }, "no permission request without a user to ask for")
+    }
+
+    @Test
+    fun `an administrator whose every listed name is hidden gets the same frame and no permission request`() = runTest {
+        val s = PermissionsHarness(this)
+        s.access.internalUsers = listOf("eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl", "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyMiJ9.c2lnbmF0dXJlMg")
+        s.open()
+        assertIs<PermissionsScreen.Failed>(s.state.screen)
+        assertEquals(PermissionsTexts.NO_USER, s.state.message)
+        assertNull(s.state.detail)
+        assertEquals(AccessTexts.RETRY, s.state.action)
+        assertEquals(emptyList(), s.requests().filter { it.startsWith("permissions:") })
+        assertFalse(s.state.toString().contains("eyJ"), "the token text is on the state: ${s.state}")
+    }
+
+    @Test
+    fun `Retry after the no-user frame reads the user list again and recovers when a user appears`() = runTest {
+        val s = PermissionsHarness(this)
+        s.access.internalUsers = emptyList()
+        s.open()
+        s.access.addUser("svc-orders")
+        s.forgetRequests()
+        s.vm.retry()
+        s.settle()
+        assertTrue("users" in s.requests(), "Retry reads the user list again: ${s.requests()}")
+        assertEquals("svc-orders", s.state.chosenUser)
+        assertFalse(s.state.screen is PermissionsScreen.Failed)
+    }
+
     @Test
     fun `an unreadable user list is a failed screen with the broker text and Retry`() = runTest {
         val s = PermissionsHarness(this)
