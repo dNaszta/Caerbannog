@@ -121,7 +121,7 @@ Suggested runs: `@smoke` on every commit, `@fake-broker` in the normal build, `@
 | 19 topology planner | Topology planner (M9): how a plan relates to a migration, step kinds, naming, the draft, review graph, guardrails | M9 (planned) |
 | 20 topology planner check | Topology planner (M9): check against the broker | M9 (planned) |
 | 21 topology planner recipes | Topology planner (M9): streams and the response stream, policies, dead-lettering for a queue, MQTT routes, facts to verify first | M9 (planned) |
-| 22 access who am I and permissions | Access view (M10): goals 1 and 2, redaction rules, match preview. `@m10-02` scenarios have step definitions (`acceptance-tests/.../accessview`, `RunAccessViewAcceptanceTest`); `@m10-02b` (unreadable user while data is shown) is red until M10-02b is built; `@m10-03`, `@m10-04` have none yet | M10 (planned) |
+| 22 access who am I and permissions | Access view (M10): goals 1 and 2, redaction rules, match preview. `@m10-02` scenarios have step definitions (`acceptance-tests/.../accessview`, `RunAccessViewAcceptanceTest`); `@m10-02b` (unreadable user while data is shown) has step definitions and passes; `@m10-03`, `@m10-04` have none yet | M10 (planned) |
 | 23 access sign-in method | Access view (M10): goal 3, the honesty rule, facts to verify first | M10 (planned) |
 | 24 access clients | Access view (M10): goal 4, redaction rules | M10 (planned) |
 | 25 access MCP | Access view (M10): MCP evaluation | M10 (planned) |
