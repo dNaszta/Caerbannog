@@ -217,6 +217,12 @@ internal class GuardedAccessGateway(
 
     override suspend fun virtualHosts(): dev.caerbannog.core.access.AccessResult<List<String>> =
         if (isCurrent()) inner.virtualHosts() else dev.caerbannog.core.access.AccessResult.Unreachable
+
+    override suspend fun users(): dev.caerbannog.core.access.AccessResult<dev.caerbannog.core.access.UserNames> =
+        if (isCurrent()) inner.users() else dev.caerbannog.core.access.AccessResult.Unreachable
+
+    override suspend fun permissionsOf(user: String): dev.caerbannog.core.access.AccessResult<dev.caerbannog.core.access.UserPermissions> =
+        if (isCurrent()) inner.permissionsOf(user) else dev.caerbannog.core.access.AccessResult.Unreachable
 }
 
 internal class GuardedQueueMessageInspector(

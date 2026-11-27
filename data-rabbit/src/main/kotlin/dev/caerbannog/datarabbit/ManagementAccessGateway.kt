@@ -3,6 +3,8 @@ package dev.caerbannog.datarabbit
 import dev.caerbannog.core.access.AccessGateway
 import dev.caerbannog.core.access.AccessResult
 import dev.caerbannog.core.access.SecretGuard
+import dev.caerbannog.core.access.UserNames
+import dev.caerbannog.core.access.UserPermissions
 import dev.caerbannog.core.access.WhoAmI
 import dev.caerbannog.core.connections.isMigrationSourceOnly
 import dev.caerbannog.core.json.UntrustedJson
@@ -27,6 +29,11 @@ internal class ManagementAccessGateway(
     override suspend fun whoAmI(): AccessResult<WhoAmI> = read(requests.whoami(), ::parseWhoAmI)
 
     override suspend fun virtualHosts(): AccessResult<List<String>> = read(requests.vhosts(), ::parseVirtualHosts)
+
+    // M10-03 COMPILE-ONLY STUB (test developer): the behaviour is the senior developer's. See ManagementAccessGatewayPermissionsTest.
+    override suspend fun users(): AccessResult<UserNames> = AccessResult.Unreachable
+
+    override suspend fun permissionsOf(user: String): AccessResult<UserPermissions> = AccessResult.Unreachable
 
     private suspend fun <T> read(url: String, parse: (JsonElement, String?) -> T?): AccessResult<T> {
         if (isMigrationSourceOnly(brokerVersion)) return AccessResult.NotOffered
