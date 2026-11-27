@@ -22,6 +22,8 @@ Step 3 part A DONE (senior developer, commit 02b6d990; round 0): `Re2jPatternEng
 
 Step 5 review of part A (architect, 2026-11-27, HEAD 941ff3f7): CHANGES REQUIRED, one major finding (inline flag groups other than the literal `(?i)`), see the review table in the architect report; the rest accepted. After the fix (small, S: one row plus one check) part A is Accepted and may merge to main on its own (no UI, no wiring; `@m10-04` is excluded from `RunAccessViewAcceptanceTest` by tag). Part B (form, `MatchPreviewViewModel`, UI, `@m10-04` steps) is next, after M10-03b is merged and this branch is merged with main. `M10-04c` (ship notices) before the next release.
 
+Step 5 round 1 (architect, 2026-11-27, HEAD 9db03e3d): part A ACCEPTED (finding 1 fixed by a flag-group shape for `(?i)`, tests added, live rows green). Follow-ups: `M10-04d` (optional live rows, limits, engine exception type), `M10-04c` (ship notices) before the next release. Part A may merge to main on its own now; part B (form, `MatchPreviewViewModel`, UI, `@m10-04` steps) is next, after M10-03b is merged and this branch is merged with main.
+
 ## Goal
 On the Permissions tab an administrator picks an action (publish, read, configure), a virtual host, a name and, optionally, a routing key, presses Check, and sees whether the patterns the broker returned would match, which pattern and kind decided, where the patterns came from, and that this is a prediction. The pure `AccessMatcher` agrees with a real broker on a differential case table; anything it cannot be sure of is reported as "Pattern could not be read.", never guessed.
 
