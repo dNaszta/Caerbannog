@@ -86,8 +86,8 @@ data class AccessState(
     /** [AccessTexts.SIGN_IN_REFUSED] while the broker refused a refresh and the last data stays, dimmed and stale (mid-session NotAuthorised); else null. */
     val refusalBanner: String? = null,
     /**
-     * M10-02b contract (test developer, COMPILE-ONLY STUB: always null until built). Set only while data is shown and the last read answered `Unexpected`:
-     * [AccessTexts.USER_ERROR] and [AccessTexts.brokerText] of the mapped reason (the screen appends [AccessTexts.CONNECTION_LOST_DETAIL]); else null.
+     * Set only while data is shown and the last read answered `Unexpected`: [AccessTexts.USER_ERROR] and [AccessTexts.brokerText] of the mapped reason
+     * (the screen appends [AccessTexts.CONNECTION_LOST_DETAIL]); never together with the connection or refusal banner; else null.
      */
     val readErrorBanner: String? = null,
     /** `ConnectionNotes.NOT_ENCRYPTED` while the held profile has TLS off; else null. */
