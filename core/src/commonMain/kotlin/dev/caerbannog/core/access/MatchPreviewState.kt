@@ -39,12 +39,70 @@ object MatchPreviewTexts {
     const val ECHO_HIDDEN: String = SecretGuard.HIDDEN
 
     /**
-     * STUB (step 3 builds it): the sentence of [answer] for the question ([name], [vhost], [routingKey] already passed through the guard; null or empty key reads as
-     * "the empty routing key"). Total over [PatternKind] (a `when` without `else`): a TopicRead hit uses the topic template with "topic read pattern".
-     * Architect ruling R2: "The topic write pattern ^sensors\..* of amq.topic does not match the routing key alarms.fire."
+     * The sentence of [answer] for the question ([name], [vhost], [routingKey] already passed through the guard; null or empty key reads as "the empty routing key").
+     * Built only from the matcher's answer: the deciding check is named from `Hit.kind` (a `when` without `else`, so a new kind cannot be forgotten) and the typed
+     * text comes from the parameters, never from the hit. [unreadablePattern] is what the form may show of an unreadable pattern; it defaults to the hidden marker
+     * so a caller that forgets it can never show a hidden pattern's text.
      */
-    fun sentence(answer: AccessAnswer, user: String, vhost: String, name: String, routingKey: String?): String =
-        throw NotImplementedError("M10-04 part B: MatchPreviewTexts.sentence")
+    fun sentence(
+        answer: AccessAnswer,
+        user: String,
+        vhost: String,
+        name: String,
+        routingKey: String?,
+        unreadablePattern: String = SecretGuard.HIDDEN,
+    ): String = when (answer) {
+        is AccessAnswer.WouldMatch -> {
+            val hit = answer.hits.lastOrNull { it.kind.isTopic() } ?: answer.hits.firstOrNull()
+            if (hit == null) "No pattern limits $name on $vhost." else hitSentence(hit, "matches", vhost, name, routingKey)
+        }
+        is AccessAnswer.NoMatch ->
+            if (answer.noRowForVhost) "$user has no permission on $vhost." else hitSentence(answer.deciding, "does not match", vhost, name, routingKey)
+        is AccessAnswer.UnreadablePattern ->
+            "The ${kindWord(answer.kind)} pattern $unreadablePattern is not a pattern this app can apply. No answer is guessed."
+        is AccessAnswer.PermissionsNotReadable -> when (answer.reason) {
+            PermissionsUnavailable.Locked -> LOCKED_SENTENCE
+            PermissionsUnavailable.TokenUser -> PermissionsTexts.tokenDetail(user)
+            PermissionsUnavailable.NotLoaded -> NOT_LOADED_SENTENCE
+        }
+    }
+
+    /** The title of [answer] as drawn; "(topic permission)" when a topic pattern took part in a match. */
+    fun title(answer: AccessAnswer): String = when (answer) {
+        is AccessAnswer.WouldMatch -> if (answer.hits.any { it.kind.isTopic() }) TITLE_MATCH_TOPIC else TITLE_MATCH
+        is AccessAnswer.NoMatch -> TITLE_NO_MATCH
+        is AccessAnswer.UnreadablePattern -> TITLE_UNREADABLE
+        is AccessAnswer.PermissionsNotReadable -> TITLE_NOT_READABLE
+    }
+
+    /** The icon of [answer]. */
+    fun icon(answer: AccessAnswer): VerdictIcon = when (answer) {
+        is AccessAnswer.WouldMatch -> VerdictIcon.Match
+        is AccessAnswer.NoMatch -> VerdictIcon.NoMatch
+        is AccessAnswer.UnreadablePattern -> VerdictIcon.Unreadable
+        is AccessAnswer.PermissionsNotReadable -> VerdictIcon.NotReadable
+    }
+
+    private fun hitSentence(hit: Hit, verb: String, vhost: String, name: String, routingKey: String?): String {
+        val pattern = "The ${kindWord(hit.kind)} pattern ${hit.pattern.text}"
+        return if (hit.kind.isTopic()) {
+            val key = if (routingKey.isNullOrEmpty()) "the empty routing key" else "the routing key $routingKey"
+            "$pattern of ${hit.exchange.orEmpty()} $verb $key."
+        } else {
+            "$pattern $verb $name on $vhost."
+        }
+    }
+
+    private fun PatternKind.isTopic(): Boolean = this == PatternKind.TopicWrite || this == PatternKind.TopicRead
+
+    /** The word a pattern kind has in a sentence. */
+    fun kindWord(kind: PatternKind): String = when (kind) {
+        PatternKind.Configure -> "configure"
+        PatternKind.Write -> "write"
+        PatternKind.Read -> "read"
+        PatternKind.TopicWrite -> "topic write"
+        PatternKind.TopicRead -> "topic read"
+    }
 }
 
 /** The three actions the form offers (PD-1). Bind and the stream forms are asked of the matcher directly. */
