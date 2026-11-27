@@ -106,9 +106,10 @@ class AppFrameDisabledNavigationUiTest {
     }
 
     @Test
-    fun `a 3x connection leaves all five items and the search in the drawer`() = runDesktopComposeUiTest(1280, 800) {
+    fun `a 3x connection leaves all five items and the search in the drawer, and Access is absent not disabled (AQ6)`() = runDesktopComposeUiTest(1280, 800) {
         frame(onlyMigration, reason)
-        AppDestination.entries.forEach { onNodeWithTag("navItem:${it.name}").assertExists("navItem:${it.name} is still drawn") }
+        onAllNodesWithTag("navItem:Access", useUnmergedTree = true).assertCountEquals(0)
+        AppDestination.entries.filter { it != AppDestination.Access }.forEach { onNodeWithTag("navItem:${it.name}").assertExists("navItem:${it.name} is still drawn") }
         onNodeWithTag("searchBox").assertExists("the search is still drawn")
     }
 
