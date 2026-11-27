@@ -5,7 +5,7 @@ Milestone: M10    Depends on: M10-02 (merged), M10-02b (merged), M10-00 (S-B)   
 Branch: `M10-03-permissions-tab`
 
 ## Status
-Step 1 brief written and confirmed against the merged M10-02 code (architect, 2026-11-27, main ed92ac65). Step 2 tests not started. One product decision is open (PD-1 below); the brief carries the recommended option as the default, so step 2 may start on everything except the token-administrator scenario (`@needs-decision`).
+Step 1 (brief) done (architect, 2026-11-27, main ed92ac65; PD-1 decided by the owner the same day). Step 2 (tests first) next. Round 0. No open questions.
 
 ## Goal
 For a user with the administrator tag the Permissions tab shows, for a chosen user of the broker, the configure, write and read patterns and the topic permissions per virtual host, as the broker returned them; for everyone else it says that only an administrator can read them and shows the profile's declaration labelled as declared. Nothing is sent that changes anything.
@@ -25,6 +25,9 @@ Spec "Access view (M10)", goal 2; "Broker-read permission" (only an administrato
 9. **Declaration.** Read from the held profile's `DeclaredPermissions(configure, write)` (M1-06); the model has no read flag, so "Read not declared" is always drawn. Shown only in the locked frames and in the "broker could not be asked" case, with the label "Declared by you, not confirmed by the broker" and a style that differs from the "Read from the broker" label. Do not copy the declaration model.
 10. **View model.** The tab state lives apart from `AccessState` (`PermissionsState`: user list, chosen user, vhost filter, rows, topic rows, status), but the banners (connection lost, refusal, read error, Not encrypted) and the refresh rule come from the same code as the Who am I tab, extracted, not copied. Refresh uses the app-wide interval (D3) only while the tab is shown, and re-reads the chosen user (and the user list on Retry); leaving the tab cancels.
 
+## Decision PD-1 (owner, 2026-11-27)
+Option (a). A token user with the `administrator` tag gets the chooser of internal users plus the token note for its own name; a token user without the tag gets the locked state; the token-only frame appears only when the chosen user answers 404. Ruling 1 stays as written (the tags decide the lock, no request). Mockup: `perm-token-admin` in `docs/ux/Access.dc.html` (proposed, no new wording).
+
 ## Scope
 In:
 - `AccessGateway` gets `users(): AccessResult<UserNames>` and `permissionsOf(user): AccessResult<UserPermissions>`; `UnavailableAccessGateway`, `FakeAccessGateway` and `ManagementAccessGateway` follow. Models in `core/access`: `PermissionRow(vhost, configure, write, read)` and `TopicPermissionRow(vhost, exchange, write, read)` over a `PatternCell(text, reading, hidden)`; `UserPermissions(user, rows, topicRows)`.
@@ -42,7 +45,7 @@ Out: any write of users, tags, permissions or vhosts (non-goal); the match previ
   - "An administrator may choose any user on the broker" (also: no password, no hash)
   - "A user with no permission on a virtual host is shown as having none"
   - added by this brief: "A user with no permission on any virtual host gets the empty message", "The Permissions tab says that the broker lists no permissions for a token user" (chosen user answers 404), "A user whose name looks like a token cannot be chosen", "An unreadable permission list keeps the last data and says so", "The Permissions tab sends only GET requests" (@security).
-  - `@needs-decision`: "A token administrator may choose an internal user" (PD-1).
+  - "A token administrator may choose an internal user" (PD-1, decided).
 - Unit (written first): parser tests on the S-B fixtures (`s-b-i-admin-user-permissions-of-i-admin.json`, `s-b-t-admin-user-permissions-of-t-narrow.json`, `s-b-t-mon-denied.json`) plus the new live-captured fixtures; a test that `password_hash` and `tags` of a user are not retained (model, `toString`, logs); the gateway sends no request without the administrator tag; the gateway's recorded requests are all GET (no non-GET method exists on `ManagementHttp` use here); view model states and the default-user rule; hidden user and hidden pattern.
 - UI test (`AccessScreenUiTest` style): tags on tab, chooser, chooser filter, rows, topic rows, banners, `accessPermissionsDeclared`, Retry.
 - Gate hook: a case in `RealBrokerM10GateTest` is `M10-09`'s job; here only the live capture of fixtures.
@@ -60,10 +63,10 @@ Out: any write of users, tags, permissions or vhosts (non-goal); the match previ
 None in this task (UI-only slice). The tool decision is recorded: exposed in `M10-08` through `caerbannog_get_access_summary` with `includePermissions` (spec "Access view (M10)", "MCP evaluation", AQ9 answered); administrator only, "not readable" otherwise; same `SecretGuard`, bounded size. No new tool is created here.
 
 ## Open points
-- PD-1 (product, below): what a token user sees on the Permissions tab when the token carries the administrator tag.
+- PD-1 CLOSED (owner, 2026-11-27, option a): see "Decision PD-1".
 - Unverified: field names of `GET /api/users` (assumed `name`, plus fields we drop), shape of `GET /api/users/{user}/topic-permissions` (assumed `user, vhost, exchange, write, read` from the management API documentation, not from a fixture), and the 401 body for a non-administrator with a management tag (not needed: ruling 1 sends no request). The first step 2 test is a live capture on the throwaway broker of the spike rig (`RealBrokerAccessSpikeTest` style, tags `broker` and `spike`) that stores the fixtures `s-b-users-*` and `s-b-topic-permissions-*` with `password_hash` removed before saving (`AccessFixtureGuardTest` must stay green). Until it runs, parser tests use hand-written bodies marked as such.
 - Idea (not now): a broker with thousands of users makes `GET /api/users` large; names only are kept, so memory is small; a cap with a visible "more users not listed" count would need new wording (owner). Left open, not in scope.
 - Idea: the vhost filter and the user filter share the box component of Clients (`M10-06`); extract when the second use arrives.
 
 ## Definition of done
-Tests first and passing (scenarios above, unit, UI); no write call exists in the new code (test asserts it); no `password_hash` retained anywhere; no unrelated changes; `docs/tasks/README.md` and `tests/bdd/README.md` updated; spec updated only if PD-1 is decided differently from the default.
+Tests first and passing (scenarios above, unit, UI); no write call exists in the new code (test asserts it); no `password_hash` retained anywhere; no unrelated changes; `docs/tasks/README.md` and `tests/bdd/README.md` updated; spec unchanged (PD-1 was decided as the default).

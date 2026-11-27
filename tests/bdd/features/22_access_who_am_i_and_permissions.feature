@@ -243,9 +243,9 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     And no permission pattern is shown
     And I do not see an error
 
-  @needs-decision @fake-broker @m10-03
+  @fake-broker @m10-03
   Scenario: A token administrator may choose an internal user
-    # PD-1, recommended option: the broker lets a token administrator read internal users' permissions (spike S-B).
+    # PD-1 decided (owner, 2026-11-27, option a): the broker lets a token administrator read internal users' permissions (spike S-B).
     Given whoami reports the connection user as not an internal user with the tag "administrator"
     And the broker has the user "svc-orders" with permissions on "/orders"
     When I choose the user "svc-orders" on the Permissions tab
