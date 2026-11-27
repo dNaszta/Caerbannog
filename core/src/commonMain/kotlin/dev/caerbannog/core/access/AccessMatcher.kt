@@ -94,7 +94,7 @@ class AccessMatcher(
         return if (compiled.containsMatchIn(need.name)) Outcome.Allowed(hit) else Outcome.Refused(hit)
     }
 
-    private fun Divergence.applies(pattern: String, name: String): Boolean = pattern.contains(construct) && when (whenName) {
+    private fun Divergence.applies(pattern: String, name: String): Boolean = appearsIn(pattern) && when (whenName) {
         DivergenceWhen.NameHasNonAscii -> name.any { it.code > 0x7F }
         DivergenceWhen.NameEndsWithLineFeed -> name.endsWith("\n")
     }

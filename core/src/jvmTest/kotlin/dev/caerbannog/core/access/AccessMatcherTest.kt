@@ -223,7 +223,7 @@ class AccessMatcherTest {
     }
 
     @Test
-    fun `a construct on KnownDivergences is unreadable only when the name meets the condition`() {
+    fun `a synthetic KnownDivergences entry is unreadable only when the name meets the condition`() {
         val divergences = KnownDivergences(listOf(Divergence("$", DivergenceWhen.NameEndsWithLineFeed, "row-a"), Divergence(".", DivergenceWhen.NameHasNonAscii, "row-b")))
         val m = matcher(divergences = divergences)
         assertEquals(AccessAnswer.UnreadablePattern(PatternKind.Write), m.check(permissions(write = cell("^ex$")), publish("ex\n")))
@@ -231,6 +231,16 @@ class AccessMatcherTest {
         assertEquals(AccessAnswer.UnreadablePattern(PatternKind.Write), m.check(permissions(write = cell("^.$")), publish("é")))
         assertTrue(m.check(permissions(write = cell("^.$")), publish("e")) is AccessAnswer.WouldMatch, "ASCII name, no divergence")
         assertEquals(AccessAnswer.UnreadablePattern(PatternKind.TopicWrite), m.check(permissions(topic = listOf(topicRow("amq.topic", write = cell("^.$")))), publish("amq.topic", routingKey = "é")), "the routing key is a name too")
+    }
+
+    @Test
+    fun `every inline flag group with i is the measured case-folding divergence on a non-ASCII name, other flags are not`() {
+        val m = matcher(divergences = KnownDivergences.Measured)
+        for (pattern in listOf("(?i)Á", "(?si)Á", "(?is)Á", "(?im)Á", "(?i:Á)")) {
+            assertEquals(AccessAnswer.UnreadablePattern(PatternKind.Write), m.check(permissions(write = cell(pattern)), publish("あ")), pattern)
+        }
+        assertTrue(m.check(permissions(write = cell("(?s)Á")), publish("あ")) is AccessAnswer.NoMatch, "no i flag, no divergence")
+        assertTrue(m.check(permissions(write = cell("(?i)ex")), publish("EX")) is AccessAnswer.WouldMatch, "ASCII name, no divergence")
     }
 
     @Test

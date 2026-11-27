@@ -9,8 +9,11 @@ enum class DivergenceWhen {
     NameEndsWithLineFeed,
 }
 
-/** [construct]: a pattern that CONTAINS this text is affected (by shape, not parsed; `\$` also contains `$`, which is the safe direction). [row]: the live row that proved it. */
-data class Divergence(val construct: String, val whenName: DivergenceWhen, val row: String)
+/** [construct]: a pattern that CONTAINS this text is affected (by shape, not parsed; `\$` also contains `$`, which is the safe direction). [shape]: optional regex for a family of spellings of the same construct. [row]: the live row that proved it. */
+data class Divergence(val construct: String, val whenName: DivergenceWhen, val row: String, val shape: Regex? = null) {
+    /** True when [pattern] contains the construct: by [shape] when given (a family such as every inline flag group with `i`), else by the literal [construct] text. */
+    fun appearsIn(pattern: String): Boolean = shape?.containsMatchIn(pattern) ?: pattern.contains(construct)
+}
 
 /**
  * M10-04 contract: constructs that the engine ACCEPTS but that the live differential rows (`RealBrokerAccessMatchTest`, `AccessMatchCases`) show to be read
@@ -20,11 +23,14 @@ data class Divergence(val construct: String, val whenName: DivergenceWhen, val r
  */
 data class KnownDivergences(val entries: List<Divergence>) {
     companion object {
+        /** Any inline flag group that sets `i`: `(?i)`, `(?si)`, `(?im)`, `(?i:...)`. `(?-i)` also matches, which is the conservative direction. */
+        private val INLINE_FLAG_WITH_I = Regex("""\(\?[a-zA-Z-]*i[a-zA-Z-]*[:)]""")
+
         /** Measured by `RealBrokerAccessMatchTest` on 2026-11-27 (rows of `AccessMatchNewRows`, ids `NEW-nnn`; the rows keep both answers). */
         val Measured: KnownDivergences = KnownDivergences(
             listOf(
                 Divergence("$", DivergenceWhen.NameEndsWithLineFeed, "NEW-047 ^ex$ / ex<LF>"),
-                Divergence("(?i)", DivergenceWhen.NameHasNonAscii, "NEW-065 (?i)Á / あ (measured: RE2/J folds byte C3 to E3, the broker does not); NEW-064 is conservative, not a measured difference"),
+                Divergence("(?i)", DivergenceWhen.NameHasNonAscii, "NEW-065 (?i)Á / あ (measured: RE2/J folds byte C3 to E3, the broker does not); NEW-064 is conservative, not a measured difference", INLINE_FLAG_WITH_I),
             ),
         )
     }
