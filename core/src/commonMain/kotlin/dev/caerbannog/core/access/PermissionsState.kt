@@ -1,7 +1,7 @@
 package dev.caerbannog.core.access
 
 /**
- * M10-03 contract (test developer, COMPILE-ONLY STUB: the types are final, the view model behind them is not built).
+ * M10-03 contract.
  * What the Permissions tab shows, all as display text (what is shown is what is copied). Mockup: `docs/ux/Access.dc.html`, frames `perm-*`.
  * The wording is approved by the owner (2026-11-25, as drawn); the strings below are the drawn ones. The state lives apart from [AccessState].
  */
@@ -20,6 +20,21 @@ object PermissionsTexts {
     const val DECLARED_NO: String = "no"
     const val DECLARED_NOT_DECLARED: String = "not declared"
     const val DECLARED_NOTE: String = "You entered this in the connection settings. The broker enforces its own permissions."
+
+    // M10-03b item 3: the words of the Permissions tab, drawn in docs/ux/Access.dc.html; they label fixed fields and carry no state.
+    // M10-03b item 1: the message of the Failed frame when the offered list has no selectable name (owner 2026-11-27).
+    const val NO_USER: String = "The broker lists no user to choose."
+    const val USER_LABEL: String = "User"
+    const val USER_FILTER_HINT: String = "Filter by user"
+    const val VHOST_FILTER_HINT: String = "Filter by virtual host"
+    const val VHOST_COLUMN: String = "Virtual host"
+    const val CONFIGURE_COLUMN: String = "Configure"
+    const val WRITE_COLUMN: String = "Write"
+    const val READ_COLUMN: String = "Read"
+    const val EXCHANGE_COLUMN: String = "Exchange"
+    const val TOPIC_HEADING: String = "Topic permissions"
+    const val PATTERN_NOTE: String =
+        "A pattern is a regular expression the broker applies to the name. An empty pattern means no permission and is shown as such. Cells are copyable as displayed."
 
     /** "The broker gives the permission patterns only to an administrator, and svc-explorer has no administrator tag. Nothing is guessed from other calls." */
     fun lockedDetail(user: String): String =

@@ -2,6 +2,9 @@
 
 Milestone: M10    Depends on: M10-03    Size: S
 
+## Status
+Steps 1 to 4 done (tests first, build, test run PASS). Step 5 architect review round 0 (2026-11-27, HEAD 348c0070): Accepted. No blocker, no major; all four scope items verified in the diff. Ready to merge on the owner's word. Not run by the reviewer: brokerTest, brokerSpikeTest, screenshots, by-eye check of the no-user frame.
+
 ## Goal
 Four small loose ends of the M10-03 review are closed: the "no user" edge case is tested and its text decided, each Access view model reads only while its own tab is selected, the Permissions labels live in `core`, and the gateway has no crash branch.
 

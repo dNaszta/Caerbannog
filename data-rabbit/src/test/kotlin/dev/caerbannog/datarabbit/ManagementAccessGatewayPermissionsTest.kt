@@ -204,6 +204,26 @@ class ManagementAccessGatewayPermissionsTest {
         assertEquals(AccessResult.NotAuthorised, withGateway(engine { Recorded(403, """{"error":"not_authorised","reason":"x"}""") }) { it.permissionsOf("u") })
     }
 
+    // M10-03b item 4 (green guards): the `withoutValue` refactor must keep every non-Loaded result of either call, including the 404 rule.
+    @Test
+    fun `every non-table result of either call is passed through unchanged`() {
+        val notManagement = Recorded(401, """{"error":"not_authorised","reason":"Not management user"}""")
+        val ok = Recorded(200, "[]")
+        fun of(first: Recorded, second: Recorded, version: String? = "4.4.1") =
+            withGateway(engine { path -> if (path.endsWith("/topic-permissions")) second else first }, version = version) { it.permissionsOf("u") }
+        assertEquals(AccessResult.NoManagementTag, of(notManagement, ok), "first call")
+        assertEquals(AccessResult.NoManagementTag, of(ok, notManagement), "second call")
+        assertEquals(AccessResult.NotFound, of(ok, Recorded(404, "{}")), "a 404 on the topic call is the token answer too")
+        assertEquals(AccessResult.NotAuthorised, of(ok, Recorded(403, "{}")), "second call")
+        assertEquals(AccessResult.Unexpected("HTTP 502"), of(Recorded(502, ""), ok), "first call")
+        assertEquals(AccessResult.NotOffered, of(ok, ok, version = "3.13.7"), "a 3.x broker is not asked")
+    }
+
+    @Test
+    fun `a 404 on the user list is not the token answer, it is Unexpected`() {
+        assertEquals(AccessResult.Unexpected("HTTP 404"), withGateway(engine { Recorded(404, "{}") }) { it.users() })
+    }
+
     @Test
     fun `an unreachable broker is Unreachable on both calls`() {
         assertEquals(AccessResult.Unreachable, withGateway(MockEngine { throw ConnectException("refused") }) { it.users() })
