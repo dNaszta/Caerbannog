@@ -1104,6 +1104,9 @@ class AccessViewSteps {
     @Then("the answer says {string} has no permission on {string}")
     fun theAnswerSaysNoPermissionOn(user: String, vhost: String) = assertEquals("$user has no permission on $vhost.", verdict.sentence)
 
+    @Then("the answer says {string}")
+    fun theAnswerSays(sentence: String) = assertEquals(sentence, verdict.sentence)
+
     @Then("the answer says the patterns were read from the broker")
     fun theAnswerSaysWhereItCameFrom() = assertEquals(MatchPreviewTexts.SOURCE_BROKER, verdict.source)
 

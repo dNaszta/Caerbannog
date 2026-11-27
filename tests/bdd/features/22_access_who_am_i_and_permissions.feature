@@ -396,6 +396,39 @@ Feature: Access view, part 1 and 2: who am I, and permissions per virtual host
     Then the answer is "no match"
     And the answer says "svc-orders" has no permission on "/billing"
 
+  # M10-04e (owner 2026-11-27): the empty pattern is a sentence, not a pattern named "no permission"
+  @fake-broker @m10-04
+  Scenario Outline: An empty pattern says the user has no such permission and nothing is allowed
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And "svc-orders" has on "/orders" configure ".*", write ".*" and read ".*"
+    And "svc-orders" has on "/orders" <kind> ""
+    When I ask whether "svc-orders" can <ask> on "/orders"
+    Then the answer is "no match"
+    And the answer says "svc-orders has no <kind> permission on /orders, so nothing is allowed."
+
+    Examples:
+      | kind      | ask                                           |
+      | write     | publish to the exchange "ex.orders"           |
+      | read      | read from the queue "queue.orders"            |
+      | configure | configure the queue "queue.orders"            |
+
+  @fake-broker @m10-04
+  Scenario: An empty topic pattern says the user has no topic permission on the exchange
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And "svc-orders" has on "/orders" write ".*"
+    And "svc-orders" has the topic permission on "/orders" for the exchange "amq.topic" with write ""
+    When I ask whether "svc-orders" can publish to the exchange "amq.topic" on "/orders" with the routing key "orders.created"
+    Then the answer is "no match"
+    And the answer says "svc-orders has no topic write permission on amq.topic, so nothing is allowed."
+
+  @fake-broker @m10-04
+  Scenario: A pattern that is spelled "no permission" is shown as a pattern
+    Given the connection user is "ops-admin" with the tag "administrator"
+    And "svc-orders" has on "/orders" write "no permission"
+    When I ask whether "svc-orders" can publish to the exchange "ex.orders" on "/orders"
+    Then the answer is "no match"
+    And the answer says "The write pattern no permission does not match ex.orders on /orders."
+
   # measured (M10-03): the guard replaces a secret-looking pattern by the word "hidden", which is itself a valid regular expression
   @security @fake-broker @m10-04
   Scenario: A hidden pattern is never applied

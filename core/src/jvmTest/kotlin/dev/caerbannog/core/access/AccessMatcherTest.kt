@@ -152,7 +152,7 @@ class AccessMatcherTest {
     fun `a virtual host without a row is no match with the pattern shown as no permission, and the engine is not asked`() {
         val engine = RecordingEngine()
         val answer = matcher(engine).check(permissions(vhost = "/orders"), publish("ex.orders", vhost = "/billing"))
-        assertEquals(AccessAnswer.NoMatch(Hit(PatternKind.Write, DisplayPattern(PermissionsTexts.NO_PERMISSION), null, "ex.orders"), noRowForVhost = true), answer)
+        assertEquals(AccessAnswer.NoMatch(Hit(PatternKind.Write, DisplayPattern(PermissionsTexts.NO_PERMISSION, noPermission = true), null, "ex.orders"), noRowForVhost = true), answer)
         assertTrue(engine.compiled.isEmpty())
         val readNo = matcher(engine).check(permissions(vhost = "/orders"), readQueue("q", vhost = "/billing")) as AccessAnswer.NoMatch
         assertEquals(PatternKind.Read, readNo.deciding.kind)
@@ -178,9 +178,25 @@ class AccessMatcherTest {
     fun `the empty pattern is no permission, a no match that allows nothing, and needs no engine`() {
         val engine = RecordingEngine()
         val answer = matcher(engine).check(permissions(write = cell("")), publish("ex"))
-        assertEquals(AccessAnswer.NoMatch(Hit(PatternKind.Write, DisplayPattern(PermissionsTexts.NO_PERMISSION), null, "ex")), answer)
+        assertEquals(AccessAnswer.NoMatch(Hit(PatternKind.Write, DisplayPattern(PermissionsTexts.NO_PERMISSION, noPermission = true), null, "ex")), answer)
         assertTrue(engine.compiled.isEmpty())
         assertTrue(matcher().check(permissions(write = cell("^$")), publish("")) is AccessAnswer.NoMatch, "^$ is a pattern, not no permission; the empty name is not matched either")
+    }
+
+    @Test
+    fun `an empty topic pattern is flagged no permission too`() {
+        val answer = matcher().check(permissions(topic = listOf(topicRow("amq.topic", write = cell("")))), publish("amq.topic", routingKey = "a.b")) as AccessAnswer.NoMatch
+        assertEquals(PatternKind.TopicWrite, answer.deciding.kind)
+        assertTrue(answer.deciding.pattern.noPermission, "the empty topic cell must carry the flag")
+    }
+
+    @Test
+    fun `a real pattern spelled no permission is a pattern, not the empty cell (M10-04e)`() {
+        val spelled = cell(PermissionsTexts.NO_PERMISSION)
+        val no = matcher().check(permissions(write = spelled), publish("ex.orders")) as AccessAnswer.NoMatch
+        assertEquals(DisplayPattern("no permission", noPermission = false), no.deciding.pattern)
+        val yes = matcher().check(permissions(write = spelled), publish("no permission queue")) as AccessAnswer.WouldMatch
+        assertEquals(DisplayPattern("no permission", noPermission = false), yes.hits.single { it.kind == PatternKind.Write }.pattern)
     }
 
     @Test

@@ -268,6 +268,55 @@ class MatchPreviewViewModelTest {
         assertEquals("svc-orders has no permission on /billing.", w.verdict.sentence)
     }
 
+    // M10-04e (owner 2026-11-27, "use recommended sentences"): the empty pattern reads as a sentence, not as a pattern named "no permission".
+
+    @Test
+    fun `an empty write, read or configure pattern says the user has no such permission on the host and nothing is allowed`() = runTest {
+        val w = World(this, permissions(write = cell(""), read = cell(""), configure = cell("")))
+        w.ask("ex.orders")
+        assertEquals(VerdictIcon.NoMatch, w.verdict.icon)
+        assertEquals("Would not match.", w.verdict.title)
+        assertEquals("svc-orders has no write permission on /orders, so nothing is allowed.", w.verdict.sentence)
+        w.ask("queue.orders", action = MatchAction.Read)
+        assertEquals("svc-orders has no read permission on /orders, so nothing is allowed.", w.verdict.sentence)
+        w.ask("queue.orders", action = MatchAction.Configure)
+        assertEquals("svc-orders has no configure permission on /orders, so nothing is allowed.", w.verdict.sentence)
+    }
+
+    @Test
+    fun `an empty topic write pattern says the user has no topic write permission on the exchange`() = runTest {
+        val w = World(this, permissions(write = cell(".*"), topic = listOf(topicRow("amq.topic", write = cell("")))))
+        w.ask("amq.topic", "orders.created")
+        assertEquals("Would not match.", w.verdict.title)
+        assertEquals("svc-orders has no topic write permission on amq.topic, so nothing is allowed.", w.verdict.sentence)
+    }
+
+    @Test
+    fun `the empty topic read sentence names topic read (the form has no bind action, so the texts are asked directly)`() {
+        val hit = Hit(PatternKind.TopicRead, DisplayPattern(PermissionsTexts.NO_PERMISSION, noPermission = true), "amq.topic", "orders.created")
+        assertEquals(
+            "svc-orders has no topic read permission on amq.topic, so nothing is allowed.",
+            MatchPreviewTexts.sentence(AccessAnswer.NoMatch(hit), "svc-orders", "/orders", "q", "orders.created"),
+        )
+    }
+
+    @Test
+    fun `a pattern the broker returns as the literal text no permission is shown as a pattern, not as the empty cell`() = runTest {
+        val w = World(this, permissions(write = cell("no permission")))
+        w.ask("ex.orders")
+        assertEquals("The write pattern no permission does not match ex.orders on /orders.", w.verdict.sentence)
+        w.ask("no permission queue")
+        assertEquals("Would match.", w.verdict.title)
+        assertEquals("The write pattern no permission matches no permission queue on /orders.", w.verdict.sentence)
+    }
+
+    @Test
+    fun `a pattern spelled no permission on a topic row is a pattern too`() = runTest {
+        val w = World(this, permissions(write = cell(".*"), topic = listOf(topicRow("amq.topic", write = cell("no permission")))))
+        w.ask("amq.topic", "orders.created")
+        assertEquals("The topic write pattern no permission of amq.topic does not match the routing key orders.created.", w.verdict.sentence)
+    }
+
     @Test
     fun `a hidden pattern is never applied and never shown as text`() = runTest {
         val w = World(this, permissions(write = cell("password=hunter2", hidden = true)))
