@@ -1,0 +1,20 @@
+{
+    "request": "GET /api/users/m3-svc/permissions as guest",
+    "status": 200,
+    "body": [
+        {
+            "user": "m3-svc",
+            "vhost": "/orders",
+            "configure": "^queue\\..*",
+            "write": "^ex\\..*",
+            "read": ".*"
+        },
+        {
+            "user": "m3-svc",
+            "vhost": "/other",
+            "configure": "^$",
+            "write": "^$",
+            "read": "^$"
+        }
+    ]
+}

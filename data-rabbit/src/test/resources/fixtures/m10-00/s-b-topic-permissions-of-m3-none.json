@@ -1,0 +1,5 @@
+{
+    "request": "GET /api/users/m3-none/topic-permissions as guest (user without any)",
+    "status": 200,
+    "body": []
+}

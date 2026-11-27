@@ -1,0 +1,8 @@
+{
+    "request": "GET /api/users/t-m3-admin/topic-permissions as t-m3-admin",
+    "status": 404,
+    "body": {
+        "error": "not_found",
+        "reason": "Not Found"
+    }
+}

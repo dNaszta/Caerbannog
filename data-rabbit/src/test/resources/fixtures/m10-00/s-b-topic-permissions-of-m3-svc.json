@@ -1,0 +1,27 @@
+{
+    "request": "GET /api/users/m3-svc/topic-permissions as guest",
+    "status": 200,
+    "body": [
+        {
+            "user": "m3-svc",
+            "vhost": "/",
+            "exchange": "amq.topic",
+            "write": ".*",
+            "read": ".*"
+        },
+        {
+            "user": "m3-svc",
+            "vhost": "/orders",
+            "exchange": "amq.topic",
+            "write": "^a\\..*",
+            "read": ""
+        },
+        {
+            "user": "m3-svc",
+            "vhost": "/orders",
+            "exchange": "orders.events",
+            "write": ".*",
+            "read": "^b\\."
+        }
+    ]
+}
