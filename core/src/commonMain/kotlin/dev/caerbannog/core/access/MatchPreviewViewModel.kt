@@ -23,6 +23,7 @@ class MatchPreviewViewModel(
     private var current: MatchInput = input.value
     private var action: MatchAction = MatchAction.Publish
     private var chosenVhost: String? = null
+    // Typed text (also a typed password) stays in the form as typed; never copy this state into a log.
     private var name: String = ""
     private var routingKey: String = ""
     private var verdict: MatchVerdictView? = null

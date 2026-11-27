@@ -31,3 +31,5 @@ The default `limit`. (AQ9 is decided.) Changed by M10-00: `caerbannog_get_access
 
 ## Definition of done
 Tests first and passing; `docs/spec.md` MCP section and README updated if names change.
+
+Note (M10-04e review, 2026-11-27): `DisplayPattern` has a `noPermission` flag for the empty pattern. The `caerbannog_check_access` output must read the flag, never compare `text` with the words "no permission", because a real pattern may be spelled that way.

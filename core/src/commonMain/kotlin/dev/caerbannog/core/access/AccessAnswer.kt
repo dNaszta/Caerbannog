@@ -3,8 +3,11 @@ package dev.caerbannog.core.access
 /** M10-04 contract: which cell decided. Topic kinds apply to the topic permission row of the asked exchange. */
 enum class PatternKind { Configure, Write, Read, TopicWrite, TopicRead }
 
-/** What is shown for a pattern: the text exactly as the broker returned it, or [PermissionsTexts.NO_PERMISSION]. Never a hidden pattern (that is unreadable, not shown). */
-data class DisplayPattern(val text: String)
+/**
+ * What is shown for a pattern: the text exactly as the broker returned it, or [PermissionsTexts.NO_PERMISSION] for the empty pattern. Never a hidden pattern (that is
+ * unreadable, not shown). M10-04e: [noPermission] is true only for the empty pattern, so a real pattern spelled "no permission" is still a pattern (a text compare cannot tell them apart).
+ */
+data class DisplayPattern(val text: String, val noPermission: Boolean = false)
 
 /** One cell that was checked: [kind], the [pattern] as shown, the topic permission's [exchange] (null for the other kinds) and the [checked] name the pattern was applied to. */
 data class Hit(val kind: PatternKind, val pattern: DisplayPattern, val exchange: String?, val checked: String)

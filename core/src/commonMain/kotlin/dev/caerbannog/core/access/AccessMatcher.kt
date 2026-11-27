@@ -26,7 +26,7 @@ class AccessMatcher(
     }
 
     private fun noRowAnswer(first: Need): AccessAnswer.NoMatch =
-        AccessAnswer.NoMatch(Hit(first.kind, DisplayPattern(PermissionsTexts.NO_PERMISSION), first.exchange, first.name), noRowForVhost = true)
+        AccessAnswer.NoMatch(Hit(first.kind, DisplayPattern(PermissionsTexts.NO_PERMISSION, noPermission = true), first.exchange, first.name), noRowForVhost = true)
 
     /** One cell the question needs: which [kind] of pattern, the [name] it is applied to, and the topic row's [exchange] (null for the vhost kinds). */
     private data class Need(val kind: PatternKind, val name: String, val exchange: String? = null)
@@ -78,7 +78,8 @@ class AccessMatcher(
 
     private fun evaluate(need: Need, cell: PatternCell?): Outcome {
         if (cell == null) return Outcome.NotNeeded
-        val shown = DisplayPattern(if (cell.reading is PatternReading.NoPermission) PermissionsTexts.NO_PERMISSION else cell.text)
+        val empty = cell.reading is PatternReading.NoPermission
+        val shown = DisplayPattern(if (empty) PermissionsTexts.NO_PERMISSION else cell.text, noPermission = empty)
         val hit = Hit(need.kind, shown, need.exchange, need.name)
         return when {
             cell.hidden -> Outcome.Unreadable(need.kind)
