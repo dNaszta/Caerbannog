@@ -1,7 +1,7 @@
 package dev.caerbannog.core.access
 
 /**
- * M10-03 contract (test developer, COMPILE-ONLY STUB: the types are final, the view model behind them is not built).
+ * M10-03 contract.
  * What the Permissions tab shows, all as display text (what is shown is what is copied). Mockup: `docs/ux/Access.dc.html`, frames `perm-*`.
  * The wording is approved by the owner (2026-11-25, as drawn); the strings below are the drawn ones. The state lives apart from [AccessState].
  */
@@ -21,7 +21,7 @@ object PermissionsTexts {
     const val DECLARED_NOT_DECLARED: String = "not declared"
     const val DECLARED_NOTE: String = "You entered this in the connection settings. The broker enforces its own permissions."
 
-    // M10-03b item 3 (test developer, COMPILE-ONLY STUB): the words of PermissionsTab.kt, final values copied from it; the developer moves the UI to these and drops its private consts.
+    // M10-03b item 3: the words of the Permissions tab, drawn in docs/ux/Access.dc.html; they label fixed fields and carry no state.
     // M10-03b item 1: the message of the Failed frame when the offered list has no selectable name (owner 2026-11-27).
     const val NO_USER: String = "The broker lists no user to choose."
     const val USER_LABEL: String = "User"
