@@ -272,6 +272,16 @@ class MatchPreviewViewModelTest {
     }
 
     @Test
+    fun `a locked tab has no host list and Check still says permissions not readable, no host is needed for that`() = runTest {
+        val w = World(this)
+        w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.Locked), vhosts = emptyList())
+        w.settle()
+        assertNull(w.state.vhost)
+        w.ask("ex.orders")
+        assertEquals("Permissions not readable.", w.verdict.title)
+    }
+
+    @Test
     fun `a token user gives permissions not readable with the sentence of the Permissions tab`() = runTest {
         val w = World(this)
         w.input.value = w.input.value.copy(source = PermissionsSource.NotAvailable(PermissionsUnavailable.TokenUser))
